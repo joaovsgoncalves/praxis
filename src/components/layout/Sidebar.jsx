@@ -30,7 +30,7 @@ export default function Sidebar({ open, onClose }) {
             <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-gold" />
             </div>
-            <span className="text-base font-bold text-sidebar-foreground tracking-tight">FlowAI</span>
+            <span className="text-base font-bold text-sidebar-foreground tracking-tight">Forja do Jota</span>
           </div>
           <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />

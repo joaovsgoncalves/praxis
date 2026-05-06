@@ -12,6 +12,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
+// API do Forja do Jota (A.N.A. backend)
+const FORJA_API = import.meta.env.VITE_FORJA_API || 'http://100.110.93.24:18556';
+
 export default function VoiceCapture() {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -50,11 +53,24 @@ export default function VoiceCapture() {
 
   const processAudio = async (blob) => {
     setProcessing(true);
-    const file = new File([blob], 'audio.webm', { type: 'audio/webm' });
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    
+    try {
+      // 1. Send audio to Forja API for transcription
+      const formData = new FormData();
+      formData.append('audio', blob, 'audio.webm');
 
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a productivity assistant. You receive an audio transcription/file and must extract tasks and habits from it.
+      const transcribeRes = await fetch(`${FORJA_API}/api/transcribe`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!transcribeRes.ok) throw new Error('Transcription failed');
+      const { text } = await transcribeRes.json();
+      setTranscription(text);
+
+      // 2. Parse transcription into items using LLM
+      const parseRes = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a productivity assistant. You receive a transcription and must extract tasks and habits from it.
 
 For each item, determine:
 - type: "task" or "habit"
@@ -69,33 +85,38 @@ Today's date is ${new Date().toISOString().split('T')[0]}.
 When the user says "amanhã" (tomorrow), use tomorrow's date.
 When the user says "hoje" (today), use today's date.
 
+Transcription: "${text}"
+
 Return items in Portuguese. Be smart about inferring dates and categories.`,
-      file_urls: [file_url],
-      response_json_schema: {
-        type: "object",
-        properties: {
-          transcription: { type: "string" },
-          items: {
-            type: "array",
+        response_json_schema: {
+          type: "object",
+          properties: {
+            transcription: { type: "string" },
             items: {
-              type: "object",
-              properties: {
-                type: { type: "string" },
-                title: { type: "string" },
-                date: { type: "string" },
-                time: { type: "string" },
-                frequency: { type: "string" },
-                category: { type: "string" },
-                priority: { type: "string" },
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  type: { type: "string" },
+                  title: { type: "string" },
+                  date: { type: "string" },
+                  time: { type: "string" },
+                  frequency: { type: "string" },
+                  category: { type: "string" },
+                  priority: { type: "string" },
+                }
               }
             }
           }
         }
-      }
-    });
+      });
 
-    setTranscription(result.transcription || '');
-    setItems((result.items || []).map((item, i) => ({ ...item, id: i, confirmed: false })));
+      setItems((parseRes.items || []).map((item, i) => ({ ...item, id: i, confirmed: false })));
+    } catch (error) {
+      console.error('Voice capture error:', error);
+      setTranscription('Erro ao processar áudio. Tente novamente.');
+    }
+    
     setProcessing(false);
   };
 
@@ -104,25 +125,36 @@ Return items in Portuguese. Be smart about inferring dates and categories.`,
   };
 
   const confirmItem = async (item) => {
-    if (item.type === 'habit') {
-      await base44.entities.Habit.create({
-        title: item.title,
-        frequency: item.frequency || 'daily',
-        category: item.category || 'personal',
-        source: 'voice_ai',
-      });
-    } else {
-      await base44.entities.Task.create({
-        title: item.title,
-        date: item.date || undefined,
-        time: item.time || undefined,
-        priority: item.priority || 'medium',
-        category: item.category || 'personal',
-        source: 'voice_ai',
-      });
+    try {
+      if (item.type === 'habit') {
+        await fetch(`${FORJA_API}/api/habits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: item.title,
+            frequency: item.frequency || 'daily',
+            source: 'voice',
+          }),
+        });
+      } else {
+        await fetch(`${FORJA_API}/api/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: item.title,
+            date: item.date || null,
+            time: item.time || null,
+            priority: item.priority || 'medium',
+            category: item.category || 'personal',
+            source: 'voice',
+          }),
+        });
+      }
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, confirmed: true } : i));
+      queryClient.invalidateQueries();
+    } catch (error) {
+      console.error('Confirm error:', error);
     }
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, confirmed: true } : i));
-    queryClient.invalidateQueries();
   };
 
   const confirmAll = async () => {
