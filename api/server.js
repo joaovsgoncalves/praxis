@@ -438,8 +438,22 @@ app.put('/api/habits/:id', (req, res) => {
 });
 
 app.delete('/api/habits/:id', (req, res) => {
-  db.prepare('DELETE FROM habits WHERE id = ?').run(req.params.id);
-  db.prepare('DELETE FROM habit_logs WHERE habit_id = ?').run(req.params.id);
+  const habitId = req.params.id;
+  // Delete logs first (FK dependency)
+  db.prepare('DELETE FROM habit_logs WHERE habit_id = ?').run(habitId);
+  // Remove from rituals (habits_order JSON arrays)
+  const rituals = db.prepare('SELECT id, habits_order FROM rituals').all();
+  for (const r of rituals) {
+    try {
+      const order = JSON.parse(r.habits_order || '[]');
+      if (order.includes(habitId)) {
+        const updated = order.filter(h => h !== habitId);
+        db.prepare('UPDATE rituals SET habits_order = ? WHERE id = ?').run(JSON.stringify(updated), r.id);
+      }
+    } catch {}
+  }
+  // Delete the habit
+  db.prepare('DELETE FROM habits WHERE id = ?').run(habitId);
   res.json({ success: true });
 });
 

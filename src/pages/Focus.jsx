@@ -82,7 +82,7 @@ export default function Focus() {
     if (sessionStart) {
       const totalSeconds = Math.round((Date.now() - sessionStart) / 1000);
       saveSessionMutation.mutate({
-        task_id: selectedTaskId || null,
+        task_id: (selectedTaskId && selectedTaskId !== 'none') ? selectedTaskId : null,
         task_title: selectedTask?.title || 'Sessão livre',
         date: format(new Date(), 'yyyy-MM-dd'),
         duration_seconds: totalSeconds,
@@ -171,7 +171,7 @@ export default function Focus() {
               <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
                 <SelectTrigger><SelectValue placeholder="Selecione uma tarefa" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma (foco livre)</SelectItem>
+                  <SelectItem value="none">Nenhuma (foco livre)</SelectItem>
                   {tasks.map(t => (
                     <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
                   ))}
