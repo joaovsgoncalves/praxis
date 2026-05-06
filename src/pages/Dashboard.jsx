@@ -9,6 +9,7 @@ import WellnessWidget from '@/components/dashboard/WellnessWidget';
 import WeeklyProgress from '@/components/dashboard/WeeklyProgress';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import DayProgressBar from '@/components/shared/DayProgressBar';
+import WaterTracker from '@/components/dashboard/WaterTracker';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -18,6 +19,16 @@ export default function Dashboard() {
     queryKey: ['me'],
     queryFn: () => base44.auth.me(),
   });
+
+  const [waterGlasses, setWaterGlasses] = React.useState(() => {
+    const saved = localStorage.getItem(`water_${format(new Date(), 'yyyy-MM-dd')}`);
+    return saved ? Number(saved) : 0;
+  });
+
+  const handleWaterUpdate = (val) => {
+    setWaterGlasses(val);
+    localStorage.setItem(`water_${today}`, String(val));
+  };
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', today],
@@ -88,6 +99,7 @@ export default function Dashboard() {
             onToggleHabit={(id, isDone) => toggleHabitMutation.mutate({ habitId: id, isDone })}
           />
           <WellnessWidget todayCheck={todayCheck} onSave={(data) => saveWellnessMutation.mutateAsync(data)} />
+          <WaterTracker glasses={waterGlasses} onUpdate={handleWaterUpdate} />
         </div>
       </div>
 
