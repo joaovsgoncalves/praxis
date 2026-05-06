@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { forjaApi } from '@/api/forjaClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -69,47 +69,7 @@ export default function VoiceCapture() {
       setTranscription(text);
 
       // 2. Parse transcription into items using LLM
-      const parseRes = await base44.integrations.Core.InvokeLLM({
-        prompt: `You are a productivity assistant. You receive a transcription and must extract tasks and habits from it.
-
-For each item, determine:
-- type: "task" or "habit"
-- title: clear, concise title
-- date: if mentioned (format YYYY-MM-DD), null otherwise
-- time: if mentioned (format HH:MM), null otherwise
-- frequency: for habits only (daily, weekdays, weekends, weekly), null for tasks
-- category: infer from context (work, personal, health, learning, finance, other)
-- priority: infer from context (high, medium, low)
-
-Today's date is ${new Date().toISOString().split('T')[0]}.
-When the user says "amanhã" (tomorrow), use tomorrow's date.
-When the user says "hoje" (today), use today's date.
-
-Transcription: "${text}"
-
-Return items in Portuguese. Be smart about inferring dates and categories.`,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            transcription: { type: "string" },
-            items: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  type: { type: "string" },
-                  title: { type: "string" },
-                  date: { type: "string" },
-                  time: { type: "string" },
-                  frequency: { type: "string" },
-                  category: { type: "string" },
-                  priority: { type: "string" },
-                }
-              }
-            }
-          }
-        }
-      });
+      const parseRes = await forjaApi.parseVoice(text);
 
       setItems((parseRes.items || []).map((item, i) => ({ ...item, id: i, confirmed: false })));
     } catch (error) {

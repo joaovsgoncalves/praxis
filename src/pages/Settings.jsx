@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 export default function Settings() {
   const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => base44.auth.me() });
+  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => forjaApi.user.getSettings() });
 
   const [pomodoroFocus, setPomodoroFocus] = useState('25');
   const [pomodoroBreak, setPomodoroBreak] = useState('5');
@@ -29,19 +29,12 @@ export default function Settings() {
   }, [user]);
 
   const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingAvatar(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    await base44.auth.updateMe({ avatar_url: file_url });
-    setAvatarUrl(file_url);
-    queryClient.invalidateQueries({ queryKey: ['me'] });
-    setUploadingAvatar(false);
-    toast.success('Foto atualizada!');
+    // Avatar upload disabled — just show initials
+    toast.info('Upload de foto não disponível no momento');
   };
 
   const saveSettings = async () => {
-    await base44.auth.updateMe({
+    await forjaApi.user.updateSettings({
       pomodoro_focus: Number(pomodoroFocus),
       pomodoro_break: Number(pomodoroBreak),
     });
@@ -50,7 +43,8 @@ export default function Settings() {
   };
 
   const handleLogout = () => {
-    base44.auth.logout();
+    localStorage.clear();
+    window.location.href = '/';
   };
 
   return (

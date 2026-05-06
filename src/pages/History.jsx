@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { forjaApi } from '@/api/forjaClient';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,10 +11,10 @@ import { Timer, Flame, Moon, Smile, Zap } from 'lucide-react';
 export default function History() {
   const [range, setRange] = useState('30');
 
-  const { data: wellnessChecks = [] } = useQuery({ queryKey: ['wellnessAll'], queryFn: () => base44.entities.WellnessCheck.list('-date', 200) });
-  const { data: habits = [] } = useQuery({ queryKey: ['habitsAll'], queryFn: () => base44.entities.Habit.filter({ status: 'active' }) });
-  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogsAll'], queryFn: () => base44.entities.HabitLog.list('-date', 500) });
-  const { data: focusSessions = [] } = useQuery({ queryKey: ['focusAll'], queryFn: () => base44.entities.FocusSession.list('-date', 200) });
+  const { data: wellnessChecks = [] } = useQuery({ queryKey: ['wellnessAll'], queryFn: () => forjaApi.wellness.list() });
+  const { data: habits = [] } = useQuery({ queryKey: ['habitsAll'], queryFn: () => forjaApi.habits.list({ status: 'active' }) });
+  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogsAll'], queryFn: () => forjaApi.habitLogs.list() });
+  const { data: focusSessions = [] } = useQuery({ queryKey: ['focusAll'], queryFn: () => forjaApi.focus.list() });
 
   const days = Number(range);
   const dateRange = Array.from({ length: days }, (_, i) => {

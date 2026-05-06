@@ -8,6 +8,16 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Load OpenAI API key
+let OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+if (!OPENAI_API_KEY) {
+  try {
+    const envFile = fs.readFileSync('/root/.hermes/secrets/api_keys.env', 'utf-8');
+    const match = envFile.match(/OPENAI_API_KEY\s*=\s*(.+)/);
+    if (match) OPENAI_API_KEY = match[1].trim();
+  } catch {}
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 18556;
@@ -87,7 +97,35 @@ db.exec(`
     duration_ms INTEGER,
     created_date TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS goals (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    deadline TEXT,
+    timeframe TEXT DEFAULT 'short',
+    category TEXT DEFAULT 'personal',
+    status TEXT DEFAULT 'active',
+    manual_progress INTEGER DEFAULT 0,
+    created_date TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS user_settings (
+    id TEXT PRIMARY KEY DEFAULT 'default',
+    full_name TEXT DEFAULT 'João Victor',
+    avatar_url TEXT,
+    pomodoro_focus INTEGER DEFAULT 25,
+    pomodoro_break INTEGER DEFAULT 5,
+    notif_habits INTEGER DEFAULT 1,
+    notif_goals INTEGER DEFAULT 1
+  );
 `);
+
+// Ensure default user settings row exists
+const settingsRow = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
+if (!settingsRow) {
+  db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
+}
 
 // ==================== HEALTH ====================
 app.get('/api/health', (req, res) => {
@@ -367,6 +405,191 @@ app.post('/api/focus', (req, res) => {
 
   const session = db.prepare('SELECT * FROM focus_sessions WHERE id = ?').get(id);
   res.status(201).json(session);
+});
+
+// ==================== GOALS ====================
+app.get('/api/goals', (req, res) => {
+  const goals = db.prepare('SELECT * FROM goals ORDER BY created_date DESC').all();
+  res.json(goals);
+});
+
+app.get('/api/goals/:id', (req, res) => {
+  const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
+  if (!goal) return res.status(404).json({ error: 'Goal not found' });
+  res.json(goal);
+});
+
+app.post('/api/goals', (req, res) => {
+  const id = uuidv4();
+  const { title, description = '', deadline, timeframe = 'short', category = 'personal', status = 'active', manual_progress = 0 } = req.body;
+
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+
+  db.prepare(`
+    INSERT INTO goals (id, title, description, deadline, timeframe, category, status, manual_progress)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, description, deadline || null, timeframe, category, status, manual_progress);
+
+  const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(id);
+  res.status(201).json(goal);
+});
+
+app.put('/api/goals/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Goal not found' });
+
+  const { title, description, deadline, timeframe, category, status, manual_progress } = req.body;
+
+  db.prepare(`
+    UPDATE goals SET
+      title = COALESCE(?, title),
+      description = COALESCE(?, description),
+      deadline = COALESCE(?, deadline),
+      timeframe = COALESCE(?, timeframe),
+      category = COALESCE(?, category),
+      status = COALESCE(?, status),
+      manual_progress = COALESCE(?, manual_progress)
+    WHERE id = ?
+  `).run(title, description, deadline, timeframe, category, status, manual_progress, req.params.id);
+
+  const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
+  res.json(goal);
+});
+
+app.delete('/api/goals/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Goal not found' });
+
+  db.prepare('DELETE FROM goals WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ==================== USER SETTINGS ====================
+app.get('/api/user/settings', (req, res) => {
+  let settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
+  if (!settings) {
+    db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
+    settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
+  }
+  // Return in a shape compatible with the frontend (mimic user object)
+  res.json({
+    id: 'default',
+    full_name: settings.full_name,
+    email: 'joao@forja.local',
+    avatar_url: settings.avatar_url,
+    pomodoro_focus: settings.pomodoro_focus,
+    pomodoro_break: settings.pomodoro_break,
+    notif_habits: settings.notif_habits,
+    notif_goals: settings.notif_goals,
+  });
+});
+
+app.put('/api/user/settings', (req, res) => {
+  const { full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals } = req.body;
+
+  // Ensure row exists
+  const existing = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
+  if (!existing) {
+    db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
+  }
+
+  db.prepare(`
+    UPDATE user_settings SET
+      full_name = COALESCE(?, full_name),
+      avatar_url = COALESCE(?, avatar_url),
+      pomodoro_focus = COALESCE(?, pomodoro_focus),
+      pomodoro_break = COALESCE(?, pomodoro_break),
+      notif_habits = COALESCE(?, notif_habits),
+      notif_goals = COALESCE(?, notif_goals)
+    WHERE id = 'default'
+  `).run(full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals);
+
+  const settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
+  res.json({
+    id: 'default',
+    full_name: settings.full_name,
+    email: 'joao@forja.local',
+    avatar_url: settings.avatar_url,
+    pomodoro_focus: settings.pomodoro_focus,
+    pomodoro_break: settings.pomodoro_break,
+    notif_habits: settings.notif_habits,
+    notif_goals: settings.notif_goals,
+  });
+});
+
+// ==================== PARSE VOICE ====================
+app.post('/api/parse-voice', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'text is required' });
+
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OpenAI API key not configured' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um assistente de produtividade. Você recebe uma transcrição de áudio em português e deve extrair tarefas e hábitos dela.
+
+Para cada item, determine:
+- type: "task" ou "habit"
+- title: título claro e conciso
+- date: se mencionado (formato YYYY-MM-DD), null caso contrário
+- time: se mencionado (formato HH:MM), null caso contrário
+- frequency: apenas para hábitos (daily, weekdays, weekends, weekly), null para tarefas
+- category: inferir do contexto (work, personal, health, learning, finance, other)
+- priority: inferir do contexto (high, medium, low)
+
+Data de hoje: ${today}
+Quando o usuário diz "amanhã", use a data de amanhã.
+Quando o usuário diz "hoje", use a data de hoje.
+Quando o usuário diz "hoje à noite", use a data de hoje.
+
+Responda APENAS com JSON válido no formato: { "items": [...] }`
+          },
+          { role: 'user', content: text }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text();
+      console.error('OpenAI error:', errText);
+      return res.status(502).json({ error: 'LLM request failed', detail: errText });
+    }
+
+    const openaiData = await openaiRes.json();
+    const content = openaiData.choices?.[0]?.message?.content;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      parsed = { items: [] };
+    }
+
+    res.json({
+      transcription: text,
+      items: parsed.items || [],
+    });
+
+  } catch (error) {
+    console.error('Parse voice error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ==================== START ====================

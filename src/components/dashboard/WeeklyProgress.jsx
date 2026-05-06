@@ -4,7 +4,7 @@ import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-export default function WeeklyProgress({ habits, habitLogs }) {
+export default function WeeklyProgress({ habits = [], habitLogs = [] }) {
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = subDays(new Date(), 6 - i);
     return { date, dateStr: format(date, 'yyyy-MM-dd'), dayLabel: format(date, 'EEE', { locale: ptBR }) };

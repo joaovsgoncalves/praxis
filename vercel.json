@@ -1,8 +1,5 @@
 {
   "rewrites": [
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
-  ],
-  "env": {
-    "VITE_FORJA_API": "http://100.110.93.24:18556"
-  }
+  ]
 }

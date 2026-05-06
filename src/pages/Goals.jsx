@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,22 +25,22 @@ export default function Goals() {
 
   const [form, setForm] = useState({ title: '', description: '', deadline: '', timeframe: 'short', category: 'personal' });
 
-  const { data: goals = [] } = useQuery({ queryKey: ['allGoals'], queryFn: () => base44.entities.Goal.list('-created_date') });
-  const { data: tasks = [] } = useQuery({ queryKey: ['goalTasks'], queryFn: () => base44.entities.Task.list('-created_date', 200) });
-  const { data: habits = [] } = useQuery({ queryKey: ['goalHabits'], queryFn: () => base44.entities.Habit.list('-created_date', 200) });
+  const { data: goals = [] } = useQuery({ queryKey: ['allGoals'], queryFn: () => forjaApi.goals.list() });
+  const { data: tasks = [] } = useQuery({ queryKey: ['goalTasks'], queryFn: () => forjaApi.tasks.list() });
+  const { data: habits = [] } = useQuery({ queryKey: ['goalHabits'], queryFn: () => forjaApi.habits.list() });
 
   const createGoal = useMutation({
-    mutationFn: (data) => base44.entities.Goal.create(data),
+    mutationFn: (data) => forjaApi.goals.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allGoals'] }); setShowForm(false); setForm({ title: '', description: '', deadline: '', timeframe: 'short', category: 'personal' }); },
   });
 
   const updateGoal = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Goal.update(id, data),
+    mutationFn: ({ id, data }) => forjaApi.goals.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allGoals'] }),
   });
 
   const deleteGoal = useMutation({
-    mutationFn: (id) => base44.entities.Goal.delete(id),
+    mutationFn: (id) => forjaApi.goals.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allGoals'] }),
   });
 

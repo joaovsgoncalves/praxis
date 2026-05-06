@@ -67,6 +67,27 @@ export const forjaApi = {
     create: (data) => request('/api/focus', { method: 'POST', body: JSON.stringify(data) }),
   },
 
+  // Goals
+  goals: {
+    list: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/api/goals${query ? '?' + query : ''}`);
+    },
+    get: (id) => request(`/api/goals/${id}`),
+    create: (data) => request('/api/goals', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => request(`/api/goals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => request(`/api/goals/${id}`, { method: 'DELETE' }),
+  },
+
+  // User Settings
+  user: {
+    getSettings: () => request('/api/user/settings'),
+    updateSettings: (data) => request('/api/user/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
+  // Parse Voice (LLM)
+  parseVoice: (text) => request('/api/parse-voice', { method: 'POST', body: JSON.stringify({ text }) }),
+
   // Transcription
   transcribe: async (audioBlob) => {
     const formData = new FormData();
