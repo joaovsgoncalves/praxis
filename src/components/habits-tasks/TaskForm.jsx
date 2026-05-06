@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { CATEGORIES } from '@/lib/categories';
+import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,7 +9,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, X } from 'lucide-react';
+import { CalendarIcon, X, Lightbulb } from 'lucide-react';
+
+function BestTimeSuggestion({ onSelect, visible }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['bestHours'],
+    queryFn: () => forjaApi.insights.bestHours(),
+    enabled: visible,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (!visible || isLoading || !data?.best_hours?.length) return null;
+
+  const bestHours = data.best_hours.slice(0, 3);
+  const hourLabels = bestHours.map(h => h.label).join(' e ');
+
+  return (
+    <div className="flex items-center gap-2 mt-1.5 px-1 py-1.5 bg-secondary/40 rounded-md text-xs text-muted-foreground animate-in fade-in slide-in-from-top-1 duration-200">
+      <Lightbulb className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+      <span className="truncate">💡 Você foca melhor entre {hourLabels}. Agendar?</span>
+      <div className="flex gap-1 ml-auto shrink-0">
+        {bestHours.map((h) => (
+          <button
+            key={h.hour}
+            type="button"
+            onClick={() => onSelect(`${String(h.hour).padStart(2, '0')}:00`)}
+            className="px-2 py-0.5 bg-secondary hover:bg-primary hover:text-primary-foreground rounded text-xs font-medium transition-colors cursor-pointer"
+          >
+            {h.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} }) {
   const [form, setForm] = useState({
@@ -16,10 +52,12 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
     time: initial.time || '',
     duration_minutes: initial.duration_minutes || '',
     priority: initial.priority || 'medium',
-    category: initial.category || 'personal',
+    category: initial.category || 'pessoal',
     goal_id: initial.goal_id || '',
     source: initial.source || 'manual',
   });
+
+  const isCreating = !initial.id;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -41,7 +79,13 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={form.date ? new Date(form.date + 'T12:00:00') : undefined} onSelect={(d) => setForm(f => ({ ...f, date: d ? format(d, 'yyyy-MM-dd') : '' }))} /></PopoverContent>
         </Popover>
-        <Input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className="bg-secondary/50" />
+        <div>
+          <Input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className="bg-secondary/50" />
+          <BestTimeSuggestion
+            visible={isCreating && !form.time}
+            onSelect={(time) => setForm(f => ({ ...f, time }))}
+          />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
@@ -55,12 +99,9 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
         <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
           <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="work">Trabalho</SelectItem>
-            <SelectItem value="personal">Pessoal</SelectItem>
-            <SelectItem value="health">Saúde</SelectItem>
-            <SelectItem value="learning">Aprendizado</SelectItem>
-            <SelectItem value="finance">Financeiro</SelectItem>
-            <SelectItem value="other">Outro</SelectItem>
+            {Object.entries(CATEGORIES).map(([key, cat]) => (
+              <SelectItem key={key} value={key}>{cat.emoji} {cat.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

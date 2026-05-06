@@ -188,7 +188,7 @@ export default function Focus() {
         <div className="space-y-6">
           <Card className="bg-card border-border">
             <CardContent className="py-12 flex flex-col items-center gap-6">
-              <Badge className={isBreak ? "bg-accent/20 text-accent" : "bg-primary/20 text-primary"} className="text-lg px-4 py-1">
+              <Badge className={cn("text-lg px-4 py-1", isBreak ? "bg-accent/20 text-accent" : "bg-primary/20 text-primary")}>
                 {isBreak ? '☕ Pausa' : '🧠 Foco'}
               </Badge>
               

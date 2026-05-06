@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
+import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -23,7 +24,7 @@ const priorityStyles = {
 };
 
 const statusLabels = { pending: 'Pendente', in_progress: 'Em andamento', completed: 'Concluída', cancelled: 'Cancelada' };
-const categoryLabels = { work: 'Trabalho', personal: 'Pessoal', health: 'Saúde', learning: 'Aprendizado', finance: 'Financeiro', other: 'Outro' };
+// categoryLabels replaced by CATEGORIES from @/lib/categories
 
 export default function HabitsTasks() {
   const [view, setView] = useState('all');
@@ -69,7 +70,10 @@ export default function HabitsTasks() {
     return true;
   });
 
-  const filteredHabits = habits;
+  const filteredHabits = habits.filter(h => {
+    if (categoryFilter !== 'all' && h.category !== categoryFilter) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -92,6 +96,25 @@ export default function HabitsTasks() {
           <TabsTrigger value="habits">Hábitos ({habits.length})</TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {/* Category filter chips */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setCategoryFilter('all')}
+          className={`text-xs px-3 py-1.5 rounded-full transition-colors ${categoryFilter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'}`}
+        >
+          Todos
+        </button>
+        {Object.entries(CATEGORIES).map(([key, cat]) => (
+          <button
+            key={key}
+            onClick={() => setCategoryFilter(key)}
+            className={`text-xs px-3 py-1.5 rounded-full transition-colors ${categoryFilter === key ? `${cat.color} ring-1 ring-current` : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'}`}
+          >
+            {cat.emoji} {cat.label}
+          </button>
+        ))}
+      </div>
 
       {(view === 'all' || view === 'tasks') && (
         <div className="space-y-3">
@@ -136,7 +159,7 @@ export default function HabitsTasks() {
                       {task.date && <Badge variant="outline" className="text-xs">{task.date}</Badge>}
                       {task.time && <Badge variant="outline" className="text-xs"><Clock className="w-3 h-3 mr-1" />{task.time}</Badge>}
                       <Badge className={cn("text-xs", priorityStyles[task.priority])}>{task.priority}</Badge>
-                      <Badge variant="outline" className="text-xs">{categoryLabels[task.category] || task.category}</Badge>
+                      <CategoryBadge category={task.category} />
                     </div>
                   </div>
                   <button onClick={() => deleteTask.mutate(task.id)} className="text-muted-foreground hover:text-destructive">
@@ -160,7 +183,15 @@ export default function HabitsTasks() {
                 <CardContent className="p-4 flex items-center gap-3">
                   <Flame className="w-5 h-5 text-primary" />
                   <div className="flex-1">
-                    <p className="font-medium">{habit.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{habit.title}</p>
+                      <CategoryBadge category={habit.category} />
+                      {habit.current_streak > 0 && (
+                        <span className="inline-flex items-center gap-1 bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded-full shrink-0">
+                          🔥 {habit.current_streak}
+                        </span>
+                      )}
+                    </div>
                     <Badge variant="outline" className="text-xs mt-1">
                       {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
                     </Badge>

@@ -1,16 +1,55 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ListTodo, Target, Timer, BarChart3, Settings, Mic, X, Sparkles } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Target, Timer, BarChart3, Settings, Mic, X, Sparkles, Link2, Trophy } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/habitos-tarefas', label: 'Hábitos & Tarefas', icon: ListTodo },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
   { path: '/metas', label: 'Metas', icon: Target },
+  { path: '/rituais', label: 'Rituais', icon: Link2 },
+  { path: '/conquistas', label: 'Conquistas', icon: Trophy },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
+
+function SidebarGamificationBar() {
+  const { data } = useQuery({
+    queryKey: ['gamification'],
+    queryFn: () => forjaApi.gamification.get(),
+    staleTime: 30_000,
+  });
+
+  if (!data) return null;
+
+  const { level, level_name, xp_total, next_level_xp, progress_pct } = data;
+
+  return (
+    <div className="px-3 pb-2 pt-1 border-t border-sidebar-border">
+      <div className="px-3 py-2.5 rounded-lg bg-gold/5 border border-gold/10">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-semibold text-gold truncate">
+            Nv. {level} — {level_name}
+          </span>
+          <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
+            {xp_total} XP
+          </span>
+        </div>
+        <Progress
+          value={progress_pct}
+          className="h-1.5 [&>div]:bg-gold"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          {xp_total} / {next_level_xp} XP
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
@@ -59,6 +98,9 @@ export default function Sidebar({ open, onClose }) {
             );
           })}
         </nav>
+
+        {/* Gamification bar */}
+        <SidebarGamificationBar />
 
         {/* Voice capture */}
         <div className="p-3 border-t border-sidebar-border">

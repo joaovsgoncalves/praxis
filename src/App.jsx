@@ -10,9 +10,11 @@ import Dashboard from '@/pages/Dashboard';
 import HabitsTasks from '@/pages/HabitsTasks';
 import Focus from '@/pages/Focus';
 import Goals from '@/pages/Goals';
+import Rituais from '@/pages/Rituais';
 import History from '@/pages/History';
 import Settings from '@/pages/Settings';
 import VoiceCapture from '@/pages/VoiceCapture';
+import Achievements from '@/pages/Achievements';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -44,9 +46,11 @@ const AuthenticatedApp = () => {
         <Route path="/habitos-tarefas" element={<HabitsTasks />} />
         <Route path="/foco" element={<Focus />} />
         <Route path="/metas" element={<Goals />} />
+        <Route path="/rituais" element={<Rituais />} />
         <Route path="/historico" element={<History />} />
         <Route path="/configuracoes" element={<Settings />} />
         <Route path="/captura" element={<VoiceCapture />} />
+        <Route path="/conquistas" element={<Achievements />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -8,6 +8,23 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Category constants
+const CATEGORIES = {
+  farmacia: { emoji: '🏪', label: 'Farmácia', color: 'green' },
+  treino: { emoji: '💪', label: 'Treino', color: 'red' },
+  estudo: { emoji: '📚', label: 'Estudo', color: 'purple' },
+  jotav_fit: { emoji: '📸', label: '@jotav.fit', color: 'pink' },
+  pessoal: { emoji: '🏠', label: 'Pessoal', color: 'yellow' },
+  rotina: { emoji: '🔥', label: 'Rotina', color: 'orange' }
+};
+
+function enrichCategory(row) {
+  if (row.category && CATEGORIES[row.category]) {
+    return { ...row, category_emoji: CATEGORIES[row.category].emoji, category_label: CATEGORIES[row.category].label };
+  }
+  return { ...row, category_emoji: null, category_label: null };
+}
+
 // Load OpenAI API key
 let OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) {
@@ -47,6 +64,7 @@ db.exec(`
     status TEXT DEFAULT 'pending',
     priority TEXT DEFAULT 'medium',
     category TEXT DEFAULT 'personal',
+    calendar_event_id TEXT,
     created_date TEXT DEFAULT (datetime('now')),
     updated_date TEXT DEFAULT (datetime('now'))
   );
@@ -119,6 +137,32 @@ db.exec(`
     notif_habits INTEGER DEFAULT 1,
     notif_goals INTEGER DEFAULT 1
   );
+
+  CREATE TABLE IF NOT EXISTS rituals (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    emoji TEXT DEFAULT '🔗',
+    time_of_day TEXT DEFAULT 'morning',
+    habits_order TEXT DEFAULT '[]',
+    status TEXT DEFAULT 'active',
+    created_date TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS gamification (
+    id TEXT PRIMARY KEY DEFAULT 'main',
+    xp_total INTEGER DEFAULT 0,
+    level INTEGER DEFAULT 1,
+    updated_date TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS achievements (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    emoji TEXT,
+    xp_reward INTEGER DEFAULT 0,
+    unlocked_date TEXT
+  );
 `);
 
 // Ensure default user settings row exists
@@ -126,6 +170,42 @@ const settingsRow = db.prepare('SELECT id FROM user_settings WHERE id = ?').get(
 if (!settingsRow) {
   db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
 }
+
+// Ensure default gamification row exists
+const gamRow = db.prepare('SELECT id FROM gamification WHERE id = ?').get('main');
+if (!gamRow) {
+  db.prepare('INSERT INTO gamification (id) VALUES (?)').run('main');
+}
+
+// Insert default achievements
+const defaultAchievements = [
+  { id: 'first_task', name: 'Primeira Tarefa', description: 'Complete 1 tarefa', emoji: '🎯', xp_reward: 10 },
+  { id: 'on_fire', name: 'Em Chamas', description: '7 dias de streak', emoji: '🔥', xp_reward: 50 },
+  { id: 'diamond', name: 'Diamante', description: '30 dias de streak', emoji: '💎', xp_reward: 200 },
+  { id: 'centurion', name: 'Centurião', description: '100 tarefas completas', emoji: '🏆', xp_reward: 100 },
+  { id: 'focus_master', name: 'Mestre do Foco', description: '10h de foco total', emoji: '⏱️', xp_reward: 50 },
+  { id: 'early_bird', name: 'Madrugador', description: 'Ritual matinal 5x', emoji: '🌅', xp_reward: 30 },
+  { id: 'balanced', name: 'Equilibrado', description: '7 dias de wellness streak', emoji: '🧘', xp_reward: 50 },
+  { id: 'creator', name: 'Criador', description: '10 tarefas jotav_fit', emoji: '📸', xp_reward: 50 },
+];
+const insertAchievement = db.prepare(
+  'INSERT OR IGNORE INTO achievements (id, name, description, emoji, xp_reward) VALUES (?, ?, ?, ?, ?)'
+);
+for (const a of defaultAchievements) {
+  insertAchievement.run(a.id, a.name, a.description, a.emoji, a.xp_reward);
+}
+
+// Migrate: add category column to habits if missing
+const habitsCols = db.prepare("PRAGMA table_info(habits)").all().map(c => c.name);
+if (!habitsCols.includes('category')) {
+  db.exec("ALTER TABLE habits ADD COLUMN category TEXT DEFAULT ''");
+}
+
+// ==================== CATEGORIES ====================
+app.get('/api/categories', (req, res) => {
+  const list = Object.entries(CATEGORIES).map(([key, val]) => ({ key, ...val }));
+  res.json(list);
+});
 
 // ==================== HEALTH ====================
 app.get('/api/health', (req, res) => {
@@ -178,7 +258,7 @@ print(result['text'])
     db.prepare(`
       INSERT INTO transcriptions (id, audio_path, text, language, duration_ms)
       VALUES (?, ?, ?, ?, ?)
-    `.run(id, audioPath, text, language, 0));
+    `).run(id, audioPath, text, language, 0);
 
     res.json({ 
       id,
@@ -207,25 +287,25 @@ app.get('/api/tasks', (req, res) => {
   params.push(Number(limit));
 
   const tasks = db.prepare(query).all(...params);
-  res.json(tasks);
+  res.json(tasks.map(enrichCategory));
 });
 
 app.get('/api/tasks/:id', (req, res) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!task) return res.status(404).json({ error: 'Task not found' });
-  res.json(task);
+  res.json(enrichCategory(task));
 });
 
 app.post('/api/tasks', (req, res) => {
   const id = uuidv4();
-  const { title, description = '', date, time, status = 'pending', priority = 'medium', category = 'personal' } = req.body;
-  
+  const { title, description = '', date, time, status = 'pending', priority = 'medium', category = 'personal', calendar_event_id } = req.body;
+
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   db.prepare(`
-    INSERT INTO tasks (id, title, description, date, time, status, priority, category)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, description, date || null, time || null, status, priority, category);
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, calendar_event_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, description, date || null, time || null, status, priority, category, calendar_event_id || null);
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
   res.status(201).json(task);
@@ -235,7 +315,7 @@ app.put('/api/tasks/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  const { title, description, date, time, status, priority, category } = req.body;
+  const { title, description, date, time, status, priority, category, calendar_event_id } = req.body;
 
   db.prepare(`
     UPDATE tasks SET 
@@ -246,9 +326,10 @@ app.put('/api/tasks/:id', (req, res) => {
       status = COALESCE(?, status),
       priority = COALESCE(?, priority),
       category = COALESCE(?, category),
+      calendar_event_id = COALESCE(?, calendar_event_id),
       updated_date = datetime('now')
     WHERE id = ?
-  `).run(title, description, date, time, status, priority, category, req.params.id);
+  `).run(title, description, date, time, status, priority, category, calendar_event_id, req.params.id);
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   res.json(task);
@@ -262,11 +343,64 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ==================== HABITS (streak helper) ====================
+function getStreaks(habitId) {
+  // Get all completed log dates for this habit, sorted descending
+  const logs = db.prepare(
+    `SELECT date FROM habit_logs WHERE habit_id = ? AND completed = 1 ORDER BY date DESC`
+  ).all(habitId);
+
+  if (logs.length === 0) return { current_streak: 0, best_streak: 0 };
+
+  const today = new Date().toISOString().split('T')[0];
+  const completedDates = new Set(logs.map(l => l.date));
+
+  // current_streak: count consecutive days going backwards from today
+  let currentStreak = 0;
+  let checkDate = new Date(today + 'T00:00:00');
+  while (true) {
+    const ds = checkDate.toISOString().split('T')[0];
+    if (completedDates.has(ds)) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  // best_streak: longest consecutive streak ever
+  // Get all completed dates sorted ascending
+  const sortedAsc = db.prepare(
+    `SELECT DISTINCT date FROM habit_logs WHERE habit_id = ? AND completed = 1 ORDER BY date ASC`
+  ).all(habitId).map(r => r.date);
+
+  let bestStreak = 0;
+  let streak = 1;
+  for (let i = 1; i < sortedAsc.length; i++) {
+    const prev = new Date(sortedAsc[i - 1] + 'T00:00:00');
+    const curr = new Date(sortedAsc[i] + 'T00:00:00');
+    const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      bestStreak = Math.max(bestStreak, streak);
+      streak = 1;
+    }
+  }
+  bestStreak = Math.max(bestStreak, streak);
+
+  return { current_streak: currentStreak, best_streak: bestStreak };
+}
+
 // ==================== HABITS ====================
 app.get('/api/habits', (req, res) => {
   const { status = 'active' } = req.query;
   const habits = db.prepare('SELECT * FROM habits WHERE status = ? ORDER BY created_date DESC').all(status);
-  res.json(habits);
+  const enriched = habits.map(h => {
+    const { current_streak, best_streak } = getStreaks(h.id);
+    return { ...h, current_streak, best_streak };
+  });
+  res.json(enriched);
 });
 
 app.post('/api/habits', (req, res) => {
@@ -307,6 +441,13 @@ app.delete('/api/habits/:id', (req, res) => {
   db.prepare('DELETE FROM habits WHERE id = ?').run(req.params.id);
   db.prepare('DELETE FROM habit_logs WHERE habit_id = ?').run(req.params.id);
   res.json({ success: true });
+});
+
+app.get('/api/habits/:id/streak', (req, res) => {
+  const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
+  if (!habit) return res.status(404).json({ error: 'Habit not found' });
+  const { current_streak, best_streak } = getStreaks(req.params.id);
+  res.json({ habit_id: habit.id, title: habit.title, current_streak, best_streak });
 });
 
 // ==================== HABIT LOGS ====================
@@ -588,6 +729,466 @@ Responda APENAS com JSON válido no formato: { "items": [...] }`
 
   } catch (error) {
     console.error('Parse voice error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== CALENDAR ====================
+// In-memory cache for today's calendar events (5 min TTL)
+let calendarCache = { data: null, date: null, timestamp: 0 };
+const CALENDAR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+app.get('/api/calendar/today', (req, res) => {
+  try {
+    const now = new Date();
+    const todayDate = now.toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' }); // YYYY-MM-DD
+
+    // Check cache validity: same date AND within TTL
+    if (calendarCache.data && calendarCache.date === todayDate && (now.getTime() - calendarCache.timestamp) < CALENDAR_CACHE_TTL) {
+      return res.json(calendarCache.data);
+    }
+
+    const fromTime = `${todayDate}T00:00:00-03:00`;
+    const toTime = `${todayDate}T23:59:59-03:00`;
+
+    const rawOutput = execSync(
+      `gog calendar list joaovs.goncalves1@gmail.com --from '${fromTime}' --to '${toTime}' --json --no-input`,
+      { encoding: 'utf-8', timeout: 15000 }
+    );
+
+    const parsed = JSON.parse(rawOutput);
+    const events = (parsed.events || []).map(ev => ({
+      title: ev.summary || '(Sem título)',
+      start: ev.start?.dateTime || ev.start?.date || null,
+      end: ev.end?.dateTime || ev.end?.date || null,
+      location: ev.location || null,
+      htmlLink: ev.htmlLink || null,
+    }));
+
+    // Update cache
+    calendarCache = { data: events, date: todayDate, timestamp: now.getTime() };
+
+    res.json(events);
+  } catch (error) {
+    console.error('Calendar fetch error:', error.message);
+    // If cache is still valid for today, return stale data on error
+    if (calendarCache.data && calendarCache.date === new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' })) {
+      return res.json(calendarCache.data);
+    }
+    res.json([]);
+  }
+});
+
+// ==================== RITUALS ====================
+app.get('/api/rituals', (req, res) => {
+  const { status } = req.query;
+  let query = 'SELECT * FROM rituals';
+  const params = [];
+  if (status) { query += ' WHERE status = ?'; params.push(status); }
+  query += ' ORDER BY created_date DESC';
+
+  const rituals = db.prepare(query).all(...params);
+  const today = new Date().toISOString().split('T')[0];
+
+  const enriched = rituals.map(ritual => {
+    const habitIds = JSON.parse(ritual.habits_order || '[]');
+    const habits = habitIds.map(hid => {
+      const habit = db.prepare('SELECT id, title FROM habits WHERE id = ?').get(hid);
+      if (!habit) return null;
+      const log = db.prepare(
+        'SELECT completed FROM habit_logs WHERE habit_id = ? AND date = ? AND completed = 1'
+      ).get(hid, today);
+      return { id: habit.id, title: habit.title, completed_today: !!log };
+    }).filter(Boolean);
+    return { ...ritual, habits_order: habitIds, habits };
+  });
+
+  res.json(enriched);
+});
+
+app.get('/api/rituals/:id/progress', (req, res) => {
+  const ritual = db.prepare('SELECT * FROM rituals WHERE id = ?').get(req.params.id);
+  if (!ritual) return res.status(404).json({ error: 'Ritual not found' });
+
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+  const habitIds = JSON.parse(ritual.habits_order || '[]');
+
+  const habits = habitIds.map(hid => {
+    const habit = db.prepare('SELECT id, title FROM habits WHERE id = ?').get(hid);
+    if (!habit) return null;
+    const log = db.prepare(
+      'SELECT completed FROM habit_logs WHERE habit_id = ? AND date = ? AND completed = 1'
+    ).get(hid, date);
+    return { id: habit.id, title: habit.title, completed: !!log };
+  }).filter(Boolean);
+
+  const completedCount = habits.filter(h => h.completed).length;
+
+  res.json({
+    ...ritual,
+    habits_order: habitIds,
+    date,
+    habits,
+    total: habits.length,
+    completed: completedCount,
+    progress: habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0
+  });
+});
+
+app.post('/api/rituals', (req, res) => {
+  const id = uuidv4();
+  const { name, emoji = '🔗', time_of_day = 'morning', habits_order = [] } = req.body;
+
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+
+  db.prepare(`
+    INSERT INTO rituals (id, name, emoji, time_of_day, habits_order)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, name, emoji, time_of_day, JSON.stringify(habits_order));
+
+  const ritual = db.prepare('SELECT * FROM rituals WHERE id = ?').get(id);
+  res.status(201).json({ ...ritual, habits_order: JSON.parse(ritual.habits_order) });
+});
+
+app.put('/api/rituals/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM rituals WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Ritual not found' });
+
+  const { name, emoji, time_of_day, habits_order, status } = req.body;
+
+  db.prepare(`
+    UPDATE rituals SET
+      name = COALESCE(?, name),
+      emoji = COALESCE(?, emoji),
+      time_of_day = COALESCE(?, time_of_day),
+      habits_order = COALESCE(?, habits_order),
+      status = COALESCE(?, status)
+    WHERE id = ?
+  `).run(
+    name,
+    emoji,
+    time_of_day,
+    habits_order ? JSON.stringify(habits_order) : null,
+    status,
+    req.params.id
+  );
+
+  const ritual = db.prepare('SELECT * FROM rituals WHERE id = ?').get(req.params.id);
+  res.json({ ...ritual, habits_order: JSON.parse(ritual.habits_order) });
+});
+
+app.delete('/api/rituals/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM rituals WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Ritual not found' });
+
+  db.prepare('DELETE FROM rituals WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ==================== INSIGHTS ====================
+app.get('/api/insights/best-hours', (req, res) => {
+  try {
+    // Query focus_sessions from the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoffDate = thirtyDaysAgo.toISOString();
+
+    const sessions = db.prepare(`
+      SELECT * FROM focus_sessions
+      WHERE created_date >= ?
+      ORDER BY created_date DESC
+    `).all(cutoffDate);
+
+    // If less than 3 sessions total, not enough data
+    if (sessions.length < 3) {
+      return res.json({
+        best_hours: [],
+        summary: 'Preciso de mais sessões de foco para sugerir horários',
+        total_sessions: sessions.length
+      });
+    }
+
+    // Group by hour of day and calculate total focus minutes per hour
+    const hourMap = {};
+    for (const session of sessions) {
+      if (!session.created_date) continue;
+      const d = new Date(session.created_date);
+      if (isNaN(d.getTime())) continue;
+      const hour = d.getHours();
+      if (!hourMap[hour]) {
+        hourMap[hour] = { hour, total_minutes: 0, sessions: 0 };
+      }
+      hourMap[hour].total_minutes += Math.round((session.duration_seconds || 0) / 60);
+      hourMap[hour].sessions += 1;
+    }
+
+    // Convert to array, add label, sort by total_minutes descending
+    const hourEntries = Object.values(hourMap)
+      .map(h => ({
+        hour: h.hour,
+        label: String(h.hour).padStart(2, '0') + ':00',
+        total_minutes: h.total_minutes,
+        sessions: h.sessions
+      }))
+      .sort((a, b) => b.total_minutes - a.total_minutes);
+
+    // Take top 3
+    const bestHours = hourEntries.slice(0, 3);
+
+    // Build summary string
+    let summary = 'Preciso de mais sessões de foco para sugerir horários';
+    if (bestHours.length >= 2) {
+      const hours = bestHours.map(h => h.hour).sort((a, b) => a - b);
+      const hourLabels = hours.map(h => h + 'h');
+      summary = `Seus melhores horários de foco são ${hourLabels.join('-')}`;
+    } else if (bestHours.length === 1) {
+      summary = `Seu melhor horário de foco é ${bestHours[0].hour}h`;
+    }
+
+    res.json({
+      best_hours: bestHours,
+      summary,
+      total_sessions: sessions.length
+    });
+  } catch (error) {
+    console.error('Best hours insights error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== GAMIFICATION ====================
+function getLevel(xp) {
+  const levels = [
+    { level: 1, name: 'Iniciante', xp: 0 },
+    { level: 2, name: 'Aprendiz', xp: 100 },
+    { level: 3, name: 'Disciplinado', xp: 300 },
+    { level: 4, name: 'Focado', xp: 600 },
+    { level: 5, name: 'Forjador', xp: 1000 },
+    { level: 6, name: 'Mestre', xp: 1500 },
+    { level: 7, name: 'Lenda da Forja', xp: 2500 },
+  ];
+  let current = levels[0];
+  for (const l of levels) {
+    if (xp >= l.xp) current = l;
+  }
+  const idx = levels.indexOf(current);
+  const next = idx < levels.length - 1 ? levels[idx + 1] : null;
+  return {
+    level: current.level,
+    name: current.name,
+    current_xp: current.xp,
+    next_level_xp: next ? next.xp : null,
+  };
+}
+
+function checkAchievements(db) {
+  const newlyUnlocked = [];
+  const today = new Date().toISOString().split('T')[0];
+
+  // first_task: at least 1 completed task
+  const completedTasks = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status = 'done'").get().c;
+  const firstTask = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'first_task'").get();
+  if (firstTask && !firstTask.unlocked_date && completedTasks >= 1) {
+    db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'first_task'").run(today);
+    newlyUnlocked.push(firstTask.id);
+  }
+
+  // centurion: at least 100 completed tasks
+  const centurion = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'centurion'").get();
+  if (centurion && !centurion.unlocked_date && completedTasks >= 100) {
+    db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'centurion'").run(today);
+    newlyUnlocked.push(centurion.id);
+  }
+
+  // on_fire: any habit with current streak >= 7
+  const habits = db.prepare("SELECT id FROM habits WHERE status = 'active'").all();
+  const onFire = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'on_fire'").get();
+  if (onFire && !onFire.unlocked_date) {
+    for (const h of habits) {
+      const { current_streak } = getStreaks(h.id);
+      if (current_streak >= 7) {
+        db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'on_fire'").run(today);
+        newlyUnlocked.push(onFire.id);
+        break;
+      }
+    }
+  }
+
+  // diamond: any habit with current streak >= 30
+  const diamond = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'diamond'").get();
+  if (diamond && !diamond.unlocked_date) {
+    for (const h of habits) {
+      const { current_streak } = getStreaks(h.id);
+      if (current_streak >= 30) {
+        db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'diamond'").run(today);
+        newlyUnlocked.push(diamond.id);
+        break;
+      }
+    }
+  }
+
+  // focus_master: total focus seconds >= 36000 (10h)
+  const totalFocusSeconds = db.prepare("SELECT COALESCE(SUM(duration_seconds), 0) as total FROM focus_sessions").get().total;
+  const focusMaster = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'focus_master'").get();
+  if (focusMaster && !focusMaster.unlocked_date && totalFocusSeconds >= 36000) {
+    db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'focus_master'").run(today);
+    newlyUnlocked.push(focusMaster.id);
+  }
+
+  // early_bird: morning ritual completed 5 times
+  const earlyBird = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'early_bird'").get();
+  if (earlyBird && !earlyBird.unlocked_date) {
+    const morningRituals = db.prepare("SELECT id FROM rituals WHERE time_of_day = 'morning' AND status = 'active'").all();
+    for (const r of morningRituals) {
+      const habitIds = [];
+      const ritualRow = db.prepare("SELECT habits_order FROM rituals WHERE id = ?").get(r.id);
+      if (ritualRow) {
+        try { habitIds.push(...JSON.parse(ritualRow.habits_order || '[]')); } catch {}
+      }
+      if (habitIds.length === 0) continue;
+      // Count days where ALL habits in the ritual were completed
+      const allDates = db.prepare(
+        `SELECT DISTINCT date FROM habit_logs WHERE habit_id IN (${habitIds.map(() => '?').join(',')}) AND completed = 1`
+      ).all(...habitIds);
+      let ritualCompleteDays = 0;
+      for (const row of allDates) {
+        const done = db.prepare(
+          `SELECT COUNT(*) as c FROM habit_logs WHERE habit_id IN (${habitIds.map(() => '?').join(',')}) AND date = ? AND completed = 1`
+        ).all(...habitIds, row.date)[0].c;
+        if (done === habitIds.length) ritualCompleteDays++;
+      }
+      if (ritualCompleteDays >= 5) {
+        db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'early_bird'").run(today);
+        newlyUnlocked.push(earlyBird.id);
+        break;
+      }
+    }
+  }
+
+  // balanced: 7 consecutive days of wellness checks
+  const balanced = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'balanced'").get();
+  if (balanced && !balanced.unlocked_date) {
+    const wellnessDates = db.prepare("SELECT DISTINCT date FROM wellness_checks ORDER BY date DESC").all().map(r => r.date);
+    if (wellnessDates.length >= 7) {
+      let streak = 1;
+      for (let i = 1; i < wellnessDates.length; i++) {
+        const prev = new Date(wellnessDates[i - 1] + 'T00:00:00');
+        const curr = new Date(wellnessDates[i] + 'T00:00:00');
+        const diff = Math.round((prev - curr) / (1000 * 60 * 60 * 24));
+        if (diff === 1) {
+          streak++;
+          if (streak >= 7) break;
+        } else {
+          streak = 1;
+        }
+      }
+      if (streak >= 7) {
+        db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'balanced'").run(today);
+        newlyUnlocked.push(balanced.id);
+      }
+    }
+  }
+
+  // creator: 10+ tasks in jotav_fit category
+  const creator = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'creator'").get();
+  if (creator && !creator.unlocked_date) {
+    const jotavCount = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE category = 'jotav_fit'").get().c;
+    if (jotavCount >= 10) {
+      db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'creator'").run(today);
+      newlyUnlocked.push(creator.id);
+    }
+  }
+
+  // Return full achievement objects for newly unlocked
+  if (newlyUnlocked.length === 0) return [];
+  return db.prepare(
+    `SELECT * FROM achievements WHERE id IN (${newlyUnlocked.map(() => '?').join(',')})`
+  ).all(...newlyUnlocked);
+}
+
+// GET /api/gamification
+app.get('/api/gamification', (req, res) => {
+  try {
+    const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
+    const levelInfo = getLevel(gam.xp_total);
+    let progress_pct = 100;
+    if (levelInfo.next_level_xp !== null) {
+      const xpInLevel = gam.xp_total - levelInfo.current_xp;
+      const xpNeeded = levelInfo.next_level_xp - levelInfo.current_xp;
+      progress_pct = xpNeeded > 0 ? Math.round((xpInLevel / xpNeeded) * 100) : 0;
+    }
+    const achievements = db.prepare('SELECT * FROM achievements ORDER BY unlocked_date DESC NULLS LAST, id').all();
+    res.json({
+      xp_total: gam.xp_total,
+      level: levelInfo.level,
+      level_name: levelInfo.name,
+      next_level_xp: levelInfo.next_level_xp,
+      progress_pct,
+      achievements,
+    });
+  } catch (error) {
+    console.error('Gamification GET error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/gamification/add-xp
+app.post('/api/gamification/add-xp', (req, res) => {
+  try {
+    const { amount, reason } = req.body;
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number' });
+    }
+
+    const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
+    const oldLevel = getLevel(gam.xp_total).level;
+    const newXp = gam.xp_total + amount;
+    const newLevelInfo = getLevel(newXp);
+    const leveledUp = newLevelInfo.level > oldLevel;
+
+    db.prepare('UPDATE gamification SET xp_total = ?, level = ?, updated_date = datetime(\'now\') WHERE id = ?')
+      .run(newXp, newLevelInfo.level, 'main');
+
+    const newAchievements = checkAchievements(db);
+
+    res.json({
+      xp_total: newXp,
+      level: newLevelInfo.level,
+      level_name: newLevelInfo.name,
+      leveled_up: leveledUp,
+      new_achievements: newAchievements,
+      reason: reason || null,
+    });
+  } catch (error) {
+    console.error('Add XP error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/gamification/check-achievements
+app.post('/api/gamification/check-achievements', (req, res) => {
+  try {
+    const newAchievements = checkAchievements(db);
+
+    // Award XP for newly unlocked achievements
+    let totalBonusXp = 0;
+    for (const a of newAchievements) {
+      totalBonusXp += a.xp_reward || 0;
+    }
+    if (totalBonusXp > 0) {
+      const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
+      const newXp = gam.xp_total + totalBonusXp;
+      const newLevelInfo = getLevel(newXp);
+      db.prepare('UPDATE gamification SET xp_total = ?, level = ?, updated_date = datetime(\'now\') WHERE id = ?')
+        .run(newXp, newLevelInfo.level, 'main');
+    }
+
+    res.json({
+      new_achievements: newAchievements,
+      bonus_xp: totalBonusXp,
+    });
+  } catch (error) {
+    console.error('Check achievements error:', error);
     res.status(500).json({ error: error.message });
   }
 });

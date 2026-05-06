@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CATEGORIES } from '@/lib/categories';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,7 +10,7 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
     title: initial.title || '',
     description: initial.description || '',
     frequency: initial.frequency || 'daily',
-    category: initial.category || 'personal',
+    category: initial.category || 'pessoal',
     streak_target: initial.streak_target || 30,
     goal_id: initial.goal_id || '',
     source: initial.source || 'manual',
@@ -38,12 +39,9 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
         <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
           <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="work">Trabalho</SelectItem>
-            <SelectItem value="personal">Pessoal</SelectItem>
-            <SelectItem value="health">Saúde</SelectItem>
-            <SelectItem value="learning">Aprendizado</SelectItem>
-            <SelectItem value="finance">Financeiro</SelectItem>
-            <SelectItem value="other">Outro</SelectItem>
+            {Object.entries(CATEGORIES).map(([key, cat]) => (
+              <SelectItem key={key} value={key}>{cat.emoji} {cat.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

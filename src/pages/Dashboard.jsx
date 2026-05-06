@@ -10,6 +10,10 @@ import WeeklyProgress from '@/components/dashboard/WeeklyProgress';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import DayProgressBar from '@/components/shared/DayProgressBar';
 import WaterTracker from '@/components/dashboard/WaterTracker';
+import TodayCalendar from '@/components/dashboard/TodayCalendar';
+import RitualWidget from '@/components/dashboard/RitualWidget';
+import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
+import GamificationWidget from '@/components/dashboard/GamificationWidget';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -109,6 +113,10 @@ export default function Dashboard() {
             today={today}
             onToggle={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })} 
           />
+          <TodayCalendar />
+          <RitualWidget />
+          <UpcomingPosts />
+          <GamificationWidget />
           <WellnessWidget 
             check={todayCheck}
             onSave={(data) => saveWellnessMutation.mutate(data)}

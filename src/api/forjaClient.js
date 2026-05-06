@@ -67,6 +67,19 @@ export const forjaApi = {
     create: (data) => request('/api/focus', { method: 'POST', body: JSON.stringify(data) }),
   },
 
+  // Rituals
+  rituals: {
+    list: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/api/rituals${query ? '?' + query : ''}`);
+    },
+    get: (id) => request(`/api/rituals/${id}`),
+    getProgress: (id, date) => request(`/api/rituals/${id}/progress?date=${date}`),
+    create: (data) => request('/api/rituals', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => request(`/api/rituals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => request(`/api/rituals/${id}`, { method: 'DELETE' }),
+  },
+
   // Goals
   goals: {
     list: (params = {}) => {
@@ -87,6 +100,27 @@ export const forjaApi = {
 
   // Parse Voice (LLM)
   parseVoice: (text) => request('/api/parse-voice', { method: 'POST', body: JSON.stringify({ text }) }),
+  // Gamification
+  gamification: {
+    get: () => request('/api/gamification'),
+    addXp: (amount, reason) =>
+      request('/api/gamification/add-xp', {
+        method: 'POST',
+        body: JSON.stringify({ amount, reason }),
+      }),
+    checkAchievements: () =>
+      request('/api/gamification/check-achievements', {
+        method: 'POST',
+      }),
+  },
+
+  // Insights
+  insights: {
+    bestHours: () => request('/api/insights/best-hours'),
+  },
+
+  // Calendar
+  getTodayCalendar: () => request('/api/calendar/today'),
 
   // Transcription
   transcribe: async (audioBlob) => {

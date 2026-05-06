@@ -4,15 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-
-const categoryEmojis = {
-  health: '💪',
-  personal: '⭐',
-  work: '💼',
-  learning: '📚',
-  finance: '💰',
-  other: '✨',
-};
+import { CategoryBadge } from '@/lib/categories';
 
 export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
   const today = new Date().toISOString().split('T')[0];
@@ -51,7 +43,6 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
         )}
         {habits.map(habit => {
           const done = isCompletedToday(habit.id);
-          const emoji = categoryEmojis[habit.category] || '✨';
           return (
             <motion.div
               key={habit.id}
@@ -62,20 +53,22 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
               )}
               onClick={() => onToggleHabit(habit.id, done)}
             >
-              <span className="text-base w-6 text-center shrink-0">{emoji}</span>
+              <span className="text-base w-6 text-center shrink-0">💪</span>
               <Checkbox
                 checked={done}
                 onCheckedChange={() => onToggleHabit(habit.id, done)}
                 className={cn(done ? "border-gold data-[state=checked]:bg-gold data-[state=checked]:border-gold" : "border-muted-foreground/40")}
               />
               <div className="flex-1 min-w-0">
-                <p className={cn("text-sm font-medium", done && "text-gold line-through")}>{habit.title}</p>
+                <div className="flex items-center gap-2">
+                  <p className={cn("text-sm font-medium truncate", done && "text-gold line-through")}>{habit.title}</p>
+                  <CategoryBadge category={habit.category} />
+                </div>
               </div>
               {habit.current_streak > 0 && (
-                <div className="flex items-center gap-1 text-chart-4">
-                  <Flame className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium">{habit.current_streak}</span>
-                </div>
+                <span className="inline-flex items-center gap-1 bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded-full shrink-0">
+                  🔥 {habit.current_streak}
+                </span>
               )}
             </motion.div>
           );

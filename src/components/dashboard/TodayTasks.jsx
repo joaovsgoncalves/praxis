@@ -6,6 +6,7 @@ import { Timer, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { CategoryBadge } from '@/lib/categories';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -48,7 +49,10 @@ export default function TodayTasks({ tasks, onToggleComplete }) {
                 className="border-muted-foreground/40"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{task.title}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium truncate">{task.title}</p>
+                  <CategoryBadge category={task.category} />
+                </div>
                 {task.time && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <Clock className="w-3 h-3 text-muted-foreground" />
@@ -77,6 +81,7 @@ export default function TodayTasks({ tasks, onToggleComplete }) {
                 className="border-accent text-accent"
               />
               <p className="text-sm text-muted-foreground line-through truncate flex-1">{task.title}</p>
+              <CategoryBadge category={task.category} className="opacity-60" />
               <CheckCircle2 className="w-4 h-4 text-accent/60" />
             </motion.div>
           ))}
