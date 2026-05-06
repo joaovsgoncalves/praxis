@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import Greeting from '@/components/dashboard/Greeting';
@@ -15,11 +15,6 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: user } = useQuery({
-    queryKey: ['me'],
-    queryFn: () => base44.auth.me(),
-  });
-
   const [waterGlasses, setWaterGlasses] = React.useState(() => {
     const saved = localStorage.getItem(`water_${format(new Date(), 'yyyy-MM-dd')}`);
     return saved ? Number(saved) : 0;
@@ -32,22 +27,22 @@ export default function Dashboard() {
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', today],
-    queryFn: () => base44.entities.Task.filter({ date: today }),
+    queryFn: () => forjaApi.tasks.list({ date: today }),
   });
 
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],
-    queryFn: () => base44.entities.Habit.filter({ status: 'active' }),
+    queryFn: () => forjaApi.habits.list({ status: 'active' }),
   });
 
   const { data: habitLogs = [] } = useQuery({
     queryKey: ['habitLogs'],
-    queryFn: () => base44.entities.HabitLog.list('-date', 200),
+    queryFn: () => forjaApi.habitLogs.list({}),
   });
 
   const { data: wellnessChecks = [] } = useQuery({
     queryKey: ['wellness', today],
-    queryFn: () => base44.entities.WellnessCheck.filter({ date: today }),
+    queryFn: () => forjaApi.wellness.list({ date: today }),
   });
 
   const todayCheck = wellnessChecks[0] || null;
@@ -55,18 +50,18 @@ export default function Dashboard() {
   const toggleTaskMutation = useMutation({
     mutationFn: (task) => {
       const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-      return base44.entities.Task.update(task.id, { status: newStatus });
+      return forjaApi.tasks.update(task.id, { status: newStatus });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   });
 
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
-      if (isDone) {
-        const logs = await base44.entities.HabitLog.filter({ habit_id: habitId, date: today });
-        if (logs[0]) await base44.entities.HabitLog.delete(logs[0].id);
-      } else {
-        await base44.entities.HabitLog.create({ habit_id: habitId, date: today, completed: true });
+      const logs = habitLogs.filter(l => l.habit_id === habitId && l.date === today);
+      if (isDone && logs[0]) {
+        await forjaApi.habitLogs.delete(logs[0].id);
+      } else if (!isDone) {
+        await forjaApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['habitLogs'] }),
@@ -74,32 +69,54 @@ export default function Dashboard() {
 
   const saveWellnessMutation = useMutation({
     mutationFn: async (data) => {
-      if (todayCheck) {
-        return base44.entities.WellnessCheck.update(todayCheck.id, data);
-      }
-      return base44.entities.WellnessCheck.create({ ...data, date: today });
+      return forjaApi.wellness.create({ ...data, date: today });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wellness'] }),
   });
 
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const todayLogs = habitLogs.filter(l => l.date === today);
+  const completedHabits = habits.filter(h => todayLogs.some(l => l.habit_id === h.id && l.completed)).length;
+  const progress = tasks.length + habits.length > 0 
+    ? Math.round(((completedTasks + completedHabits) / (tasks.length + habits.length)) * 100) 
+    : 0;
+
   return (
     <div className="space-y-6">
-      <Greeting userName={user?.full_name} />
-      <DayProgressBar habits={habits} habitLogs={habitLogs} tasks={tasks} />
+      <Greeting />
+      
+      <DayProgressBar 
+        progress={progress}
+        habitsDone={completedHabits}
+        habitsTotal={habits.length}
+        tasksDone={completedTasks}
+        tasksTotal={tasks.length}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <TodayTasks tasks={tasks} onToggleComplete={(task) => toggleTaskMutation.mutate(task)} />
-          <WeeklyProgress habits={habits} habitLogs={habitLogs} />
-        </div>
-        <div className="space-y-6">
-          <TodayHabits
-            habits={habits}
-            habitLogs={habitLogs}
-            onToggleHabit={(id, isDone) => toggleHabitMutation.mutate({ habitId: id, isDone })}
+          <TodayTasks 
+            tasks={tasks} 
+            onToggle={(task) => toggleTaskMutation.mutate(task)} 
           />
-          <WellnessWidget todayCheck={todayCheck} onSave={(data) => saveWellnessMutation.mutateAsync(data)} />
-          <WaterTracker glasses={waterGlasses} onUpdate={handleWaterUpdate} />
+          <WeeklyProgress />
+        </div>
+        
+        <div className="space-y-6">
+          <TodayHabits 
+            habits={habits} 
+            habitLogs={habitLogs}
+            today={today}
+            onToggle={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })} 
+          />
+          <WellnessWidget 
+            check={todayCheck}
+            onSave={(data) => saveWellnessMutation.mutate(data)}
+          />
+          <WaterTracker 
+            glasses={waterGlasses}
+            onUpdate={handleWaterUpdate}
+          />
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,33 +33,34 @@ export default function HabitsTasks() {
   const [showHabitForm, setShowHabitForm] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: tasks = [] } = useQuery({ queryKey: ['allTasks'], queryFn: () => base44.entities.Task.list('-created_date', 100) });
-  const { data: habits = [] } = useQuery({ queryKey: ['allHabits'], queryFn: () => base44.entities.Habit.list('-created_date', 100) });
-  const { data: goals = [] } = useQuery({ queryKey: ['goals'], queryFn: () => base44.entities.Goal.filter({ status: 'active' }) });
+  const { data: tasks = [] } = useQuery({ queryKey: ['allTasks'], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
+  const { data: habits = [] } = useQuery({ queryKey: ['allHabits'], queryFn: () => forjaApi.habits.list({}) });
 
   const createTask = useMutation({
-    mutationFn: (data) => base44.entities.Task.create(data),
+    mutationFn: (data) => forjaApi.tasks.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allTasks'] }); queryClient.invalidateQueries({ queryKey: ['tasks'] }); setShowTaskForm(false); },
   });
 
   const createHabit = useMutation({
-    mutationFn: (data) => base44.entities.Habit.create(data),
+    mutationFn: (data) => forjaApi.habits.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allHabits'] }); queryClient.invalidateQueries({ queryKey: ['habits'] }); setShowHabitForm(false); },
   });
 
   const deleteTask = useMutation({
-    mutationFn: (id) => base44.entities.Task.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allTasks'] }); queryClient.invalidateQueries({ queryKey: ['tasks'] }); },
-  });
-
-  const toggleTask = useMutation({
-    mutationFn: (task) => base44.entities.Task.update(task.id, { status: task.status === 'completed' ? 'pending' : 'completed' }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allTasks'] }); queryClient.invalidateQueries({ queryKey: ['tasks'] }); },
+    mutationFn: (id) => forjaApi.tasks.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
   });
 
   const deleteHabit = useMutation({
-    mutationFn: (id) => base44.entities.Habit.update(id, { status: 'archived' }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allHabits'] }); queryClient.invalidateQueries({ queryKey: ['habits'] }); },
+    mutationFn: (id) => forjaApi.habits.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allHabits'] }),
+  });
+
+  const toggleTask = useMutation({
+    mutationFn: (task) => forjaApi.tasks.update(task.id, { 
+      status: task.status === 'completed' ? 'pending' : 'completed' 
+    }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
   });
 
   const filteredTasks = tasks.filter(t => {
@@ -68,119 +69,123 @@ export default function HabitsTasks() {
     return true;
   });
 
-  const filteredHabits = habits.filter(h => {
-    if (h.status === 'archived') return false;
-    if (categoryFilter !== 'all' && h.category !== categoryFilter) return false;
-    return true;
-  });
+  const filteredHabits = habits;
 
   return (
     <div className="space-y-6">
-      {/* Date header — Forja style */}
-      <div className="text-center py-2">
-        <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
-          {format(new Date(), 'EEEE', { locale: ptBR })}
-        </p>
-        <p className="text-7xl font-black text-foreground leading-none">{format(new Date(), 'd')}</p>
-        <p className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy', { locale: ptBR })}</p>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Hábitos & Tarefas</h1>
         <div className="flex gap-2">
-          <Button onClick={() => setShowTaskForm(true)} className="bg-primary hover:bg-primary/90" size="sm">
+          <Button onClick={() => setShowTaskForm(true)} size="sm">
             <Plus className="w-4 h-4 mr-1" />Tarefa
           </Button>
-          <Button onClick={() => setShowHabitForm(true)} variant="outline" size="sm">
+          <Button onClick={() => setShowHabitForm(true)} size="sm" variant="outline">
             <Plus className="w-4 h-4 mr-1" />Hábito
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Tabs value={view} onValueChange={setView}>
-          <TabsList className="bg-secondary">
-            <TabsTrigger value="all">Tudo</TabsTrigger>
-            <TabsTrigger value="tasks">Tarefas</TabsTrigger>
-            <TabsTrigger value="habits">Hábitos</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-36 bg-secondary"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas categorias</SelectItem>
-            {Object.entries(categoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {view !== 'habits' && (
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36 bg-secondary"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos status</SelectItem>
-              {Object.entries(statusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
-      </div>
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList>
+          <TabsTrigger value="all">Todos</TabsTrigger>
+          <TabsTrigger value="tasks">Tarefas ({tasks.length})</TabsTrigger>
+          <TabsTrigger value="habits">Hábitos ({habits.length})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <div className="space-y-2">
-        {(view === 'all' || view === 'tasks') && filteredTasks.map(task => (
-          <Card key={task.id} className="bg-card border-border hover:bg-secondary/30 transition-colors">
-            <CardContent className="flex items-center gap-3 p-4">
-              <button onClick={() => toggleTask.mutate(task)}>
-                {task.status === 'completed' ? <CheckCircle2 className="w-5 h-5 text-accent" /> : <Circle className="w-5 h-5 text-muted-foreground" />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className={cn("text-sm font-medium", task.status === 'completed' && "line-through text-muted-foreground")}>{task.title}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  {task.date && <span className="text-xs text-muted-foreground">{format(new Date(task.date + 'T12:00:00'), 'dd/MM')}</span>}
-                  {task.time && <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{task.time}</span>}
-                  <Badge variant="outline" className="text-[10px]">{categoryLabels[task.category] || task.category}</Badge>
-                </div>
-              </div>
-              <Badge variant="outline" className={cn('text-[10px] border', priorityStyles[task.priority || 'medium'])}>
-                {task.priority || 'medium'}
-              </Badge>
-              <Link to={`/foco?taskId=${task.id}`}><Timer className="w-4 h-4 text-muted-foreground hover:text-primary" /></Link>
-              <button onClick={() => deleteTask.mutate(task.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" /></button>
-            </CardContent>
-          </Card>
-        ))}
+      {(view === 'all' || view === 'tasks') && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Tarefas</h2>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="pending">Pendentes</SelectItem>
+                <SelectItem value="completed">Concluídas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="work">Trabalho</SelectItem>
+                <SelectItem value="personal">Pessoal</SelectItem>
+                <SelectItem value="health">Saúde</SelectItem>
+                <SelectItem value="learning">Aprendizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        {(view === 'all' || view === 'habits') && filteredHabits.map(habit => {
-          const categoryEmojis = { health:'💪', personal:'⭐', work:'💼', learning:'📚', finance:'💰', other:'✨' };
-          return (
-          <Card key={habit.id} className="bg-card border-border hover:bg-secondary/30 transition-colors">
-            <CardContent className="flex items-center gap-3 p-4">
-              <span className="text-lg w-7 text-center shrink-0">{categoryEmojis[habit.category] || '✨'}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{habit.title}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className="text-[10px]">{habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}</Badge>
-                  <Badge variant="outline" className="text-[10px]">{categoryLabels[habit.category] || habit.category}</Badge>
-                </div>
-              </div>
-              {habit.current_streak > 0 && (
-                <div className="flex items-center gap-1 text-chart-4 text-xs font-medium">
-                  <Flame className="w-3.5 h-3.5" />{habit.current_streak} dias
-                </div>
-              )}
-              <button onClick={() => deleteHabit.mutate(habit.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" /></button>
-            </CardContent>
-          </Card>
-        );
-        })}
-      </div>
+          {filteredTasks.length === 0 ? (
+            <Card className="bg-secondary/30"><CardContent className="py-8 text-center text-muted-foreground">Nenhuma tarefa encontrada</CardContent></Card>
+          ) : (
+            filteredTasks.map(task => (
+              <Card key={task.id} className="bg-card border-border">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <button onClick={() => toggleTask.mutate(task)}>
+                    {task.status === 'completed' ? (
+                      <CheckCircle2 className="w-5 h-5 text-accent" />
+                    ) : (
+                      <Circle className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                    )}
+                  </button>
+                  <div className="flex-1">
+                    <p className={cn("font-medium", task.status === 'completed' && "line-through opacity-60")}>{task.title}</p>
+                    <div className="flex gap-2 mt-1">
+                      {task.date && <Badge variant="outline" className="text-xs">{task.date}</Badge>}
+                      {task.time && <Badge variant="outline" className="text-xs"><Clock className="w-3 h-3 mr-1" />{task.time}</Badge>}
+                      <Badge className={cn("text-xs", priorityStyles[task.priority])}>{task.priority}</Badge>
+                      <Badge variant="outline" className="text-xs">{categoryLabels[task.category] || task.category}</Badge>
+                    </div>
+                  </div>
+                  <button onClick={() => deleteTask.mutate(task.id)} className="text-muted-foreground hover:text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {(view === 'all' || view === 'habits') && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Hábitos</h2>
+          {filteredHabits.length === 0 ? (
+            <Card className="bg-secondary/30"><CardContent className="py-8 text-center text-muted-foreground">Nenhum hábito registrado</CardContent></Card>
+          ) : (
+            filteredHabits.map(habit => (
+              <Card key={habit.id} className="bg-card border-border">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <Flame className="w-5 h-5 text-primary" />
+                  <div className="flex-1">
+                    <p className="font-medium">{habit.title}</p>
+                    <Badge variant="outline" className="text-xs mt-1">
+                      {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
+                    </Badge>
+                  </div>
+                  <button onClick={() => deleteHabit.mutate(habit.id)} className="text-muted-foreground hover:text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
 
       <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
-        <DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
-          <TaskForm onSubmit={(d) => createTask.mutate(d)} onCancel={() => setShowTaskForm(false)} goals={goals} />
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
+          <TaskForm onSubmit={(data) => createTask.mutate(data)} onCancel={() => setShowTaskForm(false)} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showHabitForm} onOpenChange={setShowHabitForm}>
-        <DialogContent className="bg-card border-border"><DialogHeader><DialogTitle>Novo Hábito</DialogTitle></DialogHeader>
-          <HabitForm onSubmit={(d) => createHabit.mutate(d)} onCancel={() => setShowHabitForm(false)} goals={goals} />
+        <DialogContent>
+          <DialogHeader><DialogTitle>Novo Hábito</DialogTitle></DialogHeader>
+          <HabitForm onSubmit={(data) => createHabit.mutate(data)} onCancel={() => setShowHabitForm(false)} />
         </DialogContent>
       </Dialog>
 
