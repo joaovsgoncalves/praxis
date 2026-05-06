@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,6 +76,15 @@ export default function HabitsTasks() {
 
   return (
     <div className="space-y-6">
+      {/* Date header — Forja style */}
+      <div className="text-center py-2">
+        <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
+          {format(new Date(), 'EEEE', { locale: ptBR })}
+        </p>
+        <p className="text-7xl font-black text-foreground leading-none">{format(new Date(), 'd')}</p>
+        <p className="text-sm text-muted-foreground">{format(new Date(), 'MMMM yyyy', { locale: ptBR })}</p>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Hábitos & Tarefas</h1>
         <div className="flex gap-2">
@@ -137,12 +147,12 @@ export default function HabitsTasks() {
           </Card>
         ))}
 
-        {(view === 'all' || view === 'habits') && filteredHabits.map(habit => (
+        {(view === 'all' || view === 'habits') && filteredHabits.map(habit => {
+          const categoryEmojis = { health:'💪', personal:'⭐', work:'💼', learning:'📚', finance:'💰', other:'✨' };
+          return (
           <Card key={habit.id} className="bg-card border-border hover:bg-secondary/30 transition-colors">
             <CardContent className="flex items-center gap-3 p-4">
-              <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                <Flame className="w-3 h-3 text-primary" />
-              </div>
+              <span className="text-lg w-7 text-center shrink-0">{categoryEmojis[habit.category] || '✨'}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">{habit.title}</p>
                 <div className="flex items-center gap-2 mt-1">
@@ -158,7 +168,8 @@ export default function HabitsTasks() {
               <button onClick={() => deleteHabit.mutate(habit.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" /></button>
             </CardContent>
           </Card>
-        ))}
+        );
+        })}
       </div>
 
       <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>

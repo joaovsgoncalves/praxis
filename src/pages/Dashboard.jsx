@@ -8,6 +8,7 @@ import TodayHabits from '@/components/dashboard/TodayHabits';
 import WellnessWidget from '@/components/dashboard/WellnessWidget';
 import WeeklyProgress from '@/components/dashboard/WeeklyProgress';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
+import DayProgressBar from '@/components/shared/DayProgressBar';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -73,6 +74,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <Greeting userName={user?.full_name} />
+      <DayProgressBar habits={habits} habitLogs={habitLogs} tasks={tasks} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

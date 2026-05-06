@@ -24,19 +24,21 @@ export default function Sidebar({ open, onClose }) {
         "fixed top-0 left-0 h-full w-64 bg-sidebar z-50 flex flex-col border-r border-sidebar-border transition-transform duration-300 lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex items-center justify-between px-6 h-16 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary" />
+        {/* Logo */}
+        <div className="flex items-center justify-between px-5 h-16 border-b border-sidebar-border">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-gold" />
             </div>
-            <span className="text-lg font-bold text-sidebar-foreground tracking-tight">FlowAI</span>
+            <span className="text-base font-bold text-sidebar-foreground tracking-tight">FlowAI</span>
           </div>
           <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
           {navItems.map(item => {
             const isActive = location.pathname === item.path;
             return (
@@ -47,22 +49,28 @@ export default function Sidebar({ open, onClose }) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                   isActive
-                    ? "bg-primary/15 text-primary"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    ? "bg-gold text-sidebar-primary-foreground font-semibold shadow-lg shadow-gold/20"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >
-                <item.icon className="w-4.5 h-4.5" />
+                <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-sidebar-primary-foreground" : "")} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
+        {/* Voice capture */}
         <div className="p-3 border-t border-sidebar-border">
           <Link
             to="/captura"
             onClick={onClose}
-            className="flex items-center gap-3 px-3 py-3 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all text-sm font-medium"
+            className={cn(
+              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all",
+              location.pathname === '/captura'
+                ? "bg-gold text-sidebar-primary-foreground font-semibold"
+                : "bg-gold/10 text-gold hover:bg-gold/20 border border-gold/20"
+            )}
           >
             <Mic className="w-4 h-4" />
             Captura por Voz
