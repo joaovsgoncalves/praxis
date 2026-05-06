@@ -1,0 +1,54 @@
+{
+  "name": "Goal",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date"
+    },
+    "timeframe": {
+      "type": "string",
+      "enum": [
+        "short",
+        "medium",
+        "long"
+      ],
+      "default": "short"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "personal",
+        "professional",
+        "health",
+        "finance",
+        "learning",
+        "other"
+      ],
+      "default": "personal"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "completed",
+        "abandoned"
+      ],
+      "default": "active"
+    },
+    "manual_progress": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "title"
+  ]
+}
