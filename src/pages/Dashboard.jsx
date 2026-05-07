@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -19,14 +19,19 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const [waterGlasses, setWaterGlasses] = React.useState(() => {
-    const saved = localStorage.getItem(`water_${format(new Date(), 'yyyy-MM-dd')}`);
-    return saved ? Number(saved) : 0;
+  const [waterMl, setWaterMl] = React.useState(() => {
+    const dateKey = format(new Date(), 'yyyy-MM-dd');
+    const savedMl = localStorage.getItem(`water_ml_${dateKey}`);
+    if (savedMl) return Number(savedMl);
+
+    // Migra o valor antigo salvo em copos de 250ml sem perder o registro do dia.
+    const savedGlasses = localStorage.getItem(`water_${dateKey}`);
+    return savedGlasses ? Number(savedGlasses) * 250 : 0;
   });
 
   const handleWaterUpdate = (val) => {
-    setWaterGlasses(val);
-    localStorage.setItem(`water_${today}`, String(val));
+    setWaterMl(val);
+    localStorage.setItem(`water_ml_${today}`, String(val));
   };
 
   const { data: tasks = [] } = useQuery({
@@ -118,11 +123,11 @@ export default function Dashboard() {
           <UpcomingPosts />
           <GamificationWidget />
           <WellnessWidget 
-            check={todayCheck}
-            onSave={(data) => saveWellnessMutation.mutate(data)}
+            todayCheck={todayCheck}
+            onSave={(data) => saveWellnessMutation.mutateAsync(data)}
           />
           <WaterTracker 
-            glasses={waterGlasses}
+            amountMl={waterMl}
             onUpdate={handleWaterUpdate}
           />
         </div>

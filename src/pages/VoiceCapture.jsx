@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { forjaApi } from '@/api/forjaClient';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
 // API do Forja do Jota (A.N.A. backend)
-const FORJA_API = import.meta.env.VITE_FORJA_API || 'http://100.110.93.24:18556';
+const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
 
 export default function VoiceCapture() {
   const [recording, setRecording] = useState(false);

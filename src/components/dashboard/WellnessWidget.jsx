@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { Moon, Smile, Zap, Check, Star } from 'lucide-react';
+import { Moon, Smile, Zap, Check, Star, Heart } from 'lucide-react';
 
 const moodEmojis = ['😞', '😕', '😐', '🙂', '😁'];
 const moodLabels = ['Péssimo', 'Ruim', 'Neutro', 'Bom', 'Ótimo'];
@@ -36,45 +36,68 @@ export default function WellnessWidget({ todayCheck, onSave }) {
     note: todayCheck?.note || '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [savedCheck, setSavedCheck] = useState(todayCheck || null);
+  const activeCheck = savedCheck || todayCheck;
+
+  useEffect(() => {
+    if (!todayCheck) return;
+    setSavedCheck(todayCheck);
+    setData({
+      sleep_hours: todayCheck.sleep_hours ?? 7,
+      sleep_quality: todayCheck.sleep_quality ?? 3,
+      mood: todayCheck.mood ?? 3,
+      productivity: todayCheck.productivity ?? 3,
+      note: todayCheck.note || '',
+    });
+    setShowForm(false);
+  }, [todayCheck?.id]);
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave(data);
-    setSaving(false);
-    setShowForm(false);
+    setError('');
+    try {
+      const saved = await onSave(data);
+      setSavedCheck(saved || data);
+      setShowForm(false);
+    } catch (err) {
+      setError('Não consegui salvar agora. Tenta de novo em instantes.');
+    } finally {
+      setSaving(false);
+    }
   };
-
-  if (!showForm && todayCheck) {
+  if (!showForm && activeCheck) {
     return (
       <Card className="bg-card border-border">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">Bem-estar Hoje</CardTitle>
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7" onClick={() => setShowForm(true)}>
-              Editar
-            </Button>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Heart className="w-4 h-4 text-red-400" />
+              Bem-estar Hoje
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setShowForm(true)}>Editar</Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-3">
-            <div className="text-center">
-              <div className="text-2xl mb-1">{moodEmojis[(todayCheck.mood || 3) - 1]}</div>
-              <p className="text-[10px] text-muted-foreground">Humor</p>
-              <p className="text-xs font-medium">{moodLabels[(todayCheck.mood || 3) - 1]}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center p-3 rounded-lg bg-secondary/50">
+              <div className="text-2xl mb-1">{moodEmojis[(activeCheck.mood || 3) - 1]}</div>
+              <p className="text-xs text-muted-foreground">Humor</p>
+              <p className="text-xs font-medium">{moodLabels[(activeCheck.mood || 3) - 1]}</p>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-chart-3 mb-1">{todayCheck.sleep_hours || 7}h</div>
-              <p className="text-[10px] text-muted-foreground">Sono</p>
-              <p className="text-xs font-medium">{sleepQualityLabels[(todayCheck.sleep_quality || 3) - 1]}</p>
+            <div className="text-center p-3 rounded-lg bg-secondary/50">
+              <div className="text-lg font-bold text-chart-3 mb-1">{activeCheck.sleep_hours || 7}h</div>
+              <p className="text-xs text-muted-foreground">Sono</p>
+              <p className="text-xs font-medium">{sleepQualityLabels[(activeCheck.sleep_quality || 3) - 1]}</p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl mb-1">{sleepQualityEmojis[(todayCheck.sleep_quality || 3) - 1]}</div>
-              <p className="text-[10px] text-muted-foreground">Qualidade</p>
+            <div className="text-center p-3 rounded-lg bg-secondary/50">
+              <div className="text-2xl mb-1">{sleepQualityEmojis[(activeCheck.sleep_quality || 3) - 1]}</div>
+              <p className="text-xs text-muted-foreground">Qualidade</p>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-bold text-primary mb-1">{todayCheck.productivity || 3}/5</div>
-              <p className="text-[10px] text-muted-foreground">Produtiv.</p>
-              <p className="text-xs font-medium">{productivityLabels[(todayCheck.productivity || 3) - 1]}</p>
+            <div className="text-center p-3 rounded-lg bg-secondary/50">
+              <div className="text-lg font-bold text-primary mb-1">{activeCheck.productivity || 3}/5</div>
+              <p className="text-xs text-muted-foreground">Produtiv.</p>
+              <p className="text-xs font-medium">{productivityLabels[(activeCheck.productivity || 3) - 1]}</p>
             </div>
           </div>
         </CardContent>
@@ -166,6 +189,12 @@ export default function WellnessWidget({ todayCheck, onSave }) {
           onChange={e => setData(d => ({ ...d, note: e.target.value }))}
           className="bg-secondary/50 border-border resize-none h-16 text-sm"
         />
+
+        {error && (
+          <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         <Button onClick={handleSave} disabled={saving} className="w-full bg-primary hover:bg-primary/90">
           {saving ? 'Salvando...' : <><Check className="w-4 h-4 mr-2" />Salvar Check-in</>}

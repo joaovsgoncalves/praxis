@@ -1,7 +1,9 @@
 // Forja API Client — unified client for the Forja do Jota backend
 // Replaces Base44 SDK calls with direct API calls
 
-const FORJA_API = import.meta.env.VITE_FORJA_API || 'http://100.110.93.24:18556';
+// Em produção, usa API relativa para passar pelo proxy /api do Vercel.
+// Em dev local, .env define VITE_FORJA_API para o backend da Forja.
+const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
 
 async function request(path, options = {}) {
   const res = await fetch(`${FORJA_API}${path}`, {
