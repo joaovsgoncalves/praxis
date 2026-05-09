@@ -4,7 +4,6 @@ import { LayoutDashboard, ListTodo, Target, Timer, BarChart3, Settings, Mic, X, 
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
-import { Progress } from '@/components/ui/progress';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,6 +17,38 @@ const navItems = [
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
+// Apple-Watch-style ring drawn in SVG. Tiny on purpose — lives in the sidebar.
+function AvatarRing({ progress, level }) {
+  const size = 56;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - Math.max(0, Math.min(100, progress)) / 100);
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r}
+          fill="none"
+          stroke="hsl(var(--domain-gold))"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          style={{
+            transition: 'stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1)',
+            filter: 'drop-shadow(0 0 4px hsl(var(--domain-gold) / 0.6))',
+          }}
+        />
+      </svg>
+      <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-domain-gold/30 to-domain-ember/20 flex items-center justify-center">
+        <span className="text-base font-bold text-foreground">{level}</span>
+      </div>
+    </div>
+  );
+}
+
 function SidebarGamificationBar() {
   const { data } = useQuery({
     queryKey: ['gamification'],
@@ -28,25 +59,23 @@ function SidebarGamificationBar() {
   if (!data) return null;
 
   const { level, level_name, xp_total, next_level_xp, progress_pct } = data;
+  const xpToNext = next_level_xp ? Math.max(0, next_level_xp - xp_total) : 0;
 
   return (
     <div className="px-3 pb-2 pt-1 border-t border-sidebar-border">
-      <div className="px-3 py-2.5 rounded-lg bg-gold/5 border border-gold/10">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-semibold text-gold truncate">
-            Nv. {level} — {level_name}
-          </span>
-          <span className="text-[10px] text-muted-foreground shrink-0 ml-1">
-            {xp_total} XP
-          </span>
+      <div className="flex items-center gap-3 px-2.5 py-2.5 rounded-lg glass-surface">
+        <AvatarRing progress={progress_pct} level={level} />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-domain-gold truncate">{level_name}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+            {xp_total.toLocaleString('pt-BR')} XP
+          </p>
+          {next_level_xp && (
+            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+              {xpToNext} pro próximo
+            </p>
+          )}
         </div>
-        <Progress
-          value={progress_pct}
-          className="h-1.5 [&>div]:bg-gold"
-        />
-        <p className="text-[10px] text-muted-foreground mt-1">
-          {xp_total} / {next_level_xp} XP
-        </p>
       </div>
     </div>
   );
