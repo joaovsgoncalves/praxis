@@ -84,6 +84,7 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
               <span className="text-base w-6 text-center shrink-0">💪</span>
               <Checkbox
                 checked={done}
+                onClick={(e) => e.stopPropagation()}
                 onCheckedChange={() => handleToggle(habit, done)}
                 className={cn(done ? "border-domain-wellness data-[state=checked]:bg-domain-wellness data-[state=checked]:border-domain-wellness" : "border-muted-foreground/40")}
               />

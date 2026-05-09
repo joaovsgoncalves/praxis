@@ -21,7 +21,7 @@ export default function TodayCalendar() {
     refetchInterval: 300000, // 5 minutes
   });
 
-  const events = data?.events ?? [];
+  const events = Array.isArray(data) ? data : (data?.events ?? []);
 
   return (
     <Card className="bg-card border-border">

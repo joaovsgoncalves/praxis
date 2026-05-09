@@ -129,10 +129,9 @@ export default function HabitsTasks() {
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="work">Trabalho</SelectItem>
-                <SelectItem value="personal">Pessoal</SelectItem>
-                <SelectItem value="health">Saúde</SelectItem>
-                <SelectItem value="learning">Aprendizado</SelectItem>
+                {Object.entries(CATEGORIES).map(([key, cat]) => (
+                  <SelectItem key={key} value={key}>{cat.emoji} {cat.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

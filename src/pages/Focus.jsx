@@ -85,7 +85,7 @@ export default function Focus() {
     clearInterval(focusTickRef.current);
     
     if (sessionStart) {
-      const totalSeconds = Math.round((Date.now() - sessionStart) / 1000);
+      const totalSeconds = Math.max(0, Math.round(totalFocusTime));
       saveSessionMutation.mutate({
         task_id: (selectedTaskId && selectedTaskId !== 'none') ? selectedTaskId : null,
         task_title: selectedTask?.title || 'Sessão livre',

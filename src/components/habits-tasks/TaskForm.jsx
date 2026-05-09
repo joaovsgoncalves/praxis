@@ -79,6 +79,8 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
   });
 
   const isCreating = !initial.id;
+  const recurrenceNeedsDate = form.recurrence !== 'none' && !form.date;
+  const willSyncCalendar = Boolean(form.date && form.time);
 
   const toggleDay = (value) => {
     setForm(f => ({
@@ -92,6 +94,7 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
+    if (recurrenceNeedsDate) return;
     const payload = {
       ...form,
       duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
@@ -177,8 +180,11 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
             })}
           </div>
         )}
-        {form.recurrence !== 'none' && !form.date && (
-          <p className="text-xs text-yellow-500/80">⚠️ Defina uma data inicial — a próxima ocorrência é gerada quando você concluir a tarefa.</p>
+        {recurrenceNeedsDate && (
+          <p className="text-xs text-destructive">⚠️ Defina uma data inicial para a recorrência funcionar.</p>
+        )}
+        {willSyncCalendar && (
+          <p className="text-xs text-sky-400/90">📅 Vai sincronizar com o Google Agenda e lembrar 30/10 min antes.</p>
         )}
       </div>
 
@@ -196,7 +202,7 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
       )}
       <div className="flex gap-2 justify-end">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>}
-        <Button type="submit" className="bg-primary hover:bg-primary/90">{isCreating ? 'Criar Tarefa' : 'Salvar'}</Button>
+        <Button type="submit" disabled={recurrenceNeedsDate} className="bg-primary hover:bg-primary/90">{isCreating ? 'Criar Tarefa' : 'Salvar'}</Button>
       </div>
     </form>
   );

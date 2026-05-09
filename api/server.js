@@ -3,7 +3,7 @@ import cors from 'cors';
 import Database from 'better-sqlite3';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -24,6 +24,29 @@ function enrichCategory(row) {
   }
   return { ...row, category_emoji: null, category_label: null };
 }
+
+function loadEnvFile(filePath, allowedPrefixes = []) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+      if (!match) continue;
+      const key = match[1];
+      if (allowedPrefixes.length && !allowedPrefixes.some(prefix => key.startsWith(prefix))) continue;
+      if (process.env[key]) continue;
+      let value = match[2].trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] = value;
+    }
+  } catch {}
+}
+
+loadEnvFile('/root/.openclaw/secrets/gog.env', ['GOG_']);
+loadEnvFile('/root/.hermes/secrets/gog.env', ['GOG_']);
 
 // Load OpenAI API key
 let OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -95,7 +118,10 @@ db.exec(`
     time TEXT,
     status TEXT DEFAULT 'pending',
     priority TEXT DEFAULT 'medium',
-    category TEXT DEFAULT 'personal',
+    category TEXT DEFAULT 'pessoal',
+    goal_id TEXT,
+    source TEXT DEFAULT 'manual',
+    duration_minutes INTEGER,
     calendar_event_id TEXT,
     created_date TEXT DEFAULT (datetime('now')),
     updated_date TEXT DEFAULT (datetime('now'))
@@ -106,6 +132,10 @@ db.exec(`
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     frequency TEXT DEFAULT 'daily',
+    category TEXT DEFAULT 'pessoal',
+    streak_target INTEGER DEFAULT 30,
+    goal_id TEXT,
+    source TEXT DEFAULT 'manual',
     status TEXT DEFAULT 'active',
     created_date TEXT DEFAULT (datetime('now'))
   );
@@ -242,11 +272,29 @@ for (const a of defaultAchievements) {
 // Migrate: add category column to habits if missing
 const habitsCols = db.prepare("PRAGMA table_info(habits)").all().map(c => c.name);
 if (!habitsCols.includes('category')) {
-  db.exec("ALTER TABLE habits ADD COLUMN category TEXT DEFAULT ''");
+  db.exec("ALTER TABLE habits ADD COLUMN category TEXT DEFAULT 'pessoal'");
+}
+if (!habitsCols.includes('streak_target')) {
+  db.exec("ALTER TABLE habits ADD COLUMN streak_target INTEGER DEFAULT 30");
+}
+if (!habitsCols.includes('goal_id')) {
+  db.exec("ALTER TABLE habits ADD COLUMN goal_id TEXT");
+}
+if (!habitsCols.includes('source')) {
+  db.exec("ALTER TABLE habits ADD COLUMN source TEXT DEFAULT 'manual'");
 }
 
-// Migrate: add recurrence columns to tasks
+// Migrate: add task metadata/recurrence columns
 const tasksCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+if (!tasksCols.includes('goal_id')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN goal_id TEXT");
+}
+if (!tasksCols.includes('source')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN source TEXT DEFAULT 'manual'");
+}
+if (!tasksCols.includes('duration_minutes')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN duration_minutes INTEGER");
+}
 if (!tasksCols.includes('recurrence')) {
   db.exec("ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none'");
 }
@@ -330,6 +378,140 @@ print(result['text'])
 });
 
 // ==================== TASKS ====================
+const FORJA_CALENDAR_SYNC_ENABLED = !['0', 'false', 'no'].includes(String(process.env.FORJA_CALENDAR_SYNC_ENABLED ?? '1').toLowerCase());
+const FORJA_CALENDAR_ID = process.env.FORJA_CALENDAR_ID || process.env.GOG_ACCOUNT || 'joaovs.goncalves1@gmail.com';
+const FORJA_DEFAULT_TASK_DURATION_MINUTES = Math.max(5, Math.min(Number(process.env.FORJA_DEFAULT_TASK_DURATION_MINUTES) || 60, 480));
+const CALENDAR_REMINDERS = (process.env.FORJA_CALENDAR_REMINDERS || 'popup:30,popup:10')
+  .split(',')
+  .map(v => v.trim())
+  .filter(Boolean);
+
+function gogEnv() {
+  return {
+    ...process.env,
+    HOME: process.env.HOME || '/root',
+    PATH: process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+  };
+}
+
+function runGogJson(args, timeout = 20000) {
+  const output = execFileSync('gog', args, {
+    encoding: 'utf-8',
+    timeout,
+    env: gogEnv(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return JSON.parse(output || '{}');
+}
+
+function fortalezaDateTime(date, time) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return null;
+  const match = String(time || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return `${date}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00-03:00`;
+}
+
+function formatFortalezaOffset(dateObj) {
+  const shifted = new Date(dateObj.getTime() - 3 * 60 * 60 * 1000);
+  const yyyy = shifted.getUTCFullYear();
+  const mm = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(shifted.getUTCDate()).padStart(2, '0');
+  const hh = String(shifted.getUTCHours()).padStart(2, '0');
+  const mi = String(shifted.getUTCMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}:00-03:00`;
+}
+
+function taskCalendarWindow(task) {
+  const start = fortalezaDateTime(task.date, task.time);
+  if (!start) return null;
+  const duration = Math.max(5, Math.min(Number(task.duration_minutes) || FORJA_DEFAULT_TASK_DURATION_MINUTES, 480));
+  const end = formatFortalezaOffset(new Date(new Date(start).getTime() + duration * 60 * 1000));
+  return { start, end };
+}
+
+function shouldSyncTaskToCalendar(task) {
+  if (!FORJA_CALENDAR_SYNC_ENABLED) return false;
+  if (!task?.date || !task?.time) return false;
+  return !['completed', 'done', 'cancelled'].includes(String(task.status || '').toLowerCase());
+}
+
+function taskCalendarDescription(task) {
+  const parts = [
+    'Criado pela Forja do Jota.',
+    `Task ID: ${task.id}`,
+  ];
+  if (task.description) parts.push('', task.description);
+  return parts.join('\n');
+}
+
+function buildCalendarArgs(command, task, eventId = null) {
+  const window = taskCalendarWindow(task);
+  if (!window) return null;
+  const base = ['calendar', command, FORJA_CALENDAR_ID];
+  if (eventId) base.push(eventId);
+  base.push(
+    '--summary', task.title,
+    '--from', window.start,
+    '--to', window.end,
+    '--description', taskCalendarDescription(task),
+    '--event-color', '6',
+    '--json', '--no-input'
+  );
+  for (const reminder of CALENDAR_REMINDERS) base.push('--reminder', reminder);
+  return base;
+}
+
+function syncTaskToCalendar(task) {
+  if (!FORJA_CALENDAR_SYNC_ENABLED) return { skipped: true, reason: 'calendar sync disabled' };
+
+  if (!shouldSyncTaskToCalendar(task)) {
+    if (task.calendar_event_id) {
+      try {
+        runGogJson(['calendar', 'delete', FORJA_CALENDAR_ID, task.calendar_event_id, '--force', '--json', '--no-input']);
+        db.prepare('UPDATE tasks SET calendar_event_id = NULL, updated_date = datetime(\'now\') WHERE id = ?').run(task.id);
+        calendarCache = { data: null, date: null, timestamp: 0 };
+        return { action: 'deleted', event_id: task.calendar_event_id };
+      } catch (error) {
+        return { action: 'delete_failed', event_id: task.calendar_event_id, error: error.message };
+      }
+    }
+    return { skipped: true, reason: 'task has no date/time or is completed/cancelled' };
+  }
+
+  const existingEventId = task.calendar_event_id;
+  const command = existingEventId ? 'update' : 'create';
+  const args = buildCalendarArgs(command, task, existingEventId);
+  if (!args) return { skipped: true, reason: 'invalid task date/time' };
+
+  try {
+    const parsed = runGogJson(args);
+    const event = parsed.event || parsed;
+    const eventId = event?.id || existingEventId;
+    if (eventId && eventId !== existingEventId) {
+      db.prepare('UPDATE tasks SET calendar_event_id = ?, updated_date = datetime(\'now\') WHERE id = ?').run(eventId, task.id);
+    }
+    calendarCache = { data: null, date: null, timestamp: 0 };
+    return { action: command === 'create' ? 'created' : 'updated', event_id: eventId, htmlLink: event?.htmlLink || null };
+  } catch (error) {
+    if (existingEventId && /notFound|Not Found|404/i.test(error.message || '')) {
+      try {
+        const createArgs = buildCalendarArgs('create', { ...task, calendar_event_id: null });
+        const parsed = runGogJson(createArgs);
+        const event = parsed.event || parsed;
+        if (event?.id) db.prepare('UPDATE tasks SET calendar_event_id = ?, updated_date = datetime(\'now\') WHERE id = ?').run(event.id, task.id);
+        calendarCache = { data: null, date: null, timestamp: 0 };
+        return { action: 'recreated', event_id: event?.id || null, htmlLink: event?.htmlLink || null };
+      } catch (retryError) {
+        return { action: 'recreate_failed', event_id: existingEventId, error: retryError.message };
+      }
+    }
+    return { action: `${command}_failed`, event_id: existingEventId || null, error: error.message };
+  }
+}
+
 app.get('/api/tasks', (req, res) => {
   const { date, status, category, limit = 100 } = req.query;
   let query = 'SELECT * FROM tasks WHERE 1=1';
@@ -379,8 +561,13 @@ function nextRecurrenceDate(fromDate, recurrence, recurrenceDaysJson) {
     return base.toISOString().split('T')[0];
   }
   if (recurrence === 'monthly') {
-    base.setMonth(base.getMonth() + 1);
-    return base.toISOString().split('T')[0];
+    const originalDay = base.getDate();
+    const target = new Date(base);
+    target.setDate(1);
+    target.setMonth(target.getMonth() + 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(originalDay, lastDay));
+    return target.toISOString().split('T')[0];
   }
   return null;
 }
@@ -389,31 +576,34 @@ app.post('/api/tasks', (req, res) => {
   const id = uuidv4();
   const {
     title, description = '', date, time, status = 'pending',
-    priority = 'medium', category = 'personal', calendar_event_id,
-    recurrence = 'none', recurrence_days = [], recurrence_parent_id
+    priority = 'medium', category = 'pessoal', goal_id = null, source = 'manual', duration_minutes,
+    calendar_event_id, recurrence = 'none', recurrence_days = [], recurrence_parent_id
   } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   db.prepare(`
-    INSERT INTO tasks (id, title, description, date, time, status, priority, category, calendar_event_id, recurrence, recurrence_days, recurrence_parent_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days, recurrence_parent_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, title, description, date || null, time || null, status, priority, category,
+    goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
     calendar_event_id || null, recurrence,
     JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
     recurrence_parent_id || null
   );
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-  res.status(201).json(task);
+  const calendarSync = syncTaskToCalendar(task);
+  const savedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  res.status(201).json({ ...savedTask, calendar_sync: calendarSync });
 });
 
 app.put('/api/tasks/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  const { title, description, date, time, status, priority, category, calendar_event_id, recurrence, recurrence_days } = req.body;
+  const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days } = req.body;
 
   db.prepare(`
     UPDATE tasks SET
@@ -424,19 +614,26 @@ app.put('/api/tasks/:id', (req, res) => {
       status = COALESCE(?, status),
       priority = COALESCE(?, priority),
       category = COALESCE(?, category),
+      goal_id = COALESCE(?, goal_id),
+      source = COALESCE(?, source),
+      duration_minutes = COALESCE(?, duration_minutes),
       calendar_event_id = COALESCE(?, calendar_event_id),
       recurrence = COALESCE(?, recurrence),
       recurrence_days = COALESCE(?, recurrence_days),
       updated_date = datetime('now')
     WHERE id = ?
   `).run(
-    title, description, date, time, status, priority, category, calendar_event_id,
+    title, description, date, time, status, priority, category,
+    goal_id, source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
     recurrence,
     recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
     req.params.id
   );
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  const calendarSync = syncTaskToCalendar(task);
+  const syncedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  let nextOccurrenceSync = null;
 
   // When a recurring task is completed, spawn the next occurrence.
   // We only spawn from the "template" (the task itself, regardless of parent),
@@ -452,27 +649,31 @@ app.put('/api/tasks/:id', (req, res) => {
         'SELECT id FROM tasks WHERE recurrence_parent_id = ? AND date = ?'
       ).get(parentRef, nextDate);
       if (!existingChild) {
+        const childId = uuidv4();
         db.prepare(`
-          INSERT INTO tasks (id, title, description, date, time, status, priority, category, recurrence, recurrence_days, recurrence_parent_id)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+          INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, recurrence, recurrence_days, recurrence_parent_id)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
-          uuidv4(), task.title, task.description, nextDate, task.time,
-          task.priority, task.category, task.recurrence,
-          task.recurrence_days || '[]', parentRef
+          childId, task.title, task.description, nextDate, task.time,
+          task.priority, task.category, task.goal_id || null, task.source || 'recurrence', task.duration_minutes || null,
+          task.recurrence, task.recurrence_days || '[]', parentRef
         );
+        const childTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(childId);
+        nextOccurrenceSync = syncTaskToCalendar(childTask);
       }
     }
   }
 
-  res.json(task);
+  res.json({ ...syncedTask, calendar_sync: calendarSync, next_occurrence_sync: nextOccurrenceSync });
 });
 
 app.delete('/api/tasks/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
   
+  const calendarSync = syncTaskToCalendar({ ...existing, status: 'cancelled' });
   db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
+  res.json({ success: true, calendar_sync: calendarSync });
 });
 
 // ==================== HABITS (streak helper) ====================
@@ -537,14 +738,14 @@ app.get('/api/habits', (req, res) => {
 
 app.post('/api/habits', (req, res) => {
   const id = uuidv4();
-  const { title, description = '', frequency = 'daily' } = req.body;
+  const { title, description = '', frequency = 'daily', category = 'pessoal', streak_target = 30, goal_id = null, source = 'manual' } = req.body;
   
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   db.prepare(`
-    INSERT INTO habits (id, title, description, frequency)
-    VALUES (?, ?, ?, ?)
-  `).run(id, title, description, frequency);
+    INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, description, frequency, category, Number(streak_target) || 30, goal_id || null, source || 'manual');
 
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(id);
   res.status(201).json(habit);
@@ -554,16 +755,20 @@ app.put('/api/habits/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Habit not found' });
 
-  const { title, description, frequency, status } = req.body;
+  const { title, description, frequency, category, streak_target, goal_id, source, status } = req.body;
 
   db.prepare(`
     UPDATE habits SET 
       title = COALESCE(?, title),
       description = COALESCE(?, description),
       frequency = COALESCE(?, frequency),
+      category = COALESCE(?, category),
+      streak_target = COALESCE(?, streak_target),
+      goal_id = COALESCE(?, goal_id),
+      source = COALESCE(?, source),
       status = COALESCE(?, status)
     WHERE id = ?
-  `).run(title, description, frequency, status, req.params.id);
+  `).run(title, description, frequency, category, streak_target !== undefined ? Number(streak_target) : null, goal_id, source, status, req.params.id);
 
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
   res.json(habit);
@@ -897,12 +1102,12 @@ app.get('/api/calendar/today', (req, res) => {
     const fromTime = `${todayDate}T00:00:00-03:00`;
     const toTime = `${todayDate}T23:59:59-03:00`;
 
-    const rawOutput = execSync(
-      `gog calendar list joaovs.goncalves1@gmail.com --from '${fromTime}' --to '${toTime}' --json --no-input`,
-      { encoding: 'utf-8', timeout: 15000 }
-    );
-
-    const parsed = JSON.parse(rawOutput);
+    const parsed = runGogJson([
+      'calendar', 'list', FORJA_CALENDAR_ID,
+      '--from', fromTime,
+      '--to', toTime,
+      '--json', '--no-input'
+    ], 15000);
     const events = (parsed.events || []).map(ev => ({
       title: ev.summary || '(Sem título)',
       start: ev.start?.dateTime || ev.start?.date || null,

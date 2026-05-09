@@ -122,11 +122,11 @@ export default function Dashboard() {
     sideCol = ['habits', 'calendar', 'rituals', 'gamification', 'posts', 'water'];
   } else if (tod === 'evening') {
     mainCol = ['tasks', 'wellness', 'heatmap', 'weeklyProgress'];
-    sideCol = ['habits', 'gamification', 'correlation', 'rituals', 'water'];
+    sideCol = ['calendar', 'habits', 'gamification', 'correlation', 'rituals', 'water'];
   } else {
-    // late night — minimal, soft
+    // late night — minimal, but keep calendar visible for reminders.
     mainCol = ['wellness', 'heatmap'];
-    sideCol = ['habits', 'gamification'];
+    sideCol = ['calendar', 'habits', 'gamification'];
   }
 
   return (
