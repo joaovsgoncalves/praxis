@@ -3,8 +3,8 @@
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
 // Em dev local, .env define VITE_FORJA_API para o backend da Forja.
+// Nunca colocar segredo administrativo em VITE_*: tudo que começa com VITE é exposto no bundle.
 const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
-const FORJA_KEY = import.meta.env.VITE_FORJA_API_KEY || '';
 
 // Endpoints whose GET responses we mirror to localStorage so the UI keeps
 // working when the backend is unreachable (Tailscale offline, VPS down, etc).
@@ -17,6 +17,10 @@ const OFFLINE_CACHEABLE = [
   '/api/goals',
   '/api/gamification',
   '/api/calendar/today',
+  '/api/focus/stats',
+  '/api/insights/best-hours',
+  '/api/insights/correlation',
+  '/api/weekly-reviews',
 ];
 
 const OFFLINE_KEY_PREFIX = 'forja:offline:';
@@ -60,7 +64,6 @@ export function getOfflineStatus() {
 
 async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
-  if (FORJA_KEY) headers['Authorization'] = `Bearer ${FORJA_KEY}`;
 
   const isGet = !options.method || options.method === 'GET';
 
@@ -210,12 +213,9 @@ export const forjaApi = {
   transcribe: async (audioBlob) => {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'audio.webm');
-    const headers = {};
-    if (FORJA_KEY) headers['Authorization'] = `Bearer ${FORJA_KEY}`;
     const res = await fetch(`${FORJA_API}/api/transcribe`, {
       method: 'POST',
       body: formData,
-      headers,
     });
     if (!res.ok) throw new Error('Transcription failed');
     return res.json();

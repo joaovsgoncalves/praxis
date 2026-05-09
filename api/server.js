@@ -35,8 +35,10 @@ if (!OPENAI_API_KEY) {
   } catch {}
 }
 
-// Load Forja API key (optional — if unset, auth is disabled for local/dev use)
+// Load Forja API key. This is for server/server or automation callers only.
+// Do NOT expose it through VITE_* env vars: browser bundles are public.
 let FORJA_API_KEY = process.env.FORJA_API_KEY;
+const FORJA_AUTH_REQUIRED = ['1', 'true', 'yes'].includes(String(process.env.FORJA_AUTH_REQUIRED || '').toLowerCase());
 if (!FORJA_API_KEY) {
   try {
     const envFile = fs.readFileSync('/root/.hermes/secrets/api_keys.env', 'utf-8');
@@ -53,13 +55,18 @@ const PORT = process.env.PORT || 18556;
 app.use(cors());
 app.use(express.json());
 
-// API key auth — applies to every /api/* route except health.
-// If FORJA_API_KEY is unset, auth is bypassed (preserves local/dev workflow).
+// API key auth — applies to every /api/* route except health only when
+// explicitly enabled. Legacy/browser production stays public because the Vercel
+// rewrite cannot safely inject a server-only secret. Set FORJA_AUTH_REQUIRED=1
+// only behind a trusted server-side proxy that adds Authorization internally.
 const PUBLIC_PATHS = new Set(['/api/health']);
 app.use((req, res, next) => {
-  if (!FORJA_API_KEY) return next();
   if (PUBLIC_PATHS.has(req.path)) return next();
   if (!req.path.startsWith('/api/')) return next();
+  if (!FORJA_AUTH_REQUIRED) return next();
+  if (!FORJA_API_KEY) {
+    return res.status(503).json({ error: 'Forja API auth is required but FORJA_API_KEY is not configured' });
+  }
 
   const header = req.headers['authorization'] || '';
   const provided = header.startsWith('Bearer ') ? header.slice(7) : req.headers['x-forja-key'];
@@ -1125,7 +1132,7 @@ function checkAchievements(db) {
   const today = new Date().toISOString().split('T')[0];
 
   // first_task: at least 1 completed task
-  const completedTasks = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status = 'done'").get().c;
+  const completedTasks = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status IN ('completed', 'done')").get().c;
   const firstTask = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'first_task'").get();
   if (firstTask && !firstTask.unlocked_date && completedTasks >= 1) {
     db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'first_task'").run(today);

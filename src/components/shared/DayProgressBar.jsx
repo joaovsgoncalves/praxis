@@ -1,5 +1,4 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
 
 export default function DayProgressBar({ habits = [], habitLogs = [], tasks = [] }) {
   const today = new Date().toISOString().split('T')[0];

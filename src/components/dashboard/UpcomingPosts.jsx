@@ -7,7 +7,6 @@ import { Camera, Calendar, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',

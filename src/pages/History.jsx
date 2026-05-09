@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Timer, Flame, Moon, Smile, Zap } from 'lucide-react';
+import { Timer, Flame, Smile, Zap } from 'lucide-react';
 
 export default function History() {
   const [range, setRange] = useState('30');
