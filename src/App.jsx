@@ -15,6 +15,7 @@ import History from '@/pages/History';
 import Settings from '@/pages/Settings';
 import VoiceCapture from '@/pages/VoiceCapture';
 import Achievements from '@/pages/Achievements';
+import WeeklyReview from '@/pages/WeeklyReview';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         <Route path="/configuracoes" element={<Settings />} />
         <Route path="/captura" element={<VoiceCapture />} />
         <Route path="/conquistas" element={<Achievements />} />
+        <Route path="/revisao-semanal" element={<WeeklyReview />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

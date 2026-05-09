@@ -55,6 +55,14 @@ module.exports = {
   				'5': 'hsl(var(--chart-5))'
   			},
   			gold: 'hsl(var(--gold))',
+			domain: {
+				ember: 'hsl(var(--domain-ember))',
+				gold: 'hsl(var(--domain-gold))',
+				focus: 'hsl(var(--domain-focus))',
+				wellness: 'hsl(var(--domain-wellness))',
+				sky: 'hsl(var(--domain-sky))',
+				pink: 'hsl(var(--domain-pink))',
+			},
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',

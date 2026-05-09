@@ -43,6 +43,14 @@
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 240 4% 14%;
     --sidebar-ring: 40 95% 55%;
+
+    /* Domain palette — semantic colors per area of the app */
+    --domain-ember: 22 95% 58%;     /* streaks, rituals (fire) */
+    --domain-gold: 40 95% 55%;      /* XP, level, achievements */
+    --domain-focus: 265 85% 65%;    /* deep work, pomodoro */
+    --domain-wellness: 160 80% 50%; /* habits done, health */
+    --domain-sky: 200 85% 60%;      /* calendar, time */
+    --domain-pink: 330 80% 65%;     /* @jotav.fit, content */
   }
 
   .dark {
@@ -79,6 +87,13 @@
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 240 4% 14%;
     --sidebar-ring: 40 95% 55%;
+
+    --domain-ember: 22 95% 58%;
+    --domain-gold: 40 95% 55%;
+    --domain-focus: 265 85% 65%;
+    --domain-wellness: 160 80% 50%;
+    --domain-sky: 200 85% 60%;
+    --domain-pink: 330 80% 65%;
   }
 }
 
@@ -87,6 +102,94 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply text-foreground font-sans;
+    /* Ambient mesh — barely-there warm/cool gradient pinned to viewport */
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(circle at 12% -8%, hsl(265 70% 18% / 0.55), transparent 45%),
+      radial-gradient(circle at 95% 0%, hsl(22 80% 28% / 0.30), transparent 40%),
+      radial-gradient(circle at 50% 110%, hsl(265 60% 14% / 0.45), transparent 55%),
+      radial-gradient(circle at -5% 70%, hsl(40 85% 18% / 0.20), transparent 40%);
+    background-attachment: fixed;
   }
+}
+
+@layer components {
+  /* Glass surface for hero and key elevated cards */
+  .glass-surface {
+    background: linear-gradient(
+      145deg,
+      hsl(var(--card) / 0.78) 0%,
+      hsl(var(--card) / 0.55) 100%
+    );
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid hsl(0 0% 100% / 0.06);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.04),
+      0 6px 24px hsl(0 0% 0% / 0.35);
+  }
+
+  /* Domain card — adds a soft outer glow + accent border in the domain hue */
+  .card-domain {
+    --domain: var(--domain-focus);
+    position: relative;
+    transition: box-shadow 240ms ease, border-color 240ms ease, transform 240ms ease;
+  }
+  .card-domain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px hsl(var(--domain) / 0.18);
+    transition: box-shadow 240ms ease;
+  }
+  .card-domain:hover {
+    box-shadow:
+      0 8px 28px hsl(var(--domain) / 0.10),
+      0 0 0 1px hsl(var(--domain) / 0.32);
+    transform: translateY(-1px);
+  }
+  .card-domain:hover::before {
+    box-shadow: inset 0 0 0 1px hsl(var(--domain) / 0.40);
+  }
+
+  /* Inset shadow for progress fill rails */
+  .rail-inset {
+    box-shadow: inset 0 1px 2px hsl(0 0% 0% / 0.4);
+  }
+
+  /* Faded fade-in for ambient elements */
+  .ember-canvas {
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.85;
+  }
+}
+
+@layer utilities {
+  .domain-ember    { --domain: var(--domain-ember); }
+  .domain-gold     { --domain: var(--domain-gold); }
+  .domain-focus    { --domain: var(--domain-focus); }
+  .domain-wellness { --domain: var(--domain-wellness); }
+  .domain-sky      { --domain: var(--domain-sky); }
+  .domain-pink     { --domain: var(--domain-pink); }
+
+  .text-domain { color: hsl(var(--domain)); }
+  .bg-domain   { background-color: hsl(var(--domain)); }
+
+  /* Sparkle keyframe used by habit complete micro-animation */
+  @keyframes spark-burst {
+    0%   { transform: scale(0.4) translate(0, 0); opacity: 1; }
+    60%  { opacity: 1; }
+    100% { transform: scale(1) translate(var(--sx, 0), var(--sy, 0)); opacity: 0; }
+  }
+  .spark { animation: spark-burst 700ms ease-out forwards; }
+
+  @keyframes ring-pulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+  }
+  .ring-pulse { animation: ring-pulse 2.5s ease-in-out infinite; }
 }

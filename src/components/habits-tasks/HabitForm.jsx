@@ -47,10 +47,13 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
       </div>
       <Input type="number" placeholder="Meta de streak (dias)" value={form.streak_target} onChange={e => setForm(f => ({ ...f, streak_target: e.target.value }))} className="bg-secondary/50" />
       {goals.length > 0 && (
-        <Select value={form.goal_id} onValueChange={v => setForm(f => ({ ...f, goal_id: v }))}>
+        <Select
+          value={form.goal_id || 'none'}
+          onValueChange={v => setForm(f => ({ ...f, goal_id: v === 'none' ? '' : v }))}
+        >
           <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Vincular a meta (opcional)" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value={null}>Nenhuma</SelectItem>
+            <SelectItem value="none">Nenhuma</SelectItem>
             {goals.map(g => <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}
           </SelectContent>
         </Select>

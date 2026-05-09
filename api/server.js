@@ -35,6 +35,18 @@ if (!OPENAI_API_KEY) {
   } catch {}
 }
 
+// Load Forja API key. This is for server/server or automation callers only.
+// Do NOT expose it through VITE_* env vars: browser bundles are public.
+let FORJA_API_KEY = process.env.FORJA_API_KEY;
+const FORJA_AUTH_REQUIRED = ['1', 'true', 'yes'].includes(String(process.env.FORJA_AUTH_REQUIRED || '').toLowerCase());
+if (!FORJA_API_KEY) {
+  try {
+    const envFile = fs.readFileSync('/root/.hermes/secrets/api_keys.env', 'utf-8');
+    const match = envFile.match(/FORJA_API_KEY\s*=\s*(.+)/);
+    if (match) FORJA_API_KEY = match[1].trim();
+  } catch {}
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 18556;
@@ -42,6 +54,26 @@ const PORT = process.env.PORT || 18556;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// API key auth — applies to every /api/* route except health only when
+// explicitly enabled. Legacy/browser production stays public because the Vercel
+// rewrite cannot safely inject a server-only secret. Set FORJA_AUTH_REQUIRED=1
+// only behind a trusted server-side proxy that adds Authorization internally.
+const PUBLIC_PATHS = new Set(['/api/health']);
+app.use((req, res, next) => {
+  if (PUBLIC_PATHS.has(req.path)) return next();
+  if (!req.path.startsWith('/api/')) return next();
+  if (!FORJA_AUTH_REQUIRED) return next();
+  if (!FORJA_API_KEY) {
+    return res.status(503).json({ error: 'Forja API auth is required but FORJA_API_KEY is not configured' });
+  }
+
+  const header = req.headers['authorization'] || '';
+  const provided = header.startsWith('Bearer ') ? header.slice(7) : req.headers['x-forja-key'];
+  if (provided && provided === FORJA_API_KEY) return next();
+
+  return res.status(401).json({ error: 'Unauthorized' });
+});
 
 // File upload
 const upload = multer({ 
@@ -163,6 +195,18 @@ db.exec(`
     xp_reward INTEGER DEFAULT 0,
     unlocked_date TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS weekly_reviews (
+    id TEXT PRIMARY KEY,
+    week_start TEXT NOT NULL UNIQUE,
+    highlights TEXT DEFAULT '',
+    blockers TEXT DEFAULT '',
+    learnings TEXT DEFAULT '',
+    next_week_focus TEXT DEFAULT '',
+    overall_score INTEGER DEFAULT 3,
+    created_date TEXT DEFAULT (datetime('now')),
+    updated_date TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Ensure default user settings row exists
@@ -199,6 +243,18 @@ for (const a of defaultAchievements) {
 const habitsCols = db.prepare("PRAGMA table_info(habits)").all().map(c => c.name);
 if (!habitsCols.includes('category')) {
   db.exec("ALTER TABLE habits ADD COLUMN category TEXT DEFAULT ''");
+}
+
+// Migrate: add recurrence columns to tasks
+const tasksCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+if (!tasksCols.includes('recurrence')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none'");
+}
+if (!tasksCols.includes('recurrence_days')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN recurrence_days TEXT DEFAULT '[]'");
+}
+if (!tasksCols.includes('recurrence_parent_id')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN recurrence_parent_id TEXT");
 }
 
 // ==================== CATEGORIES ====================
@@ -296,16 +352,58 @@ app.get('/api/tasks/:id', (req, res) => {
   res.json(enrichCategory(task));
 });
 
+// Compute next occurrence date for a recurring task starting from `fromDate` (YYYY-MM-DD).
+function nextRecurrenceDate(fromDate, recurrence, recurrenceDaysJson) {
+  if (!fromDate || !recurrence || recurrence === 'none') return null;
+  const base = new Date(fromDate + 'T12:00:00');
+  if (isNaN(base.getTime())) return null;
+
+  if (recurrence === 'daily') {
+    base.setDate(base.getDate() + 1);
+    return base.toISOString().split('T')[0];
+  }
+  if (recurrence === 'weekly') {
+    let days = [];
+    try { days = JSON.parse(recurrenceDaysJson || '[]'); } catch {}
+    if (!Array.isArray(days) || days.length === 0) {
+      base.setDate(base.getDate() + 7);
+      return base.toISOString().split('T')[0];
+    }
+    const allowed = new Set(days.map(Number).filter(n => n >= 0 && n <= 6));
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      if (allowed.has(d.getDay())) return d.toISOString().split('T')[0];
+    }
+    base.setDate(base.getDate() + 7);
+    return base.toISOString().split('T')[0];
+  }
+  if (recurrence === 'monthly') {
+    base.setMonth(base.getMonth() + 1);
+    return base.toISOString().split('T')[0];
+  }
+  return null;
+}
+
 app.post('/api/tasks', (req, res) => {
   const id = uuidv4();
-  const { title, description = '', date, time, status = 'pending', priority = 'medium', category = 'personal', calendar_event_id } = req.body;
+  const {
+    title, description = '', date, time, status = 'pending',
+    priority = 'medium', category = 'personal', calendar_event_id,
+    recurrence = 'none', recurrence_days = [], recurrence_parent_id
+  } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   db.prepare(`
-    INSERT INTO tasks (id, title, description, date, time, status, priority, category, calendar_event_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, description, date || null, time || null, status, priority, category, calendar_event_id || null);
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, calendar_event_id, recurrence, recurrence_days, recurrence_parent_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, title, description, date || null, time || null, status, priority, category,
+    calendar_event_id || null, recurrence,
+    JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
+    recurrence_parent_id || null
+  );
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
   res.status(201).json(task);
@@ -315,10 +413,10 @@ app.put('/api/tasks/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  const { title, description, date, time, status, priority, category, calendar_event_id } = req.body;
+  const { title, description, date, time, status, priority, category, calendar_event_id, recurrence, recurrence_days } = req.body;
 
   db.prepare(`
-    UPDATE tasks SET 
+    UPDATE tasks SET
       title = COALESCE(?, title),
       description = COALESCE(?, description),
       date = COALESCE(?, date),
@@ -327,11 +425,45 @@ app.put('/api/tasks/:id', (req, res) => {
       priority = COALESCE(?, priority),
       category = COALESCE(?, category),
       calendar_event_id = COALESCE(?, calendar_event_id),
+      recurrence = COALESCE(?, recurrence),
+      recurrence_days = COALESCE(?, recurrence_days),
       updated_date = datetime('now')
     WHERE id = ?
-  `).run(title, description, date, time, status, priority, category, calendar_event_id, req.params.id);
+  `).run(
+    title, description, date, time, status, priority, category, calendar_event_id,
+    recurrence,
+    recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
+    req.params.id
+  );
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+
+  // When a recurring task is completed, spawn the next occurrence.
+  // We only spawn from the "template" (the task itself, regardless of parent),
+  // and only when status transitions to 'completed' or 'done'.
+  const becameDone = (status === 'completed' || status === 'done') &&
+                     existing.status !== 'completed' && existing.status !== 'done';
+  if (becameDone && task.recurrence && task.recurrence !== 'none' && task.date) {
+    const nextDate = nextRecurrenceDate(task.date, task.recurrence, task.recurrence_days);
+    if (nextDate) {
+      // Avoid duplicates: if a child for nextDate already exists, skip.
+      const parentRef = task.recurrence_parent_id || task.id;
+      const existingChild = db.prepare(
+        'SELECT id FROM tasks WHERE recurrence_parent_id = ? AND date = ?'
+      ).get(parentRef, nextDate);
+      if (!existingChild) {
+        db.prepare(`
+          INSERT INTO tasks (id, title, description, date, time, status, priority, category, recurrence, recurrence_days, recurrence_parent_id)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+        `).run(
+          uuidv4(), task.title, task.description, nextDate, task.time,
+          task.priority, task.category, task.recurrence,
+          task.recurrence_days || '[]', parentRef
+        );
+      }
+    }
+  }
+
   res.json(task);
 });
 
@@ -1000,7 +1132,7 @@ function checkAchievements(db) {
   const today = new Date().toISOString().split('T')[0];
 
   // first_task: at least 1 completed task
-  const completedTasks = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status = 'done'").get().c;
+  const completedTasks = db.prepare("SELECT COUNT(*) as c FROM tasks WHERE status IN ('completed', 'done')").get().c;
   const firstTask = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'first_task'").get();
   if (firstTask && !firstTask.unlocked_date && completedTasks >= 1) {
     db.prepare("UPDATE achievements SET unlocked_date = ? WHERE id = 'first_task'").run(today);
@@ -1205,6 +1337,178 @@ app.post('/api/gamification/check-achievements', (req, res) => {
     console.error('Check achievements error:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// ==================== FOCUS STATS ====================
+// GET /api/focus/stats?days=30 — total focus seconds per task over a window.
+app.get('/api/focus/stats', (req, res) => {
+  try {
+    const days = Number(req.query.days) || 30;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffISO = cutoff.toISOString();
+
+    const rows = db.prepare(`
+      SELECT
+        task_id,
+        COALESCE(MAX(task_title), '(sem tarefa)') AS task_title,
+        SUM(duration_seconds) AS total_seconds,
+        COUNT(*) AS sessions
+      FROM focus_sessions
+      WHERE created_date >= ?
+      GROUP BY task_id, task_title
+      ORDER BY total_seconds DESC
+      LIMIT 20
+    `).all(cutoffISO);
+
+    res.json(rows.map(r => ({
+      task_id: r.task_id,
+      task_title: r.task_title,
+      total_seconds: r.total_seconds || 0,
+      total_minutes: Math.round((r.total_seconds || 0) / 60),
+      sessions: r.sessions,
+    })));
+  } catch (error) {
+    console.error('Focus stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== WELLNESS x HABITS CORRELATION ====================
+// GET /api/insights/correlation — splits days by habit completion rate (>=80% vs <80%)
+// and returns averages of mood/sleep/productivity for each bucket.
+app.get('/api/insights/correlation', (req, res) => {
+  try {
+    const days = Math.min(Number(req.query.days) || 60, 180);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+
+    const wellnessRows = db.prepare(
+      'SELECT date, sleep_hours, sleep_quality, mood, productivity FROM wellness_checks WHERE date >= ? ORDER BY date ASC'
+    ).all(cutoffStr);
+
+    if (wellnessRows.length < 5) {
+      return res.json({
+        enough_data: false,
+        message: 'Preciso de pelo menos 5 dias com check-in de bem-estar para comparar.',
+        days_analyzed: wellnessRows.length,
+      });
+    }
+
+    const activeHabitsCount = db.prepare("SELECT COUNT(*) as c FROM habits WHERE status = 'active'").get().c;
+    if (activeHabitsCount === 0) {
+      return res.json({
+        enough_data: false,
+        message: 'Nenhum hábito ativo para correlacionar.',
+        days_analyzed: wellnessRows.length,
+      });
+    }
+
+    const high = { mood: 0, sleep_hours: 0, productivity: 0, count: 0 };
+    const low = { mood: 0, sleep_hours: 0, productivity: 0, count: 0 };
+
+    for (const w of wellnessRows) {
+      const completed = db.prepare(
+        `SELECT COUNT(DISTINCT habit_id) as c FROM habit_logs
+         WHERE date = ? AND completed = 1
+         AND habit_id IN (SELECT id FROM habits WHERE status = 'active')`
+      ).get(w.date).c;
+      const rate = completed / activeHabitsCount;
+      const bucket = rate >= 0.8 ? high : low;
+      bucket.mood += w.mood || 0;
+      bucket.sleep_hours += w.sleep_hours || 0;
+      bucket.productivity += w.productivity || 0;
+      bucket.count += 1;
+    }
+
+    const avg = (b) => b.count === 0 ? null : {
+      mood: +(b.mood / b.count).toFixed(2),
+      sleep_hours: +(b.sleep_hours / b.count).toFixed(2),
+      productivity: +(b.productivity / b.count).toFixed(2),
+      days: b.count,
+    };
+
+    const highAvg = avg(high);
+    const lowAvg = avg(low);
+
+    let insight = null;
+    if (highAvg && lowAvg) {
+      const moodDelta = +(highAvg.mood - lowAvg.mood).toFixed(2);
+      const sleepDelta = +(highAvg.sleep_hours - lowAvg.sleep_hours).toFixed(2);
+      const prodDelta = +(highAvg.productivity - lowAvg.productivity).toFixed(2);
+      insight = { mood_delta: moodDelta, sleep_delta: sleepDelta, productivity_delta: prodDelta };
+    }
+
+    res.json({
+      enough_data: true,
+      days_analyzed: wellnessRows.length,
+      high_completion: highAvg,
+      low_completion: lowAvg,
+      insight,
+    });
+  } catch (error) {
+    console.error('Correlation insights error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== WEEKLY REVIEWS ====================
+// We anchor weeks on Monday (ISO). week_start is YYYY-MM-DD of that Monday.
+function mondayOf(dateStr) {
+  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+  const day = d.getDay(); // 0 = Sunday
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+
+app.get('/api/weekly-reviews', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 12, 52);
+  const reviews = db.prepare(
+    'SELECT * FROM weekly_reviews ORDER BY week_start DESC LIMIT ?'
+  ).all(limit);
+  res.json(reviews);
+});
+
+app.get('/api/weekly-reviews/current', (req, res) => {
+  const weekStart = mondayOf(req.query.date);
+  const review = db.prepare('SELECT * FROM weekly_reviews WHERE week_start = ?').get(weekStart);
+  res.json({ week_start: weekStart, review: review || null });
+});
+
+app.post('/api/weekly-reviews', (req, res) => {
+  const {
+    week_start, highlights = '', blockers = '', learnings = '',
+    next_week_focus = '', overall_score = 3
+  } = req.body;
+  const ws = mondayOf(week_start);
+
+  const existing = db.prepare('SELECT id FROM weekly_reviews WHERE week_start = ?').get(ws);
+  if (existing) {
+    db.prepare(`
+      UPDATE weekly_reviews SET
+        highlights = ?, blockers = ?, learnings = ?,
+        next_week_focus = ?, overall_score = ?,
+        updated_date = datetime('now')
+      WHERE id = ?
+    `).run(highlights, blockers, learnings, next_week_focus, overall_score, existing.id);
+    const updated = db.prepare('SELECT * FROM weekly_reviews WHERE id = ?').get(existing.id);
+    return res.json(updated);
+  }
+
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO weekly_reviews (id, week_start, highlights, blockers, learnings, next_week_focus, overall_score)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, ws, highlights, blockers, learnings, next_week_focus, overall_score);
+  const created = db.prepare('SELECT * FROM weekly_reviews WHERE id = ?').get(id);
+  res.status(201).json(created);
+});
+
+app.delete('/api/weekly-reviews/:id', (req, res) => {
+  db.prepare('DELETE FROM weekly_reviews WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
 // ==================== START ====================

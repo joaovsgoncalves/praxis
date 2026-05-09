@@ -1,18 +1,43 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
+import confetti from 'canvas-confetti';
+
+// Fire a tiny gold/ember burst at the click point. Cheap and synchronous.
+function sparkAt(x, y) {
+  confetti({
+    particleCount: 14,
+    spread: 38,
+    startVelocity: 22,
+    gravity: 0.9,
+    ticks: 90,
+    scalar: 0.7,
+    origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+    colors: ['#FFC857', '#F59E0B', '#FB923C', '#FFFFFF'],
+  });
+}
 
 export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
   const today = new Date().toISOString().split('T')[0];
+  const rowRefs = useRef(new Map());
 
   const isCompletedToday = (habitId) =>
     habitLogs.some(log => log.habit_id === habitId && log.date === today && log.completed);
 
   const completedCount = habits.filter(h => isCompletedToday(h.id)).length;
+
+  const handleToggle = (habit, done, evt) => {
+    if (!done) {
+      // Becoming done — fire a spark from the row.
+      const target = rowRefs.current.get(habit.id);
+      const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
+      if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+    }
+    onToggleHabit?.(habit.id, done);
+  };
 
   return (
     <Card className="bg-card border-border">
@@ -24,12 +49,12 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
           </span>
         </div>
         {habits.length > 0 && (
-          <div className="h-1 bg-secondary rounded-full overflow-hidden mt-2">
+          <div className="h-1 bg-secondary rounded-full overflow-hidden mt-2 rail-inset">
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${Math.round((completedCount / habits.length) * 100)}%`,
-                background: 'linear-gradient(90deg, hsl(40 95% 55%), hsl(35 100% 50%))',
+                background: 'linear-gradient(90deg, hsl(var(--domain-wellness)), hsl(var(--domain-ember)))',
               }}
             />
           </div>
@@ -46,27 +71,30 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
           return (
             <motion.div
               key={habit.id}
+              ref={el => { if (el) rowRefs.current.set(habit.id, el); else rowRefs.current.delete(habit.id); }}
               whileTap={{ scale: 0.98 }}
               className={cn(
                 "flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer",
-                done ? "bg-gold/10 border border-gold/20" : "bg-secondary/50 hover:bg-secondary"
+                done
+                  ? "bg-domain-wellness/10 border border-domain-wellness/25"
+                  : "bg-secondary/50 hover:bg-secondary"
               )}
-              onClick={() => onToggleHabit(habit.id, done)}
+              onClick={(e) => handleToggle(habit, done, e)}
             >
               <span className="text-base w-6 text-center shrink-0">💪</span>
               <Checkbox
                 checked={done}
-                onCheckedChange={() => onToggleHabit(habit.id, done)}
-                className={cn(done ? "border-gold data-[state=checked]:bg-gold data-[state=checked]:border-gold" : "border-muted-foreground/40")}
+                onCheckedChange={() => handleToggle(habit, done)}
+                className={cn(done ? "border-domain-wellness data-[state=checked]:bg-domain-wellness data-[state=checked]:border-domain-wellness" : "border-muted-foreground/40")}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className={cn("text-sm font-medium truncate", done && "text-gold line-through")}>{habit.title}</p>
+                  <p className={cn("text-sm font-medium truncate", done && "text-domain-wellness line-through")}>{habit.title}</p>
                   <CategoryBadge category={habit.category} />
                 </div>
               </div>
               {habit.current_streak > 0 && (
-                <span className="inline-flex items-center gap-1 bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded-full shrink-0">
+                <span className="inline-flex items-center gap-1 bg-domain-ember/15 text-domain-ember text-xs px-2 py-0.5 rounded-full shrink-0">
                   🔥 {habit.current_streak}
                 </span>
               )}

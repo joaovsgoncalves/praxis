@@ -3,15 +3,89 @@
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
 // Em dev local, .env define VITE_FORJA_API para o backend da Forja.
+// Nunca colocar segredo administrativo em VITE_*: tudo que começa com VITE é exposto no bundle.
 const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
 
+// Endpoints whose GET responses we mirror to localStorage so the UI keeps
+// working when the backend is unreachable (Tailscale offline, VPS down, etc).
+const OFFLINE_CACHEABLE = [
+  '/api/tasks',
+  '/api/habits',
+  '/api/habit-logs',
+  '/api/wellness',
+  '/api/rituals',
+  '/api/goals',
+  '/api/gamification',
+  '/api/calendar/today',
+  '/api/focus/stats',
+  '/api/insights/best-hours',
+  '/api/insights/correlation',
+  '/api/weekly-reviews',
+];
+
+const OFFLINE_KEY_PREFIX = 'forja:offline:';
+
+function isCacheable(path) {
+  return OFFLINE_CACHEABLE.some(p => path === p || path.startsWith(p + '?') || path.startsWith(p + '/'));
+}
+
+function readOfflineCache(path) {
+  try {
+    const raw = localStorage.getItem(OFFLINE_KEY_PREFIX + path);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeOfflineCache(path, data) {
+  try {
+    localStorage.setItem(
+      OFFLINE_KEY_PREFIX + path,
+      JSON.stringify({ data, timestamp: Date.now() })
+    );
+  } catch {}
+}
+
+export function getOfflineStatus() {
+  // Heuristic: most-recently-cached entry; UI uses this to show a stale banner.
+  let mostRecent = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(OFFLINE_KEY_PREFIX)) continue;
+    try {
+      const entry = JSON.parse(localStorage.getItem(key));
+      if (entry?.timestamp > mostRecent) mostRecent = entry.timestamp;
+    } catch {}
+  }
+  return { lastSyncAt: mostRecent || null };
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(`${FORJA_API}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+
+  const isGet = !options.method || options.method === 'GET';
+
+  try {
+    const res = await fetch(`${FORJA_API}${path}`, { ...options, headers });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const data = await res.json();
+    if (isGet && isCacheable(path)) writeOfflineCache(path, data);
+    return data;
+  } catch (err) {
+    // Fall back to cached payload only on cacheable GETs — never silently swallow writes.
+    if (isGet && isCacheable(path)) {
+      const cached = readOfflineCache(path);
+      if (cached) {
+        const stale = { __stale: true, __cachedAt: cached.timestamp };
+        return Array.isArray(cached.data)
+          ? Object.assign(cached.data.slice(), stale)
+          : { ...cached.data, ...stale };
+      }
+    }
+    throw err;
+  }
 }
 
 export const forjaApi = {
@@ -67,6 +141,7 @@ export const forjaApi = {
       return request(`/api/focus${query ? '?' + query : ''}`);
     },
     create: (data) => request('/api/focus', { method: 'POST', body: JSON.stringify(data) }),
+    stats: (days = 30) => request(`/api/focus/stats?days=${days}`),
   },
 
   // Rituals
@@ -102,6 +177,7 @@ export const forjaApi = {
 
   // Parse Voice (LLM)
   parseVoice: (text) => request('/api/parse-voice', { method: 'POST', body: JSON.stringify({ text }) }),
+
   // Gamification
   gamification: {
     get: () => request('/api/gamification'),
@@ -119,6 +195,15 @@ export const forjaApi = {
   // Insights
   insights: {
     bestHours: () => request('/api/insights/best-hours'),
+    correlation: (days = 60) => request(`/api/insights/correlation?days=${days}`),
+  },
+
+  // Weekly reviews
+  weeklyReviews: {
+    list: (limit = 12) => request(`/api/weekly-reviews?limit=${limit}`),
+    current: (date) => request(`/api/weekly-reviews/current${date ? '?date=' + date : ''}`),
+    save: (data) => request('/api/weekly-reviews', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id) => request(`/api/weekly-reviews/${id}`, { method: 'DELETE' }),
   },
 
   // Calendar

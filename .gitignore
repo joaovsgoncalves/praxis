@@ -33,3 +33,4 @@ dist-ssr
 api/forja.db-shm
 api/forja.db-wal
 api/forja.db
+api/backups/
