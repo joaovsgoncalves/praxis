@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ListTodo, Target, Timer, BarChart3, Settings, Mic, X, Sparkles, Link2, Trophy } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Target, Timer, BarChart3, Settings, Mic, X, Sparkles, Link2, Trophy, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ const navItems = [
   { path: '/metas', label: 'Metas', icon: Target },
   { path: '/rituais', label: 'Rituais', icon: Link2 },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
+  { path: '/revisao-semanal', label: 'Revisão Semanal', icon: BookOpen },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];

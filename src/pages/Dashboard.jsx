@@ -14,6 +14,9 @@ import TodayCalendar from '@/components/dashboard/TodayCalendar';
 import RitualWidget from '@/components/dashboard/RitualWidget';
 import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
 import GamificationWidget from '@/components/dashboard/GamificationWidget';
+import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
+import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
+import OfflineBanner from '@/components/shared/OfflineBanner';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -92,9 +95,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <OfflineBanner />
       <Greeting />
-      
-      <DayProgressBar 
+      <WeeklyReviewPrompt />
+
+      <DayProgressBar
         progress={progress}
         habitsDone={completedHabits}
         habitsTotal={habits.length}
@@ -122,6 +127,7 @@ export default function Dashboard() {
           <RitualWidget />
           <UpcomingPosts />
           <GamificationWidget />
+          <CorrelationWidget />
           <WellnessWidget 
             todayCheck={todayCheck}
             onSave={(data) => saveWellnessMutation.mutateAsync(data)}

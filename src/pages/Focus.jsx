@@ -47,6 +47,12 @@ export default function Focus() {
     queryFn: () => forjaApi.focus.list({ date: format(new Date(), 'yyyy-MM-dd') }),
   });
 
+  const { data: focusStats = [] } = useQuery({
+    queryKey: ['focusStats', 30],
+    queryFn: () => forjaApi.focus.stats(30),
+    staleTime: 60_000,
+  });
+
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
 
   const saveSessionMutation = useMutation({
@@ -138,9 +144,45 @@ export default function Focus() {
     ? ((breakDuration * 60 - timeLeft) / (breakDuration * 60)) * 100
     : ((focusDuration * 60 - timeLeft) / (focusDuration * 60)) * 100;
 
+  const topFocusStats = focusStats.filter(s => s.task_id).slice(0, 5);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Modo Foco</h1>
+
+      {!inSession && topFocusStats.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm">Foco por tarefa (30 dias)</h2>
+              <span className="text-[11px] text-muted-foreground">
+                {focusStats.length} tarefa{focusStats.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {topFocusStats.map(s => {
+                const max = topFocusStats[0].total_minutes || 1;
+                const pct = Math.max(4, Math.round((s.total_minutes / max) * 100));
+                const hrs = Math.floor(s.total_minutes / 60);
+                const mins = s.total_minutes % 60;
+                return (
+                  <div key={s.task_id} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="truncate pr-2">{s.task_title || '(sem tarefa)'}</span>
+                      <span className="text-muted-foreground shrink-0">
+                        {hrs > 0 ? `${hrs}h${mins ? ' ' + mins + 'm' : ''}` : `${mins}m`} · {s.sessions}x
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!inSession ? (
         <div className="space-y-6">

@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Timer, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { Timer, CheckCircle2, Circle, Clock, Repeat } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -52,6 +52,11 @@ export default function TodayTasks({ tasks, onToggleComplete }) {
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium truncate">{task.title}</p>
                   <CategoryBadge category={task.category} />
+                  {task.recurrence && task.recurrence !== 'none' && (
+                    <span title={`Repete: ${task.recurrence}`} className="inline-flex items-center text-[10px] text-blue-400/80">
+                      <Repeat className="w-3 h-3" />
+                    </span>
+                  )}
                 </div>
                 {task.time && (
                   <div className="flex items-center gap-1 mt-0.5">

@@ -9,7 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, X, Lightbulb } from 'lucide-react';
+import { CalendarIcon, Lightbulb, Repeat } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const WEEKDAYS = [
+  { value: 1, short: 'Seg' },
+  { value: 2, short: 'Ter' },
+  { value: 3, short: 'Qua' },
+  { value: 4, short: 'Qui' },
+  { value: 5, short: 'Sex' },
+  { value: 6, short: 'Sáb' },
+  { value: 0, short: 'Dom' },
+];
 
 function BestTimeSuggestion({ onSelect, visible }) {
   const { data, isLoading } = useQuery({
@@ -45,6 +56,14 @@ function BestTimeSuggestion({ onSelect, visible }) {
 }
 
 export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} }) {
+  const initialDays = (() => {
+    if (Array.isArray(initial.recurrence_days)) return initial.recurrence_days;
+    if (typeof initial.recurrence_days === 'string') {
+      try { return JSON.parse(initial.recurrence_days || '[]'); } catch { return []; }
+    }
+    return [];
+  })();
+
   const [form, setForm] = useState({
     title: initial.title || '',
     description: initial.description || '',
@@ -55,14 +74,30 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
     category: initial.category || 'pessoal',
     goal_id: initial.goal_id || '',
     source: initial.source || 'manual',
+    recurrence: initial.recurrence || 'none',
+    recurrence_days: initialDays,
   });
 
   const isCreating = !initial.id;
 
+  const toggleDay = (value) => {
+    setForm(f => ({
+      ...f,
+      recurrence_days: f.recurrence_days.includes(value)
+        ? f.recurrence_days.filter(d => d !== value)
+        : [...f.recurrence_days, value].sort(),
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    onSubmit({ ...form, duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined });
+    const payload = {
+      ...form,
+      duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
+      recurrence_days: form.recurrence === 'weekly' ? form.recurrence_days : [],
+    };
+    onSubmit(payload);
   };
 
   return (
@@ -105,6 +140,48 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
           </SelectContent>
         </Select>
       </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Repeat className="w-4 h-4" />
+          <span>Recorrência</span>
+        </div>
+        <Select value={form.recurrence} onValueChange={v => setForm(f => ({ ...f, recurrence: v }))}>
+          <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sem recorrência</SelectItem>
+            <SelectItem value="daily">Todo dia</SelectItem>
+            <SelectItem value="weekly">Semanal</SelectItem>
+            <SelectItem value="monthly">Mensal</SelectItem>
+          </SelectContent>
+        </Select>
+        {form.recurrence === 'weekly' && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {WEEKDAYS.map(d => {
+              const active = form.recurrence_days.includes(d.value);
+              return (
+                <button
+                  key={d.value}
+                  type="button"
+                  onClick={() => toggleDay(d.value)}
+                  className={cn(
+                    'text-xs px-2.5 py-1 rounded-md border transition-colors',
+                    active
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-secondary/40 border-border hover:bg-secondary'
+                  )}
+                >
+                  {d.short}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {form.recurrence !== 'none' && !form.date && (
+          <p className="text-xs text-yellow-500/80">⚠️ Defina uma data inicial — a próxima ocorrência é gerada quando você concluir a tarefa.</p>
+        )}
+      </div>
+
       {goals.length > 0 && (
         <Select value={form.goal_id} onValueChange={v => setForm(f => ({ ...f, goal_id: v }))}>
           <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Vincular a meta (opcional)" /></SelectTrigger>
@@ -116,7 +193,7 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
       )}
       <div className="flex gap-2 justify-end">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>}
-        <Button type="submit" className="bg-primary hover:bg-primary/90">Criar Tarefa</Button>
+        <Button type="submit" className="bg-primary hover:bg-primary/90">{isCreating ? 'Criar Tarefa' : 'Salvar'}</Button>
       </div>
     </form>
   );
