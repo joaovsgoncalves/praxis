@@ -9,6 +9,49 @@ import { Save, User, Timer, LogOut, Bell, Camera } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
+const AVATAR_MAX_DIMENSION = 256;
+const AVATAR_MAX_DATA_URL_LENGTH = 80_000;
+const AVATAR_QUALITY_STEPS = [0.82, 0.72, 0.62, 0.52];
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Não consegui ler essa imagem.'));
+    };
+    img.src = objectUrl;
+  });
+}
+
+async function compressAvatar(file) {
+  const img = await loadImageFromFile(file);
+  const ratio = Math.min(AVATAR_MAX_DIMENSION / img.width, AVATAR_MAX_DIMENSION / img.height, 1);
+  const width = Math.max(1, Math.round(img.width * ratio));
+  const height = Math.max(1, Math.round(img.height * ratio));
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = width;
+  canvas.height = height;
+  ctx.fillStyle = '#111111';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+
+  for (const quality of AVATAR_QUALITY_STEPS) {
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    if (dataUrl.length <= AVATAR_MAX_DATA_URL_LENGTH) return dataUrl;
+  }
+
+  throw new Error('A foto ficou grande demais. Tenta uma imagem menor ou já cortada em quadrado.');
+}
+
 export default function Settings() {
   const queryClient = useQueryClient();
 
@@ -24,12 +67,32 @@ export default function Settings() {
   useEffect(() => {
     if (user?.pomodoro_focus) setPomodoroFocus(String(user.pomodoro_focus));
     if (user?.pomodoro_break) setPomodoroBreak(String(user.pomodoro_break));
-    if (user?.avatar_url) setAvatarUrl(user.avatar_url);
+    setAvatarUrl(user?.avatar_url || null);
   }, [user]);
 
   const handleAvatarChange = async (e) => {
-    // Avatar upload disabled — just show initials
-    toast.info('Upload de foto não disponível no momento');
+    const file = e.target.files?.[0];
+    e.target.value = '';
+
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Escolhe um arquivo de imagem.');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const nextAvatarUrl = await compressAvatar(file);
+      setAvatarUrl(nextAvatarUrl);
+      await forjaApi.user.updateSettings({ avatar_url: nextAvatarUrl });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      toast.success('Foto de perfil atualizada!');
+    } catch (err) {
+      setAvatarUrl(user?.avatar_url || null);
+      toast.error(err?.message || 'Não consegui atualizar a foto agora.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const saveSettings = async () => {
@@ -57,7 +120,7 @@ export default function Settings() {
         <CardContent className="space-y-4">
           {/* Avatar */}
           <div className="flex flex-col items-center gap-2">
-            <label className="relative cursor-pointer group">
+            <label className={`relative group ${uploadingAvatar ? 'cursor-wait opacity-80' : 'cursor-pointer'}`}>
               <div className="w-20 h-20 rounded-full bg-secondary border-2 border-border overflow-hidden flex items-center justify-center">
                 {avatarUrl
                   ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
@@ -67,7 +130,7 @@ export default function Settings() {
               <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Camera className="w-5 h-5 text-white" />
               </div>
-              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={uploadingAvatar} />
             </label>
             <p className="text-xs text-muted-foreground">{uploadingAvatar ? 'Enviando...' : 'Clique para alterar'}</p>
           </div>
