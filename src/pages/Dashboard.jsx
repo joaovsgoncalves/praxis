@@ -43,10 +43,24 @@ export default function Dashboard() {
     localStorage.setItem(`water_ml_${today}`, String(val));
   };
 
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks', today],
-    queryFn: () => forjaApi.tasks.list({ date: today }),
+  const { data: allTasks = [] } = useQuery({
+    queryKey: ['dashboardTasks', today],
+    queryFn: () => forjaApi.tasks.list({ limit: 200 }),
   });
+
+  const tasks = React.useMemo(() => {
+    const relevantTasks = allTasks.filter(task => {
+      const isToday = task.date === today;
+      const isOverduePending = task.status !== 'completed' && task.date && task.date < today;
+      return isToday || isOverduePending;
+    });
+
+    return relevantTasks.sort((a, b) => {
+      const dateCompare = String(a.date || '').localeCompare(String(b.date || ''));
+      if (dateCompare !== 0) return dateCompare;
+      return String(a.time || '').localeCompare(String(b.time || ''));
+    });
+  }, [allTasks, today]);
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],
     queryFn: () => forjaApi.habits.list({ status: 'active' }),
@@ -72,7 +86,12 @@ export default function Dashboard() {
       const newStatus = task.status === 'completed' ? 'pending' : 'completed';
       return forjaApi.tasks.update(task.id, { status: newStatus });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+    },
   });
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
@@ -100,7 +119,7 @@ export default function Dashboard() {
   // The same widgets exist in every mode — but the column they live in and
   // their order changes based on what's most relevant at this hour.
   const blocks = {
-    tasks:       <Slot domain="ember"><TodayTasks tasks={tasks} onToggleComplete={(t) => toggleTaskMutation.mutate(t)} /></Slot>,
+    tasks:       <Slot domain="ember"><TodayTasks tasks={tasks} today={today} onToggleComplete={(t) => toggleTaskMutation.mutate(t)} /></Slot>,
     habits:      <Slot domain="wellness"><TodayHabits habits={habits} habitLogs={habitLogs} onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })} /></Slot>,
     rituals:     <Slot domain="ember"><RitualWidget /></Slot>,
     calendar:    <Slot domain="sky"><TodayCalendar /></Slot>,
@@ -124,8 +143,8 @@ export default function Dashboard() {
     mainCol = ['tasks', 'wellness', 'heatmap', 'weeklyProgress'];
     sideCol = ['calendar', 'habits', 'gamification', 'correlation', 'rituals', 'water'];
   } else {
-    // late night — minimal, but keep calendar visible for reminders.
-    mainCol = ['wellness', 'heatmap'];
+    // late night — keep tasks visible so overdue work never disappears when the day rolls over.
+    mainCol = ['tasks', 'wellness', 'heatmap'];
     sideCol = ['calendar', 'habits', 'gamification'];
   }
 

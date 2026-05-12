@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Timer, CheckCircle2, Clock, Repeat } from 'lucide-react';
+import { Timer, CheckCircle2, Clock, Repeat, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -14,18 +14,26 @@ const priorityStyles = {
   low: 'bg-muted text-muted-foreground border-border',
 };
 
-export default function TodayTasks({ tasks, onToggleComplete }) {
+export default function TodayTasks({ tasks, today, onToggleComplete }) {
   const pending = tasks.filter(t => t.status !== 'completed');
   const completed = tasks.filter(t => t.status === 'completed');
+  const overdueCount = pending.filter(t => t.date && today && t.date < today).length;
 
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">Tarefas de Hoje</CardTitle>
-          <span className="text-xs text-muted-foreground">
-            {completed.length}/{tasks.length} concluídas
-          </span>
+          <div className="flex items-center gap-2">
+            {overdueCount > 0 && (
+              <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-[10px] text-destructive">
+                {overdueCount} atrasada{overdueCount === 1 ? '' : 's'}
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {completed.length}/{tasks.length} concluídas
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -62,6 +70,12 @@ export default function TodayTasks({ tasks, onToggleComplete }) {
                   <div className="flex items-center gap-1 mt-0.5">
                     <Clock className="w-3 h-3 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">{task.time}</span>
+                  </div>
+                )}
+                {task.date && today && task.date < today && (
+                  <div className="flex items-center gap-1 mt-0.5 text-destructive">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="text-xs font-medium">Atrasada desde {task.date}</span>
                   </div>
                 )}
               </div>
