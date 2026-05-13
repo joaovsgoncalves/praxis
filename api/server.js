@@ -138,6 +138,7 @@ db.exec(`
     source TEXT DEFAULT 'manual',
     duration_minutes INTEGER,
     calendar_event_id TEXT,
+    sort_order INTEGER,
     completed_date TEXT,
     completed_at TEXT,
     created_date TEXT DEFAULT (datetime('now')),
@@ -154,6 +155,7 @@ db.exec(`
     goal_id TEXT,
     source TEXT DEFAULT 'manual',
     status TEXT DEFAULT 'active',
+    sort_order INTEGER,
     created_date TEXT DEFAULT (datetime('now'))
   );
 
@@ -286,6 +288,57 @@ for (const a of defaultAchievements) {
   insertAchievement.run(a.id, a.name, a.description, a.emoji, a.xp_reward);
 }
 
+function stripPriorityPrefix(title) {
+  if (typeof title !== 'string') return title;
+  const cleaned = title.replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
+  return cleaned || title.trim();
+}
+
+function nextSortOrder(table) {
+  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid sortable table');
+  const row = db.prepare(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM ${table}`).get();
+  return Number(row?.next_order || 0);
+}
+
+function backfillSortOrder(table) {
+  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid sortable table');
+  const rows = db.prepare(`SELECT id FROM ${table} WHERE sort_order IS NULL ORDER BY created_date DESC, id DESC`).all();
+  if (rows.length === 0) return;
+  const start = nextSortOrder(table);
+  const update = db.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`);
+  const run = db.transaction((items) => {
+    items.forEach((row, index) => update.run(start + index, row.id));
+  });
+  run(rows);
+}
+
+function cleanPriorityTitlePrefixes(table) {
+  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid title table');
+  const rows = db.prepare(`SELECT id, title FROM ${table}`).all();
+  const statement = table === 'tasks'
+    ? db.prepare("UPDATE tasks SET title = ?, updated_date = datetime('now') WHERE id = ?")
+    : db.prepare('UPDATE habits SET title = ? WHERE id = ?');
+  const run = db.transaction((items) => {
+    for (const row of items) {
+      const cleaned = stripPriorityPrefix(row.title);
+      if (cleaned !== row.title) statement.run(cleaned, row.id);
+    }
+  });
+  run(rows);
+}
+
+function reorderItems(table, orderedIds) {
+  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid reorder table');
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return 0;
+  const uniqueIds = [...new Set(orderedIds.filter(Boolean).map(String))];
+  const update = db.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`);
+  const run = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  run(uniqueIds);
+  return uniqueIds.length;
+}
+
 // Migrate: add category column to habits if missing
 const habitsCols = db.prepare("PRAGMA table_info(habits)").all().map(c => c.name);
 if (!habitsCols.includes('category')) {
@@ -299,6 +352,9 @@ if (!habitsCols.includes('goal_id')) {
 }
 if (!habitsCols.includes('source')) {
   db.exec("ALTER TABLE habits ADD COLUMN source TEXT DEFAULT 'manual'");
+}
+if (!habitsCols.includes('sort_order')) {
+  db.exec("ALTER TABLE habits ADD COLUMN sort_order INTEGER");
 }
 
 // Migrate: add task metadata/recurrence columns
@@ -327,6 +383,14 @@ if (!tasksCols.includes('completed_date')) {
 if (!tasksCols.includes('completed_at')) {
   db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT");
 }
+if (!tasksCols.includes('sort_order')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER");
+}
+
+backfillSortOrder('tasks');
+backfillSortOrder('habits');
+cleanPriorityTitlePrefixes('tasks');
+cleanPriorityTitlePrefixes('habits');
 
 // Legacy safety: some tasks were already marked completed before the completion
 // metadata existed/was reliably filled. Backfill from updated_date so overdue
@@ -556,11 +620,17 @@ app.get('/api/tasks', (req, res) => {
   if (status) { query += ' AND status = ?'; params.push(status); }
   if (category) { query += ' AND category = ?'; params.push(category); }
   
-  query += ' ORDER BY created_date DESC LIMIT ?';
+  query += ' ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC LIMIT ?';
   params.push(Number(limit));
 
   const tasks = db.prepare(query).all(...params);
   res.json(tasks.map(enrichCategory));
+});
+
+app.patch('/api/tasks/reorder', (req, res) => {
+  const updated = reorderItems('tasks', req.body?.ordered_ids || req.body?.ids);
+  const tasks = db.prepare('SELECT * FROM tasks ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC').all();
+  res.json({ success: true, updated, tasks: tasks.map(enrichCategory) });
 });
 
 app.get('/api/tasks/:id', (req, res) => {
@@ -612,7 +682,7 @@ app.post('/api/tasks', (req, res) => {
   const {
     title, description = '', date, time, status = 'pending',
     priority = 'medium', category = 'pessoal', goal_id = null, source = 'manual', duration_minutes,
-    calendar_event_id, recurrence = 'none', recurrence_days = [], recurrence_parent_id
+    calendar_event_id, sort_order, recurrence = 'none', recurrence_days = [], recurrence_parent_id
   } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -620,14 +690,16 @@ app.post('/api/tasks', (req, res) => {
   const isDoneOnCreate = status === 'completed' || status === 'done';
   const completedDate = isDoneOnCreate ? getLocalDateString() : null;
   const completedAt = isDoneOnCreate ? new Date().toISOString() : null;
+  const taskTitle = stripPriorityPrefix(title);
+  const taskSortOrder = sort_order !== undefined ? Number(sort_order) : nextSortOrder('tasks');
 
   db.prepare(`
-    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id, title, description, date || null, time || null, status, priority, category,
+    id, taskTitle, description, date || null, time || null, status, priority, category,
     goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
-    calendar_event_id || null, recurrence,
+    calendar_event_id || null, taskSortOrder, recurrence,
     JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
     recurrence_parent_id || null,
     completedDate,
@@ -644,7 +716,7 @@ app.put('/api/tasks/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days } = req.body;
+  const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days } = req.body;
 
   const wasDone = existing.status === 'completed' || existing.status === 'done';
   const willBeDone = status === 'completed' || status === 'done';
@@ -678,6 +750,7 @@ app.put('/api/tasks/:id', (req, res) => {
       source = COALESCE(?, source),
       duration_minutes = COALESCE(?, duration_minutes),
       calendar_event_id = COALESCE(?, calendar_event_id),
+      sort_order = COALESCE(?, sort_order),
       recurrence = COALESCE(?, recurrence),
       recurrence_days = COALESCE(?, recurrence_days),
       completed_date = ?,
@@ -685,8 +758,9 @@ app.put('/api/tasks/:id', (req, res) => {
       updated_date = datetime('now')
     WHERE id = ?
   `).run(
-    title, description, date, time, status, priority, category,
+    title !== undefined ? stripPriorityPrefix(title) : null, description, date, time, status, priority, category,
     goal_id, source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
+    sort_order !== undefined ? Number(sort_order) : null,
     recurrence,
     recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
     completedDate,
@@ -732,11 +806,12 @@ app.put('/api/tasks/:id', (req, res) => {
       if (!existingChild) {
         const childId = uuidv4();
         db.prepare(`
-          INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, recurrence, recurrence_days, recurrence_parent_id)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, sort_order, recurrence, recurrence_days, recurrence_parent_id)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           childId, task.title, task.description, nextDate, task.time,
           task.priority, task.category, task.goal_id || null, task.source || 'recurrence', task.duration_minutes || null,
+          nextSortOrder('tasks'),
           task.recurrence, task.recurrence_days || '[]', parentRef
         );
         const childTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(childId);
@@ -809,7 +884,7 @@ function getStreaks(habitId) {
 // ==================== HABITS ====================
 app.get('/api/habits', (req, res) => {
   const { status = 'active' } = req.query;
-  const habits = db.prepare('SELECT * FROM habits WHERE status = ? ORDER BY created_date DESC').all(status);
+  const habits = db.prepare('SELECT * FROM habits WHERE status = ? ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC').all(status);
   const enriched = habits.map(h => {
     const { current_streak, best_streak } = getStreaks(h.id);
     return { ...h, current_streak, best_streak };
@@ -817,16 +892,29 @@ app.get('/api/habits', (req, res) => {
   res.json(enriched);
 });
 
+app.patch('/api/habits/reorder', (req, res) => {
+  const updated = reorderItems('habits', req.body?.ordered_ids || req.body?.ids);
+  const habits = db.prepare('SELECT * FROM habits WHERE status = ? ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC').all('active');
+  const enriched = habits.map(h => {
+    const { current_streak, best_streak } = getStreaks(h.id);
+    return { ...h, current_streak, best_streak };
+  });
+  res.json({ success: true, updated, habits: enriched });
+});
+
 app.post('/api/habits', (req, res) => {
   const id = uuidv4();
-  const { title, description = '', frequency = 'daily', category = 'pessoal', streak_target = 30, goal_id = null, source = 'manual' } = req.body;
+  const { title, description = '', frequency = 'daily', category = 'pessoal', streak_target = 30, goal_id = null, source = 'manual', sort_order } = req.body;
   
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
+  const habitTitle = stripPriorityPrefix(title);
+  const habitSortOrder = sort_order !== undefined ? Number(sort_order) : nextSortOrder('habits');
+
   db.prepare(`
-    INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, description, frequency, category, Number(streak_target) || 30, goal_id || null, source || 'manual');
+    INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, habitTitle, description, frequency, category, Number(streak_target) || 30, goal_id || null, source || 'manual', habitSortOrder);
 
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(id);
   res.status(201).json(habit);
@@ -836,7 +924,7 @@ app.put('/api/habits/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Habit not found' });
 
-  const { title, description, frequency, category, streak_target, goal_id, source, status } = req.body;
+  const { title, description, frequency, category, streak_target, goal_id, source, status, sort_order } = req.body;
 
   db.prepare(`
     UPDATE habits SET 
@@ -847,9 +935,21 @@ app.put('/api/habits/:id', (req, res) => {
       streak_target = COALESCE(?, streak_target),
       goal_id = COALESCE(?, goal_id),
       source = COALESCE(?, source),
-      status = COALESCE(?, status)
+      status = COALESCE(?, status),
+      sort_order = COALESCE(?, sort_order)
     WHERE id = ?
-  `).run(title, description, frequency, category, streak_target !== undefined ? Number(streak_target) : null, goal_id, source, status, req.params.id);
+  `).run(
+    title !== undefined ? stripPriorityPrefix(title) : null,
+    description,
+    frequency,
+    category,
+    streak_target !== undefined ? Number(streak_target) : null,
+    goal_id,
+    source,
+    status,
+    sort_order !== undefined ? Number(sort_order) : null,
+    req.params.id
+  );
 
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
   res.json(habit);

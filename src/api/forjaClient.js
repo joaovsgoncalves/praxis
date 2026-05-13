@@ -101,6 +101,7 @@ export const forjaApi = {
     get: (id) => request(`/api/tasks/${id}`),
     create: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    reorder: (orderedIds) => request('/api/tasks/reorder', { method: 'PATCH', body: JSON.stringify({ ordered_ids: orderedIds }) }),
     delete: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   },
 
@@ -112,6 +113,7 @@ export const forjaApi = {
     },
     create: (data) => request('/api/habits', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/api/habits/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    reorder: (orderedIds) => request('/api/habits/reorder', { method: 'PATCH', body: JSON.stringify({ ordered_ids: orderedIds }) }),
     delete: (id) => request(`/api/habits/${id}`, { method: 'DELETE' }),
   },
 
