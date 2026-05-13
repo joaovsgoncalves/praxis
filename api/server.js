@@ -73,6 +73,21 @@ if (!FORJA_API_KEY) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 18556;
+const APP_TIME_ZONE = process.env.FORJA_TIME_ZONE || 'America/Fortaleza';
+
+function getLocalDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 
 // Middleware
 app.use(cors());
@@ -312,6 +327,18 @@ if (!tasksCols.includes('completed_date')) {
 if (!tasksCols.includes('completed_at')) {
   db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT");
 }
+
+// Legacy safety: some tasks were already marked completed before the completion
+// metadata existed/was reliably filled. Backfill from updated_date so overdue
+// tasks cleared today count as today's effort without mutating their scheduled date.
+db.prepare(`
+  UPDATE tasks
+  SET
+    completed_date = COALESCE(substr(updated_date, 1, 10), date('now')),
+    completed_at = COALESCE(completed_at, updated_date, datetime('now'))
+  WHERE status IN ('completed', 'done')
+    AND completed_date IS NULL
+`).run();
 
 // ==================== CATEGORIES ====================
 app.get('/api/categories', (req, res) => {
@@ -591,7 +618,7 @@ app.post('/api/tasks', (req, res) => {
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   const isDoneOnCreate = status === 'completed' || status === 'done';
-  const completedDate = isDoneOnCreate ? new Date().toISOString().split('T')[0] : null;
+  const completedDate = isDoneOnCreate ? getLocalDateString() : null;
   const completedAt = isDoneOnCreate ? new Date().toISOString() : null;
 
   db.prepare(`
@@ -622,7 +649,7 @@ app.put('/api/tasks/:id', (req, res) => {
   const wasDone = existing.status === 'completed' || existing.status === 'done';
   const willBeDone = status === 'completed' || status === 'done';
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
+  const today = getLocalDateString(now);
   let completedDate = existing.completed_date || null;
   let completedAt = existing.completed_at || null;
   let taskXpAwarded = 0;

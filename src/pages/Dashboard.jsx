@@ -25,6 +25,9 @@ const Slot = ({ domain = 'focus', children }) => (
   <div className={`rounded-xl card-domain domain-${domain}`}>{children}</div>
 );
 
+const isTaskDone = (task) => task.status === 'completed' || task.status === 'done';
+const taskCompletionDate = (task) => task.completed_date || String(task.completed_at || task.updated_date || '').slice(0, 10);
+
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -50,16 +53,16 @@ export default function Dashboard() {
 
   const tasks = React.useMemo(() => {
     const relevantTasks = allTasks.filter(task => {
-      const isDone = task.status === 'completed' || task.status === 'done';
+      const isDone = isTaskDone(task);
       const isToday = task.date === today;
       const isOverduePending = !isDone && task.date && task.date < today;
-      const wasCompletedToday = isDone && (task.completed_date === today || (!task.completed_date && task.date === today));
+      const wasCompletedToday = isDone && (taskCompletionDate(task) === today || (!task.completed_date && task.date === today));
       return isToday || isOverduePending || wasCompletedToday;
     });
 
     return relevantTasks.sort((a, b) => {
-      const aDone = a.status === 'completed' || a.status === 'done';
-      const bDone = b.status === 'completed' || b.status === 'done';
+      const aDone = isTaskDone(a);
+      const bDone = isTaskDone(b);
       if (aDone !== bDone) return aDone ? 1 : -1;
       const dateCompare = String(a.date || '').localeCompare(String(b.date || ''));
       if (dateCompare !== 0) return dateCompare;
@@ -88,7 +91,7 @@ export default function Dashboard() {
 
   const toggleTaskMutation = useMutation({
     mutationFn: (task) => {
-      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      const newStatus = isTaskDone(task) ? 'pending' : 'completed';
       return forjaApi.tasks.update(task.id, { status: newStatus });
     },
     onSuccess: () => {
@@ -115,7 +118,7 @@ export default function Dashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wellness'] }),
   });
 
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const completedTasks = tasks.filter(t => isTaskDone(t)).length;
   const todayLogs = habitLogs.filter(l => l.date === today);
   const completedHabits = habits.filter(h =>
     todayLogs.some(l => l.habit_id === h.id && l.completed)

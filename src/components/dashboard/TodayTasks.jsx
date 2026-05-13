@@ -16,10 +16,11 @@ const priorityStyles = {
 
 export default function TodayTasks({ tasks, today, onToggleComplete }) {
   const isDone = (task) => task.status === 'completed' || task.status === 'done';
+  const completedOn = (task) => task.completed_date || String(task.completed_at || task.updated_date || '').slice(0, 10);
   const pending = tasks.filter(t => !isDone(t));
   const completed = tasks.filter(t => isDone(t));
   const overdueCount = pending.filter(t => t.date && today && t.date < today).length;
-  const cleanedOverdueCount = completed.filter(t => t.date && today && t.date < today && t.completed_date === today).length;
+  const cleanedOverdueCount = completed.filter(t => t.date && today && t.date < today && completedOn(t) === today).length;
 
   return (
     <Card className="bg-card border-border">

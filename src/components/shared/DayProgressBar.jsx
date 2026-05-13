@@ -1,13 +1,23 @@
 import React from 'react';
 
 export default function DayProgressBar({ habits = [], habitLogs = [], tasks = [] }) {
-  const today = new Date().toISOString().split('T')[0];
+  const todayParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Fortaleza',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date()).reduce((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const today = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
+  const isTaskDone = (task) => task.status === 'completed' || task.status === 'done';
 
   const completedHabits = habits.filter(h =>
     habitLogs.some(l => l.habit_id === h.id && l.date === today && l.completed)
   ).length;
 
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const completedTasks = tasks.filter(t => isTaskDone(t)).length;
   const totalItems = habits.length + tasks.length;
   const completedItems = completedHabits + completedTasks;
   const pct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
