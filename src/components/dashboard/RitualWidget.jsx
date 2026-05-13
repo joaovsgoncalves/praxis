@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle2, Flame, Sparkles } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -36,7 +37,7 @@ function ConfettiOverlay() {
   );
 }
 
-function RitualItem({ ritual, onToggleHabit, today }) {
+function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const prevDoneRef = useRef(null);
 
@@ -44,7 +45,14 @@ function RitualItem({ ritual, onToggleHabit, today }) {
   const completedCount = habits.filter((h) => h.completed_today).length;
   const totalCount = habits.length;
   const isComplete = totalCount > 0 && completedCount === totalCount;
+  const isMinimum = completedCount > 0 && !isComplete;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const nextHabit = habits.find((h) => !h.completed_today);
+  const statusCopy = isComplete
+    ? 'Ritual completo. Dia registrado.'
+    : isMinimum
+      ? 'Ritual parcial também conta. Sem culpa.'
+      : 'Comece pelo mínimo: só o primeiro passo.';
 
   useEffect(() => {
     if (prevDoneRef.current === false && isComplete) {
@@ -60,7 +68,9 @@ function RitualItem({ ritual, onToggleHabit, today }) {
       'relative p-3 rounded-lg border transition-all',
       isComplete
         ? 'bg-green-500/10 border-green-500/30'
-        : 'bg-secondary/40 border-border hover:border-border/80'
+        : isMinimum
+          ? 'bg-gold/10 border-gold/30'
+          : 'bg-secondary/40 border-border hover:border-border/80'
     )}>
       {showConfetti && <ConfettiOverlay />}
 
@@ -73,6 +83,10 @@ function RitualItem({ ritual, onToggleHabit, today }) {
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Completo
           </Badge>
+        ) : isMinimum ? (
+          <Badge variant="outline" className="bg-gold/15 text-gold border-gold/30 text-xs shrink-0">
+            Parcial
+          </Badge>
         ) : (
           <span className="text-xs text-muted-foreground shrink-0">
             {completedCount}/{totalCount}
@@ -83,8 +97,24 @@ function RitualItem({ ritual, onToggleHabit, today }) {
       {/* Progress bar */}
       <Progress
         value={progressPercent}
-        className={cn('h-1.5 mb-3', isComplete ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
+        className={cn('h-1.5 mb-2', isComplete ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
       />
+
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <p className="text-[11px] text-muted-foreground">{statusCopy}</p>
+        {!isComplete && nextHabit && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[11px] text-gold hover:text-gold"
+            onClick={() => onCompleteMinimum(nextHabit.id)}
+          >
+            <Flame className="w-3 h-3" />
+            Mínimo
+          </Button>
+        )}
+      </div>
 
       {/* Habit checklist */}
       <ul className="space-y-1.5">
@@ -111,7 +141,7 @@ function RitualItem({ ritual, onToggleHabit, today }) {
               )}
             >
               {habit.emoji && <span className="mr-1">{habit.emoji}</span>}
-              {habit.name}
+              {habit.title || habit.name}
             </label>
           </li>
         ))}
@@ -231,6 +261,9 @@ export default function RitualWidget() {
                         today={today}
                         onToggleHabit={(habitId, isDone) =>
                           toggleHabitMutation.mutate({ habitId, isDone })
+                        }
+                        onCompleteMinimum={(habitId) =>
+                          toggleHabitMutation.mutate({ habitId, isDone: false })
                         }
                       />
                     ))}

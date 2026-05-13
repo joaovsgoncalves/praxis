@@ -123,6 +123,8 @@ db.exec(`
     source TEXT DEFAULT 'manual',
     duration_minutes INTEGER,
     calendar_event_id TEXT,
+    completed_date TEXT,
+    completed_at TEXT,
     created_date TEXT DEFAULT (datetime('now')),
     updated_date TEXT DEFAULT (datetime('now'))
   );
@@ -303,6 +305,12 @@ if (!tasksCols.includes('recurrence_days')) {
 }
 if (!tasksCols.includes('recurrence_parent_id')) {
   db.exec("ALTER TABLE tasks ADD COLUMN recurrence_parent_id TEXT");
+}
+if (!tasksCols.includes('completed_date')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN completed_date TEXT");
+}
+if (!tasksCols.includes('completed_at')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN completed_at TEXT");
 }
 
 // ==================== CATEGORIES ====================
@@ -582,15 +590,21 @@ app.post('/api/tasks', (req, res) => {
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
+  const isDoneOnCreate = status === 'completed' || status === 'done';
+  const completedDate = isDoneOnCreate ? new Date().toISOString().split('T')[0] : null;
+  const completedAt = isDoneOnCreate ? new Date().toISOString() : null;
+
   db.prepare(`
-    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days, recurrence_parent_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, title, description, date || null, time || null, status, priority, category,
     goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
     calendar_event_id || null, recurrence,
     JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
-    recurrence_parent_id || null
+    recurrence_parent_id || null,
+    completedDate,
+    completedAt
   );
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
@@ -604,6 +618,25 @@ app.put('/api/tasks/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
   const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, recurrence, recurrence_days } = req.body;
+
+  const wasDone = existing.status === 'completed' || existing.status === 'done';
+  const willBeDone = status === 'completed' || status === 'done';
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  let completedDate = existing.completed_date || null;
+  let completedAt = existing.completed_at || null;
+  let taskXpAwarded = 0;
+
+  if (status !== undefined) {
+    if (willBeDone) {
+      completedDate = existing.completed_date || today;
+      completedAt = existing.completed_at || now.toISOString();
+      if (!wasDone) taskXpAwarded = 10;
+    } else {
+      completedDate = null;
+      completedAt = null;
+    }
+  }
 
   db.prepare(`
     UPDATE tasks SET
@@ -620,6 +653,8 @@ app.put('/api/tasks/:id', (req, res) => {
       calendar_event_id = COALESCE(?, calendar_event_id),
       recurrence = COALESCE(?, recurrence),
       recurrence_days = COALESCE(?, recurrence_days),
+      completed_date = ?,
+      completed_at = ?,
       updated_date = datetime('now')
     WHERE id = ?
   `).run(
@@ -627,6 +662,8 @@ app.put('/api/tasks/:id', (req, res) => {
     goal_id, source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
     recurrence,
     recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
+    completedDate,
+    completedAt,
     req.params.id
   );
 
@@ -634,6 +671,23 @@ app.put('/api/tasks/:id', (req, res) => {
   const calendarSync = syncTaskToCalendar(task);
   const syncedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   let nextOccurrenceSync = null;
+  let xpSync = null;
+
+  if (taskXpAwarded > 0) {
+    const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
+    const oldLevel = getLevel(gam.xp_total).level;
+    const newXp = gam.xp_total + taskXpAwarded;
+    const newLevelInfo = getLevel(newXp);
+    db.prepare('UPDATE gamification SET xp_total = ?, level = ?, updated_date = datetime(\'now\') WHERE id = ?')
+      .run(newXp, newLevelInfo.level, 'main');
+    xpSync = {
+      awarded: taskXpAwarded,
+      reason: task.date && task.date < today ? 'Tarefa atrasada limpa hoje' : 'Tarefa concluída',
+      xp_total: newXp,
+      level: newLevelInfo.level,
+      leveled_up: newLevelInfo.level > oldLevel,
+    };
+  }
 
   // When a recurring task is completed, spawn the next occurrence.
   // We only spawn from the "template" (the task itself, regardless of parent),
@@ -664,7 +718,7 @@ app.put('/api/tasks/:id', (req, res) => {
     }
   }
 
-  res.json({ ...syncedTask, calendar_sync: calendarSync, next_occurrence_sync: nextOccurrenceSync });
+  res.json({ ...syncedTask, calendar_sync: calendarSync, next_occurrence_sync: nextOccurrenceSync, xp_sync: xpSync });
 });
 
 app.delete('/api/tasks/:id', (req, res) => {

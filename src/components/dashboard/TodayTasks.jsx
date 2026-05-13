@@ -15,9 +15,11 @@ const priorityStyles = {
 };
 
 export default function TodayTasks({ tasks, today, onToggleComplete }) {
-  const pending = tasks.filter(t => t.status !== 'completed');
-  const completed = tasks.filter(t => t.status === 'completed');
+  const isDone = (task) => task.status === 'completed' || task.status === 'done';
+  const pending = tasks.filter(t => !isDone(t));
+  const completed = tasks.filter(t => isDone(t));
   const overdueCount = pending.filter(t => t.date && today && t.date < today).length;
+  const cleanedOverdueCount = completed.filter(t => t.date && today && t.date < today && t.completed_date === today).length;
 
   return (
     <Card className="bg-card border-border">
@@ -28,6 +30,11 @@ export default function TodayTasks({ tasks, today, onToggleComplete }) {
             {overdueCount > 0 && (
               <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-[10px] text-destructive">
                 {overdueCount} atrasada{overdueCount === 1 ? '' : 's'}
+              </Badge>
+            )}
+            {cleanedOverdueCount > 0 && (
+              <Badge variant="outline" className="border-green-500/30 bg-green-500/10 text-[10px] text-green-400">
+                {cleanedOverdueCount} limpa{cleanedOverdueCount === 1 ? '' : 's'} hoje
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">
@@ -42,6 +49,11 @@ export default function TodayTasks({ tasks, today, onToggleComplete }) {
             <p className="text-sm text-muted-foreground py-4 text-center">
               Nenhuma tarefa para hoje. Que tal capturar uma por voz?
             </p>
+          )}
+          {pending.length > 0 && (
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground/70 px-1 pt-1">
+              Pendentes — o que ainda pesa no dia
+            </div>
           )}
           {pending.map(task => (
             <motion.div
@@ -87,6 +99,11 @@ export default function TodayTasks({ tasks, today, onToggleComplete }) {
               </Link>
             </motion.div>
           ))}
+          {completed.length > 0 && (
+            <div className="text-[11px] uppercase tracking-wider text-green-400/80 px-1 pt-3">
+              Concluídas hoje — esforço registrado
+            </div>
+          )}
           {completed.map(task => (
             <motion.div
               key={task.id}
@@ -99,7 +116,14 @@ export default function TodayTasks({ tasks, today, onToggleComplete }) {
                 onCheckedChange={() => onToggleComplete(task)}
                 className="border-accent text-accent"
               />
-              <p className="text-sm text-muted-foreground line-through truncate flex-1">{task.title}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-muted-foreground line-through truncate">{task.title}</p>
+                {task.date && today && task.date < today && (
+                  <p className="text-[11px] text-green-400/80 mt-0.5">
+                    Limpa hoje · era de {task.date}
+                  </p>
+                )}
+              </div>
               <CategoryBadge category={task.category} className="opacity-60" />
               <CheckCircle2 className="w-4 h-4 text-accent/60" />
             </motion.div>

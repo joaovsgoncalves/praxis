@@ -50,12 +50,17 @@ export default function Dashboard() {
 
   const tasks = React.useMemo(() => {
     const relevantTasks = allTasks.filter(task => {
+      const isDone = task.status === 'completed' || task.status === 'done';
       const isToday = task.date === today;
-      const isOverduePending = task.status !== 'completed' && task.date && task.date < today;
-      return isToday || isOverduePending;
+      const isOverduePending = !isDone && task.date && task.date < today;
+      const wasCompletedToday = isDone && (task.completed_date === today || (!task.completed_date && task.date === today));
+      return isToday || isOverduePending || wasCompletedToday;
     });
 
     return relevantTasks.sort((a, b) => {
+      const aDone = a.status === 'completed' || a.status === 'done';
+      const bDone = b.status === 'completed' || b.status === 'done';
+      if (aDone !== bDone) return aDone ? 1 : -1;
       const dateCompare = String(a.date || '').localeCompare(String(b.date || ''));
       if (dateCompare !== 0) return dateCompare;
       return String(a.time || '').localeCompare(String(b.time || ''));
@@ -91,6 +96,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
   const toggleHabitMutation = useMutation({
