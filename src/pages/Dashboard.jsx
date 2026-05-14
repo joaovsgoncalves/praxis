@@ -18,15 +18,13 @@ import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
 import OfflineBanner from '@/components/shared/OfflineBanner';
 import { useTimeOfDay } from '@/hooks/useTimeOfDay';
 import { fortalezaDateKey } from '@/lib/dates';
+import { isTaskCompletedForToday, isTaskDone, sortTodayRelevantTasks } from '@/lib/tasks';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
 // in its semantic color (defined via .card-domain in index.css).
 const Slot = ({ domain = 'focus', children }) => (
   <div className={`rounded-xl card-domain domain-${domain}`}>{children}</div>
 );
-
-const isTaskDone = (task) => task.status === 'completed' || task.status === 'done';
-const taskCompletionDate = (task) => task.completed_date || String(task.completed_at || task.updated_date || '').slice(0, 10);
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -52,22 +50,13 @@ export default function Dashboard() {
   });
 
   const tasks = React.useMemo(() => {
-    const relevantTasks = allTasks.filter(task => {
-      const isDone = isTaskDone(task);
-      const isToday = task.date === today;
-      const isOverduePending = !isDone && task.date && task.date < today;
-      const wasCompletedToday = isDone && (taskCompletionDate(task) === today || (!task.completed_date && task.date === today));
-      return isToday || isOverduePending || wasCompletedToday;
-    });
-
-    return relevantTasks.sort((a, b) => {
-      const aDone = isTaskDone(a);
-      const bDone = isTaskDone(b);
-      if (aDone !== bDone) return aDone ? 1 : -1;
-      const dateCompare = String(a.date || '').localeCompare(String(b.date || ''));
-      if (dateCompare !== 0) return dateCompare;
-      return String(a.time || '').localeCompare(String(b.time || ''));
-    });
+    return allTasks
+      .filter(task => {
+        const isToday = task.date === today;
+        const isOverduePending = !isTaskDone(task) && task.date && task.date < today;
+        return isToday || isOverduePending || isTaskCompletedForToday(task, today);
+      })
+      .sort(sortTodayRelevantTasks);
   }, [allTasks, today]);
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],

@@ -13,6 +13,8 @@ import TaskForm from '@/components/habits-tasks/TaskForm';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
+import { fortalezaDateKey } from '@/lib/dates';
+import { isTaskRelevantForTodayList } from '@/lib/tasks';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -90,8 +92,9 @@ export default function HabitsTasks() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const queryClient = useQueryClient();
+  const today = fortalezaDateKey();
 
-  const { data: tasks = [] } = useQuery({ queryKey: ['allTasks'], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
+  const { data: tasks = [] } = useQuery({ queryKey: ['allTasks', today], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
   const { data: habits = [] } = useQuery({ queryKey: ['allHabits'], queryFn: () => forjaApi.habits.list({}) });
 
   const createTask = useMutation({
@@ -137,7 +140,9 @@ export default function HabitsTasks() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
   });
 
-  const filteredTasks = tasks.filter(t => {
+  const currentTasks = tasks.filter(t => isTaskRelevantForTodayList(t, today));
+
+  const filteredTasks = currentTasks.filter(t => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
     return true;
@@ -175,7 +180,7 @@ export default function HabitsTasks() {
       <Tabs value={view} onValueChange={setView}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
-          <TabsTrigger value="tasks">Tarefas ({tasks.length})</TabsTrigger>
+          <TabsTrigger value="tasks">Tarefas ({currentTasks.length})</TabsTrigger>
           <TabsTrigger value="habits">Hábitos ({habits.length})</TabsTrigger>
         </TabsList>
       </Tabs>
