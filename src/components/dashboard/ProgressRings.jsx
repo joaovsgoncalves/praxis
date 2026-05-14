@@ -9,12 +9,13 @@ const RINGS = [
   { key: 'focus',  stroke: 'hsl(var(--domain-focus))',    glow: 'hsl(265 85% 65% / 0.55)', radius: 46, label: 'Foco' },
 ];
 
-export default function ProgressRings({ habits = 0, tasks = 0, focus = 0, size = 200 }) {
+export default function ProgressRings({ habits = 0, tasks = 0, focus = 0, overall = null, size = 200 }) {
   const cx = size / 2;
   const cy = size / 2;
   const stroke = 10;
 
   const data = { habits, tasks, focus };
+  const centerPct = Number.isFinite(overall) ? overall : (habits + tasks + focus) / 3;
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -61,7 +62,7 @@ export default function ProgressRings({ habits = 0, tasks = 0, focus = 0, size =
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="font-mono text-3xl font-bold text-foreground">
-          {Math.round((habits + tasks + focus) / 3)}
+          {Math.round(centerPct)}
           <span className="text-muted-foreground text-base">%</span>
         </span>
         <span className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">do dia</span>

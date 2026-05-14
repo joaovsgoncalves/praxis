@@ -61,8 +61,11 @@ export default function HeroDay({
   const tasksPct = tasksTotal > 0 ? (tasksDone / tasksTotal) * 100 : 0;
   const focusPct = focusGoalSec > 0 ? Math.min(100, (focusSec / focusGoalSec) * 100) : 0;
 
-  const overall = (habitsPct + tasksPct + focusPct) / 3;
-  const intensity = Math.max(0.05, Math.min(1, overall / 100));
+  const trackableItemsTotal = habitsTotal + tasksTotal;
+  const dayPct = trackableItemsTotal > 0
+    ? ((habitsDone + tasksDone) / trackableItemsTotal) * 100
+    : focusPct;
+  const intensity = Math.max(0.05, Math.min(1, dayPct / 100));
 
   const bestStreak = useMemo(
     () => habits.reduce((m, h) => Math.max(m, h.current_streak || 0), 0),
@@ -85,6 +88,7 @@ export default function HeroDay({
             habits={habitsPct}
             tasks={tasksPct}
             focus={focusPct}
+            overall={dayPct}
             size={210}
           />
         </div>
