@@ -1,7 +1,6 @@
 import React from 'react';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import HeroDay from '@/components/dashboard/HeroDay';
 import TodayTasks from '@/components/dashboard/TodayTasks';
 import TodayHabits from '@/components/dashboard/TodayHabits';
@@ -18,6 +17,7 @@ import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
 import OfflineBanner from '@/components/shared/OfflineBanner';
 import { useTimeOfDay } from '@/hooks/useTimeOfDay';
+import { fortalezaDateKey } from '@/lib/dates';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
 // in its semantic color (defined via .card-domain in index.css).
@@ -30,11 +30,11 @@ const taskCompletionDate = (task) => task.completed_date || String(task.complete
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = fortalezaDateKey();
   const { tod } = useTimeOfDay();
 
   const [waterMl, setWaterMl] = React.useState(() => {
-    const dateKey = format(new Date(), 'yyyy-MM-dd');
+    const dateKey = fortalezaDateKey();
     const savedMl = localStorage.getItem(`water_ml_${dateKey}`);
     if (savedMl) return Number(savedMl);
     const savedGlasses = localStorage.getItem(`water_${dateKey}`);

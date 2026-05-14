@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Play, Pause, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { fortalezaDateKey } from '@/lib/dates';
 
 const PRESETS = [
   { label: 'Clássico', focus: 25, brk: 5, icon: '🍅' },
@@ -35,6 +35,7 @@ export default function Focus() {
   const intervalRef = useRef(null);
   const focusTickRef = useRef(null);
   const queryClient = useQueryClient();
+  const today = fortalezaDateKey();
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['pendingTasks'],
@@ -42,8 +43,8 @@ export default function Focus() {
   });
 
   const { data: todaySessions = [] } = useQuery({
-    queryKey: ['todayFocus'],
-    queryFn: () => forjaApi.focus.list({ date: format(new Date(), 'yyyy-MM-dd') }),
+    queryKey: ['todayFocus', today],
+    queryFn: () => forjaApi.focus.list({ date: today }),
   });
 
   const { data: focusStats = [] } = useQuery({
@@ -89,7 +90,7 @@ export default function Focus() {
       saveSessionMutation.mutate({
         task_id: (selectedTaskId && selectedTaskId !== 'none') ? selectedTaskId : null,
         task_title: selectedTask?.title || 'Sessão livre',
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: fortalezaDateKey(),
         duration_seconds: totalSeconds,
       });
     }

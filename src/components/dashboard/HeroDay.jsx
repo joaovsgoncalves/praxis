@@ -7,6 +7,7 @@ import { useTimeOfDay } from '@/hooks/useTimeOfDay';
 import EmberCanvas from './EmberCanvas';
 import ProgressRings, { RingLegend } from './ProgressRings';
 import { Flame } from 'lucide-react';
+import { fortalezaDateKey, fortalezaDisplayDate } from '@/lib/dates';
 
 const QUOTES = [
   'Disciplina derrota motivação todos os dias.',
@@ -34,7 +35,7 @@ export default function HeroDay({
   userName,
 }) {
   const { greeting, emoji, tagline } = useTimeOfDay();
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = fortalezaDateKey();
 
   const { data: focusToday = [] } = useQuery({
     queryKey: ['focusToday', today],
@@ -72,7 +73,7 @@ export default function HeroDay({
     [habits]
   );
 
-  const dateStr = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
+  const dateStr = format(fortalezaDisplayDate(), "EEEE, d 'de' MMMM", { locale: ptBR });
   const focusMin = Math.round(focusSec / 60);
   const focusGoalMin = Math.round(focusGoalSec / 60);
 
