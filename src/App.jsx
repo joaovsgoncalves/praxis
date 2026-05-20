@@ -8,6 +8,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard';
 import HabitsTasks from '@/pages/HabitsTasks';
+import Ideas from '@/pages/Ideas';
 import Focus from '@/pages/Focus';
 import Goals from '@/pages/Goals';
 import Rituais from '@/pages/Rituais';
@@ -45,6 +46,7 @@ const AuthenticatedApp = () => {
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/habitos-tarefas" element={<HabitsTasks />} />
+        <Route path="/ideias" element={<Ideas />} />
         <Route path="/foco" element={<Focus />} />
         <Route path="/metas" element={<Goals />} />
         <Route path="/rituais" element={<Rituais />} />
