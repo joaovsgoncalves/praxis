@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, Square } from 'lucide-react';
+import { CheckCircle2, Play, Pause, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
+import { toast } from '@/components/ui/use-toast';
 
 const PRESETS = [
   { label: 'Clássico', focus: 25, brk: 5, icon: '🍅' },
@@ -32,6 +33,7 @@ export default function Focus() {
   const [sessionStart, setSessionStart] = useState(null);
   const [inSession, setInSession] = useState(false);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
+  const [lastSessionSummary, setLastSessionSummary] = useState(null);
   const intervalRef = useRef(null);
   const focusTickRef = useRef(null);
   const queryClient = useQueryClient();
@@ -57,7 +59,28 @@ export default function Focus() {
 
   const saveSessionMutation = useMutation({
     mutationFn: (data) => forjaApi.focus.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['todayFocus'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todayFocus'] });
+      queryClient.invalidateQueries({ queryKey: ['focusStats'] });
+    },
+  });
+
+  const completeTaskMutation = useMutation({
+    mutationFn: (taskId) => forjaApi.tasks.update(taskId, { status: 'completed' }),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+      if (task?.xp_sync?.leveled_up) {
+        window.dispatchEvent(new CustomEvent('forja-level-up', { detail: task.xp_sync }));
+      }
+      setLastSessionSummary(summary => summary ? { ...summary, taskCompleted: true } : summary);
+      toast({
+        title: '✅ Tarefa concluída',
+        description: task?.title || 'A tarefa vinculada foi marcada como feita.',
+      });
+    },
   });
 
   const applyPreset = (index) => {
@@ -75,23 +98,33 @@ export default function Focus() {
     setIsRunning(true);
     setIsBreak(false);
     setTimeLeft(focusDuration * 60);
+    setLastSessionSummary(null);
   };
 
   const endSession = () => {
+    const totalSeconds = Math.max(0, Math.round(totalFocusTime));
+    const taskToFinish = (selectedTaskId && selectedTaskId !== 'none') ? selectedTask : null;
+
     setIsRunning(false);
     setIsPaused(false);
     setInSession(false);
     setIsBreak(false);
     clearInterval(intervalRef.current);
     clearInterval(focusTickRef.current);
-    
+
     if (sessionStart) {
-      const totalSeconds = Math.max(0, Math.round(totalFocusTime));
       saveSessionMutation.mutate({
-        task_id: (selectedTaskId && selectedTaskId !== 'none') ? selectedTaskId : null,
-        task_title: selectedTask?.title || 'Sessão livre',
+        task_id: taskToFinish?.id || null,
+        task_title: taskToFinish?.title || 'Sessão livre',
         date: fortalezaDateKey(),
         duration_seconds: totalSeconds,
+      });
+
+      setLastSessionSummary({
+        task: taskToFinish,
+        focusSeconds: totalSeconds,
+        cycles,
+        taskCompleted: false,
       });
     }
   };
@@ -140,6 +173,8 @@ export default function Focus() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const formatMinutes = (seconds) => `${Math.max(1, Math.round(seconds / 60))}min`;
+
   const progress = isBreak 
     ? ((breakDuration * 60 - timeLeft) / (breakDuration * 60)) * 100
     : ((focusDuration * 60 - timeLeft) / (focusDuration * 60)) * 100;
@@ -149,6 +184,42 @@ export default function Focus() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Modo Foco</h1>
+
+      {lastSessionSummary && !inSession && (
+        <Card className="bg-primary/10 border-primary/30">
+          <CardContent className="p-5 space-y-4">
+            <div className="space-y-1">
+              <p className="font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-primary" /> Sessão salva
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Você registrou {formatMinutes(lastSessionSummary.focusSeconds)} de foco
+                {lastSessionSummary.cycles > 0 ? ` e completou ${lastSessionSummary.cycles} ciclo${lastSessionSummary.cycles === 1 ? '' : 's'}` : ''}.
+              </p>
+            </div>
+
+            {lastSessionSummary.task && !lastSessionSummary.taskCompleted && (
+              <div className="rounded-lg border border-border bg-background/70 p-3 space-y-3">
+                <p className="text-sm">
+                  Tarefa vinculada: <span className="font-medium">{lastSessionSummary.task.title}</span>
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={() => completeTaskMutation.mutate(lastSessionSummary.task.id)}
+                  disabled={completeTaskMutation.isPending}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {completeTaskMutation.isPending ? 'Concluindo...' : 'Marcar tarefa como concluída'}
+                </Button>
+              </div>
+            )}
+
+            {lastSessionSummary.taskCompleted && (
+              <p className="text-sm font-medium text-primary">Tarefa concluída e dashboard atualizado.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {!inSession && topFocusStats.length > 0 && (
         <Card className="bg-card border-border">
