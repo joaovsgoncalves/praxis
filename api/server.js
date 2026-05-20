@@ -14,6 +14,7 @@ const CATEGORIES = {
   treino: { emoji: '💪', label: 'Treino', color: 'red' },
   estudo: { emoji: '📚', label: 'Estudo', color: 'purple' },
   jotav_fit: { emoji: '📸', label: '@jotav.fit', color: 'pink' },
+  ideias: { emoji: '💡', label: 'Ideias', color: 'cyan' },
   pessoal: { emoji: '🏠', label: 'Pessoal', color: 'yellow' },
   rotina: { emoji: '🔥', label: 'Rotina', color: 'orange' }
 };

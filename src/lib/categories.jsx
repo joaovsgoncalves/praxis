@@ -3,6 +3,7 @@ export const CATEGORIES = {
   treino: { emoji: '💪', label: 'Treino', color: 'bg-red-500/20 text-red-400' },
   estudo: { emoji: '📚', label: 'Estudo', color: 'bg-purple-500/20 text-purple-400' },
   jotav_fit: { emoji: '📸', label: '@jotav.fit', color: 'bg-pink-500/20 text-pink-400' },
+  ideias: { emoji: '💡', label: 'Ideias', color: 'bg-cyan-500/20 text-cyan-400' },
   pessoal: { emoji: '🏠', label: 'Pessoal', color: 'bg-yellow-500/20 text-yellow-400' },
   rotina: { emoji: '🔥', label: 'Rotina', color: 'bg-orange-500/20 text-orange-400' }
 };
