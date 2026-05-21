@@ -20,31 +20,51 @@ export default function VoiceCapture() {
   const [processing, setProcessing] = useState(false);
   const [items, setItems] = useState([]);
   const [transcription, setTranscription] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const mediaRecorder = useRef(null);
   const audioChunks = useRef([]);
+  const recordingTimeout = useRef(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder.current = new MediaRecorder(stream);
-    audioChunks.current = [];
+    setErrorMessage('');
+    setTranscription('');
+    setItems([]);
 
-    mediaRecorder.current.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunks.current.push(e.data);
-    };
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        throw new Error('Seu navegador não suporta gravação de áudio nesta tela.');
+      }
 
-    mediaRecorder.current.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(audioChunks.current, { type: 'audio/webm' });
-      await processAudio(blob);
-    };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      mediaRecorder.current = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      audioChunks.current = [];
 
-    mediaRecorder.current.start();
-    setRecording(true);
+      mediaRecorder.current.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.current.push(e.data);
+      };
+
+      mediaRecorder.current.onstop = async () => {
+        if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunks.current, { type: mimeType || 'audio/webm' });
+        await processAudio(blob);
+      };
+
+      mediaRecorder.current.start();
+      setRecording(true);
+      recordingTimeout.current = setTimeout(() => stopRecording(), 90_000);
+    } catch (error) {
+      console.error('Microphone error:', error);
+      setErrorMessage(error.message || 'Não consegui acessar o microfone. Verifique a permissão do navegador.');
+      setRecording(false);
+    }
   };
 
   const stopRecording = () => {
+    if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
     if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
       mediaRecorder.current.stop();
     }
@@ -55,28 +75,26 @@ export default function VoiceCapture() {
     setProcessing(true);
     
     try {
-      // 1. Send audio to Forja API for transcription
-      const formData = new FormData();
-      formData.append('audio', blob, 'audio.webm');
-
-      const transcribeRes = await fetch(`${FORJA_API}/api/transcribe`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!transcribeRes.ok) throw new Error('Transcription failed');
-      const { text } = await transcribeRes.json();
+      const { text } = await forjaApi.transcribe(blob);
       setTranscription(text);
 
-      // 2. Parse transcription into items using LLM
       const parseRes = await forjaApi.parseVoice(text);
-
-      setItems((parseRes.items || []).map((item, i) => ({ ...item, id: i, confirmed: false })));
+      const parsedItems = (parseRes.items || []).map((item, i) => ({
+        ...item,
+        id: i,
+        category: item.category || 'pessoal',
+        priority: item.priority || 'medium',
+        confirmed: false,
+      }));
+      setItems(parsedItems);
+      if (parsedItems.length === 0) {
+        setErrorMessage('Transcrevi, mas não identifiquei nenhuma tarefa/hábito. Edite o texto e tente de novo mais tarde.');
+      }
     } catch (error) {
       console.error('Voice capture error:', error);
-      setTranscription('Erro ao processar áudio. Tente novamente.');
+      setErrorMessage('Não consegui processar o áudio ainda. O servidor de transcrição pode estar indisponível.');
     }
-    
+
     setProcessing(false);
   };
 
@@ -105,7 +123,7 @@ export default function VoiceCapture() {
             date: item.date || null,
             time: item.time || null,
             priority: item.priority || 'medium',
-            category: item.category || 'personal',
+            category: item.category || 'pessoal',
             source: 'voice',
           }),
         });
@@ -164,11 +182,20 @@ export default function VoiceCapture() {
                   <Mic className="w-10 h-10 text-primary" />
                 </motion.button>
                 <p className="text-sm text-muted-foreground">Toque para gravar. Diga suas tarefas e hábitos.</p>
+                <p className="text-xs text-muted-foreground">Limite seguro: até 90 segundos por áudio.</p>
               </motion.div>
             )}
           </AnimatePresence>
         </CardContent>
       </Card>
+
+      {errorMessage && (
+        <Card className="bg-destructive/10 border-destructive/30">
+          <CardContent className="py-4">
+            <p className="text-sm text-destructive">{errorMessage}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {transcription && (
         <Card className="bg-secondary/30 border-border">
@@ -224,14 +251,16 @@ export default function VoiceCapture() {
                           </SelectContent>
                         </Select>
                       )}
-                      <Select value={item.category || 'personal'} onValueChange={v => updateItem(item.id, 'category', v)} disabled={item.confirmed}>
+                      <Select value={item.category || 'pessoal'} onValueChange={v => updateItem(item.id, 'category', v)} disabled={item.confirmed}>
                         <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="work">Trabalho</SelectItem>
-                          <SelectItem value="personal">Pessoal</SelectItem>
-                          <SelectItem value="health">Saúde</SelectItem>
-                          <SelectItem value="learning">Aprendizado</SelectItem>
-                          <SelectItem value="other">Outro</SelectItem>
+                          <SelectItem value="farmacia">💼 Trabalho / RCA</SelectItem>
+                          <SelectItem value="treino">💪 Treino</SelectItem>
+                          <SelectItem value="estudo">📚 Estudo</SelectItem>
+                          <SelectItem value="jotav_fit">📸 @jotav.fit</SelectItem>
+                          <SelectItem value="ideias">💡 Ideias</SelectItem>
+                          <SelectItem value="pessoal">🏠 Pessoal</SelectItem>
+                          <SelectItem value="rotina">🔥 Rotina</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
