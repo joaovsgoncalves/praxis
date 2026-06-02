@@ -53,30 +53,30 @@ function buildMovedOrder(allItems, visibleItems, itemId, direction) {
 
 function ReorderControls({ onMoveUp, onMoveDown, disableUp, disableDown, busy, label }) {
   return (
-    <div className="flex flex-col sm:flex-row gap-1" aria-label={`Reordenar ${label}`}>
+    <div className="flex gap-1" aria-label={`Reordenar ${label}`}>
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="h-10 w-10 text-muted-foreground hover:text-foreground"
+        className="h-9 w-9 rounded-full text-muted-foreground hover:bg-white/5 hover:text-foreground"
         onClick={onMoveUp}
         disabled={busy || disableUp}
         aria-label={`Subir ${label}`}
         title="Subir"
       >
-        <ArrowUp className="w-4 h-4" />
+        <ArrowUp className="h-4 w-4" />
       </Button>
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="h-10 w-10 text-muted-foreground hover:text-foreground"
+        className="h-9 w-9 rounded-full text-muted-foreground hover:bg-white/5 hover:text-foreground"
         onClick={onMoveDown}
         disabled={busy || disableDown}
         aria-label={`Descer ${label}`}
         title="Descer"
       >
-        <ArrowDown className="w-4 h-4" />
+        <ArrowDown className="h-4 w-4" />
       </Button>
     </div>
   );
@@ -164,150 +164,217 @@ export default function HabitsTasks() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hábitos & Tarefas</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowTaskForm(true)} size="sm">
-            <Plus className="w-4 h-4 mr-1" />Tarefa
-          </Button>
-          <Button onClick={() => setShowHabitForm(true)} size="sm" variant="outline">
-            <Plus className="w-4 h-4 mr-1" />Hábito
-          </Button>
-        </div>
-      </div>
-
-      <Tabs value={view} onValueChange={setView}>
-        <TabsList>
-          <TabsTrigger value="all">Todos</TabsTrigger>
-          <TabsTrigger value="tasks">Tarefas ({currentTasks.length})</TabsTrigger>
-          <TabsTrigger value="habits">Hábitos ({habits.length})</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Category filter chips */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setCategoryFilter('all')}
-          className={`text-xs px-3 py-1.5 rounded-full transition-colors ${categoryFilter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'}`}
-        >
-          Todos
-        </button>
-        {Object.entries(CATEGORIES).map(([key, cat]) => (
-          <button
-            key={key}
-            onClick={() => setCategoryFilter(key)}
-            className={`text-xs px-3 py-1.5 rounded-full transition-colors ${categoryFilter === key ? `${cat.color} ring-1 ring-current` : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'}`}
-          >
-            {cat.emoji} {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {(view === 'all' || view === 'tasks') && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Tarefas</h2>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="pending">Pendentes</SelectItem>
-                <SelectItem value="completed">Concluídas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {Object.entries(CATEGORIES).map(([key, cat]) => (
-                  <SelectItem key={key} value={key}>{cat.emoji} {cat.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <p className="forja-kicker">Painel operacional</p>
+            <h1 className="forja-title text-3xl font-bold sm:text-4xl">Hábitos & Tarefas</h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Visual compacto para decidir rápido: tarefas em coluna principal, hábitos no apoio e ações sempre perto do item.
+            </p>
           </div>
 
-          {filteredTasks.length === 0 ? (
-            <Card className="bg-secondary/30"><CardContent className="py-8 text-center text-muted-foreground">Nenhuma tarefa encontrada</CardContent></Card>
-          ) : (
-            filteredTasks.map((task, index) => (
-              <Card key={task.id} className="bg-card border-border">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <button onClick={() => toggleTask.mutate(task)}>
-                    {task.status === 'completed' ? (
-                      <CheckCircle2 className="w-5 h-5 text-accent" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-                    )}
-                  </button>
-                  <div className="flex-1">
-                    <p className={cn("font-medium", task.status === 'completed' && "line-through opacity-60")}>{cleanPriorityPrefix(task.title)}</p>
-                    <div className="flex gap-2 mt-1">
-                      {task.date && <Badge variant="outline" className="text-xs">{task.date}</Badge>}
-                      {task.time && <Badge variant="outline" className="text-xs"><Clock className="w-3 h-3 mr-1" />{task.time}</Badge>}
-                      <Badge className={cn("text-xs", priorityStyles[task.priority])}>{priorityLabels[task.priority] || task.priority}</Badge>
-                      <CategoryBadge category={task.category} />
-                    </div>
-                  </div>
-                  <ReorderControls
-                    label={cleanPriorityPrefix(task.title)}
-                    busy={reorderTasks.isPending}
-                    disableUp={index === 0}
-                    disableDown={index === filteredTasks.length - 1}
-                    onMoveUp={() => moveTask(task.id, -1)}
-                    onMoveDown={() => moveTask(task.id, 1)}
-                  />
-                  <button onClick={() => deleteTask.mutate(task.id)} className="text-muted-foreground hover:text-destructive" aria-label={`Excluir ${cleanPriorityPrefix(task.title)}`}>
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </CardContent>
-              </Card>
-            ))
-          )}
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Button onClick={() => setShowTaskForm(true)} className="h-10 rounded-full px-4 shadow-lg shadow-primary/20">
+              <Plus className="mr-1.5 h-4 w-4" /> Tarefa
+            </Button>
+            <Button onClick={() => setShowHabitForm(true)} className="h-10 rounded-full px-4" variant="outline">
+              <Plus className="mr-1.5 h-4 w-4" /> Hábito
+            </Button>
+          </div>
         </div>
-      )}
 
-      {(view === 'all' || view === 'habits') && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Hábitos</h2>
-          {filteredHabits.length === 0 ? (
-            <Card className="bg-secondary/30"><CardContent className="py-8 text-center text-muted-foreground">Nenhum hábito registrado</CardContent></Card>
-          ) : (
-            filteredHabits.map((habit, index) => (
-              <Card key={habit.id} className="bg-card border-border">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <Flame className="w-5 h-5 text-primary" />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{cleanPriorityPrefix(habit.title)}</p>
-                      <CategoryBadge category={habit.category} />
-                      {habit.current_streak > 0 && (
-                        <span className="inline-flex items-center gap-1 bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded-full shrink-0">
-                          🔥 {habit.current_streak}
-                        </span>
-                      )}
-                    </div>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
-                    </Badge>
-                  </div>
-                  <ReorderControls
-                    label={cleanPriorityPrefix(habit.title)}
-                    busy={reorderHabits.isPending}
-                    disableUp={index === 0}
-                    disableDown={index === filteredHabits.length - 1}
-                    onMoveUp={() => moveHabit(habit.id, -1)}
-                    onMoveDown={() => moveHabit(habit.id, 1)}
-                  />
-                  <button onClick={() => deleteHabit.mutate(habit.id)} className="text-muted-foreground hover:text-destructive" aria-label={`Excluir ${cleanPriorityPrefix(habit.title)}`}>
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </CardContent>
-              </Card>
-            ))
-          )}
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Hoje</p>
+            <p className="mt-1 text-2xl font-semibold">{currentTasks.length}</p>
+            <p className="text-xs text-muted-foreground">tarefas no radar</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Rotina</p>
+            <p className="mt-1 text-2xl font-semibold">{habits.length}</p>
+            <p className="text-xs text-muted-foreground">hábitos ativos</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Filtro</p>
+            <p className="mt-1 truncate text-lg font-semibold">
+              {categoryFilter === 'all' ? 'Todas as áreas' : CATEGORIES[categoryFilter]?.label}
+            </p>
+            <p className="text-xs text-muted-foreground">contexto selecionado</p>
+          </div>
         </div>
-      )}
+      </section>
+
+      <section className="forja-panel rounded-3xl p-3 sm:p-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <Tabs value={view} onValueChange={setView}>
+            <TabsList className="h-11 rounded-2xl bg-black/20 p-1">
+              <TabsTrigger className="rounded-xl px-4" value="all">Todos</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-4" value="tasks">Tarefas ({currentTasks.length})</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-4" value="habits">Hábitos ({habits.length})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                categoryFilter === 'all'
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                  : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
+              )}
+            >
+              Todos
+            </button>
+            {Object.entries(CATEGORIES).map(([key, cat]) => (
+              <button
+                key={key}
+                onClick={() => setCategoryFilter(key)}
+                className={cn(
+                  'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  categoryFilter === key
+                    ? `${cat.color} ring-1 ring-current`
+                    : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                )}
+              >
+                {cat.emoji} {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className={cn('grid gap-6', view === 'all' && 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start')}>
+        {(view === 'all' || view === 'tasks') && (
+          <section className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="forja-kicker">Execução</p>
+                <h2 className="forja-title text-2xl font-semibold">Tarefas</h2>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="pending">Pendentes</SelectItem>
+                  <SelectItem value="completed">Concluídas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {filteredTasks.length === 0 ? (
+              <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhuma tarefa encontrada</CardContent></Card>
+            ) : (
+              <div className="space-y-3">
+                {filteredTasks.map((task, index) => (
+                  <Card key={task.id} className="card-domain domain-ember overflow-hidden bg-card/75">
+                    <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                      <button
+                        onClick={() => toggleTask.mutate(task)}
+                        className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground sm:mt-0"
+                        aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
+                      >
+                        {task.status === 'completed' ? (
+                          <CheckCircle2 className="h-5 w-5 text-accent" />
+                        ) : (
+                          <Circle className="h-5 w-5" />
+                        )}
+                      </button>
+
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <p className={cn('text-base font-semibold leading-snug', task.status === 'completed' && 'line-through opacity-60')}>
+                          {cleanPriorityPrefix(task.title)}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {task.date && <Badge variant="outline" className="text-xs">{task.date}</Badge>}
+                          {task.time && <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{task.time}</Badge>}
+                          <Badge className={cn('text-xs', priorityStyles[task.priority])}>{priorityLabels[task.priority] || task.priority}</Badge>
+                          <CategoryBadge category={task.category} />
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center">
+                        <ReorderControls
+                          label={cleanPriorityPrefix(task.title)}
+                          busy={reorderTasks.isPending}
+                          disableUp={index === 0}
+                          disableDown={index === filteredTasks.length - 1}
+                          onMoveUp={() => moveTask(task.id, -1)}
+                          onMoveDown={() => moveTask(task.id, 1)}
+                        />
+                        <button
+                          onClick={() => deleteTask.mutate(task.id)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Excluir ${cleanPriorityPrefix(task.title)}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {(view === 'all' || view === 'habits') && (
+          <section className="space-y-3">
+            <div>
+              <p className="forja-kicker">Consistência</p>
+              <h2 className="forja-title text-2xl font-semibold">Hábitos</h2>
+            </div>
+
+            {filteredHabits.length === 0 ? (
+              <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhum hábito registrado</CardContent></Card>
+            ) : (
+              <div className="space-y-3">
+                {filteredHabits.map((habit, index) => (
+                  <Card key={habit.id} className="card-domain domain-wellness overflow-hidden bg-card/75">
+                    <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5 xl:items-start">
+                      <Flame className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold leading-snug">{cleanPriorityPrefix(habit.title)}</p>
+                          <CategoryBadge category={habit.category} />
+                          {habit.current_streak > 0 && (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs text-orange-400">
+                              🔥 {habit.current_streak}
+                            </span>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
+                        </Badge>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center xl:self-start">
+                        <ReorderControls
+                          label={cleanPriorityPrefix(habit.title)}
+                          busy={reorderHabits.isPending}
+                          disableUp={index === 0}
+                          disableDown={index === filteredHabits.length - 1}
+                          onMoveUp={() => moveHabit(habit.id, -1)}
+                          onMoveDown={() => moveHabit(habit.id, 1)}
+                        />
+                        <button
+                          onClick={() => deleteHabit.mutate(habit.id)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={`Excluir ${cleanPriorityPrefix(habit.title)}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
 
       <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
         <DialogContent>
