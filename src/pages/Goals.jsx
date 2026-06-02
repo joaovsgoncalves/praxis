@@ -55,27 +55,80 @@ export default function Goals() {
   };
 
   const filtered = goals.filter(g => filter === 'all' || g.timeframe === filter);
+  const activeGoals = goals.filter(g => g.status === 'active');
+  const completedGoals = goals.filter(g => g.status === 'completed');
+  const averageProgress = goals.length
+    ? Math.round(goals.reduce((sum, goal) => sum + getGoalProgress(goal), 0) / goals.length)
+    : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Metas Pessoais</h1>
-        <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90" size="sm">
-          <Plus className="w-4 h-4 mr-1" />Nova Meta
-        </Button>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {['all', 'short', 'medium', 'long'].map(f => (
-          <Button key={f} variant={filter === f ? 'default' : 'outline'} size="sm"
-            onClick={() => setFilter(f)} className={cn(filter === f && 'bg-primary')}>
-            {f === 'all' ? 'Todas' : timeframeLabels[f]}
+    <div className="mx-auto max-w-6xl space-y-6">
+      <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <p className="forja-kicker flex items-center gap-2 text-primary">
+              <Target className="h-4 w-4" /> Estratégia
+            </p>
+            <h1 className="forja-title text-3xl font-bold sm:text-4xl">Metas Pessoais</h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Objetivos com progresso visível, prazo e vínculo com tarefas/hábitos — sem deixar a página parecer vazia quando ainda não tem meta.
+            </p>
+          </div>
+          <Button onClick={() => setShowForm(true)} className="h-10 self-start rounded-full px-4 shadow-lg shadow-primary/20 lg:self-auto">
+            <Plus className="mr-1.5 h-4 w-4" /> Nova Meta
           </Button>
-        ))}
-      </div>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map(goal => {
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Ativas</p>
+            <p className="mt-1 text-2xl font-semibold">{activeGoals.length}</p>
+            <p className="text-xs text-muted-foreground">metas em execução</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Progresso médio</p>
+            <p className="mt-1 text-2xl font-semibold">{averageProgress}%</p>
+            <p className="text-xs text-muted-foreground">entre metas criadas</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Concluídas</p>
+            <p className="mt-1 text-2xl font-semibold">{completedGoals.length}</p>
+            <p className="text-xs text-muted-foreground">vitórias registradas</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="forja-panel rounded-3xl p-3 sm:p-4">
+        <div className="flex flex-wrap gap-2">
+          {['all', 'short', 'medium', 'long'].map(f => (
+            <Button key={f} variant={filter === f ? 'default' : 'outline'} size="sm"
+              onClick={() => setFilter(f)} className={cn('rounded-full', filter === f && 'bg-primary')}>
+              {f === 'all' ? 'Todas' : timeframeLabels[f]}
+            </Button>
+          ))}
+        </div>
+      </section>
+
+      {filtered.length === 0 ? (
+        <Card className="border-primary/15 bg-primary/5">
+          <CardContent className="flex flex-col items-center gap-3 px-5 py-12 text-center sm:py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+              <Target className="h-7 w-7" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-semibold">Nenhuma meta encontrada</p>
+              <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                Crie uma meta curta e conecte tarefas/hábitos depois. A primeira meta deve ser simples o bastante para virar ação hoje.
+              </p>
+            </div>
+            <Button onClick={() => setShowForm(true)} className="rounded-full">
+              <Plus className="mr-1.5 h-4 w-4" /> Criar primeira meta
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {filtered.map(goal => {
           const progress = getGoalProgress(goal);
           const linkedTasks = tasks.filter(t => t.goal_id === goal.id);
           const linkedHabits = habits.filter(h => h.goal_id === goal.id);
@@ -138,10 +191,9 @@ export default function Goals() {
               </CardContent>
             </Card>
           );
-        })}
-      </div>
-
-      {filtered.length === 0 && <p className="text-center text-muted-foreground py-12">Nenhuma meta encontrada. Crie sua primeira meta!</p>}
+          })}
+        </div>
+      )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="bg-card border-border">

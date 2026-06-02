@@ -86,88 +86,117 @@ export default function Ideas() {
   const completedIdeas = sortedIdeas.filter(idea => idea.status === 'completed');
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-cyan-300 mb-2">
-            <Lightbulb className="w-5 h-5" />
-            <span className="text-sm font-medium uppercase tracking-wide">Banco de Ideias</span>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <p className="forja-kicker flex items-center gap-2 text-cyan-300">
+              <Lightbulb className="h-4 w-4" /> Banco de Ideias
+            </p>
+            <h1 className="forja-title text-3xl font-bold sm:text-4xl">Ideias</h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Capturas soltas, oportunidades e padrões para virar ação quando fizer sentido — sem virar uma lista esticada demais.
+            </p>
           </div>
-          <h1 className="text-2xl font-bold">Ideias</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Capturas soltas, oportunidades e padrões para virar ação quando fizer sentido.
-          </p>
+
+          <Button onClick={() => setShowIdeaForm(true)} className="h-10 self-start rounded-full px-4 shadow-lg shadow-primary/20 lg:self-auto">
+            <Plus className="mr-1.5 h-4 w-4" /> Nova Ideia
+          </Button>
         </div>
-        <Button onClick={() => setShowIdeaForm(true)} size="sm" className="self-start sm:self-auto">
-          <Plus className="w-4 h-4 mr-1" />Nova Ideia
-        </Button>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="bg-cyan-500/10 border-cyan-500/20">
-          <CardContent className="p-4">
-            <p className="text-xs text-cyan-200/80">Abertas</p>
-            <p className="text-2xl font-bold text-cyan-100">{openIdeas.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-secondary/30 border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Concluídas</p>
-            <p className="text-2xl font-bold">{completedIdeas.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-secondary/30 border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold">{sortedIdeas.length}</p>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3">
+            <p className="forja-kicker text-cyan-200/80">Abertas</p>
+            <p className="mt-1 text-2xl font-semibold text-cyan-100">{openIdeas.length}</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Concluídas</p>
+            <p className="mt-1 text-2xl font-semibold">{completedIdeas.length}</p>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <p className="forja-kicker">Total</p>
+            <p className="mt-1 text-2xl font-semibold">{sortedIdeas.length}</p>
+          </div>
+        </div>
+      </section>
 
-      <div className="space-y-3">
-        {isLoading ? (
-          <Card className="bg-secondary/30"><CardContent className="py-8 text-center text-muted-foreground">Carregando ideias...</CardContent></Card>
-        ) : sortedIdeas.length === 0 ? (
-          <Card className="bg-secondary/30">
-            <CardContent className="py-10 text-center text-muted-foreground">
-              Nenhuma ideia registrada ainda. Capture sem compromisso; depois a Forja decide o que vira execução.
-            </CardContent>
-          </Card>
-        ) : (
-          sortedIdeas.map((idea) => (
-            <Card key={idea.id} className="bg-card border-border">
-              <CardContent className="p-4 flex items-start gap-3">
-                <button onClick={() => toggleIdea.mutate(idea)} className="mt-0.5" aria-label={`Alternar ${cleanIdeaTitle(idea.title)}`}>
-                  {idea.status === 'completed' ? (
-                    <CheckCircle2 className="w-5 h-5 text-accent" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-muted-foreground hover:text-foreground" />
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={cn('font-medium', idea.status === 'completed' && 'line-through opacity-60')}>
-                    {cleanIdeaTitle(idea.title)}
-                  </p>
-                  {idea.description && (
-                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap line-clamp-4">
-                      {idea.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <CategoryBadge category={idea.category} />
-                    <Badge variant="outline" className="text-xs">{statusLabels[idea.status] || idea.status}</Badge>
-                    {idea.priority && <Badge className={cn('text-xs', priorityStyles[idea.priority])}>{priorityLabels[idea.priority] || idea.priority}</Badge>}
-                    {idea.date && <Badge variant="outline" className="text-xs">{idea.date}</Badge>}
-                    {idea.time && <Badge variant="outline" className="text-xs"><Clock className="w-3 h-3 mr-1" />{idea.time}</Badge>}
-                  </div>
-                </div>
-                <button onClick={() => deleteIdea.mutate(idea.id)} className="text-muted-foreground hover:text-destructive" aria-label={`Excluir ${cleanIdeaTitle(idea.title)}`}>
-                  <Trash2 className="w-4 h-4" />
-                </button>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="forja-kicker">Fila de captura</p>
+              <h2 className="forja-title text-2xl font-semibold">Ideias registradas</h2>
+            </div>
+            <Badge variant="outline" className="rounded-full">{openIdeas.length} abertas</Badge>
+          </div>
+
+          {isLoading ? (
+            <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando ideias...</CardContent></Card>
+          ) : sortedIdeas.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Nenhuma ideia registrada ainda. Capture sem compromisso; depois a Forja decide o que vira execução.
               </CardContent>
             </Card>
-          ))
-        )}
+          ) : (
+            sortedIdeas.map((idea) => (
+              <Card key={idea.id} className="bg-card/95 border-border">
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:p-5">
+                  <button onClick={() => toggleIdea.mutate(idea)} className="mt-0.5 self-start" aria-label={`Alternar ${cleanIdeaTitle(idea.title)}`}>
+                    {idea.status === 'completed' ? (
+                      <CheckCircle2 className="h-5 w-5 text-accent" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+                    )}
+                  </button>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className={cn('text-base font-semibold leading-snug', idea.status === 'completed' && 'line-through opacity-60')}>
+                      {cleanIdeaTitle(idea.title)}
+                    </p>
+                    {idea.description && (
+                      <p className="max-w-3xl whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground line-clamp-4">
+                        {idea.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <CategoryBadge category={idea.category} />
+                      <Badge variant="outline" className="text-xs">{statusLabels[idea.status] || idea.status}</Badge>
+                      {idea.priority && <Badge className={cn('text-xs', priorityStyles[idea.priority])}>{priorityLabels[idea.priority] || idea.priority}</Badge>}
+                      {idea.date && <Badge variant="outline" className="text-xs">{idea.date}</Badge>}
+                      {idea.time && <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{idea.time}</Badge>}
+                    </div>
+                  </div>
+                  <button onClick={() => deleteIdea.mutate(idea.id)} className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Excluir ${cleanIdeaTitle(idea.title)}`}>
+                    <Trash2 className="mx-auto h-4 w-4" />
+                  </button>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </section>
+
+        <aside className="space-y-4">
+          <Card className="border-cyan-400/15 bg-cyan-500/5">
+            <CardContent className="space-y-3 p-5">
+              <p className="forja-kicker text-cyan-200/80">Uso certo</p>
+              <p className="text-lg font-semibold text-cyan-50">Capturar agora, decidir depois.</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Esta área é um estacionamento: ideia boa fica visível, mas só vira tarefa quando tiver energia e contexto.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-3 p-5">
+              <p className="forja-kicker">Próximo corte</p>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p><span className="font-medium text-foreground">1.</span> Manter o que tem próximo passo claro.</p>
+                <p><span className="font-medium text-foreground">2.</span> Concluir o que era só lembrete.</p>
+                <p><span className="font-medium text-foreground">3.</span> Transformar em tarefa só quando for execução real.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </aside>
       </div>
 
       <Dialog open={showIdeaForm} onOpenChange={setShowIdeaForm}>
