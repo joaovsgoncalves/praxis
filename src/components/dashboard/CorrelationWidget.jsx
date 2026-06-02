@@ -32,10 +32,10 @@ export default function CorrelationWidget() {
 
   if (!data.enough_data) {
     return (
-      <Card className="bg-card border-border">
+      <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
+          <CardTitle className="flex items-center gap-2.5">
+            <Sparkles className="w-5 h-5 text-primary" />
             Insight de Bem-estar
           </CardTitle>
         </CardHeader>
@@ -49,10 +49,10 @@ export default function CorrelationWidget() {
   const { high_completion: high, low_completion: low, insight } = data;
 
   return (
-    <Card className="bg-card border-border">
+    <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
+        <CardTitle className="flex items-center gap-2.5">
+          <Sparkles className="w-5 h-5 text-primary" />
           Hábitos × Bem-estar
         </CardTitle>
       </CardHeader>

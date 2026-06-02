@@ -68,11 +68,11 @@ export default function WellnessWidget({ todayCheck, onSave }) {
   };
   if (!showForm && activeCheck) {
     return (
-      <Card className="bg-card border-border">
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Heart className="w-4 h-4 text-red-400" />
+            <CardTitle className="flex items-center gap-2.5">
+              <Heart className="w-5 h-5 text-domain-wellness" />
               Bem-estar Hoje
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={() => setShowForm(true)}>Editar</Button>
@@ -106,9 +106,9 @@ export default function WellnessWidget({ todayCheck, onSave }) {
   }
 
   return (
-    <Card className="bg-card border-border">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">
+        <CardTitle>
           {todayCheck ? 'Editar Check-in' : 'Como está seu dia?'}
         </CardTitle>
       </CardHeader>

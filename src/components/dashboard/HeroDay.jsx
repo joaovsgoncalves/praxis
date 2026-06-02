@@ -6,7 +6,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { useTimeOfDay } from '@/hooks/useTimeOfDay';
 import EmberCanvas from './EmberCanvas';
 import ProgressRings, { RingLegend } from './ProgressRings';
-import { Flame } from 'lucide-react';
+import { Flame, Hammer, Target, Timer } from 'lucide-react';
 import { fortalezaDateKey, fortalezaDisplayDate } from '@/lib/dates';
 
 const QUOTES = [
@@ -76,54 +76,73 @@ export default function HeroDay({
   const dateStr = format(fortalezaDisplayDate(), "EEEE, d 'de' MMMM", { locale: ptBR });
   const focusMin = Math.round(focusSec / 60);
   const focusGoalMin = Math.round(focusGoalSec / 60);
-
   const quote = pickQuote();
 
-  return (
-    <div className="relative overflow-hidden rounded-2xl glass-surface p-5 md:p-7">
-      <EmberCanvas intensity={intensity} />
+  const missionStats = [
+    { label: 'Tarefas', value: `${tasksDone}/${tasksTotal}`, icon: Target, tone: 'text-domain-ember' },
+    { label: 'Hábitos', value: `${habitsDone}/${habitsTotal}`, icon: Flame, tone: 'text-domain-wellness' },
+    { label: 'Foco', value: `${focusMin}/${focusGoalMin}m`, icon: Timer, tone: 'text-domain-focus' },
+  ];
 
-      <div className="relative z-10 grid md:grid-cols-[auto_1fr] gap-6 md:gap-8 items-center">
-        <div className="flex items-center justify-center">
+  return (
+    <div className="relative overflow-hidden rounded-[2rem] glass-surface p-5 md:p-8 lg:p-10">
+      <EmberCanvas intensity={intensity} />
+      <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-domain-gold/60 to-transparent" />
+
+      <div className="relative z-10 grid lg:grid-cols-[minmax(245px,0.72fr)_minmax(0,1fr)] gap-7 lg:gap-12 items-center">
+        <div className="flex items-center justify-center lg:justify-start">
           <ProgressRings
             habits={habitsPct}
             tasks={tasksPct}
             focus={focusPct}
             overall={dayPct}
-            size={210}
+            size={260}
           />
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground/80 mb-1">
-              {emoji} {dateStr}
+            <p className="forja-kicker mb-3">
+              {emoji} Painel de comando · {dateStr}
             </p>
-            <h1 className="text-2xl md:text-3xl font-bold leading-tight">
+            <h1 className="forja-title text-4xl md:text-5xl xl:text-6xl font-bold leading-[0.95] max-w-3xl">
               {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{tagline}</p>
+            <p className="mt-3 max-w-2xl text-base md:text-lg text-muted-foreground">{tagline}</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {missionStats.map(({ label, value, icon: Icon, tone }) => (
+              <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3.5 shadow-inner">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs uppercase tracking-widest text-muted-foreground/70">{label}</span>
+                  <Icon className={`w-4 h-4 ${tone}`} />
+                </div>
+                <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-foreground">{value}</div>
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {bestStreak > 0 && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-domain-ember/15 border border-domain-ember/30">
-                <Flame className="w-3.5 h-3.5 text-domain-ember" />
-                <span className="text-xs font-semibold text-domain-ember">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-domain-ember/15 border border-domain-ember/30">
+                <Flame className="w-4 h-4 text-domain-ember" />
+                <span className="text-sm font-semibold text-domain-ember">
                   {bestStreak} {bestStreak === 1 ? 'dia' : 'dias'} forjando
                 </span>
               </div>
             )}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-domain-focus/15 border border-domain-focus/30">
-              <span className="text-xs font-semibold text-domain-focus font-mono">
-                {focusMin}/{focusGoalMin}min de foco
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-domain-gold/15 border border-domain-gold/30">
+              <Hammer className="w-4 h-4 text-domain-gold" />
+              <span className="text-sm font-semibold text-domain-gold">
+                Missão do dia em {Math.round(dayPct)}%
               </span>
             </div>
           </div>
 
           <RingLegend habits={habitsPct} tasks={tasksPct} focus={focusPct} />
 
-          <p className="text-xs italic text-muted-foreground/80 pt-2 border-t border-border/40">
+          <p className="text-sm md:text-base italic text-muted-foreground/85 pt-4 border-t border-border/40">
             "{quote}"
           </p>
         </div>

@@ -17,7 +17,7 @@ export default function WaterTracker({ amountMl = 0, onUpdate }) {
   };
 
   return (
-    <Card className="bg-card border-border">
+    <Card>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">

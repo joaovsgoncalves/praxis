@@ -17,9 +17,9 @@ export default function WeeklyProgress({ habits = [], habitLogs = [] }) {
   };
 
   return (
-    <Card className="bg-card border-border">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">Progresso Semanal</CardTitle>
+        <CardTitle>Progresso Semanal</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-end justify-between gap-2">

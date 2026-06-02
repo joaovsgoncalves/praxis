@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,6 +7,7 @@
 @layer base {
   :root {
     --font-sans: 'Inter', sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
     --background: 240 6% 7%;
@@ -103,6 +104,8 @@
   }
   body {
     @apply text-foreground font-sans;
+    font-size: 16px;
+    text-rendering: geometricPrecision;
     /* Ambient mesh — barely-there warm/cool gradient pinned to viewport */
     background-color: hsl(var(--background));
     background-image:
@@ -128,6 +131,24 @@
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.04),
       0 6px 24px hsl(0 0% 0% / 0.35);
+  }
+
+  .forja-panel {
+    background:
+      linear-gradient(145deg, hsl(var(--card) / 0.88), hsl(var(--card) / 0.64)),
+      radial-gradient(circle at top left, hsl(var(--domain-gold) / 0.10), transparent 38%);
+    border: 1px solid hsl(0 0% 100% / 0.075);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.045),
+      0 16px 48px hsl(0 0% 0% / 0.32);
+  }
+
+  .forja-kicker {
+    @apply font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:text-[11px] sm:tracking-[0.28em];
+  }
+
+  .forja-title {
+    @apply font-display tracking-[-0.045em];
   }
 
   /* Domain card — adds a soft outer glow + accent border in the domain hue */

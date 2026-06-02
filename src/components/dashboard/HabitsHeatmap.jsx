@@ -97,11 +97,11 @@ export default function HabitsHeatmap() {
   if (habits.length === 0) return null;
 
   return (
-    <Card className="bg-card border-border card-domain domain-ember">
+    <Card className="card-domain domain-ember">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Flame className="w-4 h-4 text-domain-ember" />
+          <CardTitle className="flex items-center gap-2.5">
+            <Flame className="w-5 h-5 text-domain-ember" />
             Mapa de Hábitos
           </CardTitle>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">

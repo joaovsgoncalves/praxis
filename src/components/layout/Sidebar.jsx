@@ -18,10 +18,11 @@ const navItems = [
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
-// Apple-Watch-style ring drawn in SVG. Tiny on purpose — lives in the sidebar.
+// Apple-Watch-style ring drawn in SVG. Compact, but no longer tiny — the sidebar
+// is part of the cockpit identity and should read like a status module.
 function AvatarRing({ progress, level }) {
-  const size = 56;
-  const stroke = 4;
+  const size = 68;
+  const stroke = 5;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - Math.max(0, Math.min(100, progress)) / 100);
@@ -43,8 +44,8 @@ function AvatarRing({ progress, level }) {
           }}
         />
       </svg>
-      <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-domain-gold/30 to-domain-ember/20 flex items-center justify-center">
-        <span className="text-base font-bold text-foreground">{level}</span>
+      <div className="absolute inset-2 rounded-full bg-gradient-to-br from-domain-gold/30 to-domain-ember/20 flex items-center justify-center">
+        <span className="font-display text-xl font-bold text-foreground">{level}</span>
       </div>
     </div>
   );
@@ -63,16 +64,16 @@ function SidebarGamificationBar() {
   const xpToNext = next_level_xp ? Math.max(0, next_level_xp - xp_total) : 0;
 
   return (
-    <div className="px-3 pb-2 pt-1 border-t border-sidebar-border">
-      <div className="flex items-center gap-3 px-2.5 py-2.5 rounded-lg glass-surface">
+    <div className="px-4 pb-4 pt-3 border-t border-sidebar-border">
+      <div className="flex items-center gap-3.5 px-3 py-3.5 rounded-2xl glass-surface">
         <AvatarRing progress={progress_pct} level={level} />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-domain-gold truncate">{level_name}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+          <p className="font-display text-sm font-semibold text-domain-gold truncate">{level_name}</p>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">
             {xp_total.toLocaleString('pt-BR')} XP
           </p>
           {next_level_xp && (
-            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+            <p className="text-xs text-muted-foreground/75 mt-0.5">
               {xpToNext} pro próximo
             </p>
           )}
@@ -91,16 +92,19 @@ export default function Sidebar({ open, onClose }) {
         <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={onClose} />
       )}
       <aside className={cn(
-        "fixed top-0 left-0 h-full w-64 bg-sidebar z-50 flex flex-col border-r border-sidebar-border transition-transform duration-300 lg:translate-x-0",
+        "fixed top-0 left-0 h-full w-72 bg-sidebar z-50 flex flex-col border-r border-sidebar-border transition-transform duration-300 lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 h-16 border-b border-sidebar-border">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gold/20 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-gold" />
+        <div className="flex items-center justify-between px-5 h-20 border-b border-sidebar-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gold/20 border border-gold/20 flex items-center justify-center shadow-lg shadow-gold/10">
+              <Sparkles className="w-5 h-5 text-gold" />
             </div>
-            <span className="text-base font-bold text-sidebar-foreground tracking-tight">Forja do Jota</span>
+            <div>
+              <span className="block font-display text-lg font-bold text-sidebar-foreground tracking-tight">Forja do Jota</span>
+              <span className="block font-mono text-[10px] uppercase tracking-[0.22em] text-sidebar-foreground/40">cockpit diário</span>
+            </div>
           </div>
           <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
@@ -108,7 +112,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 space-y-1.5">
           {navItems.map(item => {
             const isActive = location.pathname === item.path;
             return (
@@ -117,13 +121,13 @@ export default function Sidebar({ open, onClose }) {
                 to={item.path}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+                  "flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-all",
                   isActive
                     ? "bg-gold text-sidebar-primary-foreground font-semibold shadow-lg shadow-gold/20"
                     : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >
-                <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-sidebar-primary-foreground" : "")} />
+                <item.icon className={cn("w-[18px] h-[18px] shrink-0", isActive ? "text-sidebar-primary-foreground" : "")} />
                 {item.label}
               </Link>
             );
@@ -134,12 +138,12 @@ export default function Sidebar({ open, onClose }) {
         <SidebarGamificationBar />
 
         {/* Voice capture */}
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="p-4 border-t border-sidebar-border">
           <Link
             to="/captura"
             onClick={onClose}
             className={cn(
-              "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all",
+              "flex items-center gap-3 px-4 py-3.5 rounded-2xl text-[15px] font-semibold transition-all",
               location.pathname === '/captura'
                 ? "bg-gold text-sidebar-primary-foreground font-semibold"
                 : "bg-gold/10 text-gold hover:bg-gold/20 border border-gold/20"

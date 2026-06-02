@@ -61,11 +61,11 @@ export default function ProgressRings({ habits = 0, tasks = 0, focus = 0, overal
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="font-mono text-3xl font-bold text-foreground">
+        <span className="font-mono text-5xl font-bold tracking-tighter text-foreground">
           {Math.round(centerPct)}
-          <span className="text-muted-foreground text-base">%</span>
+          <span className="text-muted-foreground text-xl">%</span>
         </span>
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">do dia</span>
+        <span className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground mt-1">do dia</span>
       </div>
     </div>
   );
@@ -78,12 +78,12 @@ export function RingLegend({ habits = 0, tasks = 0, focus = 0 }) {
     { color: 'hsl(var(--domain-focus))',    label: 'Foco',    value: focus },
   ];
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
       {rows.map(r => (
-        <div key={r.label} className="flex items-center gap-3 text-sm">
-          <span className="block w-2 h-2 rounded-full" style={{ background: r.color, boxShadow: `0 0 8px ${r.color}` }} />
-          <span className="text-muted-foreground w-20">{r.label}</span>
-          <span className="font-mono font-semibold text-foreground">{Math.round(r.value)}%</span>
+        <div key={r.label} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
+          <span className="block w-2.5 h-2.5 rounded-full" style={{ background: r.color, boxShadow: `0 0 8px ${r.color}` }} />
+          <span className="text-muted-foreground">{r.label}</span>
+          <span className="ml-auto font-mono font-semibold text-foreground">{Math.round(r.value)}%</span>
         </div>
       ))}
     </div>

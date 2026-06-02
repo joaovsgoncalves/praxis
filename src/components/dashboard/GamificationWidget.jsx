@@ -92,7 +92,7 @@ export default function GamificationWidget() {
 
   if (isLoading) {
     return (
-      <Card className="bg-card border-border">
+      <Card>
         <CardContent className="pt-6">
           <div className="h-24 rounded-lg bg-secondary/40 animate-pulse" />
         </CardContent>
@@ -107,44 +107,44 @@ export default function GamificationWidget() {
   const unlockedAchievements = achievements.filter(a => a.unlocked).slice(0, 3);
 
   return (
-    <Card className="bg-card border-border relative overflow-hidden">
+    <Card className="relative overflow-hidden">
       {showConfetti && <ConfettiEffect />}
 
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Zap className="w-4 h-4 text-gold" />
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2.5">
+          <Zap className="w-5 h-5 text-gold" />
           Nível & Progresso
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* Level display */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <motion.div
             key={level}
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="text-5xl"
+            className="text-6xl"
           >
             {emoji}
           </motion.div>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-gold">Nv. {level}</span>
-              <span className="text-sm font-medium text-foreground/80 truncate">{level_name}</span>
+              <span className="font-display text-4xl font-bold tracking-tight text-gold">Nv. {level}</span>
+              <span className="text-base font-medium text-foreground/80 truncate">{level_name}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{xp_total} XP total</p>
+            <p className="text-sm text-muted-foreground mt-1">{xp_total} XP total</p>
           </div>
         </div>
 
         {/* XP Progress */}
         <div>
-          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+          <div className="flex justify-between text-sm text-muted-foreground mb-2">
             <span>Progresso</span>
             <span>{xp_total} / {next_level_xp} XP</span>
           </div>
-          <Progress value={progress_pct} className="h-2 [&>div]:bg-gold" />
+          <Progress value={progress_pct} className="h-3 [&>div]:bg-gold" />
         </div>
 
         {/* Recent Achievements */}

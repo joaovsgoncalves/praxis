@@ -32,11 +32,11 @@ export default function UpcomingPosts() {
     .slice(0, 5);
 
   return (
-    <Card className="bg-card border-pink-500/20">
+    <Card className="border-pink-500/20">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Camera className="w-4 h-4 text-pink-400" />
-          <CardTitle className="text-base font-semibold">Próximos Posts</CardTitle>
+          <Camera className="w-5 h-5 text-pink-400" />
+          <CardTitle>Próximos Posts</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">

@@ -210,10 +210,10 @@ export default function RitualWidget() {
     .filter((k) => grouped[k]?.length > 0);
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-gold" />
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2.5">
+          <Sparkles className="w-5 h-5 text-gold" />
           Rituais do Dia
         </CardTitle>
       </CardHeader>

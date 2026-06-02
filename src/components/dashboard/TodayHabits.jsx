@@ -40,11 +40,11 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
   };
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-3">
+    <Card>
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Hábitos de Hoje</CardTitle>
-          <span className="text-xs text-muted-foreground">
+          <CardTitle>Hábitos de Hoje</CardTitle>
+          <span className="text-sm text-muted-foreground">
             {completedCount}/{habits.length} feitos
           </span>
         </div>
@@ -60,7 +60,7 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-1.5">
+      <CardContent className="space-y-3">
         {habits.length === 0 && (
           <p className="text-sm text-muted-foreground py-4 text-center">
             Nenhum hábito ativo. Crie seu primeiro hábito!
@@ -74,28 +74,28 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
               ref={el => { if (el) rowRefs.current.set(habit.id, el); else rowRefs.current.delete(habit.id); }}
               whileTap={{ scale: 0.98 }}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-lg transition-colors cursor-pointer",
+                "flex items-center gap-3.5 p-4 rounded-2xl transition-colors cursor-pointer",
                 done
                   ? "bg-domain-wellness/10 border border-domain-wellness/25"
                   : "bg-secondary/50 hover:bg-secondary"
               )}
               onClick={(e) => handleToggle(habit, done, e)}
             >
-              <span className="text-base w-6 text-center shrink-0">💪</span>
+              <span className="text-xl w-7 text-center shrink-0">💪</span>
               <Checkbox
                 checked={done}
                 onClick={(e) => e.stopPropagation()}
                 onCheckedChange={() => handleToggle(habit, done)}
-                className={cn(done ? "border-domain-wellness data-[state=checked]:bg-domain-wellness data-[state=checked]:border-domain-wellness" : "border-muted-foreground/40")}
+                className={cn("h-5 w-5", done ? "border-domain-wellness data-[state=checked]:bg-domain-wellness data-[state=checked]:border-domain-wellness" : "border-muted-foreground/40")}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className={cn("text-sm font-medium truncate", done && "text-domain-wellness line-through")}>{habit.title}</p>
+                  <p className={cn("text-base font-semibold truncate", done && "text-domain-wellness line-through")}>{habit.title}</p>
                   <CategoryBadge category={habit.category} />
                 </div>
               </div>
               {habit.current_streak > 0 && (
-                <span className="inline-flex items-center gap-1 bg-domain-ember/15 text-domain-ember text-xs px-2 py-0.5 rounded-full shrink-0">
+                <span className="inline-flex items-center gap-1 bg-domain-ember/15 text-domain-ember text-sm px-2.5 py-1 rounded-full shrink-0">
                   🔥 {habit.current_streak}
                 </span>
               )}

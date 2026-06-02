@@ -23,7 +23,7 @@ import { isTaskCompletedForToday, isTaskDone, sortTodayRelevantTasks } from '@/l
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
 // in its semantic color (defined via .card-domain in index.css).
 const Slot = ({ domain = 'focus', children }) => (
-  <div className={`rounded-xl card-domain domain-${domain}`}>{children}</div>
+  <div className={`rounded-2xl card-domain domain-${domain}`}>{children}</div>
 );
 
 export default function Dashboard() {
@@ -147,7 +147,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 lg:space-y-10">
       <OfflineBanner />
 
       <HeroDay
@@ -160,11 +160,11 @@ export default function Dashboard() {
 
       <WeeklyReviewPrompt />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)] gap-7 lg:gap-8 items-start">
+        <div className="space-y-7 lg:space-y-8">
           {mainCol.map(key => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
         </div>
-        <div className="space-y-6">
+        <div className="space-y-7 lg:space-y-8">
           {sideCol.map(key => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
         </div>
       </div>

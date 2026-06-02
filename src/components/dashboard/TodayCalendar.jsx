@@ -24,9 +24,9 @@ export default function TodayCalendar() {
   const events = Array.isArray(data) ? data : (data?.events ?? []);
 
   return (
-    <Card className="bg-card border-border">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold">📅 Próximos Eventos</CardTitle>
+        <CardTitle>📅 Próximos Eventos</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading && (
