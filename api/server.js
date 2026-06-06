@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import Database from 'better-sqlite3';
 import multer from 'multer';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -489,7 +489,7 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
       return res.status(422).json({ error: 'Empty transcription' });
     }
 
-    const id = uuidv4();
+    const id = randomUUID();
     db.prepare(`
       INSERT INTO transcriptions (id, audio_path, text, language, duration_ms)
       VALUES (?, ?, ?, ?, ?)
@@ -712,7 +712,7 @@ function nextRecurrenceDate(fromDate, recurrence, recurrenceDaysJson) {
 }
 
 app.post('/api/tasks', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const {
     title, description = '', date, time, status = 'pending',
     priority = 'medium', category = 'pessoal', goal_id = null, source = 'manual', duration_minutes,
@@ -838,7 +838,7 @@ app.put('/api/tasks/:id', (req, res) => {
         'SELECT id FROM tasks WHERE recurrence_parent_id = ? AND date = ?'
       ).get(parentRef, nextDate);
       if (!existingChild) {
-        const childId = uuidv4();
+        const childId = randomUUID();
         db.prepare(`
           INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, sort_order, recurrence, recurrence_days, recurrence_parent_id)
           VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -937,7 +937,7 @@ app.patch('/api/habits/reorder', (req, res) => {
 });
 
 app.post('/api/habits', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const { title, description = '', frequency = 'daily', category = 'pessoal', streak_target = 30, goal_id = null, source = 'manual', sort_order } = req.body;
   
   if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -1030,7 +1030,7 @@ app.get('/api/habit-logs', (req, res) => {
 });
 
 app.post('/api/habit-logs', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const { habit_id, date, completed = true } = req.body;
   
   if (!habit_id || !date) return res.status(400).json({ error: 'habit_id and date required' });
@@ -1062,7 +1062,7 @@ app.get('/api/wellness', (req, res) => {
 });
 
 app.post('/api/wellness', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const { date, sleep_hours = 7, sleep_quality = 3, mood = 3, productivity = 3, note = '' } = req.body;
   
   if (!date) return res.status(400).json({ error: 'date required' });
@@ -1102,7 +1102,7 @@ app.get('/api/focus', (req, res) => {
 });
 
 app.post('/api/focus', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const { task_id, task_title, date, duration_seconds } = req.body;
 
   db.prepare(`
@@ -1127,7 +1127,7 @@ app.get('/api/goals/:id', (req, res) => {
 });
 
 app.post('/api/goals', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const { title, description = '', deadline, timeframe = 'short', category = 'personal', status = 'active', manual_progress = 0 } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -1544,7 +1544,7 @@ app.get('/api/rituals/:id/progress', (req, res) => {
 });
 
 app.post('/api/rituals', (req, res) => {
-  const id = uuidv4();
+  const id = randomUUID();
   const { name, emoji = '🔗', time_of_day = 'morning', habits_order = [] } = req.body;
 
   if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -2059,7 +2059,7 @@ app.post('/api/weekly-reviews', (req, res) => {
     return res.json(updated);
   }
 
-  const id = uuidv4();
+  const id = randomUUID();
   db.prepare(`
     INSERT INTO weekly_reviews (id, week_start, highlights, blockers, learnings, next_week_focus, overall_score)
     VALUES (?, ?, ?, ?, ?, ?, ?)
