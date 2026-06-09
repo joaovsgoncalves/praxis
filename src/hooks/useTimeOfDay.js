@@ -12,10 +12,10 @@ export function getTimeOfDay(date = new Date()) {
 }
 
 const COPY = {
-  morning:    { greeting: 'Bom dia',  emoji: '🌅', tagline: 'Hora de acender a forja.' },
+  morning:    { greeting: 'Bom dia',  emoji: '🌅', tagline: 'Hora de abrir a Praxis.' },
   afternoon:  { greeting: 'Boa tarde', emoji: '☀️', tagline: 'Mantenha o calor.' },
   evening:    { greeting: 'Boa noite', emoji: '🌙', tagline: 'Hora de fechar o dia.' },
-  late_night: { greeting: 'Tá tarde', emoji: '💤', tagline: 'Descansar é forjar amanhã.' },
+  late_night: { greeting: 'Tá tarde', emoji: '💤', tagline: 'Descansar também é Praxis.' },
 };
 
 export function useTimeOfDay() {

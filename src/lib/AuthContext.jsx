@@ -3,7 +3,7 @@ import React, { createContext, useContext } from 'react';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const user = { full_name: 'João Victor', email: 'joao@forja.local' };
+  const user = { full_name: 'João Victor', email: 'joao@praxis.local' };
   const isAuthenticated = true;
   const isLoadingAuth = false;
   const isLoadingPublicSettings = false;

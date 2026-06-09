@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local STT helper for Forja voice capture.
+"""Local STT helper for Praxis voice capture.
 
 Reads an audio path and prints JSON: {"text": "...", "language": "pt"}.
 Uses faster-whisper when installed. The Node API owns upload validation,

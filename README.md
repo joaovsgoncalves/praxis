@@ -1,39 +1,43 @@
-**Welcome to your Base44 project** 
+# Praxis
 
-**About**
+> **Fale. Organize. Execute.**
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+Praxis é o cockpit diário pessoal para transformar intenção em execução. Tarefas, hábitos, foco, revisão e captura por áudio — tudo num lugar só, com **PraxIA** como copiloto.
 
-This project contains everything you need to run your app locally.
+## Stack
 
-**Edit the code in your local development environment**
+- **Frontend:** React 18 + Vite + Tailwind + shadcn/ui + TanStack Query
+- **Backend:** Express + better-sqlite3 (SQLite WAL) + Multer
+- **Deploy:** Vercel (front) + VPS Tailscale (API)
+- **Integrações:** Google Calendar, captura de voz por áudio
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+## Desenvolvimento local
 
-**Prerequisites:** 
+```bash
+# Frontend
+npm install
+npm run dev
 
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
-
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
+# API (porta 18556)
+cd api
+npm install
+node server.js
 ```
 
-Run the app: `npm run dev`
+## Estrutura
 
-**Publish your changes**
+```
+/              → frontend React (Vercel)
+/api           → backend Express (VPS)
+/src/pages     → páginas do app
+/src/components→ UI compartilhada
+```
 
-Open [Base44.com](http://Base44.com) and click on Publish.
+## PRD e evolução
 
-**Docs & Support**
+- Conceito atual: [`PRD-PRAXIS-v1.md`](./PRD-PRAXIS-v1.md)
+- Histórico: [`PRD-PRAXIS-LEGADO-v0.md`](./PRD-PRAXIS-LEGADO-v0.md)
 
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
+## Domínio
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+`praxis.vercel.app` (placeholder até domínio próprio ser comprado).

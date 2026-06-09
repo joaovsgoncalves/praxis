@@ -1,4 +1,4 @@
-// Forja API Client — unified client for the Forja do Jota backend
+// Praxis API Client — unified client for the Praxis backend
 // Replaces Base44 SDK calls with direct API calls
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.

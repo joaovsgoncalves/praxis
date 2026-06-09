@@ -102,7 +102,7 @@ export default function Sidebar({ open, onClose }) {
               <Sparkles className="w-5 h-5 text-gold" />
             </div>
             <div>
-              <span className="block font-display text-lg font-bold text-sidebar-foreground tracking-tight">Forja do Jota</span>
+              <span className="block font-display text-lg font-bold text-sidebar-foreground tracking-tight">Praxis</span>
               <span className="block font-mono text-[10px] uppercase tracking-[0.22em] text-sidebar-foreground/40">cockpit diário</span>
             </div>
           </div>

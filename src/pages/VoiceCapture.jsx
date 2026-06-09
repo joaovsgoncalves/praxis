@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
-// API do Forja do Jota (A.N.A. backend)
+// API da Praxis (A.N.A. backend)
 const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
 
 export default function VoiceCapture() {

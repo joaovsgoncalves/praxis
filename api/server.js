@@ -104,7 +104,7 @@ app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) return next();
   if (!FORJA_AUTH_REQUIRED) return next();
   if (!FORJA_API_KEY) {
-    return res.status(503).json({ error: 'Forja API auth is required but FORJA_API_KEY is not configured' });
+    return res.status(503).json({ error: 'Praxis API auth is required but FORJA_API_KEY is not configured' });
   }
 
   const header = req.headers['authorization'] || '';
@@ -479,7 +479,7 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
       console.error('Local STT error:', sttError.message);
       return res.status(503).json({
         error: 'STT backend not configured or failed',
-        detail: 'A transcrição local da Forja ainda não está disponível neste servidor.',
+        detail: 'A transcrição local da Praxis ainda não está disponível neste servidor.',
       });
     }
 
@@ -573,7 +573,7 @@ function shouldSyncTaskToCalendar(task) {
 
 function taskCalendarDescription(task) {
   const parts = [
-    'Criado pela Forja do Jota.',
+    'Criado pela Praxis.',
     `Task ID: ${task.id}`,
   ];
   if (task.description) parts.push('', task.description);
@@ -1182,7 +1182,7 @@ app.get('/api/user/settings', (req, res) => {
   res.json({
     id: 'default',
     full_name: settings.full_name,
-    email: 'joao@forja.local',
+    email: 'joao@praxis.local',
     avatar_url: settings.avatar_url,
     pomodoro_focus: settings.pomodoro_focus,
     pomodoro_break: settings.pomodoro_break,
@@ -1215,7 +1215,7 @@ app.put('/api/user/settings', (req, res) => {
   res.json({
     id: 'default',
     full_name: settings.full_name,
-    email: 'joao@forja.local',
+    email: 'joao@praxis.local',
     avatar_url: settings.avatar_url,
     pomodoro_focus: settings.pomodoro_focus,
     pomodoro_break: settings.pomodoro_break,
@@ -1392,7 +1392,7 @@ app.post('/api/parse-voice', async (req, res) => {
             messages: [
               {
                 role: 'system',
-                content: `Você extrai tarefas e hábitos de transcrições em português para a Forja do Jota.
+                content: `Você extrai tarefas e hábitos de transcrições em português para a Praxis.
 
 Responda APENAS JSON válido: {"items": [...]}.
 Cada item deve ter:
@@ -1671,9 +1671,9 @@ function getLevel(xp) {
     { level: 2, name: 'Aprendiz', xp: 100 },
     { level: 3, name: 'Disciplinado', xp: 300 },
     { level: 4, name: 'Focado', xp: 600 },
-    { level: 5, name: 'Forjador', xp: 1000 },
-    { level: 6, name: 'Mestre', xp: 1500 },
-    { level: 7, name: 'Lenda da Forja', xp: 2500 },
+    { level: 5, name: 'Praticante', xp: 1000 },
+    { level: 6, name: 'Disciplinado', xp: 1500 },
+    { level: 7, name: 'Lenda da Praxis', xp: 2500 },
   ];
   let current = levels[0];
   for (const l of levels) {
@@ -2075,6 +2075,6 @@ app.delete('/api/weekly-reviews/:id', (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🔥 Forja do Jota API running on port ${PORT}`);
+  console.log(`🔥 Praxis API running on port ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
 });
