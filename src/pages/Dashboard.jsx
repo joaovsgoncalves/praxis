@@ -55,11 +55,7 @@ export default function Dashboard() {
 
   const tasks = React.useMemo(() => {
     return allTasks
-      .filter(task => {
-        const isToday = task.date === today;
-        const isOverduePending = !isTaskDone(task) && task.date && task.date < today;
-        return isToday || isOverduePending || isTaskCompletedForToday(task, today);
-      })
+      .filter(task => task.date === today || isTaskCompletedForToday(task, today))
       .sort(sortTodayRelevantTasks);
   }, [allTasks, today]);
   const { data: habits = [] } = useQuery({
