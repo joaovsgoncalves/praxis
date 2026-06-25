@@ -85,27 +85,26 @@ export default function HeroDay({
   ];
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] glass-surface p-5 md:p-8 lg:p-10">
+    <div className="relative overflow-hidden rounded-2xl md:rounded-[2rem] glass-surface p-4 sm:p-5 md:p-8 lg:p-10">
       <EmberCanvas intensity={intensity} />
       <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-domain-gold/60 to-transparent" />
 
-      <div className="relative z-10 grid lg:grid-cols-[minmax(245px,0.72fr)_minmax(0,1fr)] gap-7 lg:gap-12 items-center">
-        <div className="flex items-center justify-center lg:justify-start">
-          <ProgressRings
-            habits={habitsPct}
-            tasks={tasksPct}
-            focus={focusPct}
-            overall={dayPct}
-            size={260}
-          />
+      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[minmax(245px,0.72fr)_minmax(0,1fr)] gap-5 md:gap-7 lg:gap-12 items-center">
+        <div className="flex items-center justify-center lg:justify-start order-2 lg:order-1">
+          <div className="sm:hidden">
+            <ProgressRings habits={habitsPct} tasks={tasksPct} focus={focusPct} overall={dayPct} size={200} />
+          </div>
+          <div className="hidden sm:block">
+            <ProgressRings habits={habitsPct} tasks={tasksPct} focus={focusPct} overall={dayPct} size={260} />
+          </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5 md:space-y-6 order-1 lg:order-2">
           <div>
-            <p className="forja-kicker mb-3">
+            <p className="forja-kicker mb-2 md:mb-3">
               {emoji} Praxis · {dateStr}
             </p>
-            <h1 className="forja-title text-4xl md:text-5xl xl:text-6xl font-bold leading-[0.95] max-w-3xl">
+            <h1 className="forja-title text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold leading-[0.95] max-w-3xl">
               {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
             </h1>
             <p className="mt-3 max-w-2xl text-base md:text-lg text-muted-foreground">{tagline}</p>
@@ -140,7 +139,9 @@ export default function HeroDay({
             </div>
           </div>
 
-          <RingLegend habits={habitsPct} tasks={tasksPct} focus={focusPct} />
+          <div className="hidden md:block">
+            <RingLegend habits={habitsPct} tasks={tasksPct} focus={focusPct} />
+          </div>
 
           <p className="text-sm md:text-base italic text-muted-foreground/85 pt-4 border-t border-border/40">
             "{quote}"

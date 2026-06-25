@@ -4,21 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
-import confetti from 'canvas-confetti';
-
-// Fire a tiny gold/ember burst at the click point. Cheap and synchronous.
-function sparkAt(x, y) {
-  confetti({
-    particleCount: 14,
-    spread: 38,
-    startVelocity: 22,
-    gravity: 0.9,
-    ticks: 90,
-    scalar: 0.7,
-    origin: { x: x / window.innerWidth, y: y / window.innerHeight },
-    colors: ['#FFC857', '#F59E0B', '#FB923C', '#FFFFFF'],
-  });
-}
+import { sparkAt } from '@/lib/celebration';
 
 export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
   const today = new Date().toISOString().split('T')[0];

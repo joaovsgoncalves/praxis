@@ -18,7 +18,7 @@ export default function AppLayout() {
             <Menu className="w-5 h-5" />
           </button>
         </header>
-        <main className="p-4 md:p-7 lg:p-10 max-w-[1480px] mx-auto">
+        <main className="p-4 pb-24 md:p-7 md:pb-10 lg:p-10 max-w-[1480px] mx-auto">
           <Outlet />
         </main>
       </div>

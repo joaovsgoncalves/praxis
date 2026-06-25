@@ -127,7 +127,7 @@ export default function Dashboard() {
     gamification:<Slot domain="gold"><GamificationWidget /></Slot>,
     wellness:    <Slot domain="wellness"><WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} /></Slot>,
     water:       <Slot domain="sky"><WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} /></Slot>,
-    weeklyProgress: <Slot domain="focus"><WeeklyProgress habits={habits} habitLogs={habitLogs} /></Slot>,
+    weeklyProgress: <div className="hidden md:block"><Slot domain="focus"><WeeklyProgress habits={habits} habitLogs={habitLogs} /></Slot></div>,
     heatmap:     <HabitsHeatmap />,
     correlation: <Slot domain="wellness"><CorrelationWidget /></Slot>,
   };
@@ -141,7 +141,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 lg:space-y-10">
+    <div className="space-y-5 sm:space-y-8 lg:space-y-10">
       <OfflineBanner />
 
       <HeroDay
