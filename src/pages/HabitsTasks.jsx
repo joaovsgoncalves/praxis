@@ -70,7 +70,7 @@ const statusLabels = { pending: 'Pendente', in_progress: 'Em andamento', complet
 
 export default function HabitsTasks() {
   const [view, setView] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('pending');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -165,7 +165,7 @@ export default function HabitsTasks() {
             <p className="forja-kicker">Painel operacional</p>
             <h1 className="forja-title text-3xl font-bold sm:text-4xl">Hábitos & Tarefas</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Visual compacto para decidir rápido: tarefas em coluna principal, hábitos no apoio e ações sempre perto do item.
+              Só o dia de hoje no radar — pendentes com data de hoje e o que você concluiu agora.
             </p>
           </div>
 

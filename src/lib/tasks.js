@@ -1,8 +1,19 @@
-export const isTaskDone = (task) => task?.status === 'completed' || task?.status === 'done';
+export const isTaskDone = (task) =>
+  task?.status === 'completed' || task?.status === 'done';
+
+export const isTaskClosed = (task) =>
+  isTaskDone(task) || task?.status === 'cancelled';
+
+export const isTaskOpen = (task) =>
+  task?.status === 'pending' || task?.status === 'in_progress';
 
 export const taskCompletionDate = (task) => (
   task?.completed_date || String(task?.completed_at || task?.updated_date || '').slice(0, 10)
 );
+
+export function isTaskForToday(task, today) {
+  return (task?.date || '').slice(0, 10) === today;
+}
 
 export function isTaskCompletedForToday(task, today) {
   if (!isTaskDone(task)) return false;
@@ -11,8 +22,11 @@ export function isTaskCompletedForToday(task, today) {
   return wasCompletedToday || legacyCompletedTodayTask;
 }
 
+/** Lista operacional do dia: pendentes só com data=hoje; concluídas só se fechadas hoje. */
 export function isTaskRelevantForTodayList(task, today) {
-  return !isTaskDone(task) || isTaskCompletedForToday(task, today);
+  if (task?.status === 'cancelled') return false;
+  if (isTaskOpen(task)) return isTaskForToday(task, today);
+  return isTaskCompletedForToday(task, today);
 }
 
 export function sortTodayRelevantTasks(a, b) {
