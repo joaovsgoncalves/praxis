@@ -1,6 +1,7 @@
 import React from 'react';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import DayWins from '@/components/dashboard/DayWins';
 import HeroDay from '@/components/dashboard/HeroDay';
 import TodayTasks from '@/components/dashboard/TodayTasks';
 import TodayHabits from '@/components/dashboard/TodayHabits';
@@ -117,6 +118,7 @@ export default function Dashboard() {
   // The same widgets exist in every mode — but the column they live in and
   // their order changes based on what's most relevant at this hour.
   const blocks = {
+    dayWins:     <Slot domain="gold"><DayWins tasks={tasks} today={today} onToggleComplete={(t) => toggleTaskMutation.mutate(t)} /></Slot>,
     tasks:       <Slot domain="ember"><TodayTasks tasks={tasks} today={today} onToggleComplete={(t) => toggleTaskMutation.mutate(t)} /></Slot>,
     habits:      <Slot domain="wellness"><TodayHabits habits={habits} habitLogs={habitLogs} onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })} /></Slot>,
     rituals:     <Slot domain="ember"><RitualWidget /></Slot>,
@@ -131,19 +133,11 @@ export default function Dashboard() {
   };
 
   let mainCol, sideCol;
-  if (tod === 'morning') {
-    mainCol = ['rituals', 'tasks', 'heatmap', 'weeklyProgress'];
-    sideCol = ['habits', 'calendar', 'gamification', 'water', 'wellness'];
-  } else if (tod === 'afternoon') {
-    mainCol = ['tasks', 'heatmap', 'weeklyProgress'];
-    sideCol = ['habits', 'calendar', 'rituals', 'gamification', 'posts', 'water'];
-  } else if (tod === 'evening') {
-    mainCol = ['tasks', 'wellness', 'heatmap', 'weeklyProgress'];
-    sideCol = ['calendar', 'habits', 'gamification', 'correlation', 'rituals', 'water'];
-  } else {
-    // late night — keep tasks visible so overdue work never disappears when the day rolls over.
-    mainCol = ['tasks', 'wellness', 'heatmap'];
-    sideCol = ['calendar', 'habits', 'gamification'];
+  // Cockpit Praxis: vitórias + execução + agenda primeiro; analytics secundário.
+  mainCol = ['dayWins', 'tasks', 'calendar', 'habits'];
+  sideCol = ['rituals', 'water', 'wellness', 'weeklyProgress'];
+  if (tod === 'evening' || tod === 'late_night') {
+    sideCol = ['wellness', 'rituals', 'water', 'weeklyProgress'];
   }
 
   return (

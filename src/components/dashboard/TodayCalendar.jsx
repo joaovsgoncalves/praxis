@@ -26,7 +26,10 @@ export default function TodayCalendar() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle>📅 Próximos Eventos</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <CalendarDays className="w-4 h-4" />
+          Agenda de hoje
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading && (

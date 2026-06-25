@@ -40,4 +40,4 @@ node server.js
 
 ## Domínio
 
-`praxis.vercel.app` (placeholder até domínio próprio ser comprado).
+`https://praxis-jota.vercel.app` (produção; API via proxy `/api` → VPS).

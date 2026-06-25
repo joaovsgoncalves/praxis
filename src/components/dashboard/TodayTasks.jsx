@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Timer, CheckCircle2, Clock, Repeat, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -95,8 +96,11 @@ export default function TodayTasks({ tasks, today, onToggleComplete }) {
                   </div>
                 )}
               </div>
-              <Link to={`/foco?taskId=${task.id}`} className="mt-1 shrink-0 opacity-70 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                <Timer className="w-5 h-5 text-primary" />
+              <Link to={`/foco?taskId=${task.id}`} className="shrink-0">
+                <Button type="button" size="sm" variant="outline" className="gap-1.5 h-9">
+                  <Timer className="w-4 h-4" />
+                  <span className="hidden xs:inline sm:inline">Foco</span>
+                </Button>
               </Link>
             </motion.div>
           ))}

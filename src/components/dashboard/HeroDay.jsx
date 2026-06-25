@@ -10,13 +10,13 @@ import { Flame, Hammer, Target, Timer } from 'lucide-react';
 import { fortalezaDateKey, fortalezaDisplayDate } from '@/lib/dates';
 
 const QUOTES = [
-  'Disciplina derrota motivação todos os dias.',
-  'Pequeno e consistente bate grande e raro.',
-  'Cada dia martelado é uma camada a mais.',
-  'A forja não pergunta se você tá com vontade.',
-  'O ferro só vira aço sob calor constante.',
-  'Você não precisa estar pronto, precisa começar.',
-  'Hoje é o material da próxima semana.',
+  'Ganhar o dia bate resolver a vida inteira.',
+  'Clareza antes da motivação.',
+  'Movimento reduz ansiedade melhor que ruminação.',
+  'Uma vitória pequena ainda é vitória.',
+  'Falar organiza; executar confirma.',
+  'O objetivo não é perfeição — é sequência.',
+  'Hoje é o bloco que você escolheu.',
 ];
 
 function pickQuote(date = new Date()) {
@@ -103,7 +103,7 @@ export default function HeroDay({
         <div className="space-y-6">
           <div>
             <p className="forja-kicker mb-3">
-              {emoji} Painel de comando · {dateStr}
+              {emoji} Praxis · {dateStr}
             </p>
             <h1 className="forja-title text-4xl md:text-5xl xl:text-6xl font-bold leading-[0.95] max-w-3xl">
               {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
@@ -135,7 +135,7 @@ export default function HeroDay({
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-domain-gold/15 border border-domain-gold/30">
               <Hammer className="w-4 h-4 text-domain-gold" />
               <span className="text-sm font-semibold text-domain-gold">
-                Missão do dia em {Math.round(dayPct)}%
+                Missão do dia · {Math.round(dayPct)}%
               </span>
             </div>
           </div>
