@@ -15,8 +15,7 @@ import { sparkFromElement } from '@/lib/celebration';
 export default function DayWins({ tasks = [], today, onToggleComplete, onEditTask }) {
   const rowRefs = useRef(new Map());
   const todayPending = tasks
-    .filter((t) => t.date === today && !isTaskDone(t))
-    .slice(0, 5);
+    .filter((t) => t.date === today && !isTaskDone(t));
 
   const todayDone = tasks.filter((t) => t.date === today && isTaskDone(t)).length;
   const todayTotal = tasks.filter((t) => t.date === today).length;
@@ -36,10 +35,10 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="w-5 h-5 text-domain-gold shrink-0" />
-              Vitórias de hoje
+              Tarefas de hoje
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Movimento conta — não precisa resolver tudo.
+              Só o que vale para ganhar este dia.
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -69,7 +68,7 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
               animate={{ opacity: 1 }}
               className="text-sm text-muted-foreground py-2 text-center"
             >
-              Nada pendente com data de hoje — ou você já ganhou o dia.
+              Nenhuma tarefa pendente para hoje.
             </motion.p>
           ) : (
             todayPending.map((task) => (
@@ -119,9 +118,11 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
             ))
           )}
         </AnimatePresence>
-        <p className="text-xs text-muted-foreground/80 pt-2 border-t border-border/40">
-          Treino · pessoas · trabalho — marque e use Pomodoro quando for executar.
-        </p>
+        {todayDone > 0 && (
+          <p className="text-xs text-domain-wellness pt-2">
+            {todayDone} concluída{todayDone === 1 ? '' : 's'} hoje — bom movimento.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

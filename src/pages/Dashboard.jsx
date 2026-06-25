@@ -183,7 +183,7 @@ export default function Dashboard() {
 
   let mainCol, sideCol;
   // Cockpit Praxis: vitórias + execução + agenda primeiro; analytics secundário.
-  mainCol = ['dayWins', 'tasks', 'calendar', 'habits'];
+  mainCol = ['dayWins', 'calendar', 'habits'];
   sideCol = ['rituals', 'water', 'wellness', 'weeklyProgress'];
   if (tod === 'evening' || tod === 'late_night') {
     sideCol = ['wellness', 'rituals', 'water', 'weeklyProgress'];
