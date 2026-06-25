@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Timer, Sparkles } from 'lucide-react';
+import { Timer, Sparkles, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { isTaskDone } from '@/lib/tasks';
@@ -12,7 +12,7 @@ import { sparkFromElement } from '@/lib/celebration';
 /**
  * Vitórias do dia — cockpit Praxis alinhado a “ganhar o dia”, não resolver a vida.
  */
-export default function DayWins({ tasks = [], today, onToggleComplete }) {
+export default function DayWins({ tasks = [], today, onToggleComplete, onEditTask }) {
   const rowRefs = useRef(new Map());
   const todayPending = tasks
     .filter((t) => t.date === today && !isTaskDone(t))
@@ -97,12 +97,24 @@ export default function DayWins({ tasks = [], today, onToggleComplete }) {
                     )}
                   </div>
                 </div>
-                <Button asChild size="default" variant="secondary" className="w-full sm:w-auto shrink-0 gap-2 h-11 touch-manipulation">
-                  <Link to={`/foco?taskId=${task.id}`}>
-                    <Timer className="w-4 h-4" />
-                    Iniciar foco
-                  </Link>
-                </Button>
+                <div className="flex w-full gap-2 sm:w-auto shrink-0">
+                  <Button
+                    type="button"
+                    size="default"
+                    variant="outline"
+                    className="flex-1 gap-2 h-11 touch-manipulation sm:flex-none"
+                    onClick={() => onEditTask?.(task)}
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Editar
+                  </Button>
+                  <Button asChild size="default" variant="secondary" className="flex-1 sm:flex-none gap-2 h-11 touch-manipulation">
+                    <Link to={`/foco?taskId=${task.id}`}>
+                      <Timer className="w-4 h-4" />
+                      Foco
+                    </Link>
+                  </Button>
+                </div>
               </motion.div>
             ))
           )}

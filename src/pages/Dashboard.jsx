@@ -17,8 +17,11 @@ import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
 import OfflineBanner from '@/components/shared/OfflineBanner';
+import TaskForm from '@/components/habits-tasks/TaskForm';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTimeOfDay } from '@/hooks/useTimeOfDay';
 import { fortalezaDateKey } from '@/lib/dates';
+import { buildDragOrder } from '@/lib/taskReorder';
 import { isTaskCompletedForToday, isTaskDone, sortTodayRelevantTasks } from '@/lib/tasks';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
@@ -78,6 +81,15 @@ export default function Dashboard() {
   });
 
   const todayCheck = wellnessChecks[0] || null;
+  const [editingTask, setEditingTask] = React.useState(null);
+
+  const invalidateTaskQueries = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+    queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+    queryClient.invalidateQueries({ queryKey: ['gamification'] });
+  }, [queryClient]);
 
   const toggleTaskMutation = useMutation({
     mutationFn: (task) => {
@@ -85,13 +97,30 @@ export default function Dashboard() {
       return forjaApi.tasks.update(task.id, { status: newStatus });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+      invalidateTaskQueries();
     },
   });
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    onSuccess: () => {
+      invalidateTaskQueries();
+      setEditingTask(null);
+    },
+  });
+  const reorderTasksMutation = useMutation({
+    mutationFn: (orderedIds) => forjaApi.tasks.reorder(orderedIds),
+    onSuccess: invalidateTaskQueries,
+  });
+
+  const handleReorderPending = React.useCallback(
+    (fromIndex, toIndex) => {
+      const pending = tasks.filter((t) => !isTaskDone(t));
+      const orderedIds = buildDragOrder(allTasks, pending, fromIndex, toIndex);
+      if (orderedIds) reorderTasksMutation.mutate(orderedIds);
+    },
+    [allTasks, tasks, reorderTasksMutation]
+  );
+
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
       const logs = habitLogs.filter(l => l.habit_id === habitId && l.date === today);
@@ -118,8 +147,28 @@ export default function Dashboard() {
   // The same widgets exist in every mode — but the column they live in and
   // their order changes based on what's most relevant at this hour.
   const blocks = {
-    dayWins:     <Slot domain="gold"><DayWins tasks={tasks} today={today} onToggleComplete={(t) => toggleTaskMutation.mutate(t)} /></Slot>,
-    tasks:       <Slot domain="ember"><TodayTasks tasks={tasks} today={today} onToggleComplete={(t) => toggleTaskMutation.mutate(t)} /></Slot>,
+    dayWins: (
+      <Slot domain="gold">
+        <DayWins
+          tasks={tasks}
+          today={today}
+          onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
+          onEditTask={setEditingTask}
+        />
+      </Slot>
+    ),
+    tasks: (
+      <Slot domain="ember">
+        <TodayTasks
+          tasks={tasks}
+          today={today}
+          onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
+          onEditTask={setEditingTask}
+          onReorderPending={handleReorderPending}
+          reorderBusy={reorderTasksMutation.isPending}
+        />
+      </Slot>
+    ),
     habits:      <Slot domain="wellness"><TodayHabits habits={habits} habitLogs={habitLogs} onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })} /></Slot>,
     rituals:     <Slot domain="ember"><RitualWidget /></Slot>,
     calendar:    <Slot domain="sky"><TodayCalendar /></Slot>,
@@ -162,6 +211,26 @@ export default function Dashboard() {
           {sideCol.map(key => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(editingTask)}
+        onOpenChange={(open) => {
+          if (!open) setEditingTask(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar tarefa</DialogTitle>
+          </DialogHeader>
+          {editingTask && (
+            <TaskForm
+              initial={editingTask}
+              onCancel={() => setEditingTask(null)}
+              onSubmit={(data) => updateTaskMutation.mutate({ id: editingTask.id, data })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <VoiceCaptureButton />
     </div>

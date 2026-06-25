@@ -7,13 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, CheckCircle2, Circle, Clock, Trash2, Flame, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Trash2, Flame, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { fortalezaDateKey } from '@/lib/dates';
+import { buildMovedOrder } from '@/lib/taskReorder';
 import { isTaskRelevantForTodayList } from '@/lib/tasks';
 
 const priorityStyles = {
@@ -31,24 +32,6 @@ const priorityLabels = {
 function cleanPriorityPrefix(title = '') {
   const cleaned = String(title).replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
   return cleaned || title;
-}
-
-function buildMovedOrder(allItems, visibleItems, itemId, direction) {
-  const visibleIndex = visibleItems.findIndex(item => item.id === itemId);
-  const targetVisibleIndex = visibleIndex + direction;
-  if (visibleIndex < 0 || targetVisibleIndex < 0 || targetVisibleIndex >= visibleItems.length) {
-    return null;
-  }
-
-  const targetId = visibleItems[targetVisibleIndex].id;
-  const orderedIds = allItems.map(item => item.id);
-  const currentIndex = orderedIds.indexOf(itemId);
-  const targetIndex = orderedIds.indexOf(targetId);
-  if (currentIndex < 0 || targetIndex < 0) return null;
-
-  const [movedId] = orderedIds.splice(currentIndex, 1);
-  orderedIds.splice(targetIndex, 0, movedId);
-  return orderedIds;
 }
 
 function ReorderControls({ onMoveUp, onMoveDown, disableUp, disableDown, busy, label }) {
@@ -90,6 +73,7 @@ export default function HabitsTasks() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
@@ -100,6 +84,16 @@ export default function HabitsTasks() {
   const createTask = useMutation({
     mutationFn: (data) => forjaApi.tasks.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allTasks'] }); queryClient.invalidateQueries({ queryKey: ['tasks'] }); setShowTaskForm(false); },
+  });
+
+  const updateTask = useMutation({
+    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      setEditingTask(null);
+    },
   });
 
   const createHabit = useMutation({
@@ -305,6 +299,14 @@ export default function HabitsTasks() {
                           onMoveDown={() => moveTask(task.id, 1)}
                         />
                         <button
+                          type="button"
+                          onClick={() => setEditingTask(task)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                          aria-label={`Editar ${cleanPriorityPrefix(task.title)}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => deleteTask.mutate(task.id)}
                           className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           aria-label={`Excluir ${cleanPriorityPrefix(task.title)}`}
@@ -377,9 +379,22 @@ export default function HabitsTasks() {
       </div>
 
       <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
           <TaskForm onSubmit={(data) => createTask.mutate(data)} onCancel={() => setShowTaskForm(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editingTask)} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar tarefa</DialogTitle></DialogHeader>
+          {editingTask && (
+            <TaskForm
+              initial={editingTask}
+              onSubmit={(data) => updateTask.mutate({ id: editingTask.id, data })}
+              onCancel={() => setEditingTask(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
