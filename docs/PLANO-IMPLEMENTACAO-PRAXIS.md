@@ -96,12 +96,12 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P4-T01 | Componente `NowBlock`: próxima tarefa pendente com `time` hoje, ou primeira P0 sem hora | M | Uma tarefa destacada | todo |
-| P4-T02 | Ações: Começar foco (link Focus + tarefa), Concluir, Adiar (+15min / amanhã) | M | Adiar persiste na API | todo |
-| P4-T03 | Frase fixa: “Se só fizer uma coisa agora, faça isso.” | S | Copy no bloco | todo |
-| P4-T04 | Reordenar Dashboard: 1 Agora → 2 Hoje → 3 Hábitos essenciais → 4 Check-in → 5 Agenda → 6 XP/resumo | M | Ordem visual no JSX | todo |
-| P4-T05 | “Hábitos essenciais”: máx. 3–5 ativos (sort_order ou pin) | M | Config simples ou top N | todo |
-| P4-T06 | Esconder/rebaixar heatmap/XP se bloco Agora vazio (estado vazio útil) | S | Empty state com CTA voz/tarefa | todo |
+| P4-T01 | Componente `NowBlock`: próxima tarefa pendente com `time` hoje, ou primeira P0 sem hora | M | Uma tarefa destacada | **done** |
+| P4-T02 | Ações: Começar foco (link Focus + tarefa), Concluir, Adiar (+15min / amanhã) | M | Adiar persiste na API | **done** |
+| P4-T03 | Frase fixa: “Se só fizer uma coisa agora, faça isso.” | S | Copy no bloco | **done** |
+| P4-T04 | Reordenar Dashboard: 1 Agora → 2 Hoje → 3 Hábitos essenciais → 4 Check-in → 5 Agenda → 6 XP/resumo | M | Ordem visual no JSX | **done** |
+| P4-T05 | “Hábitos essenciais”: máx. 3–5 ativos (sort_order ou pin) | M | Config simples ou top N | **done** (top 5) |
+| P4-T06 | Esconder/rebaixar heatmap/XP se bloco Agora vazio (estado vazio útil) | S | Empty state com CTA voz/tarefa | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **3** | (este commit) | Hábitos — ciclo de vida + quant + frequência |
+| 2026-07-02 | **4** | (este commit) | Dashboard Agora — NowBlock + cockpit |
+| 2026-07-02 | **3** | `22559a4` | Hábitos — ciclo de vida + quant + frequência |
 | 2026-07-02 | **2** | `7d8ab43` | UX Praxis — legado Forja fora da UI |
 | 2026-07-02 | **1** | `a5010e8` | Auth sessão + login Praxis |
 | 2026-07-02 | — | `0f85de2` | Edição hábitos v1 |

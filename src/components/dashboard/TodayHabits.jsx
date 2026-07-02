@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 
-export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
-  const today = new Date().toISOString().split('T')[0];
+export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 'Hábitos de Hoje', today: todayProp }) {
+  const today = todayProp || new Date().toISOString().split('T')[0];
   const rowRefs = useRef(new Map());
 
   const isCompletedToday = (habitId) =>
@@ -29,7 +29,7 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit }) {
     <Card>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle>Hábitos de Hoje</CardTitle>
+          <CardTitle>{title}</CardTitle>
           <span className="text-sm text-muted-foreground">
             {completedCount}/{habits.length} feitos
           </span>
