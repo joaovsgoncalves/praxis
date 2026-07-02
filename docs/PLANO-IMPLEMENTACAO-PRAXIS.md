@@ -307,6 +307,7 @@ Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
+| 2026-07-02 | **23** | `85c7246` | Metas templates + ritual Hoje + 3 tarefas/semana |
 | 2026-07-02 | **22** | `b95bd3c` | Lista: chips, arquivar, atrasadas |
 | 2026-07-02 | **21** | `236344f` | UX voz: fases, fila Hoje, erros PT |
 | 2026-07-02 | **20** | `66886e2` | Health cron + ship:api + redirect URL |
