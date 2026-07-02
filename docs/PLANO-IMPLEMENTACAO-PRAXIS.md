@@ -291,6 +291,13 @@ Ver `docs/ONDA-18-OPERACAO.md` e `docs/CHECKLIST-PRAXIS-10.md`.
 
 ---
 
+## Pós-18 (evolução)
+
+Plano **ondas 19–24** + fase de uso: `docs/PLANO-PRAXIS-POS-18.md`  
+Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
+
+---
+
 ## Registro de ondas (atualizar a cada entrega)
 
 | Data | Onda | Commit | Notas |
