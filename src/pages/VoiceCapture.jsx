@@ -12,8 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
-// API da Praxis (A.N.A. backend)
-const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
+// Captura por voz — API Praxis (mesmo origin / VITE_FORJA_API em dev)
 
 export default function VoiceCapture() {
   const [recording, setRecording] = useState(false);
@@ -105,27 +104,20 @@ export default function VoiceCapture() {
   const confirmItem = async (item) => {
     try {
       if (item.type === 'habit') {
-        await fetch(`${FORJA_API}/api/habits`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: item.title,
-            frequency: item.frequency || 'daily',
-            source: 'voice',
-          }),
+        await forjaApi.habits.create({
+          title: item.title,
+          frequency: item.frequency || 'daily',
+          category: item.category || 'pessoal',
+          source: 'voice',
         });
       } else {
-        await fetch(`${FORJA_API}/api/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: item.title,
-            date: item.date || null,
-            time: item.time || null,
-            priority: item.priority || 'medium',
-            category: item.category || 'pessoal',
-            source: 'voice',
-          }),
+        await forjaApi.tasks.create({
+          title: item.title,
+          date: item.date || null,
+          time: item.time || null,
+          priority: item.priority || 'medium',
+          category: item.category || 'pessoal',
+          source: 'voice',
         });
       }
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, confirmed: true } : i));
@@ -161,7 +153,7 @@ export default function VoiceCapture() {
             {processing ? (
               <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4">
                 <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                <p className="text-muted-foreground text-sm">A IA está interpretando seu áudio...</p>
+                <p className="text-muted-foreground text-sm">Organizando o que você falou…</p>
               </motion.div>
             ) : recording ? (
               <motion.div key="recording" initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-4">

@@ -19,7 +19,7 @@ export default function Login({ onSuccess }) {
     } catch (err) {
       const msg = err?.message || '';
       if (msg.includes('503')) {
-        setError('Login ainda não configurado no servidor. Avise a A.N.A.');
+        setError('Login ainda não configurado no servidor. Defina PRAXIS_APP_PASSWORD na VPS.');
       } else if (msg.includes('401')) {
         setError('Senha incorreta.');
       } else {

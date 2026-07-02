@@ -12,7 +12,7 @@ import { toast } from '@/components/ui/use-toast';
 
 const PRESETS = [
   { label: 'Clássico', focus: 25, brk: 5, icon: '🍅' },
-  { label: 'Deep Work', focus: 50, brk: 10, icon: '🧠' },
+  { label: 'Foco profundo', focus: 50, brk: 10, icon: '🧠' },
   { label: 'Rápido', focus: 15, brk: 3, icon: '⚡' },
   { label: 'Maratona', focus: 90, brk: 20, icon: '🏃' },
 ];
@@ -294,7 +294,7 @@ export default function Focus() {
           </Card>
 
           <Button onClick={startSession} size="lg" className="w-full">
-            <Play className="w-5 h-5 mr-2" />Iniciar Sessão
+            <Play className="w-5 h-5 mr-2" />Iniciar foco de {focusDuration} min
           </Button>
         </div>
       ) : (

@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ParticleBackground from '@/components/shared/ParticleBackground';
 import { Menu } from 'lucide-react';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    document.title = 'Praxis';
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-background relative">

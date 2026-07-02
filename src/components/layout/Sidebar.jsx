@@ -74,7 +74,7 @@ function SidebarGamificationBar() {
           </p>
           {next_level_xp && (
             <p className="text-xs text-muted-foreground/75 mt-0.5">
-              {xpToNext} pro próximo
+              Faltam {xpToNext.toLocaleString('pt-BR')} XP
             </p>
           )}
         </div>

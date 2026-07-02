@@ -135,7 +135,7 @@ export default function Ideas() {
           ) : sortedIdeas.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                Nenhuma ideia registrada ainda. Capture sem compromisso; depois a Forja decide o que vira execução.
+                Nenhuma ideia registrada ainda. Capture sem compromisso; na revisão você escolhe o que vira execução.
               </CardContent>
             </Card>
           ) : (

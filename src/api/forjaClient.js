@@ -2,7 +2,7 @@
 // Replaces Base44 SDK calls with direct API calls
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
-// Em dev local, .env define VITE_FORJA_API para o backend da Forja.
+// Em dev local, .env define VITE_FORJA_API para o backend da Praxis.
 // Nunca colocar segredo administrativo em VITE_*: tudo que começa com VITE é exposto no bundle.
 const FORJA_API = import.meta.env.PROD ? '' : (import.meta.env.VITE_FORJA_API || '');
 

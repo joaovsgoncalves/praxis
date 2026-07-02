@@ -61,11 +61,11 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P2-T01 | Grep UX: strings user-facing `Forja`, `A.N.A`, `forja` em `src/pages`, `src/components`, `index.html` | S | Lista de arquivos no PR/commit | todo |
-| P2-T02 | Substituir copy (Ideas, Focus, VoiceCapture, empty states, tooltips) → Praxis / assistente de planejamento / captura por voz | S | Nenhuma string “Forja” em UI | todo |
-| P2-T03 | Modo Foco: “Deep Work” → “Foco profundo”; botão “Iniciar foco de {n} min” | S | Focus.jsx atualizado | todo |
-| P2-T04 | Gamificação: “5 pro próximo” → “Faltam 5 XP” (ou equivalente discreto) | S | Sidebar/Dashboard | todo |
-| P2-T05 | Revisar títulos de página e meta (`document.title` / rotas) | S | Aba do browser só “Praxis” | todo |
+| P2-T01 | Grep UX: strings user-facing `Forja`, `A.N.A`, `forja` em `src/pages`, `src/components`, `index.html` | S | Lista de arquivos no PR/commit | **done** (`docs/P2-UX-STRINGS-AUDIT.md`) |
+| P2-T02 | Substituir copy (Ideas, Focus, VoiceCapture, empty states, tooltips) → Praxis / assistente de planejamento / captura por voz | S | Nenhuma string “Forja” em UI | **done** |
+| P2-T03 | Modo Foco: “Deep Work” → “Foco profundo”; botão “Iniciar foco de {n} min” | S | Focus.jsx atualizado | **done** |
+| P2-T04 | Gamificação: “5 pro próximo” → “Faltam 5 XP” (ou equivalente discreto) | S | Sidebar/Dashboard | **done** |
+| P2-T05 | Revisar títulos de página e meta (`document.title` / rotas) | S | Aba do browser só “Praxis” | **done** |
 
 *Não renomear:* `FORJA_*` env, `forja-api.service`, `forjaClient.js`, classes CSS `forja-*` (interno).
 
@@ -207,7 +207,7 @@
 ## Métricas de “pronto” (8.7/10 alvo Sêneca)
 
 - [ ] Endpoints pessoais **401** sem sessão (teste externo).
-- [ ] Zero “Forja” na UI.
+- [x] Zero “Forja” na UI.
 - [ ] Hábitos: editar + pausar/arquivar + histórico preservado.
 - [ ] Dashboard abre com bloco **Agora** acima da dobra.
 - [ ] Cards com ≤3 ações visíveis; resto em ⋯.
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **1** | (este commit) | Auth sessão + login Praxis |
+| 2026-07-02 | **2** | (este commit) | UX Praxis — legado Forja fora da UI |
+| 2026-07-02 | **1** | `a5010e8` | Auth sessão + login Praxis |
 | 2026-07-02 | — | `0f85de2` | Edição hábitos v1 |
 
 ---

@@ -127,7 +127,7 @@ export default function HeroDay({
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-domain-ember/15 border border-domain-ember/30">
                 <Flame className="w-4 h-4 text-domain-ember" />
                 <span className="text-sm font-semibold text-domain-ember">
-                  {bestStreak} {bestStreak === 1 ? 'dia' : 'dias'} forjando
+                  {bestStreak} {bestStreak === 1 ? 'dia' : 'dias'} em sequência
                 </span>
               </div>
             )}

@@ -68,8 +68,8 @@ export default function GamificationWidget() {
       if (leveled_up && !levelUpShown.current.has(level)) {
         levelUpShown.current.add(level);
         toast({
-          title: '🎉 Level Up!',
-          description: `Você alcançou o nível ${level} — ${level_name}!`,
+          title: 'Subiu de nível no Praxis',
+          description: `Nível ${level} — ${level_name}`,
           duration: 6000,
         });
         // Dispatch custom event so the widget can show confetti
