@@ -213,4 +213,14 @@
     50%      { opacity: 1; }
   }
   .ring-pulse { animation: ring-pulse 2.5s ease-in-out infinite; }
+
+  /* Onda 12 — viewport estreito (~390px): CTAs e listas sem overflow horizontal */
+  .praxis-scroll-x {
+    @apply overflow-x-auto max-w-full overscroll-x-contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .praxis-touch-target {
+    @apply min-h-11 touch-manipulation;
+  }
+}
 }

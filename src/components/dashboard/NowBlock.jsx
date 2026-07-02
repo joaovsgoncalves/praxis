@@ -29,11 +29,11 @@ export default function NowBlock({
           <p className="text-sm text-muted-foreground max-w-xl">
             Use a voz ou crie uma tarefa com horário para o Praxis destacar o próximo passo aqui.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="default" className="gap-2" onClick={onVoiceCapture}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button type="button" variant="default" className="praxis-touch-target w-full gap-2 sm:w-auto" onClick={onVoiceCapture}>
               <Mic className="h-4 w-4" /> Captura por voz
             </Button>
-            <Button type="button" variant="outline" className="gap-2" onClick={onAddTask}>
+            <Button type="button" variant="outline" className="praxis-touch-target w-full gap-2 sm:w-auto" onClick={onAddTask}>
               <Plus className="h-4 w-4" /> Nova tarefa
             </Button>
           </div>
@@ -80,8 +80,8 @@ export default function NowBlock({
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button asChild className="gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          <Button asChild className="praxis-touch-target w-full gap-2 sm:w-auto">
             <Link to={`/foco?taskId=${encodeURIComponent(task.id)}`}>
               <Timer className="h-4 w-4" /> Começar foco
             </Link>
@@ -89,7 +89,7 @@ export default function NowBlock({
           <Button
             type="button"
             variant="secondary"
-            className="gap-2"
+            className="praxis-touch-target w-full gap-2 sm:w-auto"
             disabled={busy}
             onClick={() => onComplete?.(task)}
           >
@@ -98,6 +98,7 @@ export default function NowBlock({
           <Button
             type="button"
             variant="outline"
+            className="praxis-touch-target w-full sm:w-auto"
             disabled={busy}
             onClick={() => onSnooze15?.(task)}
           >
@@ -106,6 +107,7 @@ export default function NowBlock({
           <Button
             type="button"
             variant="outline"
+            className="praxis-touch-target w-full sm:w-auto"
             disabled={busy}
             onClick={() => onSnoozeTomorrow?.(task)}
           >

@@ -1,5 +1,5 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DayWins from '@/components/dashboard/DayWins';
@@ -39,6 +39,7 @@ const Slot = ({ domain = 'focus', children }) => (
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
 
@@ -54,6 +55,12 @@ export default function Dashboard() {
     setWaterMl(val);
     localStorage.setItem(`water_ml_${today}`, String(val));
   };
+
+  useEffect(() => {
+    if (searchParams.get('from') === 'capture') {
+      navigate('/captura', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const { data: allTasks = [] } = useQuery({
     queryKey: ['dashboardTasks', today],

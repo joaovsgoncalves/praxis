@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +27,10 @@ import {
   isQuantitativeHabit,
   todayLogForHabit,
 } from '@/lib/habits';
+import {
+  habitTasksTabFromSearchParams,
+  setHabitTasksTabInSearchParams,
+} from '@/lib/urlDeepLinks';
 
 function cleanPriorityPrefix(title = '') {
   const cleaned = String(title).replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
@@ -45,7 +50,8 @@ const priorityLabels = {
 };
 
 export default function HabitsTasks() {
-  const [view, setView] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [view, setView] = useState(() => habitTasksTabFromSearchParams(searchParams));
   const [habitStatusFilter, setHabitStatusFilter] = useState('active');
   const [statusFilter, setStatusFilter] = useState('pending');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -57,6 +63,15 @@ export default function HabitsTasks() {
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
+
+  useEffect(() => {
+    setView(habitTasksTabFromSearchParams(searchParams));
+  }, [searchParams]);
+
+  const handleViewChange = (next) => {
+    setView(next);
+    setSearchParams(setHabitTasksTabInSearchParams(searchParams, next), { replace: true });
+  };
 
   const { data: tasks = [] } = useQuery({ queryKey: ['allTasks', today], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
   const { data: habits = [] } = useQuery({
@@ -268,7 +283,7 @@ export default function HabitsTasks() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 overflow-x-hidden px-0.5">
       <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -279,13 +294,13 @@ export default function HabitsTasks() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Button onClick={() => setShowTaskForm(true)} className="h-10 rounded-full px-4 shadow-lg shadow-primary/20">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
+            <Button onClick={() => setShowTaskForm(true)} className="praxis-touch-target h-11 w-full rounded-full px-4 shadow-lg shadow-primary/20 sm:w-auto">
               <Plus className="mr-1.5 h-4 w-4" /> Tarefa
             </Button>
             <Button
               onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
-              className="h-10 rounded-full px-4"
+              className="praxis-touch-target h-11 w-full rounded-full px-4 sm:w-auto"
               variant="outline"
             >
               <Plus className="mr-1.5 h-4 w-4" /> Hábito
@@ -316,11 +331,11 @@ export default function HabitsTasks() {
 
       <section className="forja-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <Tabs value={view} onValueChange={setView}>
-            <TabsList className="h-11 rounded-2xl bg-black/20 p-1">
-              <TabsTrigger className="rounded-xl px-4" value="all">Todos</TabsTrigger>
-              <TabsTrigger className="rounded-xl px-4" value="tasks">Tarefas ({currentTasks.length})</TabsTrigger>
-              <TabsTrigger className="rounded-xl px-4" value="habits">Hábitos ({habits.length})</TabsTrigger>
+          <Tabs value={view} onValueChange={handleViewChange}>
+            <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-black/20 p-1 flex-nowrap">
+              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="all">Todos</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="tasks">Tarefas ({currentTasks.length})</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="habits">Hábitos ({habits.length})</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -351,7 +366,7 @@ export default function HabitsTasks() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2 xl:justify-end">
+          <div className="praxis-scroll-x flex w-full max-w-full gap-2 pb-1 xl:justify-end">
             <button
               onClick={() => setCategoryFilter('all')}
               className={cn(
@@ -413,7 +428,7 @@ export default function HabitsTasks() {
                     >
                       <button
                         onClick={() => toggleTask.mutate(task)}
-                        className="shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                        className="praxis-touch-target shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"
                         aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
                       >
                         {task.status === 'completed' ? (

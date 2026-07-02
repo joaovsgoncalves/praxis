@@ -1,7 +1,7 @@
 // @ts-nocheck
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Lightbulb, Plus, Trash2, Sparkles, Archive, ArrowRightCircle, Star } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
   ideasForWeeklyReview,
 } from '@/lib/ideas';
 import { toast } from '@/components/ui/use-toast';
+import { stripQueryParam } from '@/lib/urlDeepLinks';
 
 const statusFilterOptions = [
   { value: 'ativas', label: 'Ativas (captura + promissoras)' },
@@ -28,7 +29,15 @@ const statusFilterOptions = [
 export default function Ideas() {
   const [showIdeaForm, setShowIdeaForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ativas');
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (searchParams.get('from') === 'capture') {
+      setShowIdeaForm(true);
+      setSearchParams(stripQueryParam(searchParams, 'from'), { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data: ideas = [], isLoading } = useQuery({
     queryKey: ['ideas'],

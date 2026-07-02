@@ -1,8 +1,8 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–11**
+**Data:** 2026-07-02 · **Após ondas 0–12 (plano fechado)**
 
-## Nota geral: **8,5 / 10**
+## Nota geral: **8,6 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 12 — Mobile e polish** (viewport 390px, deep link, PWA).
+**Plano 0–12 concluído.** Manutenção: voz/STT, recorrência de tarefas, polish contínuo no celular.
 
 ---

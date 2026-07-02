@@ -182,9 +182,9 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P12-T01 | Audit viewport: Hábitos & Tarefas + Agora em 390px | M | Sem overflow CTA | todo |
-| P12-T02 | Deep link `/habitos-tarefas?tab=habits` (ou state URL) | S | Share/bookmark | todo |
-| P12-T03 | PWA manifest name/icon Praxis (se já existir, conferir) | S | Install banner correto | todo |
+| P12-T01 | Audit viewport: Hábitos & Tarefas + Agora em 390px | M | Sem overflow CTA | **done** |
+| P12-T02 | Deep link `/habitos-tarefas?tab=habits` (ou state URL) | S | Share/bookmark | **done** |
+| P12-T03 | PWA manifest name/icon Praxis (se já existir, conferir) | S | Install banner correto | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **11** | (este commit) | Gamificação discreta |
+| 2026-07-02 | **12** | (este commit) | Mobile + deep links + PWA |
+| 2026-07-02 | **11** | `50b812b` | Gamificação discreta |
 | 2026-07-02 | **10** | `480393a` | Rituais presets + nav condicional |
 | 2026-07-02 | **9** | `e96cb02` | Metas wizard + nav condicional |
 | 2026-07-02 | **8** | `d2e8623` | Revisão semanal automática |
