@@ -5,7 +5,8 @@ import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Loader2, Mic, RefreshCw } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
+import { Inbox, Loader2, Mic, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/components/ui/use-toast';
@@ -68,25 +69,23 @@ export default function CaptureInbox() {
   });
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link to="/captura" className="text-muted-foreground hover:text-foreground praxis-touch-target">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="text-2xl font-bold">Revisar capturas</h1>
-        </div>
-        <Button asChild variant="outline" size="sm" className="praxis-touch-target">
-          <Link to="/captura">
-            <Mic className="w-4 h-4 mr-1" />
-            Nova gravação
-          </Link>
-        </Button>
-      </div>
+    <div className="praxis-page max-w-2xl">
+      <PageHero
+        kicker="Capturas"
+        kickerIcon={Inbox}
+        title="Revisar capturas"
+        description="Áudios no servidor. Se a transcrição falhar, use Tentar de novo — sem gravar de novo."
+        action={(
+          <Button asChild variant="outline" size="sm" className="praxis-touch-target rounded-full">
+            <Link to="/captura">
+              <Mic className="w-4 h-4 mr-1" />
+              Nova gravação
+            </Link>
+          </Button>
+        )}
+      />
 
-      <p className="text-sm text-muted-foreground">
-        Áudios salvos no servidor. Se o STT falhar, toque <strong>Tentar de novo</strong> — sem gravar outra vez.
-      </p>
+      <Link to="/captura" className="sr-only">Voltar à captura</Link>
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-12 gap-2">

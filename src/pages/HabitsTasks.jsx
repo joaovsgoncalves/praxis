@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive, ListTodo } from 'lucide-react';
+import { PageHero, StatGrid, StatTile } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
@@ -361,17 +362,13 @@ export default function HabitsTasks() {
       : archivableTasks;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 overflow-x-hidden px-0.5">
-      <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <p className="forja-kicker hidden lg:block text-muted-foreground">Lista</p>
-            <h1 className="forja-title hidden text-3xl font-bold sm:text-4xl lg:block">Hábitos & Tarefas</h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Chips Hoje / Semana / Atrasadas / Todas — arquive em lote o que não vale mais.
-            </p>
-          </div>
-
+    <div className="praxis-page overflow-x-hidden">
+      <PageHero
+        kicker="Hábitos e tarefas"
+        kickerIcon={ListTodo}
+        title="Hábitos & Tarefas"
+        description="Hoje, semana ou atrasadas — arquive em lote o que não vale mais."
+        action={(
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
             <Button onClick={() => setShowTaskForm(true)} className="praxis-touch-target h-11 w-full rounded-full px-4 shadow-lg shadow-primary/20 sm:w-auto">
               <Plus className="mr-1.5 h-4 w-4" /> Tarefa
@@ -384,28 +381,17 @@ export default function HabitsTasks() {
               <Plus className="mr-1.5 h-4 w-4" /> Hábito
             </Button>
           </div>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Hoje</p>
-            <p className="mt-1 text-2xl font-semibold">{todayRadarCount}</p>
-            <p className="text-xs text-muted-foreground">tarefas no radar</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Rotina</p>
-            <p className="mt-1 text-2xl font-semibold">{completedHabits}/{activeHabitsDueToday.length}</p>
-            <p className="text-xs text-muted-foreground">hábitos de hoje concluídos</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Filtro</p>
-            <p className="mt-1 truncate text-lg font-semibold">
-              {categoryFilter === 'all' ? 'Todas as áreas' : CATEGORIES[categoryFilter]?.label}
-            </p>
-            <p className="text-xs text-muted-foreground">contexto selecionado</p>
-          </div>
-        </div>
-      </section>
+        )}
+      >
+        <StatGrid className="sm:grid-cols-3 lg:grid-cols-3">
+          <StatTile label="Hoje" value={todayRadarCount} tone="cyan" />
+          <StatTile label="Hábitos hoje" value={`${completedHabits}/${activeHabitsDueToday.length}`} />
+          <StatTile
+            label="Área"
+            value={categoryFilter === 'all' ? 'Todas' : (CATEGORIES[categoryFilter]?.label || '—')}
+          />
+        </StatGrid>
+      </PageHero>
 
       <section className="forja-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">

@@ -48,10 +48,12 @@ export default function NowBlock({
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/15 via-background to-background shadow-lg shadow-primary/5">
       <CardContent className="p-6 sm:p-8 space-y-5">
-        <div className="space-y-1">
-          <p className="forja-kicker text-primary">Agora</p>
-          <p className="text-sm text-muted-foreground italic">
-            Se só fizer uma coisa agora, faça isso.
+        <div className="space-y-2">
+          <p className="praxis-kicker-row text-primary">
+            <span>Agora</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Uma coisa de cada vez.
           </p>
         </div>
 
@@ -80,8 +82,8 @@ export default function NowBlock({
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <Button asChild className="praxis-touch-target w-full gap-2 sm:w-auto">
+        <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 lg:flex lg:flex-wrap">
+          <Button asChild className="praxis-touch-target w-full gap-2 sm:col-span-2 lg:col-span-1 lg:w-auto">
             <Link to={`/foco?taskId=${encodeURIComponent(task.id)}`}>
               <Timer className="h-4 w-4" /> Começar foco
             </Link>

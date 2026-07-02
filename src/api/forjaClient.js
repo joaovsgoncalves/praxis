@@ -137,6 +137,16 @@ export const forjaApi = {
       request(`/api/ideas/${id}/to-task`, { method: 'POST', body: JSON.stringify(data) }),
   },
 
+  purchases: {
+    list: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/api/purchases${query ? `?${query}` : ''}`);
+    },
+    create: (data) => request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => request(`/api/purchases/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: (id) => request(`/api/purchases/${id}`, { method: 'DELETE' }),
+  },
+
   // Habits
   habits: {
     list: (params = {}) => {

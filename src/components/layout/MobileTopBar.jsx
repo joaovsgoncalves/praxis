@@ -7,6 +7,7 @@ const ROUTE_TITLES = [
   { prefix: '/capturas', title: 'Revisar capturas' },
   { prefix: '/captura', title: 'Captura por voz' },
   { prefix: '/ideias', title: 'Ideias' },
+  { prefix: '/compras', title: 'Compras' },
   { prefix: '/foco', title: 'Modo Foco' },
   { prefix: '/metas', title: 'Metas' },
   { prefix: '/rituais', title: 'Rituais' },

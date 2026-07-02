@@ -44,8 +44,8 @@ export default function AvoidanceCockpit() {
             </p>
           </div>
           {data?.pressure > 0 && (
-            <Badge variant="outline" className="shrink-0">
-              pressão {data.pressure}
+            <Badge variant="outline" className="shrink-0 tabular-nums">
+              {items.length} {items.length === 1 ? 'item' : 'itens'}
             </Badge>
           )}
         </div>

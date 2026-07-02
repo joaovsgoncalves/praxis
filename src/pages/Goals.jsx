@@ -18,6 +18,7 @@ import {
   GOAL_STARTER_TEMPLATES,
   goalPayloadFromStarter,
 } from '@/lib/goalStarterTemplates';
+import { PageHero, StatGrid, StatTile } from '@/components/layout/PraxisPage';
 
 const timeframeLabels = { short: 'Curto prazo', medium: 'Médio prazo', long: 'Longo prazo' };
 const categoryLabels = { personal: 'Pessoal', professional: 'Profissional', health: 'Saúde', finance: 'Financeiro', learning: 'Aprendizado', other: 'Outro' };
@@ -82,38 +83,24 @@ export default function Goals() {
     : 0;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <p className="forja-kicker flex items-center gap-2 text-primary">
-              <Target className="h-4 w-4" /> Estratégia
-            </p>
-            <h1 className="forja-title text-3xl font-bold sm:text-4xl">Metas Pessoais</h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Meta com prazo + primeira tarefa ou hábito — nada de objetivo solto no vácuo.
-            </p>
-          </div>
-          <Button onClick={() => setShowWizard(true)} className="h-10 self-start rounded-full px-4 shadow-lg shadow-primary/20 lg:self-auto">
-            <Plus className="mr-1.5 h-4 w-4" /> Nova meta (wizard)
+    <div className="praxis-page">
+      <PageHero
+        kicker="Metas"
+        kickerIcon={Target}
+        title="Metas pessoais"
+        description="Prazo claro e um primeiro passo — tarefa ou hábito ligado à meta."
+        action={(
+          <Button onClick={() => setShowWizard(true)} className="h-10 rounded-full px-4 shadow-lg shadow-primary/20">
+            <Plus className="mr-1.5 h-4 w-4" /> Nova meta
           </Button>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Ativas</p>
-            <p className="mt-1 text-2xl font-semibold">{activeGoals.length}</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Progresso médio</p>
-            <p className="mt-1 text-2xl font-semibold">{averageProgress}%</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Concluídas</p>
-            <p className="mt-1 text-2xl font-semibold">{completedGoals.length}</p>
-          </div>
-        </div>
-      </section>
+        )}
+      >
+        <StatGrid className="sm:grid-cols-3 lg:grid-cols-3">
+          <StatTile label="Ativas" value={activeGoals.length} />
+          <StatTile label="Progresso médio" value={`${averageProgress}%`} tone="cyan" />
+          <StatTile label="Concluídas" value={completedGoals.length} />
+        </StatGrid>
+      </PageHero>
 
       <section className="forja-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-wrap gap-2">

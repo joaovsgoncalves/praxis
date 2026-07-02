@@ -147,7 +147,7 @@ export default function WeeklyReview() {
   const priorities = auto?.suggested_priorities || [];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="praxis-page max-w-3xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="forja-title flex items-center gap-2 text-2xl font-bold sm:text-3xl">

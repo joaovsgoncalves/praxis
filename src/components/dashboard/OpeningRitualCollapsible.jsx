@@ -76,13 +76,13 @@ export default function OpeningRitualCollapsible() {
       <CollapsibleTrigger className="flex w-full items-center gap-3 px-4 py-3 text-left">
         <span className="text-xl">🌅</span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">Abertura do dia · ~3 min</p>
-          <p className="text-[11px] text-muted-foreground truncate">
+          <p className="text-sm font-semibold leading-snug">Abertura do dia · ~3 min</p>
+          <p className="text-xs text-muted-foreground truncate">
             {opening
               ? allDone
                 ? 'Ritual de hoje completo'
                 : `${done}/${habits.length} passos`
-              : 'Preset: água, movimento, prioridade'}
+              : 'Água, movimento e prioridade'}
           </p>
         </div>
         <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
@@ -92,17 +92,18 @@ export default function OpeningRitualCollapsible() {
         {!isLoading && !opening && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Três passos leves para ligar o dia sem peso. Cria o ritual &quot;Abertura do dia&quot; uma vez.
+              Três passos leves para começar o dia. Você configura uma vez.
             </p>
             <Button
               type="button"
               size="sm"
-              className="rounded-full gap-1.5"
+              variant="outline"
+              className="rounded-full gap-1.5 border-gold/30"
               disabled={createFromTemplate.isPending}
               onClick={() => createFromTemplate.mutate()}
             >
               <Sparkles className="h-4 w-4" />
-              {createFromTemplate.isPending ? 'Criando…' : 'Ativar ritual padrão'}
+              {createFromTemplate.isPending ? 'Criando…' : 'Começar abertura'}
             </Button>
           </div>
         )}

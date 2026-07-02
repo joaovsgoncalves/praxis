@@ -6,7 +6,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Timer, Flame, Smile, Zap } from 'lucide-react';
+import { Timer, Flame, Smile, Zap, BarChart3 } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
 
 export default function History() {
   const [range, setRange] = useState('30');
@@ -51,17 +52,22 @@ export default function History() {
   const chartTooltipStyle = { contentStyle: { background: 'hsl(240 5% 10%)', border: '1px solid hsl(240 4% 18%)', borderRadius: '8px', color: 'hsl(0 0% 95%)' } };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Histórico</h1>
-        <Tabs value={range} onValueChange={setRange}>
-          <TabsList className="bg-secondary">
-            <TabsTrigger value="7">7 dias</TabsTrigger>
-            <TabsTrigger value="30">30 dias</TabsTrigger>
-            <TabsTrigger value="90">90 dias</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <div className="praxis-page">
+      <PageHero
+        kicker="Histórico"
+        kickerIcon={BarChart3}
+        title="Histórico"
+        description="Foco, hábitos e bem-estar nos últimos dias."
+        action={(
+          <Tabs value={range} onValueChange={setRange}>
+            <TabsList className="bg-secondary">
+              <TabsTrigger value="7">7 dias</TabsTrigger>
+              <TabsTrigger value="30">30 dias</TabsTrigger>
+              <TabsTrigger value="90">90 dias</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-card border-border">

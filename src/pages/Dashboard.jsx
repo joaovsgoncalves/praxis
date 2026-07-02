@@ -212,7 +212,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-5 lg:space-y-8">
+    <div className="praxis-page space-y-4 sm:space-y-5 lg:space-y-8">
       <OfflineBanner />
       <PwaInstallBanner />
       <CapturePendingBanner />

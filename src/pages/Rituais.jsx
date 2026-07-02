@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { forjaApi } from '@/api/forjaClient';
 import { Link2, Sparkles, Flame, CheckCircle2, Trash2, Sun, Moon } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
 import { RITUAL_TEMPLATES } from '@/lib/ritualTemplates';
 
 const timeOptions = [
@@ -106,18 +107,13 @@ export default function Rituais() {
   const canCreate = name.trim() && selectedHabits.length > 0 && !createMutation.isPending;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gold/20 flex items-center justify-center">
-          <Link2 className="w-5 h-5 text-gold" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">Rituais</h1>
-          <p className="text-sm text-muted-foreground">
-            Sequências guiadas por período do dia, com modo mínimo para dias pesados.
-          </p>
-        </div>
-      </div>
+    <div className="praxis-page">
+      <PageHero
+        kicker="Rituais"
+        kickerIcon={Link2}
+        title="Rituais"
+        description="Sequências por período do dia. Em dia pesado, faça só o primeiro passo."
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {RITUAL_TEMPLATES.map((tpl) => (
@@ -138,7 +134,7 @@ export default function Rituais() {
                 onClick={() => templateMutation.mutate(tpl.id)}
               >
                 {tpl.id === 'day_open' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                Instalar preset
+                Instalar modelo
               </Button>
             </CardContent>
           </Card>

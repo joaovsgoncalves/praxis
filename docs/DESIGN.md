@@ -2,6 +2,10 @@
 
 Registro mínimo para polish visual (fluxo Impeccable / typeset + layout).
 
+## Regra (pedido do João)
+
+Quando o pedido for **ajuste geral de design**, aplicar o mesmo padrão em **todas as abas** (`praxis-page`, `PageHero`, `StatGrid`, kickers `praxis-kicker-row`) — não só na tela que apareceu no print.
+
 ## Tom
 
 - **Simples:** sem jargão (“cockpit”, “painel operacional”).

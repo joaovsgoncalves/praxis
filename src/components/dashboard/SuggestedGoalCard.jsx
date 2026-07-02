@@ -34,16 +34,16 @@ export default function SuggestedGoalCard() {
   };
 
   return (
-    <Card className="border-primary/25 bg-gradient-to-br from-primary/10 to-transparent">
+    <Card className="border-white/10 bg-card/80">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
             <Target className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Sua primeira meta em 1 toque</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Escolha um template (RCA, Encarte ou corpo). O menu Metas aparece quando você tiver meta ativa.
+            <p className="text-sm font-semibold leading-snug">Criar sua primeira meta</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Atalhos para RCA, Encarte ou corpo. Depois você ajusta em Metas.
             </p>
           </div>
           <Button type="button" variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={handleDismiss} aria-label="Agora não">
