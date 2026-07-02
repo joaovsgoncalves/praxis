@@ -121,9 +121,9 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P6-T01 | Pós-sessão: modal “Concluir tarefa?” + “Só registrar tempo” (já parcial no produto) | M | Fluxo explícito pós-timer | todo |
-| P6-T02 | Legenda “Foco por tarefa — últimos 30 dias” | S | Focus.jsx | todo |
-| P6-T03 | Preset Pomodoro com label em PT no botão principal | S | Fase 2 overlap | todo |
+| P6-T01 | Pós-sessão: modal “Concluir tarefa?” + “Só registrar tempo” (já parcial no produto) | M | Fluxo explícito pós-timer | **done** |
+| P6-T02 | Legenda “Foco por tarefa — últimos 30 dias” | S | Focus.jsx | **done** |
+| P6-T03 | Preset Pomodoro com label em PT no botão principal | S | Fase 2 overlap | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **5** | (este commit) | Hábitos & Tarefas — menos ruído |
+| 2026-07-02 | **6** | (este commit) | Modo Foco — pós-sessão + copy PT |
+| 2026-07-02 | **5** | `f74af68` | Hábitos & Tarefas — menos ruído |
 | 2026-07-02 | **4** | `02a09fd` | Dashboard Agora — NowBlock + cockpit |
 | 2026-07-02 | **3** | `22559a4` | Hábitos — ciclo de vida + quant + frequência |
 | 2026-07-02 | **2** | `7d8ab43` | UX Praxis — legado Forja fora da UI |
