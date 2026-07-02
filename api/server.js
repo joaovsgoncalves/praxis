@@ -487,6 +487,31 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/api/ops/backup-meta', (req, res) => {
+  try {
+    const backupDir = path.join(__dirname, 'backups');
+    const metaPath = path.join(backupDir, 'last-backup.json');
+    const dailyDir = path.join(backupDir, 'daily');
+    let last = null;
+    if (fs.existsSync(metaPath)) {
+      last = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    }
+    let dailyCount = 0;
+    try {
+      dailyCount = fs.readdirSync(dailyDir).filter((f) => f.endsWith('.db.gz')).length;
+    } catch {}
+    res.json({
+      ok: true,
+      backup_dir: backupDir,
+      daily_snapshots: dailyCount,
+      last,
+      cron_hint: '15 3 * * * scripts/praxis-backup.sh',
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 function safeUnlink(filePath) {
   if (!filePath) return;
   try { fs.unlinkSync(filePath); } catch {}

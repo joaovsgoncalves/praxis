@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, User, Timer, LogOut, Bell, Camera } from 'lucide-react';
+import { Save, User, Timer, LogOut, Bell, Camera, Database } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
@@ -58,6 +58,11 @@ export default function Settings() {
   const { logout } = useAuth();
 
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => forjaApi.user.getSettings() });
+  const { data: backupMeta } = useQuery({
+    queryKey: ['ops', 'backup-meta'],
+    queryFn: () => forjaApi.ops.backupMeta(),
+    staleTime: 120_000,
+  });
 
   const [pomodoroFocus, setPomodoroFocus] = useState('25');
   const [pomodoroBreak, setPomodoroBreak] = useState('5');
@@ -219,6 +224,35 @@ export default function Settings() {
             </div>
             <Switch checked={notifGoals} onCheckedChange={setNotifGoals} />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="w-4 h-4" />
+            Backup (servidor)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {backupMeta?.last ? (
+            <>
+              <p>
+                <span className="text-muted-foreground">Último snapshot: </span>
+                {new Date(backupMeta.last.at).toLocaleString('pt-BR')}
+              </p>
+              <p className="text-xs text-muted-foreground font-mono truncate">
+                {backupMeta.last.daily} · {(backupMeta.last.bytes / 1024).toFixed(0)} KB
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Diários guardados: {backupMeta.daily_snapshots ?? '—'}
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Nenhum backup registrado ainda. Na VPS: <code className="text-xs">./scripts/praxis-backup.sh</code>
+            </p>
+          )}
         </CardContent>
       </Card>
 

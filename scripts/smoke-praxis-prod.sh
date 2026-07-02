@@ -54,4 +54,16 @@ C=$(code -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/api/insights/weekly")
 [[ "$C" == "200" ]] || fail "GET /api/insights/weekly → $C"
 ok "GET /api/insights/weekly → 200"
 
+C=$(code -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/api/insights/avoidance")
+[[ "$C" == "200" ]] || fail "GET /api/insights/avoidance → $C"
+ok "GET /api/insights/avoidance → 200"
+
+C=$(code -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/api/captures/pending-count")
+[[ "$C" == "200" ]] || fail "GET /api/captures/pending-count → $C"
+ok "GET /api/captures/pending-count → 200"
+
+C=$(code -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/api/ops/backup-meta")
+[[ "$C" == "200" ]] || fail "GET /api/ops/backup-meta → $C"
+ok "GET /api/ops/backup-meta → 200"
+
 echo "=== Smoke completo OK ==="

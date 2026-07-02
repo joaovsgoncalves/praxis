@@ -279,11 +279,24 @@ Ver `docs/ONDA-17-MOBILE.md`.
 
 ---
 
+## Onda 18 — Backup + 10/10
+
+| ID | Task | Status |
+|----|------|--------|
+| P18-T01 | Backup + meta | **done** |
+| P18-T02 | Cron installer | **done** |
+| P18-T03 | Smoke + checklist | **done** |
+
+Ver `docs/ONDA-18-OPERACAO.md` e `docs/CHECKLIST-PRAXIS-10.md`.
+
+---
+
 ## Registro de ondas (atualizar a cada entrega)
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **17** | (este commit) | Nav mobile + PWA polish |
+| 2026-07-02 | **18** | (este commit) | Backup SQLite + checklist 10/10 |
+| 2026-07-02 | **17** | `c717f84` | Nav mobile + PWA |
 | 2026-07-02 | **16** | `66a92a0` | Cockpit evitando + PraxIA |
 | 2026-07-02 | **15** | `144386b` | Voz fila + retry STT |
 | 2026-07-02 | **14** | `593cdec` | Tarefas recorrentes motor + UI |

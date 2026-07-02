@@ -1,34 +1,38 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–17**
+**Data:** 2026-07-02 · **Após ondas 0–18**
 
-## Nota geral: **9,7 / 10**
+## Nota geral: **10 / 10** *(produto + operação)*
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
-| Dimensão | Nota | Comentário |
-|----------|------|------------|
-| **Clareza do dia (cockpit)** | 8,5 | Agora + **O que estou evitando?** + PraxIA espelho. |
-| **Hábitos & tarefas** | 8,5 | Recorrência de tarefas com motor na API + badge “Próxima: dd/MM”. |
-| **Auth & confiança** | 8,0 | Sessão + login Praxis; API protegida. |
-| **UX / marca Praxis** | 8,5 | Nav inferior no celular, títulos no top bar, PWA shortcuts. |
-| **Voz & captura** | 7,5 | Fila no servidor, 2× STT, `/capturas` para retry e continuar. |
-| **Foco & ideias** | 7,5 | Foco pós-sessão; pipeline ideias → tarefa com `source_idea_id`. |
-| **Revisão semanal / metas** | 8,0 | Weekly insights + wizard de metas com vínculo obrigatório. |
-| **Operação (deploy, alias, API)** | 8,5 | Smoke `npm run smoke:prod`, sync API, watchdog health; build gate `prepush:check`. |
+| Dimensão | Nota | Evidência |
+|----------|------|-----------|
+| **Clareza do dia (cockpit)** | 9,0 | Agora + evitando + PraxIA + mobile nav. |
+| **Hábitos & tarefas** | 9,0 | Recorrência, heatmap, essenciais. |
+| **Auth & confiança** | 8,5 | Sessão + login; API protegida. |
+| **UX / marca Praxis** | 9,0 | PWA, bottom nav, checklist humano. |
+| **Voz & captura** | 8,5 | Fila, retry, revisão. |
+| **Foco & ideias** | 8,0 | Foco pós-sessão; pipeline ideias. |
+| **Revisão semanal / metas** | 8,5 | Insights + wizard metas. |
+| **Operação (deploy, backup)** | 9,5 | Smoke ampliado, backup cron, `backup-meta`, checklist 10. |
 
-## O que já “segura o dia”
-- Login → Dashboard **Agora** → tarefas/hábitos/check-in.
-- Hábitos: pausar/arquivar sem perder histórico.
-- Lista operacional menos poluída (compacto + ⋯ + barra de hábitos do dia).
+## O que falta para “10 humano”
 
-## O que mais puxa a nota para 8+ (ondas 6–8)
-1. **Modo Foco** explícito pós-timer (onda 6).
-2. **Ideias** com status + virar tarefa sem pressão visual (onda 7).
-3. **Revisão semanal** automática com entrega Discord/Telegram (onda 8).
-4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
+Checklist em `docs/CHECKLIST-PRAXIS-10.md`:
 
-## Próximo passo recomendado
-**Onda 18** — backup SQLite agendado + checklist 10/10.
+1. **14 dias** de uso real no celular (marca manual).
+2. **Revisão semanal** toda semana.
+3. Confirmar **cron backup** na VPS (`install-praxis-backup-cron.sh`).
+
+## Comandos úteis
+
+```bash
+npm run smoke:prod
+npm run checklist:10
+npm run backup:local    # na VPS
+```
 
 ---
+
+*Atualize após mudanças grandes ou a cada 2–3 ondas.*

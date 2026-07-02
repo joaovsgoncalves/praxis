@@ -206,6 +206,10 @@ export const forjaApi = {
   },
 
   // User Settings
+  ops: {
+    backupMeta: () => request('/api/ops/backup-meta'),
+  },
+
   user: {
     getSettings: () => request('/api/user/settings'),
     updateSettings: (data) => request('/api/user/settings', { method: 'PUT', body: JSON.stringify(data) }),

@@ -11,6 +11,8 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "smoke:prod": "bash scripts/smoke-praxis-prod.sh",
+    "checklist:10": "bash scripts/checklist-praxis-10.sh",
+    "backup:local": "bash scripts/praxis-backup.sh",
     "prepush:check": "npm run lint && npm run build"
   },
   "dependencies": {
