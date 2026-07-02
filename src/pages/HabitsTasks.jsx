@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,7 @@ import TaskForm from '@/components/habits-tasks/TaskForm';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
+import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder } from '@/lib/taskReorder';
 import { isTaskRelevantForTodayList } from '@/lib/tasks';
@@ -76,10 +77,12 @@ export default function HabitsTasks() {
   const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const queryClient = useQueryClient();
+  const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
 
   const { data: tasks = [] } = useQuery({ queryKey: ['allTasks', today], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
   const { data: habits = [] } = useQuery({ queryKey: ['allHabits'], queryFn: () => forjaApi.habits.list({}) });
+  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => forjaApi.habitLogs.list({ date: today }) });
 
   const createTask = useMutation({
     mutationFn: (data) => forjaApi.tasks.create(data),
@@ -134,6 +137,34 @@ export default function HabitsTasks() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
   });
 
+  const toggleHabit = useMutation({
+    mutationFn: async ({ habitId, isDone }) => {
+      const logs = habitLogs.filter(log => log.habit_id === habitId && log.date === today);
+      if (isDone && logs[0]) {
+        await forjaApi.habitLogs.delete(logs[0].id);
+      } else if (!isDone) {
+        await forjaApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
+
+  const isHabitCompletedToday = (habitId) =>
+    habitLogs.some(log => log.habit_id === habitId && log.date === today && log.completed);
+
+  const handleToggleHabit = (habit, isDone, evt) => {
+    if (!isDone) {
+      const target = habitRowRefs.current.get(habit.id);
+      const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
+      if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+    }
+    toggleHabit.mutate({ habitId: habit.id, isDone });
+  };
+
   const currentTasks = tasks.filter(t => isTaskRelevantForTodayList(t, today));
 
   const filteredTasks = currentTasks.filter(t => {
@@ -146,6 +177,8 @@ export default function HabitsTasks() {
     if (categoryFilter !== 'all' && h.category !== categoryFilter) return false;
     return true;
   });
+
+  const completedHabits = habits.filter(h => isHabitCompletedToday(h.id)).length;
 
   const moveTask = (taskId, direction) => {
     const orderedIds = buildMovedOrder(tasks, filteredTasks, taskId, direction);
@@ -187,8 +220,8 @@ export default function HabitsTasks() {
           </div>
           <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
             <p className="forja-kicker">Rotina</p>
-            <p className="mt-1 text-2xl font-semibold">{habits.length}</p>
-            <p className="text-xs text-muted-foreground">hábitos ativos</p>
+            <p className="mt-1 text-2xl font-semibold">{completedHabits}/{habits.length}</p>
+            <p className="text-xs text-muted-foreground">hábitos concluídos hoje</p>
           </div>
           <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
             <p className="forja-kicker">Filtro</p>
@@ -333,45 +366,76 @@ export default function HabitsTasks() {
               <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhum hábito registrado</CardContent></Card>
             ) : (
               <div className="space-y-3">
-                {filteredHabits.map((habit, index) => (
-                  <Card key={habit.id} className="card-domain domain-wellness overflow-hidden bg-card/75">
-                    <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5 xl:items-start">
-                      <Flame className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-base font-semibold leading-snug">{cleanPriorityPrefix(habit.title)}</p>
-                          <CategoryBadge category={habit.category} />
-                          {habit.current_streak > 0 && (
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs text-orange-400">
-                              🔥 {habit.current_streak}
-                            </span>
-                          )}
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
-                        </Badge>
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center xl:self-start">
-                        <ReorderControls
-                          label={cleanPriorityPrefix(habit.title)}
-                          busy={reorderHabits.isPending}
-                          disableUp={index === 0}
-                          disableDown={index === filteredHabits.length - 1}
-                          onMoveUp={() => moveHabit(habit.id, -1)}
-                          onMoveDown={() => moveHabit(habit.id, 1)}
-                        />
+                {filteredHabits.map((habit, index) => {
+                  const done = isHabitCompletedToday(habit.id);
+                  return (
+                    <Card
+                      key={habit.id}
+                      ref={el => { if (el) habitRowRefs.current.set(habit.id, el); else habitRowRefs.current.delete(habit.id); }}
+                      className={cn(
+                        'card-domain domain-wellness overflow-hidden bg-card/75 transition-colors',
+                        done && 'border-domain-wellness/30 bg-domain-wellness/10'
+                      )}
+                    >
+                      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5 xl:items-start">
                         <button
-                          onClick={() => deleteHabit.mutate(habit.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`Excluir ${cleanPriorityPrefix(habit.title)}`}
+                          type="button"
+                          onClick={(evt) => handleToggleHabit(habit, done, evt)}
+                          disabled={toggleHabit.isPending}
+                          className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 sm:mt-0"
+                          aria-label={`${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`}
+                          title={done ? 'Desmarcar hábito de hoje' : 'Concluir hábito de hoje'}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {done ? (
+                            <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
+                          ) : (
+                            <Circle className="h-5 w-5" />
+                          )}
                         </button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <Flame className={cn('mt-0.5 h-5 w-5 shrink-0 text-primary', done && 'text-domain-wellness')} />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className={cn('text-base font-semibold leading-snug', done && 'text-domain-wellness line-through opacity-80')}>
+                              {cleanPriorityPrefix(habit.title)}
+                            </p>
+                            <CategoryBadge category={habit.category} />
+                            {done && (
+                              <Badge className="border-domain-wellness/30 bg-domain-wellness/15 text-domain-wellness">
+                                Feito hoje
+                              </Badge>
+                            )}
+                            {habit.current_streak > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs text-orange-400">
+                                🔥 {habit.current_streak}
+                              </span>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
+                          </Badge>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center xl:self-start">
+                          <ReorderControls
+                            label={cleanPriorityPrefix(habit.title)}
+                            busy={reorderHabits.isPending}
+                            disableUp={index === 0}
+                            disableDown={index === filteredHabits.length - 1}
+                            onMoveUp={() => moveHabit(habit.id, -1)}
+                            onMoveDown={() => moveHabit(habit.id, 1)}
+                          />
+                          <button
+                            onClick={() => deleteHabit.mutate(habit.id)}
+                            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`Excluir ${cleanPriorityPrefix(habit.title)}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </section>
