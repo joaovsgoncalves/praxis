@@ -4,6 +4,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Calendar } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -104,23 +105,21 @@ export default function Achievements() {
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-3">
-          <Trophy className="w-7 h-7 text-gold" />
-          Conquistas
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isLoading
-            ? 'Carregando conquistas...'
+    <div className="praxis-page">
+      <PageHero
+        kicker="Progresso"
+        kickerIcon={Trophy}
+        kickerClassName="text-gold"
+        title="Conquistas"
+        description={
+          isLoading
+            ? 'Carregando…'
             : unlockedCount > 0
               ? `${unlockedCount} desbloqueada${unlockedCount !== 1 ? 's' : ''}`
-              : 'Complete tarefas e hábitos para desbloquear — o menu Conquistas aparece com a primeira.'}
-        </p>
-      </div>
+              : 'Complete tarefas e hábitos para desbloquear a primeira.'
+        }
+      />
 
-      {/* Level summary */}
       {data && (
         <Card className="bg-card border-gold/20">
           <CardContent className="p-4 flex items-center gap-4">

@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CheckCircle2, Play, Pause, Square, Timer } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
 import { toast } from '@/components/ui/use-toast';
@@ -201,11 +202,13 @@ export default function Focus() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="forja-title text-2xl font-bold">Modo Foco</h1>
-        <p className="text-sm text-muted-foreground mt-1">Pomodoro com tarefa opcional e histórico por tarefa.</p>
-      </div>
+    <div className="praxis-page max-w-2xl">
+      <PageHero
+        kicker="Foco"
+        kickerIcon={Timer}
+        title="Modo Foco"
+        description="Pomodoro com tarefa opcional. O tempo fica no histórico."
+      />
 
       <Dialog open={postSessionOpen} onOpenChange={(open) => !open && dismissPostSession()}>
         <DialogContent className="sm:max-w-md">

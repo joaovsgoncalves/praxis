@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, User, Timer, LogOut, Bell, Camera, Database } from 'lucide-react';
+import { Save, User, Timer, LogOut, Bell, Camera, Database, Settings as SettingsIcon } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
@@ -117,8 +118,13 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Configurações</h1>
+    <div className="praxis-page max-w-xl">
+      <PageHero
+        kicker="Conta"
+        kickerIcon={SettingsIcon}
+        title="Configurações"
+        description="Perfil, pomodoro, notificações e backup."
+      />
 
       <Card className="bg-card border-border">
         <CardHeader className="pb-3">

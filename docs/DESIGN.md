@@ -36,7 +36,7 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - Subtítulo “cockpit” na marca.
 - Cards dentro de cards sem necessidade.
 
-## Próximo polish (fila)
+## Opcional (pós-fechamento)
 
-- Metas, Hábitos & Tarefas, Capturas — migrar para `PraxisPage`.
-- Passada Playwright 390px após cada lote.
+- Playwright 390px após mudanças visuais.
+- Status vivo: `docs/ONDE-ESTAMOS.md`.

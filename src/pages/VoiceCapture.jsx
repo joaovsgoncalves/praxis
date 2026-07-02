@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mic, Square, Loader2, Check, X, Sparkles, ArrowLeft, Inbox, Upload, FileAudio } from 'lucide-react';
+import { Mic, Square, Loader2, Check, X, Sparkles, Inbox, Upload, FileAudio } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ import {
   validateVoiceBlob,
 } from '@/lib/voiceCaptureLimits';
 import { humanizeCaptureError } from '@/lib/captureErrorMessage';
+import { PageHero } from '@/components/layout/PraxisPage';
 
 const PHASE_COPY = {
   sending: { icon: Upload, title: 'Enviando áudio…', hint: 'Conexão com o servidor.' },
@@ -266,26 +267,28 @@ export default function VoiceCapture() {
   const recordingWarn = capturePhase === 'recording' && recordingElapsed >= VOICE_CAPTURE_WARN_DURATION_MS;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link to="/" className="hidden lg:inline-flex text-muted-foreground hover:text-foreground shrink-0">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="hidden lg:block text-2xl font-bold truncate">Captura por Voz</h1>
-        </div>
-        <Button asChild variant="outline" size="sm" className="relative praxis-touch-target shrink-0">
-          <Link to="/capturas">
-            <Inbox className="w-4 h-4 mr-1" />
-            Revisar
-            {inboxCount > 0 && (
-              <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
-                {inboxCount}
-              </span>
-            )}
-          </Link>
-        </Button>
-      </div>
+    <div className="praxis-page max-w-2xl">
+      <PageHero
+        kicker="Voz"
+        kickerIcon={Mic}
+        title="Captura por voz"
+        description="Fale; o Praxis separa tarefas e hábitos. Áudio fica salvo se a transcrição falhar."
+        action={(
+          <Button asChild variant="outline" size="sm" className="relative praxis-touch-target shrink-0 rounded-full">
+            <Link to="/capturas">
+              <Inbox className="w-4 h-4 mr-1" />
+              Revisar
+              {inboxCount > 0 && (
+                <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
+                  {inboxCount}
+                </span>
+              )}
+            </Link>
+          </Button>
+        )}
+      />
+
+      <Link to="/" className="sr-only">Hoje</Link>
 
       <p className="text-xs text-muted-foreground text-center lg:text-left">
         Máx. {formatBytes(VOICE_CAPTURE_MAX_BYTES)} · até 90s por gravação

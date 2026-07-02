@@ -9,6 +9,7 @@ import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { pickWeeklyTaskTitles, taskDatesForNextWeek } from '@/lib/weeklyReviewTasks';
+import { PageHero } from '@/components/layout/PraxisPage';
 
 const SCORE_OPTIONS = [
   { value: 1, emoji: '😞', label: 'Difícil' },
@@ -148,22 +149,21 @@ export default function WeeklyReview() {
 
   return (
     <div className="praxis-page max-w-3xl">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="forja-title flex items-center gap-2 text-2xl font-bold sm:text-3xl">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Revisão semanal
-          </h1>
-          <p className="text-sm text-muted-foreground">Dados automáticos + seu texto — ritual de 10 minutos.</p>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
-          <Button variant="outline" size="sm" onClick={() => setWeekDate(mondayOf(new Date()))} disabled={isCurrentWeek}>
-            Esta semana
-          </Button>
-          <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
-        </div>
-      </div>
+      <PageHero
+        kicker="Semana"
+        kickerIcon={Sparkles}
+        title="Revisão semanal"
+        description="Resumo automático + seu texto — cerca de 10 minutos."
+        action={(
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="sm" onClick={() => setWeekDate(mondayOf(new Date()))} disabled={isCurrentWeek}>
+              Esta semana
+            </Button>
+            <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        )}
+      />
 
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader className="pb-2">
