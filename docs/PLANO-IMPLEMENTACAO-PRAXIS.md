@@ -254,11 +254,24 @@ Ver `docs/ONDA-15-VOZ.md`.
 
 ---
 
+## Onda 16 — Cockpit evitando + PraxIA
+
+| ID | Task | Status |
+|----|------|--------|
+| P16-T01 | API avoidance insights | **done** |
+| P16-T02 | Dashboard widget | **done** |
+| P16-T03 | PraxIA confront | **done** |
+
+Ver `docs/ONDA-16-COCKPIT.md`.
+
+---
+
 ## Registro de ondas (atualizar a cada entrega)
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **15** | (este commit) | Voz: fila captura + retry STT + revisar capturas |
+| 2026-07-02 | **16** | (este commit) | Cockpit evitando + PraxIA leve |
+| 2026-07-02 | **15** | `144386b` | Voz fila + retry STT |
 | 2026-07-02 | **14** | `593cdec` | Tarefas recorrentes motor + UI |
 | 2026-07-02 | **13** | `f514623` | Smoke prod + sync API + health watchdog |
 | 2026-07-02 | **12** | `fc5f3cc` | Mobile + deep links + PWA |

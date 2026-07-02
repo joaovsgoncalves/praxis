@@ -1,14 +1,14 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–15**
+**Data:** 2026-07-02 · **Após ondas 0–16**
 
-## Nota geral: **9,3 / 10**
+## Nota geral: **9,5 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
 | Dimensão | Nota | Comentário |
 |----------|------|------------|
-| **Clareza do dia (cockpit)** | 8,0 | Bloco **Agora**, ordem do dashboard, hábitos essenciais — forte. |
+| **Clareza do dia (cockpit)** | 8,5 | Agora + **O que estou evitando?** + PraxIA espelho. |
 | **Hábitos & tarefas** | 8,5 | Recorrência de tarefas com motor na API + badge “Próxima: dd/MM”. |
 | **Auth & confiança** | 8,0 | Sessão + login Praxis; API protegida. |
 | **UX / marca Praxis** | 7,5 | Legado Forja fora da UI; copy em PT; ainda há densidade em telas secundárias. |
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 16** — cockpit “o que estou evitando” + PraxIA leve.
+**Ondas 17–18** — polish celular, backup SQLite, checklist 10/10.
 
 ---

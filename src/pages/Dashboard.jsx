@@ -17,6 +17,7 @@ import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
 import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
 import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
+import AvoidanceCockpit from '@/components/dashboard/AvoidanceCockpit';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
 import OfflineBanner from '@/components/shared/OfflineBanner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -212,6 +213,8 @@ export default function Dashboard() {
       />
 
       <WeeklyReviewPrompt />
+
+      <AvoidanceCockpit />
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)] gap-7 lg:gap-8 items-start">
         <div className="space-y-7 lg:space-y-8">

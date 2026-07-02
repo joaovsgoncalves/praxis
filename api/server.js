@@ -15,6 +15,7 @@ import {
   isWebAuthEnabled,
 } from './praxisAuth.js';
 import { buildWeeklyInsights } from './lib/weeklyInsights.js';
+import { buildAvoidanceInsights, buildRuleBasedPraxiaMirror } from './lib/avoidanceInsights.js';
 import { nextRecurrenceDate } from './taskRecurrence.js';
 import {
   initCaptureQueueSchema,
@@ -2451,6 +2452,88 @@ app.get('/api/insights/weekly', (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Weekly insights error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/insights/avoidance — cockpit "o que estou evitando" (onda 16)
+app.get('/api/insights/avoidance', (req, res) => {
+  try {
+    const today = req.query.date || getLocalDateString();
+    const payload = buildAvoidanceInsights(db, today);
+    res.json(payload);
+  } catch (error) {
+    console.error('Avoidance insights error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/praxia/confront — espelho leve (regras + LLM opcional)
+app.post('/api/praxia/confront', async (req, res) => {
+  try {
+    const today = req.body?.date || getLocalDateString();
+    const note = String(req.body?.note || '').trim().slice(0, 500);
+    const avoidance = buildAvoidanceInsights(db, today);
+    const rulesMirror = buildRuleBasedPraxiaMirror(avoidance);
+
+    if (!OPENAI_API_KEY) {
+      return res.json({ ...rulesMirror, avoidance_headline: avoidance.headline });
+    }
+
+    try {
+      const context = [
+        `Data: ${today}`,
+        avoidance.headline,
+        ...avoidance.bullets.slice(0, 6),
+        note ? `Nota do usuário: ${note}` : '',
+      ].filter(Boolean).join('\n');
+
+      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: process.env.FORJA_PRAXIA_MODEL || process.env.FORJA_PARSE_MODEL || 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `Você é a PraxIA, copiloto da Praxis. Tom: direto, parceiro, português BR, sem firula.
+Não decide pelo usuário. Espelha padrões de evitação com gentileza e confronto honesto.
+Responda APENAS JSON: {"lines": ["...", "..."]} com 3 a 5 frases curtas.
+Sem listas numeradas dentro das strings. Sem emoji.`,
+            },
+            { role: 'user', content: context },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.4,
+        }),
+      });
+
+      if (openaiRes.ok) {
+        const data = await openaiRes.json();
+        const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+        const lines = Array.isArray(parsed.lines)
+          ? parsed.lines.map((s) => String(s).trim()).filter(Boolean).slice(0, 5)
+          : [];
+        if (lines.length) {
+          return res.json({
+            source: 'llm',
+            lines,
+            avoidance_headline: avoidance.headline,
+          });
+        }
+      } else {
+        console.error('PraxIA LLM failed:', await openaiRes.text());
+      }
+    } catch (llmErr) {
+      console.error('PraxIA confront error:', llmErr.message);
+    }
+
+    res.json({ ...rulesMirror, avoidance_headline: avoidance.headline });
+  } catch (error) {
+    console.error('PraxIA confront error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -21,6 +21,7 @@ const OFFLINE_CACHEABLE = [
   '/api/insights/best-hours',
   '/api/insights/correlation',
   '/api/insights/weekly',
+  '/api/insights/avoidance',
   '/api/weekly-reviews',
 ];
 
@@ -270,6 +271,15 @@ export const forjaApi = {
     correlation: (days = 60) => request(`/api/insights/correlation?days=${days}`),
     weekly: (weekStart) =>
       request(`/api/insights/weekly${weekStart ? `?week_start=${encodeURIComponent(weekStart)}` : ''}`),
+    avoidance: (params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/api/insights/avoidance${q ? `?${q}` : ''}`);
+    },
+  },
+
+  praxia: {
+    confront: (body = {}) =>
+      request('/api/praxia/confront', { method: 'POST', body: JSON.stringify(body) }),
   },
 
   // Weekly reviews
