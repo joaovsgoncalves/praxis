@@ -14,6 +14,7 @@ import {
   createApiAuthMiddleware,
   isWebAuthEnabled,
 } from './praxisAuth.js';
+import { buildWeeklyInsights } from './lib/weeklyInsights.js';
 
 // Category constants
 const CATEGORIES = {
@@ -2195,6 +2196,18 @@ app.get('/api/insights/correlation', (req, res) => {
     });
   } catch (error) {
     console.error('Correlation insights error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/insights/weekly — agregação estável para revisão semanal (onda 8)
+app.get('/api/insights/weekly', (req, res) => {
+  try {
+    const weekStart = mondayOf(req.query.week_start || req.query.date);
+    const payload = buildWeeklyInsights(db, weekStart);
+    res.json(payload);
+  } catch (error) {
+    console.error('Weekly insights error:', error);
     res.status(500).json({ error: error.message });
   }
 });

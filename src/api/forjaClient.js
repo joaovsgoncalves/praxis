@@ -20,6 +20,7 @@ const OFFLINE_CACHEABLE = [
   '/api/focus/stats',
   '/api/insights/best-hours',
   '/api/insights/correlation',
+  '/api/insights/weekly',
   '/api/weekly-reviews',
 ];
 
@@ -225,6 +226,8 @@ export const forjaApi = {
   insights: {
     bestHours: () => request('/api/insights/best-hours'),
     correlation: (days = 60) => request(`/api/insights/correlation?days=${days}`),
+    weekly: (weekStart) =>
+      request(`/api/insights/weekly${weekStart ? `?week_start=${encodeURIComponent(weekStart)}` : ''}`),
   },
 
   // Weekly reviews

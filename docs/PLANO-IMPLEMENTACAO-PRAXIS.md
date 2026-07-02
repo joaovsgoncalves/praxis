@@ -142,9 +142,9 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P8-T01 | Endpoint `GET /api/insights/weekly` agregando: tasks done, hábitos falhos, wellness, focus, ideias | L | JSON estável | todo |
-| P8-T02 | Página Revisão: render automático (vitórias, padrão, gargalo, 3 prioridades sugeridas) | L | Não é formulário vazio | todo |
-| P8-T03 | Opcional: cron Hermes domingo usa mesmo endpoint e manda resumo Discord/Telegram | M | Read-only script | todo |
+| P8-T01 | Endpoint `GET /api/insights/weekly` agregando: tasks done, hábitos falhos, wellness, focus, ideias | L | JSON estável | **done** |
+| P8-T02 | Página Revisão: render automático (vitórias, padrão, gargalo, 3 prioridades sugeridas) | L | Não é formulário vazio | **done** |
+| P8-T03 | Opcional: cron Hermes domingo usa mesmo endpoint e manda resumo Discord/Telegram | M | `scripts/praxis-weekly-brief.sh` + `FORJA_API_KEY` | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **7** | (este commit) | Ideias — status + virar tarefa + revisão |
+| 2026-07-02 | **8** | (este commit) | Revisão semanal automática |
+| 2026-07-02 | **7** | `5a8a1ad` | Ideias — status + virar tarefa |
 | 2026-07-02 | **6** | `55b64d1` | Modo Foco — pós-sessão + copy PT |
 | 2026-07-02 | **5** | `f74af68` | Hábitos & Tarefas — menos ruído |
 | 2026-07-02 | **4** | `02a09fd` | Dashboard Agora — NowBlock + cockpit |

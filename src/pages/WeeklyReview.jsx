@@ -4,7 +4,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2 } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -43,6 +43,11 @@ export default function WeeklyReview() {
   const { data: current } = useQuery({
     queryKey: ['weeklyReviewCurrent', weekStart],
     queryFn: () => forjaApi.weeklyReviews.current(weekStart),
+  });
+
+  const { data: auto, isLoading: autoLoading } = useQuery({
+    queryKey: ['weeklyInsights', weekStart],
+    queryFn: () => forjaApi.insights.weekly(weekStart),
   });
 
   const { data: history = [] } = useQuery({
@@ -86,76 +91,149 @@ export default function WeeklyReview() {
     },
   });
 
-  const goPrev = () => setWeekDate(d => mondayOf(addDays(d, -7)));
-  const goNext = () => setWeekDate(d => mondayOf(addDays(d, 7)));
+  const applyDrafts = () => {
+    if (!auto?.drafts) return;
+    setForm((f) => ({
+      ...f,
+      highlights: f.highlights.trim() ? f.highlights : auto.drafts.highlights || f.highlights,
+      blockers: f.blockers.trim() ? f.blockers : auto.drafts.blockers || f.blockers,
+      learnings: f.learnings.trim() ? f.learnings : auto.drafts.learnings || f.learnings,
+      next_week_focus: f.next_week_focus.trim() ? f.next_week_focus : auto.drafts.next_week_focus || f.next_week_focus,
+    }));
+    toast.success('Rascunho automático aplicado nos campos vazios');
+  };
+
+  const goPrev = () => setWeekDate((d) => mondayOf(addDays(d, -7)));
+  const goNext = () => setWeekDate((d) => mondayOf(addDays(d, 7)));
   const isCurrentWeek = useMemo(
     () => format(mondayOf(new Date()), 'yyyy-MM-dd') === weekStart,
-    [weekStart]
+    [weekStart],
   );
 
   const range = `${format(weekDate, 'dd MMM', { locale: ptBR })} – ${format(addDays(weekDate, 6), 'dd MMM yyyy', { locale: ptBR })}`;
 
+  const v = auto?.victories;
+  const priorities = auto?.suggested_priorities || [];
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Revisão Semanal
+          <h1 className="forja-title flex items-center gap-2 text-2xl font-bold sm:text-3xl">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Revisão semanal
           </h1>
-          <p className="text-sm text-muted-foreground">Olhar pra trás pra olhar pra frente.</p>
+          <p className="text-sm text-muted-foreground">Dados automáticos + seu texto — ritual de 10 minutos.</p>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="w-4 h-4" /></Button>
+          <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
           <Button variant="outline" size="sm" onClick={() => setWeekDate(mondayOf(new Date()))} disabled={isCurrentWeek}>
             Esta semana
           </Button>
-          <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="w-4 h-4" /></Button>
+          <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </div>
 
-      <Card className="bg-card border-border">
+      <Card className="border-primary/20 bg-primary/5">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">{range}</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            Resumo automático · {range}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          {autoLoading ? (
+            <p className="text-muted-foreground">Calculando a semana…</p>
+          ) : auto ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InsightBlock title="Vitórias">
+                  <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                    <li>{v?.tasks_completed_count ?? 0} tarefa(s) concluída(s)</li>
+                    <li>
+                      Hábitos: {v?.habits_done ?? 0}/{v?.habits_target ?? 0}
+                      {v?.habits_completion_pct != null ? ` (${v.habits_completion_pct}%)` : ''}
+                    </li>
+                    <li>{v?.focus_minutes ?? 0} min de foco · {v?.ideas_promoted ?? 0} ideia(s) viraram tarefa</li>
+                  </ul>
+                </InsightBlock>
+                <InsightBlock title="Padrões">
+                  <p className="text-muted-foreground leading-relaxed">{auto.patterns?.summary}</p>
+                </InsightBlock>
+                <InsightBlock title="Gargalos">
+                  <p className="text-muted-foreground leading-relaxed">{auto.bottlenecks?.summary}</p>
+                </InsightBlock>
+                <InsightBlock title="Ideias na semana">
+                  <p className="text-muted-foreground">
+                    {auto.ideas?.new_captures ?? 0} nova(s) · {auto.ideas?.promissoras_count ?? 0} promissora(s) no banco
+                  </p>
+                </InsightBlock>
+              </div>
+
+              {priorities.length > 0 && (
+                <div>
+                  <p className="mb-2 font-medium text-foreground">3 prioridades sugeridas</p>
+                  <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+                    {priorities.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              <Button type="button" variant="secondary" size="sm" className="rounded-full" onClick={applyDrafts}>
+                <Wand2 className="mr-1.5 h-4 w-4" />
+                Preencher campos vazios com rascunho
+              </Button>
+            </>
+          ) : (
+            <p className="text-muted-foreground">Sem dados para esta semana.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">Sua revisão · {weekStart} → {weekEnd}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Section
             label="✨ O que foi bem?"
             placeholder="3 vitórias, momentos de orgulho, hábitos que funcionaram…"
             value={form.highlights}
-            onChange={v => setForm(f => ({ ...f, highlights: v }))}
+            onChange={(val) => setForm((f) => ({ ...f, highlights: val }))}
           />
           <Section
             label="🪨 O que emperrou?"
             placeholder="Bloqueios, distrações, hábitos que falharam, energia baixa…"
             value={form.blockers}
-            onChange={v => setForm(f => ({ ...f, blockers: v }))}
+            onChange={(val) => setForm((f) => ({ ...f, blockers: val }))}
           />
           <Section
             label="💡 O que aprendi?"
             placeholder="Padrões, descobertas, ajustes de processo…"
             value={form.learnings}
-            onChange={v => setForm(f => ({ ...f, learnings: v }))}
+            onChange={(val) => setForm((f) => ({ ...f, learnings: val }))}
           />
           <Section
             label="🎯 Foco da próxima semana"
             placeholder="3 prioridades concretas, mudança de rotina, coisa nova pra testar…"
             value={form.next_week_focus}
-            onChange={v => setForm(f => ({ ...f, next_week_focus: v }))}
+            onChange={(val) => setForm((f) => ({ ...f, next_week_focus: val }))}
           />
 
           <div>
-            <p className="text-sm font-medium mb-2">Como foi a semana no geral?</p>
+            <p className="mb-2 text-sm font-medium">Como foi a semana no geral?</p>
             <div className="flex gap-2">
-              {SCORE_OPTIONS.map(opt => (
+              {SCORE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, overall_score: opt.value }))}
-                  className={`flex-1 py-2 px-3 rounded-lg border text-center transition-colors ${
+                  onClick={() => setForm((f) => ({ ...f, overall_score: opt.value }))}
+                  className={`flex-1 rounded-lg border py-2 px-3 text-center transition-colors ${
                     form.overall_score === opt.value
-                      ? 'bg-primary/15 border-primary text-primary'
-                      : 'bg-secondary/40 border-border hover:bg-secondary'
+                      ? 'border-primary bg-primary/15 text-primary'
+                      : 'border-border bg-secondary/40 hover:bg-secondary'
                   }`}
                 >
                   <div className="text-lg">{opt.emoji}</div>
@@ -173,11 +251,11 @@ export default function WeeklyReview() {
                 onClick={() => deleteMutation.mutate(current.review.id)}
                 className="text-rose-400 hover:text-rose-400"
               >
-                <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
               </Button>
             )}
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               {saveMutation.isPending ? 'Salvando…' : 'Salvar revisão'}
             </Button>
           </div>
@@ -185,23 +263,23 @@ export default function WeeklyReview() {
       </Card>
 
       {history.length > 0 && (
-        <Card className="bg-card border-border">
+        <Card className="border-border bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold">Revisões anteriores</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {history.map(r => {
-              const opt = SCORE_OPTIONS.find(o => o.value === r.overall_score);
-              const start = new Date(r.week_start + 'T12:00:00');
+            {history.map((r) => {
+              const opt = SCORE_OPTIONS.find((o) => o.value === r.overall_score);
+              const start = new Date(`${r.week_start}T12:00:00`);
               return (
                 <button
                   key={r.id}
                   type="button"
                   onClick={() => setWeekDate(mondayOf(start))}
-                  className="w-full flex items-center justify-between p-2.5 rounded-md bg-secondary/40 hover:bg-secondary text-left"
+                  className="flex w-full items-center justify-between rounded-md bg-secondary/40 p-2.5 text-left hover:bg-secondary"
                 >
                   <span className="text-sm">
-                    {format(start, "dd MMM", { locale: ptBR })} – {format(addDays(start, 6), "dd MMM yyyy", { locale: ptBR })}
+                    {format(start, 'dd MMM', { locale: ptBR })} – {format(addDays(start, 6), 'dd MMM yyyy', { locale: ptBR })}
                   </span>
                   <span className="text-base">{opt?.emoji || '📝'}</span>
                 </button>
@@ -214,15 +292,24 @@ export default function WeeklyReview() {
   );
 }
 
+function InsightBlock({ title, children }) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-black/20 p-3">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      {children}
+    </div>
+  );
+}
+
 function Section({ label, placeholder, value, onChange }) {
   return (
     <div>
-      <label className="text-sm font-medium block mb-1.5">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium">{label}</label>
       <Textarea
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="bg-secondary/40 min-h-[80px] resize-y"
+        className="min-h-[80px] resize-y bg-secondary/40"
       />
     </div>
   );
