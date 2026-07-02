@@ -12,7 +12,7 @@ const navItems = [
   { path: '/foco', label: 'Modo Foco', icon: Timer },
   { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
   { path: '/rituais', label: 'Rituais', icon: Link2, requiresActiveRituals: true },
-  { path: '/conquistas', label: 'Conquistas', icon: Trophy },
+  { path: '/conquistas', label: 'Conquistas', icon: Trophy, requiresUnlockedAchievements: true },
   { path: '/revisao-semanal', label: 'Revisão Semanal', icon: BookOpen, requiresWeeklyReviewValue: true },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
@@ -118,10 +118,18 @@ export default function Sidebar({ open, onClose }) {
     || (weeklyInsight?.victories?.habit_done ?? 0) > 0
     || (weeklyInsight?.ideas?.new_captures ?? 0) > 0;
 
+  const { data: gamificationNav } = useQuery({
+    queryKey: ['gamification'],
+    queryFn: () => forjaApi.gamification.get(),
+    staleTime: 120_000,
+  });
+  const unlockedAchievementCount = (gamificationNav?.achievements || []).filter((a) => a.unlocked).length;
+
   const visibleNav = navItems.filter((item) => {
     if (item.requiresActiveGoals) return activeGoalCount > 0;
     if (item.requiresActiveRituals) return activeRitualCount > 0;
     if (item.requiresWeeklyReviewValue) return weeklyReviewNavVisible;
+    if (item.requiresUnlockedAchievements) return unlockedAchievementCount > 0;
     return true;
   });
 

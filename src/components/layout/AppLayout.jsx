@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ParticleBackground from '@/components/shared/ParticleBackground';
+import PraxisLevelUpListener from '@/components/gamification/PraxisLevelUpListener';
 import { Menu } from 'lucide-react';
 
 export default function AppLayout() {
@@ -14,6 +15,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background relative">
+      <PraxisLevelUpListener />
       <ParticleBackground />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       

@@ -172,9 +172,9 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P11-T01 | XP/level em collapsible ou rodapé Dashboard, não hero | S | Menos competição com Agora | todo |
-| P11-T02 | Achievements: só mostrar se &gt;0 desbloqueados | S | History/gamification | todo |
-| P11-T03 | Evento `forja-level-up` renomear display string only (interno pode ficar) | S | Toast diz Praxis | todo |
+| P11-T01 | XP/level em collapsible ou rodapé Dashboard, não hero | S | Menos competição com Agora | **done** |
+| P11-T02 | Achievements: só mostrar se &gt;0 desbloqueados | S | History/gamification | **done** |
+| P11-T03 | Evento `forja-level-up` renomear display string only (interno pode ficar) | S | Toast diz Praxis | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **10** | (este commit) | Rituais presets + nav condicional |
+| 2026-07-02 | **11** | (este commit) | Gamificação discreta |
+| 2026-07-02 | **10** | `480393a` | Rituais presets + nav condicional |
 | 2026-07-02 | **9** | `e96cb02` | Metas wizard + nav condicional |
 | 2026-07-02 | **8** | `d2e8623` | Revisão semanal automática |
 | 2026-07-02 | **7** | `5a8a1ad` | Ideias — status + virar tarefa |

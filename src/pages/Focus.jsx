@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { forjaApi } from '@/api/forjaClient';
+import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -82,9 +83,7 @@ export default function Focus() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
-      if (task?.xp_sync?.leveled_up) {
-        window.dispatchEvent(new CustomEvent('forja-level-up', { detail: task.xp_sync }));
-      }
+      dispatchPraxisLevelUpFromResponse(task);
       setPostSessionOpen(false);
       toast({
         title: 'Tarefa concluída',

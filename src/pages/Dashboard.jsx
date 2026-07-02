@@ -14,7 +14,7 @@ import WaterTracker from '@/components/dashboard/WaterTracker';
 import TodayCalendar from '@/components/dashboard/TodayCalendar';
 import RitualWidget from '@/components/dashboard/RitualWidget';
 import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
-import GamificationWidget from '@/components/dashboard/GamificationWidget';
+import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
 import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
@@ -28,6 +28,7 @@ import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from
 import { pickNowTask } from '@/lib/nowTask';
 import { isHabitDueOnDate } from '@/lib/habits';
 import { buildDragOrder } from '@/lib/taskReorder';
+import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { isTaskCompletedForToday, isTaskDone, sortTodayRelevantTasks } from '@/lib/tasks';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
@@ -99,8 +100,10 @@ export default function Dashboard() {
       const newStatus = isTaskDone(task) ? 'pending' : 'completed';
       return forjaApi.tasks.update(task.id, { status: newStatus });
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       invalidateTaskQueries();
+      dispatchPraxisLevelUpFromResponse(updated);
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
   const updateTaskMutation = useMutation({
@@ -243,13 +246,12 @@ export default function Dashboard() {
         <Collapsible defaultOpen={false} className="rounded-2xl border border-white/5 bg-black/20">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-6 h-auto">
-              <span className="forja-kicker text-left">Resumo · XP · consistência</span>
+              <span className="forja-kicker text-left">Resumo · consistência</span>
               <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-7 px-2 pb-6 sm:px-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
-              <Slot domain="gold"><GamificationWidget /></Slot>
+            <div className="grid grid-cols-1 gap-7">
               <Slot domain="gold">
                 <DayWins
                   tasks={tasks}
@@ -269,9 +271,11 @@ export default function Dashboard() {
         </Collapsible>
       ) : (
         <p className="text-center text-sm text-muted-foreground py-2">
-          XP e heatmap aparecem quando você começar a executar o dia.
+          Heatmap e resumo aparecem quando você começar a executar o dia.
         </p>
       )}
+
+      {showAnalyticsSection && <XpProgressStrip className="mt-2" />}
 
       <Dialog
         open={Boolean(editingTask)}

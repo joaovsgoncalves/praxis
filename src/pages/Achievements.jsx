@@ -114,8 +114,9 @@ export default function Achievements() {
         <p className="text-sm text-muted-foreground mt-1">
           {isLoading
             ? 'Carregando conquistas...'
-            : `${unlockedCount} de ${achievements.length} desbloqueadas`
-          }
+            : unlockedCount > 0
+              ? `${unlockedCount} desbloqueada${unlockedCount !== 1 ? 's' : ''}`
+              : 'Complete tarefas e hábitos para desbloquear — o menu Conquistas aparece com a primeira.'}
         </p>
       </div>
 
