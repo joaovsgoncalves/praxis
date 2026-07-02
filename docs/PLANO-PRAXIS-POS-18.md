@@ -11,7 +11,7 @@
 
 | Meta | Hoje | Alvo | Quem faz |
 |------|------|------|----------|
-| **Técnica** | 9,2 | 9,5+ | Código + smoke + ops (ondas 19–21) |
+| **Técnica** | 9,4 | 9,5+ | Código + smoke + ops (ondas 20–21) |
 | **Confiança** | 8,7 | 9,5+ | **Você** usa 14 dias + revisão semanal + 1 voz real |
 
 Sem a linha “Confiança”, nota alta é só no papel.
@@ -53,13 +53,13 @@ Marca no calendário. Isso sozinho pode levar confiança para **~9,0** se não q
 
 | ID | Entrega | Critério done |
 |----|---------|----------------|
-| P19-T01 | Smoke: criar tarefa + concluir + apagar (ou tag test) | Script idempotente |
-| P19-T02 | Smoke: tarefa recorrente → verificar `next_occurrence` / 2ª instância | 1 caso fixo no script |
-| P19-T03 | Smoke: POST captura com **arquivo áudio fixture** (curto .webm) → status `transcribed` ou `failed` explícito | Não fingir sucesso |
-| P19-T04 | Smoke: `GET /capturas` + `pending-count` após fixture | 200 + JSON válido |
-| P19-T05 | `npm run smoke:prod` documentado no README interno | Uma página em `docs/ONDA-19-SMOKE.md` |
+| P19-T01 | Smoke: criar tarefa + concluir + apagar | **done** |
+| P19-T02 | Smoke: recorrência + `next_occurrence` | **done** |
+| P19-T03 | Smoke: POST captura fixture WAV | **done** |
+| P19-T04 | Smoke: GET captures + pending-count | **done** |
+| P19-T05 | Doc `ONDA-19-SMOKE.md` | **done** |
 
-**Nota esperada:** técnica **9,4** · voz sobe para **~8,5** (prova automatizada).
+Ver `docs/ONDA-19-SMOKE.md`. **Nota:** técnica **9,4** · voz **~8,5**.
 
 ---
 
