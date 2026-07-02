@@ -206,14 +206,27 @@
 
 ## Métricas de “pronto” (8.7/10 alvo Sêneca)
 
-- [ ] Endpoints pessoais **401** sem sessão (teste externo).
+- [x] Endpoints pessoais **401** sem sessão (teste externo) — `npm run smoke:prod`
 - [x] Zero “Forja” na UI.
-- [ ] Hábitos: editar + pausar/arquivar + histórico preservado.
-- [ ] Dashboard abre com bloco **Agora** acima da dobra.
-- [ ] Cards com ≤3 ações visíveis; resto em ⋯.
-- [ ] Ideia → tarefa em 1 clique.
-- [ ] Revisão semanal mostra dados sem preencher formulário.
-- [ ] Toda entrega na **`main`** + Vercel `praxis-jota` verificado.
+- [x] Hábitos: editar + pausar/arquivar + histórico preservado.
+- [x] Dashboard abre com bloco **Agora** acima da dobra.
+- [x] Cards com ≤3 ações visíveis; resto em ⋯.
+- [x] Ideia → tarefa em 1 clique.
+- [x] Revisão semanal mostra dados sem preencher formulário.
+- [x] Toda entrega na **`main`** + Vercel `praxis-jota` verificado (`smoke:prod` + build local).
+
+---
+
+## Onda 13 — Confiança operacional
+
+| ID | Task | Status |
+|----|------|--------|
+| P13-T01 | Smoke prod script | **done** |
+| P13-T02 | Sync API produção | **done** |
+| P13-T03 | Checklist métricas (acima) | **done** |
+| P13-T04 | Health watchdog | **done** |
+
+Ver `docs/ONDA-13-OPERACAO.md`.
 
 ---
 
@@ -221,7 +234,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **12** | (este commit) | Mobile + deep links + PWA |
+| 2026-07-02 | **13** | (este commit) | Smoke prod + sync API + health watchdog |
+| 2026-07-02 | **12** | `fc5f3cc` | Mobile + deep links + PWA |
 | 2026-07-02 | **11** | `50b812b` | Gamificação discreta |
 | 2026-07-02 | **10** | `480393a` | Rituais presets + nav condicional |
 | 2026-07-02 | **9** | `e96cb02` | Metas wizard + nav condicional |

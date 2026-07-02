@@ -1,8 +1,8 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–12 (plano fechado)**
+**Data:** 2026-07-02 · **Após ondas 0–13**
 
-## Nota geral: **8,6 / 10**
+## Nota geral: **8,9 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
@@ -15,7 +15,7 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 | **Voz & captura** | 6,0 | Fluxo existe; STT depende de VPS (`faster-whisper`); fila/revisão ainda leve. |
 | **Foco & ideias** | 7,5 | Foco pós-sessão; pipeline ideias → tarefa com `source_idea_id`. |
 | **Revisão semanal / metas** | 8,0 | Weekly insights + wizard de metas com vínculo obrigatório. |
-| **Operação (deploy, alias, API)** | 7,0 | Vercel + VPS estável; documentação de ondas boa. |
+| **Operação (deploy, alias, API)** | 8,5 | Smoke `npm run smoke:prod`, sync API, watchdog health; build gate `prepush:check`. |
 
 ## O que já “segura o dia”
 - Login → Dashboard **Agora** → tarefas/hábitos/check-in.
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Plano 0–12 concluído.** Manutenção: voz/STT, recorrência de tarefas, polish contínuo no celular.
+**Onda 14** — tarefas recorrentes (motor próxima instância). Ver plano 8,6→10 no chat / futuro `docs/PLANO-PRAXIS-10.md`.
 
 ---
