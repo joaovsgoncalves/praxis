@@ -21,6 +21,10 @@ npm run smoke:prod
 
 # Cron health (opcional webhook Discord)
 PRAXIS_BASE=https://praxis-jota.vercel.app ./scripts/praxis-health-watchdog.sh
+./scripts/install-praxis-health-cron.sh   # */5 na VPS
+
+# Após editar api/
+npm run ship:api
 ```
 
 ## Falha Vercel (referência)

@@ -1,12 +1,12 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após onda 19** · `docs/ONDA-19-SMOKE.md`
+**Data:** 2026-07-02 · **Após onda 20** · `docs/ONDA-20-OPERACAO.md`
 
 ## Notas (duas leituras)
 
 | Leitura | Nota | Quando usar |
 |---------|------|-------------|
-| **Técnica / operação** | **9,4 / 10** | Build + smoke E2E (tarefa, recorrência, voz) |
+| **Técnica / operação** | **9,5 / 10** | Smoke E2E + ops onda 20 |
 | **Confiança no dia a dia** | **8,7 / 10** | Você no celular + voz sua (não só fixture) |
 
 ## Por dimensão
@@ -20,7 +20,7 @@
 | **Voz & captura** | 8,5 | Smoke POST captura + STT VPS |
 | **Foco & ideias** | 8,0 | Fora do smoke |
 | **Revisão semanal / metas** | 8,5 | weekly OK |
-| **Operação** | 9,3 | Backup cron; watchdog cron pendente (onda 20) |
+| **Operação** | 9,6 | Backup + health cron + drift check |
 
 ## Confiança 9,5+ (só uso)
 

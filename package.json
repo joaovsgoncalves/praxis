@@ -14,6 +14,8 @@
     "smoke:e2e": "bash scripts/smoke-praxis-e2e.sh",
     "checklist:10": "bash scripts/checklist-praxis-10.sh",
     "backup:local": "bash scripts/praxis-backup.sh",
+    "ship:api": "bash scripts/ship-praxis-api.sh",
+    "check:api-drift": "bash scripts/check-api-drift.sh",
     "prepush:check": "npm run lint && npm run build"
   },
   "dependencies": {

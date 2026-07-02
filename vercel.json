@@ -1,4 +1,12 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "forja-do-jota.vercel.app" }],
+      "destination": "https://praxis-jota.vercel.app/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "http://76.13.227.227:18556/api/$1" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }

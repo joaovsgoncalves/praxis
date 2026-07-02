@@ -46,6 +46,19 @@ fi
 echo "[4] Build gate"
 (cd "$ROOT" && npm run prepush:check >/dev/null 2>&1) && check "prepush:check" || bad "prepush:check"
 
+echo "[5] API drift + health cron"
+if bash "$ROOT/scripts/check-api-drift.sh" >/dev/null 2>&1; then
+  check "api sem drift (ou mesmo path)"
+else
+  warn "api divergente — npm run ship:api"
+fi
+
+if crontab -l 2>/dev/null | grep -qF praxis-health-watchdog; then
+  check "cron health instalado"
+else
+  warn "cron health ausente — ./scripts/install-praxis-health-cron.sh"
+fi
+
 if [[ $fail -eq 0 ]]; then
   echo "=== Checklist auto: OK ==="
   exit 0

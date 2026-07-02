@@ -69,12 +69,12 @@ Ver `docs/ONDA-19-SMOKE.md`. **Nota:** técnica **9,4** · voz **~8,5**.
 
 | ID | Entrega | Critério done |
 |----|---------|----------------|
-| P20-T01 | Cron opcional `praxis-health-watchdog.sh` (*/5) + doc “como instalar” | Script `install-praxis-health-cron.sh` |
-| P20-T02 | Vercel: **só** `praxis-jota` como URL oficial; redirect ou nota em `forja-do-jota` | João recebe 1 link |
-| P20-T03 | `sync-forja-api-production.sh` no fluxo pós-push API (checklist) | Uma linha no `ONDA-13` / checklist |
-| P20-T04 | Alerta mínimo se smoke falhar (opcional: Discord webhook **só se você pedir**) | Fora do escopo default |
+| P20-T01 | Cron health + `install-praxis-health-cron.sh` | **done** |
+| P20-T02 | Redirect `forja-do-jota` → `praxis-jota` | **done** |
+| P20-T03 | `npm run ship:api` + drift no checklist | **done** |
+| P20-T04 | Discord no smoke | **fora** |
 
-**Nota esperada:** operação **9,6**.
+Ver `docs/ONDA-20-OPERACAO.md`. Operação **~9,6**.
 
 ---
 
