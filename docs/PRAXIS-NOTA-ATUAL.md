@@ -14,7 +14,7 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 | **UX / marca Praxis** | 7,5 | Legado Forja fora da UI; copy em PT; ainda há densidade em telas secundárias. |
 | **Voz & captura** | 6,0 | Fluxo existe; STT depende de VPS (`faster-whisper`); fila/revisão ainda leve. |
 | **Foco & ideias** | 7,5 | Foco pós-sessão; pipeline ideias → tarefa com `source_idea_id`. |
-| **Revisão semanal / metas** | 7,5 | `/api/insights/weekly` + UI automática; metas ainda leves. |
+| **Revisão semanal / metas** | 8,0 | Weekly insights + wizard de metas com vínculo obrigatório. |
 | **Operação (deploy, alias, API)** | 7,0 | Vercel + VPS estável; documentação de ondas boa. |
 
 ## O que já “segura o dia”
