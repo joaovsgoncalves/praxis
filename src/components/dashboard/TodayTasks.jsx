@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkFromElement } from '@/lib/celebration';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
+import { sortPendingWithOverdueFirst } from '@/lib/taskListFilters';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -39,7 +40,10 @@ export default function TodayTasks({
   const isDone = (task) => task.status === 'completed' || task.status === 'done';
   const completedOn = (task) =>
     task.completed_date || String(task.completed_at || task.updated_date || '').slice(0, 10);
-  const pending = tasks.filter((t) => !isDone(t));
+  const pending = sortPendingWithOverdueFirst(
+    tasks.filter((t) => !isDone(t)),
+    today,
+  );
   const completed = tasks.filter((t) => isDone(t));
   const overdueCount = pending.filter((t) => t.date && today && t.date < today).length;
   const cleanedOverdueCount = completed.filter(

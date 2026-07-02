@@ -17,3 +17,17 @@ export function stripQueryParam(searchParams, key) {
   next.delete(key);
   return next;
 }
+
+const TASK_SCOPES = new Set(['today', 'week', 'overdue', 'all']);
+
+export function taskScopeFromSearchParams(searchParams) {
+  const scope = searchParams.get('scope');
+  return TASK_SCOPES.has(scope) ? scope : 'today';
+}
+
+export function setTaskScopeInSearchParams(searchParams, scope) {
+  const next = new URLSearchParams(searchParams);
+  if (!scope || scope === 'today') next.delete('scope');
+  else next.set('scope', scope);
+  return next;
+}

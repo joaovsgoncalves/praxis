@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
@@ -17,12 +17,14 @@ import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
 import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
+import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder } from '@/lib/taskReorder';
-import { isTaskRelevantForTodayList } from '@/lib/tasks';
+import { isTaskOpen } from '@/lib/tasks';
 import {
   HABIT_STATUS_LABELS,
   formatFrequencyLabel,
@@ -31,8 +33,17 @@ import {
   todayLogForHabit,
 } from '@/lib/habits';
 import {
+  TASK_SCOPE_CHIPS,
+  filterTasksByScope,
+  sortTasksForList,
+  countOpenOverdue,
+  isTaskOverdue,
+} from '@/lib/taskListFilters';
+import {
   habitTasksTabFromSearchParams,
   setHabitTasksTabInSearchParams,
+  taskScopeFromSearchParams,
+  setTaskScopeInSearchParams,
 } from '@/lib/urlDeepLinks';
 
 function cleanPriorityPrefix(title = '') {
@@ -63,20 +74,34 @@ export default function HabitsTasks() {
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
   const [noiseDialogOpen, setNoiseDialogOpen] = useState(false);
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
+  const [taskSelectionMode, setTaskSelectionMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState(() => new Set());
+  const [taskScope, setTaskScope] = useState(() => taskScopeFromSearchParams(searchParams));
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
 
   useEffect(() => {
     setView(habitTasksTabFromSearchParams(searchParams));
+    setTaskScope(taskScopeFromSearchParams(searchParams));
   }, [searchParams]);
+
+  const handleTaskScopeChange = (scope) => {
+    setTaskScope(scope);
+    setSearchParams(setTaskScopeInSearchParams(searchParams, scope), { replace: true });
+    setSelectedTaskIds(new Set());
+  };
 
   const handleViewChange = (next) => {
     setView(next);
     setSearchParams(setHabitTasksTabInSearchParams(searchParams, next), { replace: true });
   };
 
-  const { data: tasks = [] } = useQuery({ queryKey: ['allTasks', today], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['allTasks', today],
+    queryFn: () => forjaApi.tasks.list({ limit: 50 }),
+  });
   const { data: habits = [] } = useQuery({
     queryKey: ['allHabits', habitStatusFilter],
     queryFn: () => forjaApi.habits.list({ status: habitStatusFilter }),
@@ -200,6 +225,22 @@ export default function HabitsTasks() {
     },
   });
 
+  const bulkArchiveTasks = useMutation({
+    mutationFn: async (ids) => {
+      for (const id of ids) {
+        await forjaApi.tasks.update(id, { status: 'cancelled' });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      setBulkArchiveOpen(false);
+      setTaskSelectionMode(false);
+      setSelectedTaskIds(new Set());
+    },
+  });
+
   const bulkCancelTasks = useMutation({
     mutationFn: async (ids) => {
       for (const id of ids) {
@@ -237,13 +278,36 @@ export default function HabitsTasks() {
     toggleHabit.mutate({ habitId: habit.id, isDone });
   };
 
-  const currentTasks = tasks.filter(t => isTaskRelevantForTodayList(t, today));
+  const scopedTasks = filterTasksByScope(tasks, taskScope, today);
+  const overdueInScope = countOpenOverdue(scopedTasks, today);
 
-  const filteredTasks = currentTasks.filter(t => {
-    if (statusFilter !== 'all' && t.status !== statusFilter) return false;
-    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-    return true;
-  });
+  const filteredTasks = scopedTasks
+    .filter((t) => {
+      if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+      return true;
+    })
+    .sort((a, b) => sortTasksForList(a, b, today));
+
+  const archivableTasks = filteredTasks.filter((t) => isTaskOpen(t));
+
+  const toggleTaskSelected = (id) => {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openBulkArchive = () => {
+    const pool =
+      selectedTaskIds.size > 0
+        ? archivableTasks.filter((t) => selectedTaskIds.has(t.id))
+        : archivableTasks;
+    if (pool.length === 0) return;
+    setBulkArchiveOpen(true);
+  };
 
   const filteredHabits = habits.filter(h => {
     if (categoryFilter !== 'all' && h.category !== categoryFilter) return false;
@@ -290,6 +354,12 @@ export default function HabitsTasks() {
     deleteHabit.mutate(habit.id);
   };
 
+  const todayRadarCount = filterTasksByScope(tasks, 'today', today).length;
+  const bulkArchivePool =
+    selectedTaskIds.size > 0
+      ? archivableTasks.filter((t) => selectedTaskIds.has(t.id))
+      : archivableTasks;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 overflow-x-hidden px-0.5">
       <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
@@ -298,7 +368,7 @@ export default function HabitsTasks() {
             <p className="forja-kicker hidden lg:block">Painel operacional</p>
             <h1 className="forja-title hidden text-3xl font-bold sm:text-4xl lg:block">Hábitos & Tarefas</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Só o dia de hoje no radar — pendentes com data de hoje e o que você concluiu agora.
+              Chips Hoje / Semana / Atrasadas / Todas — arquive em lote o que não vale mais.
             </p>
           </div>
 
@@ -319,7 +389,7 @@ export default function HabitsTasks() {
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
             <p className="forja-kicker">Hoje</p>
-            <p className="mt-1 text-2xl font-semibold">{currentTasks.length}</p>
+            <p className="mt-1 text-2xl font-semibold">{todayRadarCount}</p>
             <p className="text-xs text-muted-foreground">tarefas no radar</p>
           </div>
           <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
@@ -342,7 +412,7 @@ export default function HabitsTasks() {
           <Tabs value={view} onValueChange={handleViewChange}>
             <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-black/20 p-1 flex-nowrap">
               <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="all">Todos</TabsTrigger>
-              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="tasks">Tarefas ({currentTasks.length})</TabsTrigger>
+              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="tasks">Tarefas ({filteredTasks.length})</TabsTrigger>
               <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="habits">Hábitos ({habits.length})</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -411,16 +481,68 @@ export default function HabitsTasks() {
               <div>
                 <p className="forja-kicker">Execução</p>
                 <h2 className="forja-title text-2xl font-semibold">Tarefas</h2>
+                {overdueInScope > 0 && (
+                  <p className="text-xs text-destructive mt-1">
+                    {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste filtro
+                  </p>
+                )}
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="pending">Pendentes</SelectItem>
-                  <SelectItem value="completed">Concluídas</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant={taskSelectionMode ? 'secondary' : 'outline'}
+                  size="sm"
+                  className="h-9 rounded-full"
+                  onClick={() => {
+                    setTaskSelectionMode((v) => !v);
+                    setSelectedTaskIds(new Set());
+                  }}
+                >
+                  {taskSelectionMode ? 'Pronto' : 'Selecionar'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-full gap-1"
+                  disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
+                  onClick={openBulkArchive}
+                >
+                  <Archive className="h-4 w-4" />
+                  Arquivar
+                </Button>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="completed">Concluídas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            <div className="praxis-scroll-x flex gap-2 pb-1">
+              {TASK_SCOPE_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => handleTaskScopeChange(chip.id)}
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-medium transition-colors shrink-0',
+                    taskScope === chip.id
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                      : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground',
+                  )}
+                >
+                  {chip.label}
+                  {chip.id === 'overdue' && countOpenOverdue(tasks, today) > 0
+                    ? ` (${countOpenOverdue(tasks, today)})`
+                    : ''}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">Lista carrega até 50 tarefas recentes da API.</p>
 
             {filteredTasks.length === 0 ? (
               <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhuma tarefa encontrada</CardContent></Card>
@@ -434,6 +556,14 @@ export default function HabitsTasks() {
                         compact ? 'p-2.5 sm:p-3' : 'flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5',
                       )}
                     >
+                      {taskSelectionMode && isTaskOpen(task) && (
+                        <Checkbox
+                          checked={selectedTaskIds.has(task.id)}
+                          onCheckedChange={() => toggleTaskSelected(task.id)}
+                          className="shrink-0"
+                          aria-label="Selecionar para arquivar"
+                        />
+                      )}
                       <button
                         onClick={() => toggleTask.mutate(task)}
                         className="praxis-touch-target shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"
@@ -468,6 +598,11 @@ export default function HabitsTasks() {
                           </Badge>
                           <CategoryBadge category={task.category} />
                           <TaskRecurrenceBadge task={task} allTasks={tasks} className="shrink-0" />
+                          {isTaskOverdue(task, today) && (
+                            <Badge variant="destructive" className="text-[10px] shrink-0">
+                              Atrasada
+                            </Badge>
+                          )}
                         </div>
                         {!compact && task.date && (
                           <div className="mt-1.5 flex flex-wrap gap-2">
@@ -686,6 +821,14 @@ export default function HabitsTasks() {
           )}
         </DialogContent>
       </Dialog>
+
+      <TaskBulkArchiveDialog
+        open={bulkArchiveOpen}
+        onOpenChange={setBulkArchiveOpen}
+        tasks={bulkArchivePool}
+        busy={bulkArchiveTasks.isPending}
+        onConfirm={(ids) => bulkArchiveTasks.mutate(ids)}
+      />
 
       <NoiseCleanupDialog
         open={noiseDialogOpen}

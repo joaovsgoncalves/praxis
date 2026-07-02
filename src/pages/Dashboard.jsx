@@ -33,7 +33,12 @@ import { isHabitDueOnDate } from '@/lib/habits';
 import { buildDragOrder } from '@/lib/taskReorder';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
-import { isTaskCompletedForToday, isTaskDone, sortTodayRelevantTasks } from '@/lib/tasks';
+import { isTaskCompletedForToday, isTaskDone, isTaskOpen } from '@/lib/tasks';
+import {
+  countOpenOverdue,
+  sortTasksForList,
+} from '@/lib/taskListFilters';
+import OverdueTasksBanner from '@/components/dashboard/OverdueTasksBanner';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
 // in its semantic color (defined via .card-domain in index.css).
@@ -68,13 +73,26 @@ export default function Dashboard() {
 
   const { data: allTasks = [] } = useQuery({
     queryKey: ['dashboardTasks', today],
-    queryFn: () => forjaApi.tasks.list({ limit: 200 }),
+    queryFn: () => forjaApi.tasks.list({ limit: 50 }),
   });
+
+  const overdueOpenCount = React.useMemo(
+    () => countOpenOverdue(allTasks, today),
+    [allTasks, today],
+  );
 
   const tasks = React.useMemo(() => {
     return allTasks
-      .filter(task => task.date === today || isTaskCompletedForToday(task, today))
-      .sort(sortTodayRelevantTasks);
+      .filter((task) => {
+        if (task.status === 'cancelled') return false;
+        if (isTaskOpen(task)) {
+          const d = (task.date || '').slice(0, 10);
+          if (!d) return false;
+          return d <= today;
+        }
+        return isTaskCompletedForToday(task, today);
+      })
+      .sort((a, b) => sortTasksForList(a, b, today));
   }, [allTasks, today]);
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],
@@ -196,6 +214,7 @@ export default function Dashboard() {
       <OfflineBanner />
       <PwaInstallBanner />
       <CapturePendingBanner />
+      <OverdueTasksBanner count={overdueOpenCount} />
 
       <HeroDay
         habitsDone={completedHabits}

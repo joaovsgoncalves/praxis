@@ -297,7 +297,7 @@ Plano **ondas 19–24** + fase de uso: `docs/PLANO-PRAXIS-POS-18.md`
 Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`  
 **Onda 19:** `docs/ONDA-19-SMOKE.md`  
 **Onda 20:** `docs/ONDA-20-OPERACAO.md`  
-**Onda 21:** `docs/ONDA-21-VOZ-UX.md`
+**Onda 22:** `docs/ONDA-22-LISTA.md`
 
 ---
 

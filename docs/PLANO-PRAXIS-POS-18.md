@@ -99,10 +99,10 @@ Ver `docs/ONDA-21-VOZ-UX.md`.
 
 | ID | Entrega | Critério done |
 |----|---------|----------------|
-| P22-T01 | Ação “**Arquivar atrasadas**” (> N dias) com confirmação | Bulk API existente ou novo endpoint |
-| P22-T02 | Filtro rápido Hoje / Atrasadas / Sem data na lista tarefas | Já parcial; unificar UX |
-| P22-T03 | Dashboard: link “ver todas atrasadas” → filtro pronto | 1 clique |
-| P22-T04 | Doc curto: quando usar arquivar vs concluir | `docs/PRAXIS-LISTA-LIMPA.md` |
+| P22-T01 | Multi-seleção + **Arquivar** com confirmação | **done** |
+| P22-T02 | Chips Hoje / Semana / Atrasadas / Todas | **done** |
+| P22-T03 | Atrasadas no topo + banner no Hoje | **done** |
+| P22-T04 | `limit: 50` + doc arquivar vs concluir | **done** |
 
 **Nota esperada:** hábitos/tarefas **9,2**.
 

@@ -1,6 +1,6 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após onda 21** · `docs/ONDA-21-VOZ-UX.md`
+**Data:** 2026-07-02 · **Após onda 22** · `docs/ONDA-22-LISTA.md`
 
 ## Notas (duas leituras)
 
@@ -14,7 +14,7 @@
 | Dimensão | Nota | Evidência |
 |----------|------|-----------|
 | **Clareza do dia (cockpit)** | 9,0 | Agora + evitando + PraxIA |
-| **Hábitos & tarefas** | 9,0 | Smoke recorrência + `next_occurrence` |
+| **Hábitos & tarefas** | 9,2 | Chips + arquivar em lote + atrasadas |
 | **Auth & confiança** | 9,0 | Login prod; API 401 anônima |
 | **UX / marca Praxis** | 8,5 | PWA; uso mobile = você |
 | **Voz & captura** | 9,0 | Fases UX + fila no Hoje + revisar capturas |
