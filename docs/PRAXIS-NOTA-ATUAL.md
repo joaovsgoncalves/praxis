@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 6 — Modo Foco** (modal pós-sessão + copy PT + legenda 30 dias).
+**Onda 7 — Ideias** (status + transformar em tarefa).
 
 ---
