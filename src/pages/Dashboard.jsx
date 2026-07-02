@@ -39,6 +39,8 @@ import {
   sortTasksForList,
 } from '@/lib/taskListFilters';
 import OverdueTasksBanner from '@/components/dashboard/OverdueTasksBanner';
+import SuggestedGoalCard from '@/components/dashboard/SuggestedGoalCard';
+import OpeningRitualCollapsible from '@/components/dashboard/OpeningRitualCollapsible';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
 // in its semantic color (defined via .card-domain in index.css).
@@ -234,6 +236,9 @@ export default function Dashboard() {
         onVoiceCapture={() => navigate('/captura')}
         onAddTask={() => setShowNewTaskForm(true)}
       />
+
+      <OpeningRitualCollapsible />
+      <SuggestedGoalCard />
 
       <WeeklyReviewPrompt />
 

@@ -114,9 +114,9 @@ Ver `docs/ONDA-21-VOZ-UX.md`.
 
 | ID | Entrega | Critério done |
 |----|---------|----------------|
-| P23-T01 | Wizard meta: sugerir **1 meta ativa** se zero (template RCA / Encarte / corpo) | Opcional dismiss |
-| P23-T02 | Ritual abertura 3 min no **Hoje** (card colapsável) | 1 preset default |
-| P23-T03 | Revisão semanal: botão “criar 3 tarefas da semana” a partir do insight | Reduz fricção pós-wizard |
+| P23-T01 | Wizard: sugerir 1 meta se zero (RCA / Encarte / corpo) | **done** |
+| P23-T02 | Ritual abertura 3 min no Hoje (colapsável) | **done** |
+| P23-T03 | Revisão: criar 3 tarefas da semana | **done** |
 
 ---
 

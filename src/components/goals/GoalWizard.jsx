@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 const steps = ['Meta', 'Prazo', 'Vínculo'];
 
-export default function GoalWizard({ onSubmit, onCancel, busy }) {
+export default function GoalWizard({ onSubmit, onCancel, busy, preset = null }) {
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -17,6 +17,17 @@ export default function GoalWizard({ onSubmit, onCancel, busy }) {
   const [category, setCategory] = useState('personal');
   const [linkType, setLinkType] = useState('task');
   const [linkTitle, setLinkTitle] = useState('');
+
+  useEffect(() => {
+    if (!preset) return;
+    setTitle(preset.title || '');
+    setDescription(preset.description || '');
+    setDeadline(preset.deadline || '');
+    setTimeframe(preset.timeframe || 'short');
+    setCategory(preset.category || 'personal');
+    setLinkType(preset.initial_link?.type || 'task');
+    setLinkTitle(preset.initial_link?.title || '');
+  }, [preset]);
 
   const canNext0 = title.trim().length >= 2;
   const canNext1 = Boolean(deadline);

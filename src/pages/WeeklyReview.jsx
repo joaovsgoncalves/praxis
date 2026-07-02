@@ -4,10 +4,11 @@ import { forjaApi } from '@/api/forjaClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2 } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2, ListChecks } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { pickWeeklyTaskTitles, taskDatesForNextWeek } from '@/lib/weeklyReviewTasks';
 
 const SCORE_OPTIONS = [
   { value: 1, emoji: '😞', label: 'Difícil' },
@@ -89,6 +90,36 @@ export default function WeeklyReview() {
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewHistory'] });
       setForm(empty);
     },
+  });
+
+  const createWeekTasksMutation = useMutation({
+    mutationFn: async () => {
+      const suggested = auto?.suggested_priorities || [];
+      const titles = pickWeeklyTaskTitles({
+        suggestedPriorities: suggested,
+        nextWeekFocus: form.next_week_focus,
+      });
+      const dates = taskDatesForNextWeek(weekStart);
+      const created = [];
+      for (let i = 0; i < titles.length; i++) {
+        const t = await forjaApi.tasks.create({
+          title: titles[i],
+          date: dates[i],
+          status: 'pending',
+          priority: i === 0 ? 'high' : 'medium',
+          category: 'pessoal',
+          source: 'weekly_review',
+        });
+        created.push(t);
+      }
+      return created;
+    },
+    onSuccess: (created) => {
+      toast.success(`${created.length} tarefa(s) criadas para a próxima semana`);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+    },
+    onError: () => toast.error('Não foi possível criar as tarefas'),
   });
 
   const applyDrafts = () => {
@@ -184,6 +215,18 @@ export default function WeeklyReview() {
               <Button type="button" variant="secondary" size="sm" className="rounded-full" onClick={applyDrafts}>
                 <Wand2 className="mr-1.5 h-4 w-4" />
                 Preencher campos vazios com rascunho
+              </Button>
+
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                className="rounded-full ml-0 sm:ml-2"
+                disabled={createWeekTasksMutation.isPending || !auto}
+                onClick={() => createWeekTasksMutation.mutate()}
+              >
+                <ListChecks className="mr-1.5 h-4 w-4" />
+                {createWeekTasksMutation.isPending ? 'Criando…' : 'Criar 3 tarefas da semana'}
               </Button>
             </>
           ) : (

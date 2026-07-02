@@ -1,6 +1,6 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após onda 22** · `docs/ONDA-22-LISTA.md`
+**Data:** 2026-07-02 · **Após onda 23** · `docs/ONDA-23-METAS-RITUAIS.md`
 
 ## Notas (duas leituras)
 
@@ -19,7 +19,7 @@
 | **UX / marca Praxis** | 8,5 | PWA; uso mobile = você |
 | **Voz & captura** | 9,0 | Fases UX + fila no Hoje + revisar capturas |
 | **Foco & ideias** | 8,0 | Fora do smoke |
-| **Revisão semanal / metas** | 8,5 | weekly OK |
+| **Revisão semanal / metas** | 9,2 | 3 tarefas da semana + templates meta |
 | **Operação** | 9,6 | Backup + health cron + drift check |
 
 ## Confiança 9,5+ (só uso)

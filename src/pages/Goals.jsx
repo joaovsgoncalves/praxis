@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,13 +14,19 @@ import { format } from 'date-fns';
 import GoalWizard from '@/components/goals/GoalWizard';
 import { computeGoalProgress, goalProgressDetail } from '@/lib/goalProgress';
 import { fortalezaDateKey } from '@/lib/dates';
+import {
+  GOAL_STARTER_TEMPLATES,
+  goalPayloadFromStarter,
+} from '@/lib/goalStarterTemplates';
 
 const timeframeLabels = { short: 'Curto prazo', medium: 'Médio prazo', long: 'Longo prazo' };
 const categoryLabels = { personal: 'Pessoal', professional: 'Profissional', health: 'Saúde', finance: 'Financeiro', learning: 'Aprendizado', other: 'Outro' };
 const statusLabels = { active: 'Ativa', paused: 'Pausada', completed: 'Concluída', abandoned: 'Abandonada' };
 
 export default function Goals() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardPreset, setWizardPreset] = useState(null);
   const [filter, setFilter] = useState('all');
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
@@ -39,6 +46,7 @@ export default function Goals() {
       queryClient.invalidateQueries({ queryKey: ['goalTasks'] });
       queryClient.invalidateQueries({ queryKey: ['goalHabits'] });
       setShowWizard(false);
+      setWizardPreset(null);
     },
   });
 
@@ -54,6 +62,18 @@ export default function Goals() {
 
   const filtered = goals.filter((g) => filter === 'all' || g.timeframe === filter);
   const activeGoals = goals.filter((g) => g.status === 'active');
+
+  useEffect(() => {
+    const starter = searchParams.get('starter');
+    const payload = starter ? goalPayloadFromStarter(starter) : null;
+    if (!payload) return;
+    setWizardPreset(payload);
+    setShowWizard(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('starter');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const completedGoals = goals.filter((g) => g.status === 'completed');
   const averageProgress = goals.length
     ? Math.round(
@@ -116,8 +136,23 @@ export default function Goals() {
           <CardContent className="flex flex-col items-center gap-3 px-5 py-12 text-center sm:py-16">
             <Target className="h-10 w-10 text-primary" />
             <p className="text-lg font-semibold">Primeira meta em 3 passos</p>
-            <p className="max-w-md text-sm text-muted-foreground">Meta → prazo → tarefa ou hábito. O menu Metas só aparece quando você tiver meta ativa.</p>
-            <Button onClick={() => setShowWizard(true)} className="rounded-full">
+            <p className="max-w-md text-sm text-muted-foreground">Meta → prazo → tarefa ou hábito. Ou use um template abaixo.</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {GOAL_STARTER_TEMPLATES.map((t) => (
+                <Button
+                  key={t.id}
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => {
+                    setWizardPreset(goalPayloadFromStarter(t.id));
+                    setShowWizard(true);
+                  }}
+                >
+                  {t.emoji} {t.label}
+                </Button>
+              ))}
+            </div>
+            <Button onClick={() => { setWizardPreset(null); setShowWizard(true); }} className="rounded-full">
               <Plus className="mr-1.5 h-4 w-4" /> Começar wizard
             </Button>
           </CardContent>
@@ -183,14 +218,15 @@ export default function Goals() {
         </div>
       )}
 
-      <Dialog open={showWizard} onOpenChange={setShowWizard}>
+      <Dialog open={showWizard} onOpenChange={(v) => { setShowWizard(v); if (!v) setWizardPreset(null); }}>
         <DialogContent className="border-border bg-card sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Nova meta guiada</DialogTitle>
           </DialogHeader>
           <GoalWizard
             busy={createGoal.isPending}
-            onCancel={() => setShowWizard(false)}
+            preset={wizardPreset}
+            onCancel={() => { setShowWizard(false); setWizardPreset(null); }}
             onSubmit={(payload) => createGoal.mutate(payload)}
           />
         </DialogContent>

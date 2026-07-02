@@ -298,7 +298,8 @@ Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
 **Onda 19:** `docs/ONDA-19-SMOKE.md`  
 **Onda 20:** `docs/ONDA-20-OPERACAO.md`  
 **Onda 21:** `docs/ONDA-21-VOZ-UX.md`  
-**Onda 22:** `docs/ONDA-22-LISTA.md`
+**Onda 22:** `docs/ONDA-22-LISTA.md`  
+**Onda 23:** `docs/ONDA-23-METAS-RITUAIS.md`
 
 ---
 
