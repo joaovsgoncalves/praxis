@@ -59,7 +59,11 @@ fi
 # Rotation — keep last N files in each tier.
 keep_last() {
   local dir="$1" keep="$2"
-  ls -1t "$dir"/forja-*.db.gz 2>/dev/null | tail -n +"$((keep + 1))" | xargs -r rm -f
+  shopt -s nullglob
+  local files=("$dir"/forja-*.db.gz)
+  shopt -u nullglob
+  if ((${#files[@]} <= keep)); then return 0; fi
+  ls -1t "${files[@]}" 2>/dev/null | tail -n +"$((keep + 1))" | xargs -r rm -f
 }
 keep_last "$BACKUP_DIR/daily"   7
 keep_last "$BACKUP_DIR/weekly"  4
