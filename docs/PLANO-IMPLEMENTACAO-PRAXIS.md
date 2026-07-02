@@ -162,9 +162,9 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P10-T01 | Esconder Rituais no menu se `rituals.active === 0` | S | Sidebar | todo |
-| P10-T02 | Templates iniciais: abertura do dia / fechamento (opcional criar 2 presets) | M | Rituais.jsx | todo |
-| P10-T03 | Revisão semanal escondida até Fase 8 entregar valor | S | Nav condicional | todo |
+| P10-T01 | Esconder Rituais no menu se `rituals.active === 0` | S | Sidebar | **done** |
+| P10-T02 | Templates iniciais: abertura do dia / fechamento (opcional criar 2 presets) | M | Rituais.jsx | **done** |
+| P10-T03 | Revisão semanal escondida até Fase 8 entregar valor | S | Nav condicional | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **9** | (este commit) | Metas wizard + nav condicional |
+| 2026-07-02 | **10** | (este commit) | Rituais presets + nav condicional |
+| 2026-07-02 | **9** | `e96cb02` | Metas wizard + nav condicional |
 | 2026-07-02 | **8** | `d2e8623` | Revisão semanal automática |
 | 2026-07-02 | **7** | `5a8a1ad` | Ideias — status + virar tarefa |
 | 2026-07-02 | **6** | `55b64d1` | Modo Foco — pós-sessão + copy PT |

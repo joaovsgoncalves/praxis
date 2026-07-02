@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { forjaApi } from '@/api/forjaClient';
-import { Link2, Sparkles, Flame, CheckCircle2, Trash2 } from 'lucide-react';
+import { Link2, Sparkles, Flame, CheckCircle2, Trash2, Sun, Moon } from 'lucide-react';
+import { RITUAL_TEMPLATES } from '@/lib/ritualTemplates';
 
 const timeOptions = [
   { value: 'morning', label: 'Manhã', emoji: '🌅' },
@@ -85,6 +86,15 @@ export default function Rituais() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rituals'] }),
   });
 
+  const templateMutation = useMutation({
+    mutationFn: (templateId) => forjaApi.rituals.fromTemplate(templateId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rituals'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['rituals', 'nav'] });
+    },
+  });
+
   const toggleHabit = (habitId) => {
     setSelectedHabits((current) => (
       current.includes(habitId)
@@ -107,6 +117,32 @@ export default function Rituais() {
             Sequências guiadas por período do dia, com modo mínimo para dias pesados.
           </p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {RITUAL_TEMPLATES.map((tpl) => (
+          <Card key={tpl.id} className="border-primary/20 bg-primary/5">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{tpl.emoji}</span>
+                <div>
+                  <h2 className="text-sm font-semibold">{tpl.title}</h2>
+                  <p className="text-[11px] text-muted-foreground">{tpl.period}</p>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">{tpl.description}</p>
+              <Button
+                className="w-full rounded-full"
+                variant="secondary"
+                disabled={templateMutation.isPending}
+                onClick={() => templateMutation.mutate(tpl.id)}
+              >
+                {tpl.id === 'day_open' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                Instalar preset
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -204,10 +240,12 @@ export default function Rituais() {
           <CardContent className="space-y-3">
             {loadingRituals && <p className="text-sm text-muted-foreground">Carregando rituais...</p>}
             {!loadingRituals && rituals.length === 0 && (
-              <div className="text-center py-10 space-y-2">
-                <Sparkles className="w-8 h-8 text-muted-foreground/50 mx-auto" />
-                <p className="text-sm text-muted-foreground">Nenhum ritual configurado ainda.</p>
-                <p className="text-xs text-muted-foreground/70">Comece com 1 ritual de 3 passos. Simples vence perfeito.</p>
+              <div className="space-y-3 py-10 text-center">
+                <Sparkles className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">Nenhum ritual ativo.</p>
+                <p className="text-xs text-muted-foreground/70">
+                  Use os presets acima ou monte o seu. O item <strong>Rituais</strong> volta no menu quando houver um ativo.
+                </p>
               </div>
             )}
 

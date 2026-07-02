@@ -1767,6 +1767,73 @@ app.get('/api/rituals/:id/progress', (req, res) => {
   });
 });
 
+const RITUAL_TEMPLATES = {
+  day_open: {
+    name: 'Abertura do dia',
+    emoji: '🌅',
+    time_of_day: 'morning',
+    habitTitles: ['Água ao acordar', '5 min de movimento', 'Uma prioridade para hoje'],
+  },
+  day_close: {
+    name: 'Fechamento do dia',
+    emoji: '🌙',
+    time_of_day: 'evening',
+    habitTitles: ['Revisar o dia (2 min)', 'Preparar o amanhã', 'Desligar telas'],
+  },
+};
+
+function findOrCreateHabitForTemplate(title) {
+  const existing = db.prepare("SELECT id FROM habits WHERE title = ? AND status = 'active' LIMIT 1").get(title);
+  if (existing) return existing.id;
+  const id = randomUUID();
+  const sort = nextSortOrder('habits');
+  db.prepare(`
+    INSERT INTO habits (id, title, frequency, category, status, sort_order, source)
+    VALUES (?, ?, 'daily', 'wellness', 'active', ?, 'ritual_template')
+  `).run(id, title, sort);
+  return id;
+}
+
+// POST /api/rituals/from-template — presets abertura/fechamento (onda 10)
+app.post('/api/rituals/from-template', (req, res) => {
+  try {
+    const templateId = req.body?.template;
+    const tpl = RITUAL_TEMPLATES[templateId];
+    if (!tpl) {
+      return res.status(400).json({ error: 'Unknown template', code: 'invalid_template' });
+    }
+
+    const existing = db.prepare(
+      "SELECT * FROM rituals WHERE name = ? AND status = 'active' LIMIT 1",
+    ).get(tpl.name);
+    if (existing) {
+      const habitIds = JSON.parse(existing.habits_order || '[]');
+      return res.status(200).json({
+        ritual: { ...existing, habits_order: habitIds },
+        created: false,
+        message: 'Ritual já existe',
+      });
+    }
+
+    const habitIds = tpl.habitTitles.map((t) => findOrCreateHabitForTemplate(t));
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO rituals (id, name, emoji, time_of_day, habits_order, status)
+      VALUES (?, ?, ?, ?, ?, 'active')
+    `).run(id, tpl.name, tpl.emoji, tpl.time_of_day, JSON.stringify(habitIds));
+
+    const ritual = db.prepare('SELECT * FROM rituals WHERE id = ?').get(id);
+    res.status(201).json({
+      ritual: { ...ritual, habits_order: habitIds },
+      created: true,
+      habits_created: habitIds.length,
+    });
+  } catch (err) {
+    console.error('[rituals/from-template]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/rituals', (req, res) => {
   const id = randomUUID();
   const { name, emoji = '🔗', time_of_day = 'morning', habits_order = [] } = req.body;

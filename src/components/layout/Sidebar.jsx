@@ -11,9 +11,9 @@ const navItems = [
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
   { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
-  { path: '/rituais', label: 'Rituais', icon: Link2 },
+  { path: '/rituais', label: 'Rituais', icon: Link2, requiresActiveRituals: true },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
-  { path: '/revisao-semanal', label: 'Revisão Semanal', icon: BookOpen },
+  { path: '/revisao-semanal', label: 'Revisão Semanal', icon: BookOpen, requiresWeeklyReviewValue: true },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
@@ -92,8 +92,36 @@ export default function Sidebar({ open, onClose }) {
   });
   const activeGoalCount = goals.filter((g) => g.status === 'active').length;
 
+  const { data: rituals = [] } = useQuery({
+    queryKey: ['rituals', 'nav'],
+    queryFn: () => forjaApi.rituals.list({ status: 'active' }),
+    staleTime: 60_000,
+  });
+  const activeRitualCount = rituals.length;
+
+  const { data: weeklyReviews = [] } = useQuery({
+    queryKey: ['weeklyReviews', 'nav'],
+    queryFn: () => forjaApi.weeklyReviews.list(1),
+    staleTime: 120_000,
+  });
+
+  const { data: weeklyInsight } = useQuery({
+    queryKey: ['insights', 'weekly', 'nav'],
+    queryFn: () => forjaApi.insights.weekly(),
+    staleTime: 300_000,
+    enabled: weeklyReviews.length === 0,
+  });
+
+  const weeklyReviewNavVisible =
+    weeklyReviews.length > 0
+    || (weeklyInsight?.victories?.tasks_completed ?? 0) > 0
+    || (weeklyInsight?.victories?.habit_done ?? 0) > 0
+    || (weeklyInsight?.ideas?.new_captures ?? 0) > 0;
+
   const visibleNav = navItems.filter((item) => {
     if (item.requiresActiveGoals) return activeGoalCount > 0;
+    if (item.requiresActiveRituals) return activeRitualCount > 0;
+    if (item.requiresWeeklyReviewValue) return weeklyReviewNavVisible;
     return true;
   });
 

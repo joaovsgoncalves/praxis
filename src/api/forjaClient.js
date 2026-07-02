@@ -188,6 +188,8 @@ export const forjaApi = {
     create: (data) => request('/api/rituals', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/api/rituals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id) => request(`/api/rituals/${id}`, { method: 'DELETE' }),
+    fromTemplate: (template) =>
+      request('/api/rituals/from-template', { method: 'POST', body: JSON.stringify({ template }) }),
   },
 
   // Goals
