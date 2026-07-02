@@ -67,16 +67,10 @@ keep_last "$BACKUP_DIR/monthly" 12
 
 BYTES=$(stat -c%s "$DAILY_FILE.gz" 2>/dev/null || echo 0)
 DAILY_NAME="forja-${TS}.db.gz"
-if command -v node >/dev/null 2>&1; then
-  node -e "
-const fs=require('fs');
-const meta={at:new Date().toISOString(),daily:process.argv[1],bytes:Number(process.argv[2]),backup_dir:process.argv[3]};
-fs.writeFileSync(process.argv[4], JSON.stringify(meta,null,2));
-" "$DAILY_NAME" "$BYTES" "$BACKUP_DIR" "$BACKUP_DIR/last-backup.json"
-else
-  echo "{\"at\":\"$(date -Iseconds)\",\"daily\":\"$DAILY_NAME\",\"bytes\":$BYTES}" > "$BACKUP_DIR/last-backup.json"
-fi
-echo "[praxis-backup] meta: $BACKUP_DIR/last-backup.json"
+META_FILE="$BACKUP_DIR/last-backup.json"
+# argv após node -e é inconsistente entre versões — gravamos JSON via shell
+printf '%s\n' "{\"at\":\"$(date -Iseconds)\",\"daily\":\"$DAILY_NAME\",\"bytes\":${BYTES},\"backup_dir\":\"$BACKUP_DIR\"}" > "$META_FILE"
+echo "[praxis-backup] meta: $META_FILE"
 
 # Optional offsite copy via rclone (e.g. RCLONE_REMOTE=gdrive:/forja-backups).
 if [ -n "$RCLONE_REMOTE" ] && command -v rclone >/dev/null 2>&1; then
