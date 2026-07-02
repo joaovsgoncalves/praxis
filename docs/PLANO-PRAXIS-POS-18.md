@@ -84,10 +84,12 @@ Ver `docs/ONDA-20-OPERACAO.md`. Operação **~9,6**.
 
 | ID | Entrega | Critério done |
 |----|---------|----------------|
-| P21-T01 | Tela captura: estados claros (gravando / enviando / transcrevendo / falhou) | Copy PT, sem spinner genérico |
-| P21-T02 | Toast ou badge quando STT termina em background (poll `pending-count`) | Dashboard reage |
-| P21-T03 | `/capturas`: retry em 1 toque + mensagem **por que** falhou (timeout, sem áudio, STT) | Sem “erro genérico” |
-| P21-T04 | Limite de tamanho/duração áudio com mensagem antes do upload | Menos fila zumbi |
+| P21-T01 | Tela captura: estados claros | **done** |
+| P21-T02 | Toast/badge `pending-count` no Dashboard | **done** |
+| P21-T03 | `/capturas` retry + mensagem por que falhou | **done** |
+| P21-T04 | Limite áudio antes do upload | **done** |
+
+Ver `docs/ONDA-21-VOZ-UX.md`.
 
 ---
 

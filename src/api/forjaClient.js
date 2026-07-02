@@ -225,7 +225,22 @@ export const forjaApi = {
     },
     pendingCount: () => request('/api/captures/pending-count'),
     get: (id) => request(`/api/captures/${id}`),
-    retry: (id) => request(`/api/captures/${id}/retry`, { method: 'POST', body: '{}' }),
+    retry: async (id) => {
+      const res = await fetch(`${FORJA_API}/api/captures/${id}/retry`, {
+        method: 'POST',
+        body: '{}',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(body.detail || body.error || 'Retry failed');
+        err.status = res.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    },
     saveParsed: (id, parsedItems) =>
       request(`/api/captures/${id}`, {
         method: 'PATCH',

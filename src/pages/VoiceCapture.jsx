@@ -7,23 +7,41 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mic, Square, Loader2, Check, X, Sparkles, ArrowLeft, Inbox } from 'lucide-react';
+import { Mic, Square, Loader2, Check, X, Sparkles, ArrowLeft, Inbox, Upload, FileAudio } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import {
+  VOICE_CAPTURE_MAX_BYTES,
+  VOICE_CAPTURE_MAX_DURATION_MS,
+  VOICE_CAPTURE_WARN_DURATION_MS,
+  formatBytes,
+  validateVoiceBlob,
+} from '@/lib/voiceCaptureLimits';
+import { humanizeCaptureError } from '@/lib/captureErrorMessage';
+
+const PHASE_COPY = {
+  sending: { icon: Upload, title: 'Enviando áudio…', hint: 'Conexão com o servidor.' },
+  transcribing: { icon: FileAudio, title: 'Transcrevendo…', hint: 'Até 2 tentativas no servidor (pode levar ~1 min).' },
+  parsing: { icon: Sparkles, title: 'Organizando tarefas…', hint: 'IA separa hábitos e tarefas do texto.' },
+  loading_capture: { icon: Loader2, title: 'Carregando captura…', hint: 'Buscando gravação salva.' },
+};
 
 export default function VoiceCapture() {
   const [searchParams, setSearchParams] = useSearchParams();
   const captureParam = searchParams.get('capture');
 
-  const [recording, setRecording] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [capturePhase, setCapturePhase] = useState('idle'); // idle | recording | sending | transcribing | parsing | loading_capture
   const [items, setItems] = useState([]);
   const [transcription, setTranscription] = useState('');
+  const [errorTitle, setErrorTitle] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [activeCaptureId, setActiveCaptureId] = useState(captureParam || null);
+  const [recordingElapsed, setRecordingElapsed] = useState(0);
   const mediaRecorder = useRef(null);
   const audioChunks = useRef([]);
   const recordingTimeout = useRef(null);
+  const recordingStartedAt = useRef(0);
+  const recordingTick = useRef(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -33,6 +51,17 @@ export default function VoiceCapture() {
     staleTime: 20_000,
   });
   const inboxCount = pending?.count ?? 0;
+
+  const clearError = () => {
+    setErrorTitle('');
+    setErrorMessage('');
+  };
+
+  const setCaptureError = (opts) => {
+    const { title, detail } = humanizeCaptureError(opts);
+    setErrorTitle(title);
+    setErrorMessage(detail);
+  };
 
   const applyParsedItems = useCallback((parseRes) => {
     const parsedItems = (parseRes.items || []).map((item, i) => ({
@@ -44,7 +73,8 @@ export default function VoiceCapture() {
     }));
     setItems(parsedItems);
     if (parsedItems.length === 0) {
-      setErrorMessage('Transcrevi, mas não identifiquei nenhuma tarefa/hábito. Edite o texto e tente de novo mais tarde.');
+      setErrorTitle('Nada identificado');
+      setErrorMessage('Transcrevi, mas não achei tarefa/hábito. Edite o texto ou grave de novo com frases curtas.');
     }
   }, []);
 
@@ -64,8 +94,8 @@ export default function VoiceCapture() {
     if (!captureParam) return;
     let cancelled = false;
     (async () => {
-      setProcessing(true);
-      setErrorMessage('');
+      setCapturePhase('loading_capture');
+      clearError();
       try {
         const cap = await forjaApi.captures.get(captureParam);
         if (cancelled) return;
@@ -75,21 +105,26 @@ export default function VoiceCapture() {
           applyParsedItems({ items: cap.parsed_items });
         } else if (cap.transcript) {
           setTranscription(cap.transcript);
+          setCapturePhase('parsing');
           await runParse(cap.transcript, cap.id);
         } else if (cap.status === 'failed') {
-          setErrorMessage(cap.error_message || 'Esta captura falhou. Abra Revisar capturas para tentar de novo.');
+          setErrorTitle('Captura falhou');
+          setErrorMessage(cap.error_message || 'Use Revisar capturas → Tentar STT de novo.');
         }
-      } catch (e) {
-        if (!cancelled) setErrorMessage('Não encontrei essa captura.');
+      } catch {
+        if (!cancelled) {
+          setErrorTitle('Não encontrada');
+          setErrorMessage('Essa captura não existe mais ou foi arquivada.');
+        }
       } finally {
-        if (!cancelled) setProcessing(false);
+        if (!cancelled) setCapturePhase('idle');
       }
     })();
     return () => { cancelled = true; };
   }, [captureParam, applyParsedItems, runParse]);
 
   const startRecording = async () => {
-    setErrorMessage('');
+    clearError();
     setTranscription('');
     setItems([]);
     setActiveCaptureId(null);
@@ -111,38 +146,56 @@ export default function VoiceCapture() {
 
       mediaRecorder.current.onstop = async () => {
         if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
+        if (recordingTick.current) clearInterval(recordingTick.current);
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunks.current, { type: mimeType || 'audio/webm' });
+        const durationMs = Date.now() - recordingStartedAt.current;
+        const validationError = validateVoiceBlob(blob, durationMs);
+        if (validationError) {
+          setErrorTitle('Áudio inválido');
+          setErrorMessage(validationError);
+          setCapturePhase('idle');
+          return;
+        }
         await processAudio(blob);
       };
 
       mediaRecorder.current.start();
-      setRecording(true);
-      recordingTimeout.current = setTimeout(() => stopRecording(), 90_000);
+      recordingStartedAt.current = Date.now();
+      setRecordingElapsed(0);
+      recordingTick.current = setInterval(() => {
+        setRecordingElapsed(Date.now() - recordingStartedAt.current);
+      }, 500);
+      setCapturePhase('recording');
+      recordingTimeout.current = setTimeout(() => stopRecording(), VOICE_CAPTURE_MAX_DURATION_MS);
     } catch (error) {
       console.error('Microphone error:', error);
+      setErrorTitle('Microfone');
       setErrorMessage(error.message || 'Não consegui acessar o microfone. Verifique a permissão do navegador.');
-      setRecording(false);
+      setCapturePhase('idle');
     }
   };
 
   const stopRecording = () => {
     if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
+    if (recordingTick.current) clearInterval(recordingTick.current);
     if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
       mediaRecorder.current.stop();
     }
-    setRecording(false);
   };
 
   const processAudio = async (blob) => {
-    setProcessing(true);
+    clearError();
+    setCapturePhase('sending');
 
     try {
+      setCapturePhase('transcribing');
       const captureRes = await forjaApi.captures.submitAudio(blob);
       const captureId = captureRes.capture_id || null;
       setActiveCaptureId(captureId);
       const text = captureRes.text || '';
       setTranscription(text);
+      setCapturePhase('parsing');
       await runParse(text, captureId);
       queryClient.invalidateQueries({ queryKey: ['captures'] });
     } catch (error) {
@@ -150,18 +203,11 @@ export default function VoiceCapture() {
       const body = error.body || {};
       const captureId = body.capture_id;
       if (captureId) setActiveCaptureId(captureId);
-      const detail = body.detail || error.message;
-      if (body.exhausted && captureId) {
-        setErrorMessage(
-          `${detail || 'STT falhou.'} A gravação foi salva — abra Revisar capturas para tentar de novo.`,
-        );
-      } else {
-        setErrorMessage(detail || 'Não consegui processar o áudio. Tente de novo em instantes.');
-      }
+      setCaptureError({ status: error.status, body, message: error.message });
       queryClient.invalidateQueries({ queryKey: ['captures'] });
     }
 
-    setProcessing(false);
+    setCapturePhase('idle');
   };
 
   const updateItem = (id, field, value) => {
@@ -214,6 +260,10 @@ export default function VoiceCapture() {
   };
 
   const allConfirmed = items.length > 0 && items.every((i) => i.confirmed);
+  const busy = ['sending', 'transcribing', 'parsing', 'loading_capture'].includes(capturePhase);
+  const phaseMeta = PHASE_COPY[capturePhase];
+  const PhaseIcon = phaseMeta?.icon || Loader2;
+  const recordingWarn = capturePhase === 'recording' && recordingElapsed >= VOICE_CAPTURE_WARN_DURATION_MS;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -237,46 +287,66 @@ export default function VoiceCapture() {
         </Button>
       </div>
 
+      <p className="text-xs text-muted-foreground text-center lg:text-left">
+        Máx. {formatBytes(VOICE_CAPTURE_MAX_BYTES)} · até 90s por gravação
+      </p>
+
       <Card className="bg-card border-border">
         <CardContent className="py-12 flex flex-col items-center gap-6">
           <AnimatePresence mode="wait">
-            {processing ? (
-              <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4">
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                <p className="text-muted-foreground text-sm">Salvando áudio e transcrevendo (até 2 tentativas)…</p>
+            {busy && phaseMeta ? (
+              <motion.div key={capturePhase} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4 text-center">
+                <PhaseIcon className={cn('w-12 h-12 text-primary', capturePhase !== 'loading_capture' && 'animate-pulse')} />
+                <div>
+                  <p className="font-medium text-sm">{phaseMeta.title}</p>
+                  <p className="text-muted-foreground text-xs mt-1">{phaseMeta.hint}</p>
+                </div>
               </motion.div>
-            ) : recording ? (
+            ) : capturePhase === 'recording' ? (
               <motion.div key="recording" initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-4">
                 <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="w-24 h-24 rounded-full bg-destructive/20 flex items-center justify-center">
                   <div className="w-16 h-16 rounded-full bg-destructive/40 flex items-center justify-center">
                     <Mic className="w-8 h-8 text-destructive" />
                   </div>
                 </motion.div>
-                <p className="text-sm text-muted-foreground">Gravando... Fale sobre suas tarefas e hábitos</p>
-                <Button onClick={stopRecording} variant="destructive" size="lg" className="rounded-full">
-                  <Square className="w-4 h-4 mr-2" />Parar
+                <p className="text-sm text-muted-foreground">Gravando — fale tarefas e hábitos em frases curtas</p>
+                <p className="text-xs tabular-nums text-muted-foreground">
+                  {Math.floor(recordingElapsed / 1000)}s / {VOICE_CAPTURE_MAX_DURATION_MS / 1000}s
+                </p>
+                {recordingWarn && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Quase no limite — pare em instantes.</p>
+                )}
+                <Button onClick={stopRecording} variant="destructive" size="lg" className="rounded-full praxis-touch-target">
+                  <Square className="w-4 h-4 mr-2" />Parar e enviar
                 </Button>
               </motion.div>
             ) : (
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={startRecording}
-                  className="praxis-touch-target w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={startRecording}
+                  disabled={busy}
+                  className="praxis-touch-target w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors disabled:opacity-50"
+                >
                   <Mic className="w-10 h-10 text-primary" />
                 </motion.button>
-                <p className="text-sm text-muted-foreground">Toque para gravar. Diga suas tarefas e hábitos.</p>
-                <p className="text-xs text-muted-foreground">Áudio fica na fila do servidor se o STT falhar.</p>
+                <p className="text-sm text-muted-foreground">Toque para gravar</p>
+                <p className="text-xs text-muted-foreground">Se o STT falhar, o áudio fica em Revisar capturas.</p>
               </motion.div>
             )}
           </AnimatePresence>
         </CardContent>
       </Card>
 
-      {errorMessage && (
+      {(errorTitle || errorMessage) && (
         <Card className="bg-destructive/10 border-destructive/30">
           <CardContent className="py-4 space-y-2">
-            <p className="text-sm text-destructive">{errorMessage}</p>
+            {errorTitle && <p className="text-sm font-medium text-destructive">{errorTitle}</p>}
+            <p className="text-sm text-destructive/90">{errorMessage}</p>
             {(activeCaptureId || inboxCount > 0) && (
-              <Button asChild variant="secondary" size="sm">
+              <Button asChild variant="secondary" size="sm" className="praxis-touch-target">
                 <Link to="/capturas">Abrir Revisar capturas</Link>
               </Button>
             )}
@@ -352,7 +422,7 @@ export default function VoiceCapture() {
                       </Select>
                     </div>
                     {!item.confirmed && (
-                      <Button onClick={() => confirmItem(item)} className="w-full bg-primary hover:bg-primary/90" size="sm">
+                      <Button onClick={() => confirmItem(item)} className="w-full bg-primary hover:bg-primary/90 praxis-touch-target" size="sm">
                         <Check className="w-4 h-4 mr-1" />Confirmar
                       </Button>
                     )}
@@ -365,7 +435,7 @@ export default function VoiceCapture() {
           {allConfirmed && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-4">
               <p className="text-accent font-medium">Tudo confirmado! ✨</p>
-              <Button onClick={() => navigate('/')} variant="outline" className="mt-2">Voltar ao Dashboard</Button>
+              <Button onClick={() => navigate('/')} variant="outline" className="mt-2 praxis-touch-target">Voltar ao Dashboard</Button>
             </motion.div>
           )}
         </div>

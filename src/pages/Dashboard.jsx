@@ -19,6 +19,7 @@ import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
 import AvoidanceCockpit from '@/components/dashboard/AvoidanceCockpit';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
+import CapturePendingBanner from '@/components/dashboard/CapturePendingBanner';
 import OfflineBanner from '@/components/shared/OfflineBanner';
 import PwaInstallBanner from '@/components/shared/PwaInstallBanner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -194,6 +195,7 @@ export default function Dashboard() {
     <div className="space-y-4 sm:space-y-5 lg:space-y-8">
       <OfflineBanner />
       <PwaInstallBanner />
+      <CapturePendingBanner />
 
       <HeroDay
         habitsDone={completedHabits}
