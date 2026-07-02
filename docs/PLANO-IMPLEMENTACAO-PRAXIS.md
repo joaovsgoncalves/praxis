@@ -77,14 +77,14 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P3-T01 | Schema: `habits.status` já existe — definir semântica `active` \| `paused` \| `archived` | S | Doc no código + API | todo |
-| P3-T02 | `GET /api/habits`: default `active`; query `?status=all` para histórico admin | S | Pausados não aparecem no “hoje” | todo |
-| P3-T03 | UI: ações Pausar / Retomar / Arquivar no form ou menu ⋯ (sem delete como única saída) | M | Confirmação só em excluir definitivo | todo |
-| P3-T04 | Delete hábito: opção A) soft-delete `archived` only; opção B) hard delete com confirmação **dupla** citando perda de logs | M | João escolhe na implementação (recomendado B com texto explícito) | todo |
-| P3-T05 | Frequência: `weekends` já no form; exibir label “Fins de semana”; avaliar `weekly` + dias da semana (JSON `recurrence_days`) | L | Pelo menos dias úteis / fds / semanal com dias | todo |
-| P3-T06 | Hábitos quantitativos (água, etc.): campo opcional `target_value` + `unit` + log com `value` — MVP só água ou genérico | L | Um hábito quantitativo funcional | todo |
-| P3-T07 | Lista hábitos: filtro “Ativos / Pausados / Arquivados” | M | Hábitos & Tarefas + Dashboard só ativos | todo |
-| P3-T08 | Garantir `habit_logs` intactos em pause/archive; streak recalcula ao retomar | M | Teste manual + nota no commit | todo |
+| P3-T01 | Schema: `habits.status` já existe — definir semântica `active` \| `paused` \| `archived` | S | Doc no código + API | **done** (`src/lib/habits.js`, `docs/HABITS-LIFECYCLE.md`) |
+| P3-T02 | `GET /api/habits`: default `active`; query `?status=all` para histórico admin | S | Pausados não aparecem no “hoje” | **done** |
+| P3-T03 | UI: ações Pausar / Retomar / Arquivar no form ou menu ⋯ (sem delete como única saída) | M | Confirmação só em excluir definitivo | **done** |
+| P3-T04 | Delete hábito: hard delete com confirmação **dupla** citando perda de logs | M | Duplo `confirm` | **done** |
+| P3-T05 | Frequência: labels + `weekly` + dias (`recurrence_days`) | L | `isHabitDueOnDate` | **done** |
+| P3-T06 | Hábitos quantitativos: `target_value` + `unit` + log `value` | L | MVP prompt + progresso | **done** |
+| P3-T07 | Lista hábitos: filtro “Ativos / Pausados / Arquivados” | M | Hábitos & Tarefas | **done** |
+| P3-T08 | Garantir `habit_logs` intactos em pause/archive; streak recalcula ao retomar | M | Sem DELETE em pause/archive | **done** |
 
 **Depende:** P0-T00 done. P1 recomendado antes de expor mais dados.
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **2** | (este commit) | UX Praxis — legado Forja fora da UI |
+| 2026-07-02 | **3** | (este commit) | Hábitos — ciclo de vida + quant + frequência |
+| 2026-07-02 | **2** | `7d8ab43` | UX Praxis — legado Forja fora da UI |
 | 2026-07-02 | **1** | `a5010e8` | Auth sessão + login Praxis |
 | 2026-07-02 | — | `0f85de2` | Edição hábitos v1 |
 

@@ -377,8 +377,22 @@ if (!habitsCols.includes('source')) {
 if (!habitsCols.includes('sort_order')) {
   db.exec("ALTER TABLE habits ADD COLUMN sort_order INTEGER");
 }
+// Re-fetch after prior alters
+const habitsCols2 = db.prepare("PRAGMA table_info(habits)").all().map(c => c.name);
+if (!habitsCols2.includes('recurrence_days')) {
+  db.exec("ALTER TABLE habits ADD COLUMN recurrence_days TEXT DEFAULT '[]'");
+}
+if (!habitsCols2.includes('target_value')) {
+  db.exec('ALTER TABLE habits ADD COLUMN target_value REAL');
+}
+if (!habitsCols2.includes('unit')) {
+  db.exec("ALTER TABLE habits ADD COLUMN unit TEXT DEFAULT ''");
+}
 
-// Migrate: add task metadata/recurrence columns
+const habitLogsCols = db.prepare("PRAGMA table_info(habit_logs)").all().map(c => c.name);
+if (!habitLogsCols.includes('value')) {
+  db.exec('ALTER TABLE habit_logs ADD COLUMN value REAL');
+}
 const tasksCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
 if (!tasksCols.includes('goal_id')) {
   db.exec("ALTER TABLE tasks ADD COLUMN goal_id TEXT");
@@ -920,9 +934,35 @@ function getStreaks(habitId) {
 }
 
 // ==================== HABITS ====================
+// Status: active | paused | archived — pause/archive preserve habit_logs (see docs/HABITS-LIFECYCLE.md)
+const HABIT_STATUSES = new Set(['active', 'paused', 'archived']);
+const HABIT_FREQUENCIES = new Set(['daily', 'weekdays', 'weekends', 'weekly']);
+
+function normalizeRecurrenceDays(input) {
+  if (input === undefined || input === null) return null;
+  let arr = input;
+  if (typeof input === 'string') {
+    try { arr = JSON.parse(input); } catch { return '[]'; }
+  }
+  if (!Array.isArray(arr)) return '[]';
+  const days = [...new Set(arr.map(Number).filter((n) => n >= 0 && n <= 6))].sort((a, b) => a - b);
+  return JSON.stringify(days);
+}
+
+function listHabitsQuery(statusFilter) {
+  const order = 'ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC';
+  if (statusFilter === 'all') {
+    return db.prepare(`SELECT * FROM habits ${order}`).all();
+  }
+  return db.prepare(`SELECT * FROM habits WHERE status = ? ${order}`).all(statusFilter);
+}
+
 app.get('/api/habits', (req, res) => {
-  const { status = 'active' } = req.query;
-  const habits = db.prepare('SELECT * FROM habits WHERE status = ? ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC').all(status);
+  const raw = String(req.query.status ?? 'active');
+  if (raw !== 'all' && !HABIT_STATUSES.has(raw)) {
+    return res.status(400).json({ error: 'Invalid status. Use active, paused, archived, or all' });
+  }
+  const habits = listHabitsQuery(raw);
   const enriched = habits.map(h => {
     const { current_streak, best_streak } = getStreaks(h.id);
     return { ...h, current_streak, best_streak };
@@ -942,17 +982,37 @@ app.patch('/api/habits/reorder', (req, res) => {
 
 app.post('/api/habits', (req, res) => {
   const id = randomUUID();
-  const { title, description = '', frequency = 'daily', category = 'pessoal', streak_target = 30, goal_id = null, source = 'manual', sort_order } = req.body;
-  
+  const {
+    title,
+    description = '',
+    frequency = 'daily',
+    category = 'pessoal',
+    streak_target = 30,
+    goal_id = null,
+    source = 'manual',
+    sort_order,
+    recurrence_days,
+    target_value,
+    unit = '',
+  } = req.body;
+
   if (!title) return res.status(400).json({ error: 'Title is required' });
+  const freq = HABIT_FREQUENCIES.has(frequency) ? frequency : 'daily';
 
   const habitTitle = stripPriorityPrefix(title);
   const habitSortOrder = sort_order !== undefined ? Number(sort_order) : nextSortOrder('habits');
+  const recDays = normalizeRecurrenceDays(recurrence_days) ?? '[]';
+  const tgt = target_value === undefined || target_value === null || target_value === ''
+    ? null
+    : Number(target_value);
 
   db.prepare(`
-    INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, habitTitle, description, frequency, category, Number(streak_target) || 30, goal_id || null, source || 'manual', habitSortOrder);
+    INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source, sort_order, recurrence_days, target_value, unit)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, habitTitle, description, freq, category, Number(streak_target) || 30,
+    goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || ''
+  );
 
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(id);
   res.status(201).json(habit);
@@ -962,7 +1022,19 @@ app.put('/api/habits/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Habit not found' });
 
-  const { title, description, frequency, category, streak_target, goal_id, source, status, sort_order } = req.body;
+  const { title, description, frequency, category, streak_target, goal_id, source, status, sort_order, recurrence_days, target_value, unit } = req.body;
+
+  if (status !== undefined && status !== null && !HABIT_STATUSES.has(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  if (frequency !== undefined && frequency !== null && !HABIT_FREQUENCIES.has(frequency)) {
+    return res.status(400).json({ error: 'Invalid frequency' });
+  }
+
+  const recDays = recurrence_days !== undefined ? normalizeRecurrenceDays(recurrence_days) : null;
+  const tgt = target_value !== undefined
+    ? (target_value === null || target_value === '' ? null : Number(target_value))
+    : undefined;
 
   db.prepare(`
     UPDATE habits SET 
@@ -974,7 +1046,10 @@ app.put('/api/habits/:id', (req, res) => {
       goal_id = COALESCE(?, goal_id),
       source = COALESCE(?, source),
       status = COALESCE(?, status),
-      sort_order = COALESCE(?, sort_order)
+      sort_order = COALESCE(?, sort_order),
+      recurrence_days = COALESCE(?, recurrence_days),
+      target_value = COALESCE(?, target_value),
+      unit = COALESCE(?, unit)
     WHERE id = ?
   `).run(
     title !== undefined ? stripPriorityPrefix(title) : null,
@@ -986,6 +1061,9 @@ app.put('/api/habits/:id', (req, res) => {
     source,
     status,
     sort_order !== undefined ? Number(sort_order) : null,
+    recDays,
+    tgt !== undefined ? tgt : null,
+    unit,
     req.params.id
   );
 
@@ -1034,17 +1112,37 @@ app.get('/api/habit-logs', (req, res) => {
 });
 
 app.post('/api/habit-logs', (req, res) => {
-  const id = randomUUID();
-  const { habit_id, date, completed = true } = req.body;
-  
+  const { habit_id, date, completed = true, value } = req.body;
+
   if (!habit_id || !date) return res.status(400).json({ error: 'habit_id and date required' });
 
-  db.prepare(`
-    INSERT INTO habit_logs (id, habit_id, date, completed)
-    VALUES (?, ?, ?, ?)
-  `).run(id, habit_id, date, completed ? 1 : 0);
+  const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(habit_id);
+  if (!habit) return res.status(404).json({ error: 'Habit not found' });
 
-  res.status(201).json({ id, habit_id, date, completed });
+  let completedFlag = completed ? 1 : 0;
+  let logValue = value === undefined || value === null || value === '' ? null : Number(value);
+  if (habit.target_value != null && Number(habit.target_value) > 0) {
+    if (logValue == null || Number.isNaN(logValue)) {
+      logValue = Number(habit.target_value);
+    }
+    if (logValue >= Number(habit.target_value)) completedFlag = 1;
+  }
+
+  const existing = db.prepare('SELECT id FROM habit_logs WHERE habit_id = ? AND date = ?').get(habit_id, date);
+  if (existing) {
+    db.prepare('UPDATE habit_logs SET completed = ?, value = ? WHERE id = ?').run(completedFlag, logValue, existing.id);
+    const row = db.prepare('SELECT * FROM habit_logs WHERE id = ?').get(existing.id);
+    return res.json(row);
+  }
+
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO habit_logs (id, habit_id, date, completed, value)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, habit_id, date, completedFlag, logValue);
+
+  const row = db.prepare('SELECT * FROM habit_logs WHERE id = ?').get(id);
+  res.status(201).json(row);
 });
 
 app.delete('/api/habit-logs/:id', (req, res) => {

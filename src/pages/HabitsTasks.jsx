@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, CheckCircle2, Circle, Clock, Trash2, Flame, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Trash2, Flame, ArrowUp, ArrowDown, Pencil, MoreHorizontal, Pause, Play, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import HabitForm from '@/components/habits-tasks/HabitForm';
@@ -17,6 +17,20 @@ import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder } from '@/lib/taskReorder';
 import { isTaskRelevantForTodayList } from '@/lib/tasks';
+import {
+  HABIT_STATUS_LABELS,
+  formatFrequencyLabel,
+  isHabitDueOnDate,
+  isQuantitativeHabit,
+  todayLogForHabit,
+} from '@/lib/habits';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -71,6 +85,7 @@ const statusLabels = { pending: 'Pendente', in_progress: 'Em andamento', complet
 
 export default function HabitsTasks() {
   const [view, setView] = useState('all');
+  const [habitStatusFilter, setHabitStatusFilter] = useState('active');
   const [statusFilter, setStatusFilter] = useState('pending');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -82,8 +97,15 @@ export default function HabitsTasks() {
   const today = fortalezaDateKey();
 
   const { data: tasks = [] } = useQuery({ queryKey: ['allTasks', today], queryFn: () => forjaApi.tasks.list({ limit: 100 }) });
-  const { data: habits = [] } = useQuery({ queryKey: ['allHabits'], queryFn: () => forjaApi.habits.list({}) });
+  const { data: habits = [] } = useQuery({
+    queryKey: ['allHabits', habitStatusFilter],
+    queryFn: () => forjaApi.habits.list({ status: habitStatusFilter }),
+  });
   const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => forjaApi.habitLogs.list({ date: today }) });
+  const { data: activeHabitsList = [] } = useQuery({
+    queryKey: ['habits', 'active'],
+    queryFn: () => forjaApi.habits.list({ status: 'active' }),
+  });
 
   const createTask = useMutation({
     mutationFn: (data) => forjaApi.tasks.create(data),
@@ -149,12 +171,17 @@ export default function HabitsTasks() {
   });
 
   const toggleHabit = useMutation({
-    mutationFn: async ({ habitId, isDone }) => {
+    mutationFn: async ({ habitId, isDone, value }) => {
       const logs = habitLogs.filter(log => log.habit_id === habitId && log.date === today);
       if (isDone && logs[0]) {
         await forjaApi.habitLogs.delete(logs[0].id);
       } else if (!isDone) {
-        await forjaApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
+        await forjaApi.habitLogs.create({
+          habit_id: habitId,
+          date: today,
+          completed: true,
+          ...(value !== undefined ? { value } : {}),
+        });
       }
     },
     onSuccess: () => {
@@ -164,10 +191,34 @@ export default function HabitsTasks() {
     },
   });
 
-  const isHabitCompletedToday = (habitId) =>
-    habitLogs.some(log => log.habit_id === habitId && log.date === today && log.completed);
+  const isHabitCompletedToday = (habitId) => {
+    const log = todayLogForHabit(habitLogs, habitId, today);
+    return Boolean(log?.completed);
+  };
+
+  const setHabitStatus = useMutation({
+    mutationFn: ({ id, status }) => forjaApi.habits.update(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
 
   const handleToggleHabit = (habit, isDone, evt) => {
+    if (isQuantitativeHabit(habit) && !isDone) {
+      const current = todayLogForHabit(habitLogs, habit.id, today);
+      const target = Number(habit.target_value);
+      const nextDefault = current?.value != null ? Number(current.value) + 1 : 1;
+      const raw = window.prompt(
+        `Quanto registrou hoje? (meta: ${target}${habit.unit ? ` ${habit.unit}` : ''})`,
+        String(nextDefault)
+      );
+      if (raw === null) return;
+      const value = Number(raw);
+      if (Number.isNaN(value) || value < 0) return;
+      toggleHabit.mutate({ habitId: habit.id, isDone: false, value });
+      return;
+    }
     if (!isDone) {
       const target = habitRowRefs.current.get(habit.id);
       const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
@@ -189,7 +240,10 @@ export default function HabitsTasks() {
     return true;
   });
 
-  const completedHabits = habits.filter(h => isHabitCompletedToday(h.id)).length;
+  const activeHabitsDueToday = activeHabitsList.filter(
+    (h) => isHabitDueOnDate(h, today)
+  );
+  const completedHabits = activeHabitsDueToday.filter((h) => isHabitCompletedToday(h.id)).length;
 
   const moveTask = (taskId, direction) => {
     const orderedIds = buildMovedOrder(tasks, filteredTasks, taskId, direction);
@@ -212,8 +266,11 @@ export default function HabitsTasks() {
 
   const confirmDeleteHabit = (habit) => {
     const title = cleanPriorityPrefix(habit.title);
-    const message = `Excluir o hábito "${title}"? O histórico de check-ins também será apagado.`;
-    if (window.confirm(message)) deleteHabit.mutate(habit.id);
+    if (!window.confirm(`Excluir permanentemente o hábito "${title}"?`)) return;
+    if (!window.confirm(
+      'Última confirmação: todos os check-ins e o histórico de streak deste hábito serão apagados para sempre. Continuar?'
+    )) return;
+    deleteHabit.mutate(habit.id);
   };
 
   return (
@@ -250,8 +307,8 @@ export default function HabitsTasks() {
           </div>
           <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
             <p className="forja-kicker">Rotina</p>
-            <p className="mt-1 text-2xl font-semibold">{completedHabits}/{habits.length}</p>
-            <p className="text-xs text-muted-foreground">hábitos concluídos hoje</p>
+            <p className="mt-1 text-2xl font-semibold">{completedHabits}/{activeHabitsDueToday.length}</p>
+            <p className="text-xs text-muted-foreground">hábitos de hoje concluídos</p>
           </div>
           <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
             <p className="forja-kicker">Filtro</p>
@@ -388,9 +445,22 @@ export default function HabitsTasks() {
 
         {(view === 'all' || view === 'habits') && (
           <section className="space-y-3">
-            <div>
-              <p className="forja-kicker">Consistência</p>
-              <h2 className="forja-title text-2xl font-semibold">Hábitos</h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="forja-kicker">Consistência</p>
+                <h2 className="forja-title text-2xl font-semibold">Hábitos</h2>
+              </div>
+              <Select value={habitStatusFilter} onValueChange={setHabitStatusFilter}>
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativos</SelectItem>
+                  <SelectItem value="paused">Pausados</SelectItem>
+                  <SelectItem value="archived">Arquivados</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {filteredHabits.length === 0 ? (
@@ -399,6 +469,10 @@ export default function HabitsTasks() {
               <div className="space-y-3">
                 {filteredHabits.map((habit, index) => {
                   const done = isHabitCompletedToday(habit.id);
+                  const dueToday = isHabitDueOnDate(habit, today);
+                  const canCheckIn = habit.status === 'active' && dueToday;
+                  const todayLog = todayLogForHabit(habitLogs, habit.id, today);
+                  const quant = isQuantitativeHabit(habit);
                   return (
                     <Card
                       key={habit.id}
@@ -409,13 +483,14 @@ export default function HabitsTasks() {
                       )}
                     >
                       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5 xl:items-start">
+                        {canCheckIn ? (
                         <button
                           type="button"
                           onClick={(evt) => handleToggleHabit(habit, done, evt)}
                           disabled={toggleHabit.isPending}
                           className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 sm:mt-0"
                           aria-label={`${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`}
-                          title={done ? 'Desmarcar hábito de hoje' : 'Concluir hábito de hoje'}
+                          title={done ? 'Desmarcar hábito de hoje' : quant ? 'Registrar valor de hoje' : 'Concluir hábito de hoje'}
                         >
                           {done ? (
                             <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
@@ -423,6 +498,9 @@ export default function HabitsTasks() {
                             <Circle className="h-5 w-5" />
                           )}
                         </button>
+                        ) : (
+                          <div className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+                        )}
                         <Flame className={cn('mt-0.5 h-5 w-5 shrink-0 text-primary', done && 'text-domain-wellness')} />
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
@@ -435,6 +513,11 @@ export default function HabitsTasks() {
                                 Feito hoje
                               </Badge>
                             )}
+                            {habit.status !== 'active' && (
+                              <Badge variant="outline" className="text-xs">
+                                {HABIT_STATUS_LABELS[habit.status] || habit.status}
+                              </Badge>
+                            )}
                             {habit.current_streak > 0 && (
                               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs text-orange-400">
                                 🔥 {habit.current_streak}
@@ -442,8 +525,18 @@ export default function HabitsTasks() {
                             )}
                           </div>
                           <Badge variant="outline" className="text-xs">
-                            {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekdays' ? 'Dias úteis' : habit.frequency}
+                            {formatFrequencyLabel(habit)}
+                            {quant && habit.target_value ? ` · meta ${habit.target_value}${habit.unit ? ` ${habit.unit}` : ''}` : ''}
                           </Badge>
+                          {quant && todayLog?.value != null && (
+                            <p className="text-xs text-muted-foreground">
+                              Hoje: {todayLog.value}{habit.unit ? ` ${habit.unit}` : ''}
+                              {Number(habit.target_value) > 0 ? ` / ${habit.target_value}` : ''}
+                            </p>
+                          )}
+                          {!dueToday && habit.status === 'active' && (
+                            <p className="text-xs text-muted-foreground">Não previsto para hoje</p>
+                          )}
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center xl:self-start">
@@ -463,14 +556,46 @@ export default function HabitsTasks() {
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => confirmDeleteHabit(habit)}
-                            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={`Excluir ${cleanPriorityPrefix(habit.title)}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                                aria-label={`Mais ações — ${cleanPriorityPrefix(habit.title)}`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              {habit.status === 'active' && (
+                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'paused' })}>
+                                  <Pause className="mr-2 h-4 w-4" /> Pausar
+                                </DropdownMenuItem>
+                              )}
+                              {habit.status === 'paused' && (
+                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'active' })}>
+                                  <Play className="mr-2 h-4 w-4" /> Retomar
+                                </DropdownMenuItem>
+                              )}
+                              {habit.status !== 'archived' && (
+                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'archived' })}>
+                                  <Archive className="mr-2 h-4 w-4" /> Arquivar
+                                </DropdownMenuItem>
+                              )}
+                              {habit.status === 'archived' && (
+                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'active' })}>
+                                  <Play className="mr-2 h-4 w-4" /> Reativar
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => confirmDeleteHabit(habit)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Excluir definitivo
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </CardContent>
                     </Card>
