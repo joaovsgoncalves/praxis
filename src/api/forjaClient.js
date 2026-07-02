@@ -123,6 +123,15 @@ export const forjaApi = {
     delete: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   },
 
+  ideas: {
+    list: (params = {}) => {
+      const query = new URLSearchParams({ category: 'ideias', limit: 100, ...params }).toString();
+      return request(`/api/tasks?${query}`);
+    },
+    promoteToTask: (id, data = {}) =>
+      request(`/api/ideas/${id}/to-task`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+
   // Habits
   habits: {
     list: (params = {}) => {

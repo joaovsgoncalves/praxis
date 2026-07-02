@@ -425,6 +425,17 @@ if (!tasksCols.includes('completed_at')) {
 if (!tasksCols.includes('sort_order')) {
   db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER");
 }
+const tasksCols2 = db.prepare("PRAGMA table_info(tasks)").all().map((c) => c.name);
+if (!tasksCols2.includes('idea_status')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN idea_status TEXT");
+}
+if (!tasksCols2.includes('source_idea_id')) {
+  db.exec("ALTER TABLE tasks ADD COLUMN source_idea_id TEXT");
+}
+db.prepare(`
+  UPDATE tasks SET idea_status = 'capturada'
+  WHERE category = 'ideias' AND (idea_status IS NULL OR idea_status = '')
+`).run();
 
 backfillSortOrder('tasks');
 backfillSortOrder('habits');
@@ -668,14 +679,15 @@ function syncTaskToCalendar(task) {
 }
 
 app.get('/api/tasks', (req, res) => {
-  const { date, status, category, limit = 100 } = req.query;
+  const { date, status, category, idea_status, limit = 100 } = req.query;
   let query = 'SELECT * FROM tasks WHERE 1=1';
   const params = [];
 
   if (date) { query += ' AND date = ?'; params.push(date); }
   if (status) { query += ' AND status = ?'; params.push(status); }
   if (category) { query += ' AND category = ?'; params.push(category); }
-  
+  if (idea_status) { query += ' AND idea_status = ?'; params.push(idea_status); }
+
   query += ' ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC LIMIT ?';
   params.push(Number(limit));
 
@@ -738,10 +750,17 @@ app.post('/api/tasks', (req, res) => {
   const {
     title, description = '', date, time, status = 'pending',
     priority = 'medium', category = 'pessoal', goal_id = null, source = 'manual', duration_minutes,
-    calendar_event_id, sort_order, recurrence = 'none', recurrence_days = [], recurrence_parent_id
+    calendar_event_id, sort_order, recurrence = 'none', recurrence_days = [], recurrence_parent_id,
+    idea_status, source_idea_id,
   } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
+
+  const isIdea = category === 'ideias';
+  const taskPriority = isIdea ? (priority || 'low') : priority;
+  const taskIdeaStatus = isIdea ? (idea_status || 'capturada') : (idea_status || null);
+  const taskDate = isIdea ? (date || null) : date;
+  const taskTime = isIdea ? (time || null) : time;
 
   const isDoneOnCreate = status === 'completed' || status === 'done';
   const completedDate = isDoneOnCreate ? getLocalDateString() : null;
@@ -750,16 +769,18 @@ app.post('/api/tasks', (req, res) => {
   const taskSortOrder = sort_order !== undefined ? Number(sort_order) : nextSortOrder('tasks');
 
   db.prepare(`
-    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at, idea_status, source_idea_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id, taskTitle, description, date || null, time || null, status, priority, category,
+    id, taskTitle, description, taskDate || null, taskTime || null, status, taskPriority, category,
     goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
     calendar_event_id || null, taskSortOrder, recurrence,
     JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
     recurrence_parent_id || null,
     completedDate,
-    completedAt
+    completedAt,
+    taskIdeaStatus,
+    source_idea_id || null,
   );
 
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
@@ -772,7 +793,7 @@ app.put('/api/tasks/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-  const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days } = req.body;
+  const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, idea_status, source_idea_id } = req.body;
 
   const wasDone = existing.status === 'completed' || existing.status === 'done';
   const willBeDone = status === 'completed' || status === 'done';
@@ -809,6 +830,8 @@ app.put('/api/tasks/:id', (req, res) => {
       sort_order = COALESCE(?, sort_order),
       recurrence = COALESCE(?, recurrence),
       recurrence_days = COALESCE(?, recurrence_days),
+      idea_status = COALESCE(?, idea_status),
+      source_idea_id = COALESCE(?, source_idea_id),
       completed_date = ?,
       completed_at = ?,
       updated_date = datetime('now')
@@ -819,6 +842,8 @@ app.put('/api/tasks/:id', (req, res) => {
     sort_order !== undefined ? Number(sort_order) : null,
     recurrence,
     recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
+    idea_status !== undefined ? idea_status : null,
+    source_idea_id !== undefined ? source_idea_id : null,
     completedDate,
     completedAt,
     req.params.id
@@ -877,6 +902,47 @@ app.put('/api/tasks/:id', (req, res) => {
   }
 
   res.json({ ...syncedTask, calendar_sync: calendarSync, next_occurrence_sync: nextOccurrenceSync, xp_sync: xpSync });
+});
+
+const IDEA_STATUSES = new Set(['capturada', 'promissora', 'virou_tarefa', 'arquivada']);
+
+app.post('/api/ideas/:id/to-task', (req, res) => {
+  const idea = db.prepare('SELECT * FROM tasks WHERE id = ? AND category = ?').get(req.params.id, 'ideias');
+  if (!idea) return res.status(404).json({ error: 'Idea not found' });
+  if (idea.idea_status === 'virou_tarefa') {
+    return res.status(409).json({ error: 'Idea already promoted to task' });
+  }
+
+  const { category = 'pessoal', date, priority = 'medium' } = req.body || {};
+  const newId = randomUUID();
+  const taskDate = date || getLocalDateString();
+  const sort = nextSortOrder('tasks');
+
+  db.prepare(`
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, source, sort_order, source_idea_id)
+    VALUES (?, ?, ?, ?, NULL, 'pending', ?, ?, 'from_idea', ?, ?)
+  `).run(
+    newId,
+    idea.title,
+    idea.description || '',
+    taskDate,
+    priority,
+    category,
+    sort,
+    idea.id,
+  );
+
+  db.prepare(`UPDATE tasks SET idea_status = 'virou_tarefa', updated_date = datetime('now') WHERE id = ?`).run(idea.id);
+
+  let task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newId);
+  const calendarSync = syncTaskToCalendar(task);
+  task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newId);
+  const updatedIdea = db.prepare('SELECT * FROM tasks WHERE id = ?').get(idea.id);
+  res.status(201).json({
+    task: enrichCategory(task),
+    idea: enrichCategory(updatedIdea),
+    calendar_sync: calendarSync,
+  });
 });
 
 app.delete('/api/tasks/:id', (req, res) => {

@@ -1,8 +1,8 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–6**
+**Data:** 2026-07-02 · **Após ondas 0–7**
 
-## Nota geral: **7,6 / 10**
+## Nota geral: **7,8 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
@@ -13,7 +13,7 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 | **Auth & confiança** | 8,0 | Sessão + login Praxis; API protegida. |
 | **UX / marca Praxis** | 7,5 | Legado Forja fora da UI; copy em PT; ainda há densidade em telas secundárias. |
 | **Voz & captura** | 6,0 | Fluxo existe; STT depende de VPS (`faster-whisper`); fila/revisão ainda leve. |
-| **Foco & ideias** | 6,8 | Modal pós-sessão + legenda 30d; ideias (onda 7) ainda pendentes. |
+| **Foco & ideias** | 7,5 | Foco pós-sessão; pipeline ideias → tarefa com `source_idea_id`. |
 | **Revisão semanal / metas** | 5,5 | Widgets existem; automação e ritual semanal ainda fracos. |
 | **Operação (deploy, alias, API)** | 7,0 | Vercel + VPS estável; documentação de ondas boa. |
 
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 7 — Ideias** (status + transformar em tarefa).
+**Onda 8 — Revisão semanal automática** (`/api/insights/weekly` + página).
 
 ---

@@ -131,10 +131,10 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P7-T01 | Campo `idea_status`: capturada \| promissora \| virou_tarefa \| arquivada (task category ideias ou tabela) | M | API + UI filtro | todo |
-| P7-T02 | Botão “Transformar em tarefa” (cria task, link `source_idea_id`, marca ideia) | M | Uma ideia → uma tarefa | todo |
-| P7-T03 | Copy: ideia sem mesma pressão visual que tarefa (sem hora/prioridade alta default) | S | Ideas.jsx | todo |
-| P7-T04 | Revisão semanal de ideias (lista promissoras) — pode ser subconjunto Fase 8 | M | Tela ou seção | todo |
+| P7-T01 | Campo `idea_status`: capturada \| promissora \| virou_tarefa \| arquivada (task category ideias ou tabela) | M | API + UI filtro | **done** |
+| P7-T02 | Botão “Transformar em tarefa” (cria task, link `source_idea_id`, marca ideia) | M | Uma ideia → uma tarefa | **done** |
+| P7-T03 | Copy: ideia sem mesma pressão visual que tarefa (sem hora/prioridade alta default) | S | Ideas.jsx | **done** |
+| P7-T04 | Revisão semanal de ideias (lista promissoras) — pode ser subconjunto Fase 8 | M | Tela ou seção | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **6** | (este commit) | Modo Foco — pós-sessão + copy PT |
+| 2026-07-02 | **7** | (este commit) | Ideias — status + virar tarefa + revisão |
+| 2026-07-02 | **6** | `55b64d1` | Modo Foco — pós-sessão + copy PT |
 | 2026-07-02 | **5** | `f74af68` | Hábitos & Tarefas — menos ruído |
 | 2026-07-02 | **4** | `02a09fd` | Dashboard Agora — NowBlock + cockpit |
 | 2026-07-02 | **3** | `22559a4` | Hábitos — ciclo de vida + quant + frequência |
