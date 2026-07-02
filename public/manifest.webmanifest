@@ -1,7 +1,7 @@
 {
   "name": "Praxis",
   "short_name": "Praxis",
-  "description": "Fale. Organize. Execute. Cockpit diário de execução.",
+  "description": "Fale. Organize. Execute. Seu dia em um lugar só.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

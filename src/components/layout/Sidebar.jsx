@@ -6,7 +6,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/', label: 'Hoje', icon: LayoutDashboard },
   { path: '/habitos-tarefas', label: 'Hábitos & Tarefas', icon: ListTodo },
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
@@ -18,8 +18,7 @@ const navItems = [
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
-// Apple-Watch-style ring drawn in SVG. Compact, but no longer tiny — the sidebar
-// is part of the cockpit identity and should read like a status module.
+// Apple-Watch-style ring — status compacto na sidebar.
 function AvatarRing({ progress, level }) {
   const size = 68;
   const stroke = 5;
@@ -150,7 +149,6 @@ export default function Sidebar({ open, onClose }) {
             </div>
             <div>
               <span className="block font-display text-lg font-bold text-sidebar-foreground tracking-tight">Praxis</span>
-              <span className="block font-mono text-[10px] uppercase tracking-[0.22em] text-sidebar-foreground/40">cockpit diário</span>
             </div>
           </div>
           <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">

@@ -16,7 +16,8 @@
     "backup:local": "bash scripts/praxis-backup.sh",
     "ship:api": "bash scripts/ship-praxis-api.sh",
     "check:api-drift": "bash scripts/check-api-drift.sh",
-    "prepush:check": "npm run lint && npm run build"
+    "prepush:check": "npm run lint && npm run build",
+    "deploy:prod": "bash scripts/deploy-praxis-front.sh"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.27",

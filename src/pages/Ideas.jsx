@@ -19,6 +19,7 @@ import {
 } from '@/lib/ideas';
 import { toast } from '@/components/ui/use-toast';
 import { stripQueryParam } from '@/lib/urlDeepLinks';
+import { PageHero, StatGrid, StatTile, SectionHeading } from '@/components/layout/PraxisPage';
 
 const statusFilterOptions = [
   { value: 'ativas', label: 'Ativas (captura + promissoras)' },
@@ -111,61 +112,45 @@ export default function Ideas() {
   }, [ideas]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <p className="forja-kicker flex items-center gap-2 text-cyan-300">
-              <Lightbulb className="h-4 w-4" /> Banco de ideias
-            </p>
-            <h1 className="forja-title text-3xl font-bold sm:text-4xl">Ideias</h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Estacionamento sem pressão de prazo — capture agora, promova quando brilhar, execute quando virar tarefa.
-            </p>
-          </div>
-          <Button onClick={() => setShowIdeaForm(true)} className="h-10 self-start rounded-full px-4 lg:self-auto">
+    <div className="praxis-page">
+      <PageHero
+        kicker="Banco de ideias"
+        kickerIcon={Lightbulb}
+        kickerClassName="text-cyan-300/90"
+        title="Ideias"
+        description="Guarde sem prazo. Quando fizer sentido, vira tarefa."
+        action={(
+          <Button onClick={() => setShowIdeaForm(true)} className="h-10 rounded-full px-4">
             <Plus className="mr-1.5 h-4 w-4" /> Nova ideia
           </Button>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3">
-            <p className="forja-kicker text-cyan-200/80">Capturadas</p>
-            <p className="mt-1 text-2xl font-semibold text-cyan-100">{counts.capturada}</p>
-          </div>
-          <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
-            <p className="forja-kicker text-amber-200/80">Promissoras</p>
-            <p className="mt-1 text-2xl font-semibold">{counts.promissora}</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Viraram tarefa</p>
-            <p className="mt-1 text-2xl font-semibold">{counts.virou_tarefa}</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-            <p className="forja-kicker">Arquivadas</p>
-            <p className="mt-1 text-2xl font-semibold">{counts.arquivada}</p>
-          </div>
-        </div>
-      </section>
+        )}
+      >
+        <StatGrid>
+          <StatTile label="Capturadas" value={counts.capturada} tone="cyan" />
+          <StatTile label="Promissoras" value={counts.promissora} tone="amber" />
+          <StatTile label="Viraram tarefa" value={counts.virou_tarefa} />
+          <StatTile label="Arquivadas" value={counts.arquivada} />
+        </StatGrid>
+      </PageHero>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
         <section className="space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="forja-kicker">Fila</p>
-              <h2 className="forja-title text-2xl font-semibold">Suas ideias</h2>
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statusFilterOptions.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SectionHeading
+            kicker="Fila"
+            title="Suas ideias"
+            trailing={(
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusFilterOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
 
           {isLoading ? (
             <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent></Card>
@@ -254,8 +239,9 @@ export default function Ideas() {
         <aside className="space-y-4">
           <Card className="border-cyan-400/15 bg-cyan-500/5">
             <CardContent className="space-y-3 p-5">
-              <p className="forja-kicker text-cyan-200/80 flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5" /> Revisão desta semana
+              <p className="praxis-kicker-row text-cyan-200/90">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                <span>Revisão desta semana</span>
               </p>
               <p className="text-sm text-muted-foreground">
                 Promissoras e capturas dos últimos 7 dias — o que merece virar execução?
@@ -279,9 +265,9 @@ export default function Ideas() {
           </Card>
 
           <Card>
-            <CardContent className="space-y-2 p-5 text-sm text-muted-foreground">
-              <p className="forja-kicker">Tom certo</p>
-              <p>Ideia não carrega hora nem prioridade alta por padrão — isso fica na tarefa, quando você decidir.</p>
+            <CardContent className="space-y-2 p-5 text-sm leading-relaxed text-muted-foreground">
+              <p className="praxis-kicker-row">Dica</p>
+              <p>Ideia não leva hora nem prioridade alta — isso fica na tarefa, quando você decidir.</p>
             </CardContent>
           </Card>
         </aside>

@@ -40,7 +40,7 @@ export default function Login({ onSuccess }) {
       <div className="w-full max-w-sm space-y-6 forja-panel p-8">
         <div className="text-center space-y-2">
           <p className="forja-kicker text-primary">Praxis</p>
-          <h1 className="forja-title text-2xl">Entrar no cockpit</h1>
+          <h1 className="forja-title text-2xl">Entrar</h1>
           <p className="text-sm text-muted-foreground">
             Uso pessoal — senha definida no servidor.
           </p>

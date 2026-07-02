@@ -144,7 +144,32 @@
   }
 
   .forja-kicker {
-    @apply font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:text-[11px] sm:tracking-[0.28em];
+    @apply font-sans text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:text-xs sm:tracking-[0.16em];
+  }
+
+  /* Kicker com ícone — baseline alinhada ao bloco */
+  .praxis-kicker-row {
+    @apply flex items-center gap-2 font-sans text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:text-xs sm:tracking-[0.16em];
+  }
+
+  .praxis-page {
+    @apply mx-auto max-w-6xl space-y-6;
+  }
+
+  .praxis-page-hero {
+    @apply glass-surface rounded-3xl p-5 sm:p-6;
+  }
+
+  .praxis-stat-tile {
+    @apply rounded-2xl px-4 py-3.5 text-left;
+  }
+
+  .praxis-stat-label {
+    @apply text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground leading-tight;
+  }
+
+  .praxis-stat-value {
+    @apply mt-2 text-2xl font-semibold tabular-nums leading-none tracking-tight;
   }
 
   .forja-title {
