@@ -7,6 +7,13 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  initAuthSchema,
+  ensureDefaultUser,
+  registerAuthRoutes,
+  createApiAuthMiddleware,
+  isWebAuthEnabled,
+} from './praxisAuth.js';
 
 // Category constants
 const CATEGORIES = {
@@ -68,6 +75,10 @@ if (!FORJA_API_KEY) {
     const envFile = fs.readFileSync('/root/.hermes/secrets/api_keys.env', 'utf-8');
     const match = envFile.match(/FORJA_API_KEY\s*=\s*(.+)/);
     if (match) FORJA_API_KEY = match[1].trim();
+    const passMatch = envFile.match(/(?:PRAXIS_APP_PASSWORD|FORJA_APP_PASSWORD)\s*=\s*(.+)/);
+    if (passMatch && !process.env.PRAXIS_APP_PASSWORD && !process.env.FORJA_APP_PASSWORD) {
+      process.env.PRAXIS_APP_PASSWORD = passMatch[1].trim();
+    }
   } catch {}
 }
 
@@ -90,29 +101,13 @@ function getLocalDateString(date = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-// Middleware
-app.use(cors());
+// Middleware — credentials so session cookies work (Vercel same-origin + local dev)
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// API key auth — applies to every /api/* route except health only when
-// explicitly enabled. Legacy/browser production stays public because the Vercel
-// rewrite cannot safely inject a server-only secret. Set FORJA_AUTH_REQUIRED=1
-// only behind a trusted server-side proxy that adds Authorization internally.
-const PUBLIC_PATHS = new Set(['/api/health']);
-app.use((req, res, next) => {
-  if (PUBLIC_PATHS.has(req.path)) return next();
-  if (!req.path.startsWith('/api/')) return next();
-  if (!FORJA_AUTH_REQUIRED) return next();
-  if (!FORJA_API_KEY) {
-    return res.status(503).json({ error: 'Praxis API auth is required but FORJA_API_KEY is not configured' });
-  }
-
-  const header = req.headers['authorization'] || '';
-  const provided = header.startsWith('Bearer ') ? header.slice(7) : req.headers['x-forja-key'];
-  if (provided && provided === FORJA_API_KEY) return next();
-
-  return res.status(401).json({ error: 'Unauthorized' });
-});
+const COOKIE_SECURE = !['0', 'false', 'no'].includes(
+  String(process.env.PRAXIS_COOKIE_SECURE ?? '1').toLowerCase()
+);
 
 // File upload
 const UPLOAD_DIR = '/tmp/forja-uploads/';
@@ -309,6 +304,11 @@ for (const a of defaultAchievements) {
   insertAchievement.run(a.id, a.name, a.description, a.emoji, a.xp_reward);
 }
 
+initAuthSchema(db);
+ensureDefaultUser(db);
+registerAuthRoutes(app, db, { secureCookie: COOKIE_SECURE });
+app.use(createApiAuthMiddleware({ db, apiKey: FORJA_API_KEY }));
+
 function stripPriorityPrefix(title) {
   if (typeof title !== 'string') return title;
   const cleaned = title.replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
@@ -433,7 +433,11 @@ app.get('/api/categories', (req, res) => {
 
 // ==================== HEALTH ====================
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    webAuth: isWebAuthEnabled(),
+  });
 });
 
 function safeUnlink(filePath) {

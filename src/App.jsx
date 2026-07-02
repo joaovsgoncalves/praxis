@@ -17,9 +17,17 @@ import Settings from '@/pages/Settings';
 import VoiceCapture from '@/pages/VoiceCapture';
 import Achievements from '@/pages/Achievements';
 import WeeklyReview from '@/pages/WeeklyReview';
+import Login from '@/pages/Login';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const {
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    authError,
+    isAuthenticated,
+    onLoginSuccess,
+    webAuthEnabled,
+  } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -35,10 +43,23 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      navigateToLogin();
-      return null;
     }
+    if (authError.type === 'auth_required' || !isAuthenticated) {
+      if (webAuthEnabled) {
+        return <Login onSuccess={onLoginSuccess} />;
+      }
+    }
+    if (authError.type === 'network') {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6 text-center text-muted-foreground">
+          <p>Não consegui falar com a API. {authError.message}</p>
+        </div>
+      );
+    }
+  }
+
+  if (!isAuthenticated && webAuthEnabled) {
+    return <Login onSuccess={onLoginSuccess} />;
   }
 
   return (

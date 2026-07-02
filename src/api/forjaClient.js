@@ -68,12 +68,22 @@ async function request(path, options = {}) {
   const isGet = !options.method || options.method === 'GET';
 
   try {
-    const res = await fetch(`${FORJA_API}${path}`, { ...options, headers });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const res = await fetch(`${FORJA_API}${path}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = new Error(`API error: ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    if (res.status === 204) return null;
     const data = await res.json();
     if (isGet && isCacheable(path)) writeOfflineCache(path, data);
     return data;
   } catch (err) {
+    if (err?.status === 401 || err?.status === 403) throw err;
     // Fall back to cached payload only on cacheable GETs — never silently swallow writes.
     if (isGet && isCacheable(path)) {
       const cached = readOfflineCache(path);
@@ -91,6 +101,14 @@ async function request(path, options = {}) {
 export const forjaApi = {
   // Health
   health: () => request('/api/health'),
+
+  auth: {
+    config: () => request('/api/auth/config'),
+    me: () => request('/api/auth/me'),
+    login: (password) =>
+      request('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+    logout: () => request('/api/auth/logout', { method: 'POST', body: '{}' }),
+  },
 
   // Tasks
   tasks: {
@@ -218,6 +236,7 @@ export const forjaApi = {
     const res = await fetch(`${FORJA_API}/api/transcribe`, {
       method: 'POST',
       body: formData,
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Transcription failed');
     return res.json();

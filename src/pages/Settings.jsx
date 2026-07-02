@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Save, User, Timer, LogOut, Bell, Camera } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
 
 const AVATAR_MAX_DIMENSION = 256;
 const AVATAR_MAX_DATA_URL_LENGTH = 80_000;
@@ -54,6 +55,7 @@ async function compressAvatar(file) {
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { logout } = useAuth();
 
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => forjaApi.user.getSettings() });
 
@@ -104,8 +106,8 @@ export default function Settings() {
     toast.success('Configurações salvas!');
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    await logout();
     window.location.href = '/';
   };
 
