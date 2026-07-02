@@ -29,6 +29,7 @@ import { pickNowTask } from '@/lib/nowTask';
 import { isHabitDueOnDate } from '@/lib/habits';
 import { buildDragOrder } from '@/lib/taskReorder';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
+import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
 import { isTaskCompletedForToday, isTaskDone, sortTodayRelevantTasks } from '@/lib/tasks';
 
 // Widgets are wrapped in domain-aware sections so each block has a hover-glow
@@ -110,6 +111,7 @@ export default function Dashboard() {
     onSuccess: (updated) => {
       invalidateTaskQueries();
       dispatchPraxisLevelUpFromResponse(updated);
+      notifyPraxisRecurrenceSpawned(updated);
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
@@ -217,6 +219,7 @@ export default function Dashboard() {
             <TodayTasks
               tasks={tasks}
               today={today}
+              allTasksForRecurrence={allTasks}
               onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
               onEditTask={setEditingTask}
               onReorderPending={handleReorderPending}

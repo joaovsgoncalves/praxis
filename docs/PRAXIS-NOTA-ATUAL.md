@@ -1,15 +1,15 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–13**
+**Data:** 2026-07-02 · **Após ondas 0–14**
 
-## Nota geral: **8,9 / 10**
+## Nota geral: **9,1 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
 | Dimensão | Nota | Comentário |
 |----------|------|------------|
 | **Clareza do dia (cockpit)** | 8,0 | Bloco **Agora**, ordem do dashboard, hábitos essenciais — forte. |
-| **Hábitos & tarefas** | 7,5 | Ciclo de vida, compacto, ⋯, limpar ruído; recorrência de tarefas ainda básica. |
+| **Hábitos & tarefas** | 8,5 | Recorrência de tarefas com motor na API + badge “Próxima: dd/MM”. |
 | **Auth & confiança** | 8,0 | Sessão + login Praxis; API protegida. |
 | **UX / marca Praxis** | 7,5 | Legado Forja fora da UI; copy em PT; ainda há densidade em telas secundárias. |
 | **Voz & captura** | 6,0 | Fluxo existe; STT depende de VPS (`faster-whisper`); fila/revisão ainda leve. |
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 14** — tarefas recorrentes (motor próxima instância). Ver plano 8,6→10 no chat / futuro `docs/PLANO-PRAXIS-10.md`.
+**Onda 15** — voz confiável (fila + retry STT).
 
 ---

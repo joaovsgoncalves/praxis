@@ -15,6 +15,7 @@ import {
   isWebAuthEnabled,
 } from './praxisAuth.js';
 import { buildWeeklyInsights } from './lib/weeklyInsights.js';
+import { nextRecurrenceDate } from './taskRecurrence.js';
 
 // Category constants
 const CATEGORIES = {
@@ -708,42 +709,45 @@ app.get('/api/tasks/:id', (req, res) => {
   res.json(enrichCategory(task));
 });
 
-// Compute next occurrence date for a recurring task starting from `fromDate` (YYYY-MM-DD).
-function nextRecurrenceDate(fromDate, recurrence, recurrenceDaysJson) {
-  if (!fromDate || !recurrence || recurrence === 'none') return null;
-  const base = new Date(fromDate + 'T12:00:00');
-  if (isNaN(base.getTime())) return null;
+function spawnNextRecurringTask(db, task, { completedDate, today }) {
+  if (!task?.recurrence || task.recurrence === 'none') return null;
+  const baseForNext = task.date || completedDate || today;
+  const nextDate = nextRecurrenceDate(baseForNext, task.recurrence, task.recurrence_days);
+  if (!nextDate) return null;
 
-  if (recurrence === 'daily') {
-    base.setDate(base.getDate() + 1);
-    return base.toISOString().split('T')[0];
-  }
-  if (recurrence === 'weekly') {
-    let days = [];
-    try { days = JSON.parse(recurrenceDaysJson || '[]'); } catch {}
-    if (!Array.isArray(days) || days.length === 0) {
-      base.setDate(base.getDate() + 7);
-      return base.toISOString().split('T')[0];
-    }
-    const allowed = new Set(days.map(Number).filter(n => n >= 0 && n <= 6));
-    for (let i = 1; i <= 7; i++) {
-      const d = new Date(base);
-      d.setDate(d.getDate() + i);
-      if (allowed.has(d.getDay())) return d.toISOString().split('T')[0];
-    }
-    base.setDate(base.getDate() + 7);
-    return base.toISOString().split('T')[0];
-  }
-  if (recurrence === 'monthly') {
-    const originalDay = base.getDate();
-    const target = new Date(base);
-    target.setDate(1);
-    target.setMonth(target.getMonth() + 1);
-    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-    target.setDate(Math.min(originalDay, lastDay));
-    return target.toISOString().split('T')[0];
-  }
-  return null;
+  const parentRef = task.recurrence_parent_id || task.id;
+  const existingChild = db
+    .prepare(
+      `SELECT id FROM tasks
+       WHERE recurrence_parent_id = ? AND date = ?
+       AND status NOT IN ('completed', 'done', 'cancelled')`,
+    )
+    .get(parentRef, nextDate);
+  if (existingChild) return { id: existingChild.id, date: nextDate, created: false };
+
+  const childId = randomUUID();
+  db.prepare(`
+    INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, sort_order, recurrence, recurrence_days, recurrence_parent_id)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    childId,
+    task.title,
+    task.description,
+    nextDate,
+    task.time,
+    task.priority,
+    task.category,
+    task.goal_id || null,
+    task.source || 'recurrence',
+    task.duration_minutes || null,
+    nextSortOrder('tasks'),
+    task.recurrence,
+    task.recurrence_days || '[]',
+    parentRef,
+  );
+  const childTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(childId);
+  const calendarSync = syncTaskToCalendar(childTask);
+  return { id: childId, date: nextDate, created: true, calendar_sync: calendarSync };
 }
 
 app.post('/api/tasks', (req, res) => {
@@ -853,6 +857,7 @@ app.put('/api/tasks/:id', (req, res) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   const calendarSync = syncTaskToCalendar(task);
   const syncedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  let nextOccurrence = null;
   let nextOccurrenceSync = null;
   let xpSync = null;
 
@@ -872,37 +877,25 @@ app.put('/api/tasks/:id', (req, res) => {
     };
   }
 
-  // When a recurring task is completed, spawn the next occurrence.
-  // We only spawn from the "template" (the task itself, regardless of parent),
-  // and only when status transitions to 'completed' or 'done'.
-  const becameDone = (status === 'completed' || status === 'done') &&
-                     existing.status !== 'completed' && existing.status !== 'done';
-  if (becameDone && task.recurrence && task.recurrence !== 'none' && task.date) {
-    const nextDate = nextRecurrenceDate(task.date, task.recurrence, task.recurrence_days);
-    if (nextDate) {
-      // Avoid duplicates: if a child for nextDate already exists, skip.
-      const parentRef = task.recurrence_parent_id || task.id;
-      const existingChild = db.prepare(
-        'SELECT id FROM tasks WHERE recurrence_parent_id = ? AND date = ?'
-      ).get(parentRef, nextDate);
-      if (!existingChild) {
-        const childId = randomUUID();
-        db.prepare(`
-          INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, sort_order, recurrence, recurrence_days, recurrence_parent_id)
-          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          childId, task.title, task.description, nextDate, task.time,
-          task.priority, task.category, task.goal_id || null, task.source || 'recurrence', task.duration_minutes || null,
-          nextSortOrder('tasks'),
-          task.recurrence, task.recurrence_days || '[]', parentRef
-        );
-        const childTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(childId);
-        nextOccurrenceSync = syncTaskToCalendar(childTask);
-      }
+  const becameDone =
+    (status === 'completed' || status === 'done') &&
+    existing.status !== 'completed' &&
+    existing.status !== 'done';
+  if (becameDone) {
+    const spawned = spawnNextRecurringTask(db, task, { completedDate, today });
+    if (spawned) {
+      nextOccurrence = { id: spawned.id, date: spawned.date, created: spawned.created };
+      nextOccurrenceSync = spawned.calendar_sync || null;
     }
   }
 
-  res.json({ ...syncedTask, calendar_sync: calendarSync, next_occurrence_sync: nextOccurrenceSync, xp_sync: xpSync });
+  res.json({
+    ...syncedTask,
+    calendar_sync: calendarSync,
+    next_occurrence: nextOccurrence,
+    next_occurrence_sync: nextOccurrenceSync,
+    xp_sync: xpSync,
+  });
 });
 
 const IDEA_STATUSES = new Set(['capturada', 'promissora', 'virou_tarefa', 'arquivada']);

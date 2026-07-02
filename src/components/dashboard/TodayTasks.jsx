@@ -8,7 +8,6 @@ import {
   Timer,
   CheckCircle2,
   Clock,
-  Repeat,
   AlertTriangle,
   GripVertical,
   Pencil,
@@ -18,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkFromElement } from '@/lib/celebration';
+import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -28,12 +28,14 @@ const priorityStyles = {
 export default function TodayTasks({
   tasks,
   today,
+  allTasksForRecurrence,
   onToggleComplete,
   onEditTask,
   onReorderPending,
   reorderBusy = false,
 }) {
   const rowRefs = useRef(new Map());
+  const recurrencePool = allTasksForRecurrence ?? tasks;
   const isDone = (task) => task.status === 'completed' || task.status === 'done';
   const completedOn = (task) =>
     task.completed_date || String(task.completed_at || task.updated_date || '').slice(0, 10);
@@ -177,14 +179,7 @@ export default function TodayTasks({
                                 >
                                   {task.priority || 'medium'}
                                 </Badge>
-                                {task.recurrence && task.recurrence !== 'none' && (
-                                  <span
-                                    title={`Repete: ${task.recurrence}`}
-                                    className="inline-flex items-center text-[10px] text-blue-400/80"
-                                  >
-                                    <Repeat className="w-3 h-3" />
-                                  </span>
-                                )}
+                                <TaskRecurrenceBadge task={task} allTasks={recurrencePool} />
                               </div>
                               {task.time && (
                                 <div className="flex items-center gap-1">

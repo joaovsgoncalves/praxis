@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
+import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
+import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
+import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
 import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
@@ -152,10 +155,15 @@ export default function HabitsTasks() {
   });
 
   const toggleTask = useMutation({
-    mutationFn: (task) => forjaApi.tasks.update(task.id, { 
-      status: task.status === 'completed' ? 'pending' : 'completed' 
+    mutationFn: (task) => forjaApi.tasks.update(task.id, {
+      status: task.status === 'completed' ? 'pending' : 'completed',
     }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      dispatchPraxisLevelUpFromResponse(data);
+      notifyPraxisRecurrenceSpawned(data);
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+    },
   });
 
   const toggleHabit = useMutation({
@@ -459,11 +467,15 @@ export default function HabitsTasks() {
                             {priorityLabels[task.priority] || task.priority}
                           </Badge>
                           <CategoryBadge category={task.category} />
+                          <TaskRecurrenceBadge task={task} allTasks={tasks} className="shrink-0" />
                         </div>
                         {!compact && task.date && (
                           <div className="mt-1.5 flex flex-wrap gap-2">
                             <Badge variant="outline" className="text-xs">{task.date}</Badge>
                           </div>
+                        )}
+                        {!compact && !task.date && task.recurrence && task.recurrence !== 'none' && (
+                          <p className="mt-1 text-xs text-amber-400/90">Defina uma data para a recorrência funcionar.</p>
                         )}
                       </div>
 

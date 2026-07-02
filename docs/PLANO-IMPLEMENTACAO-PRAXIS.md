@@ -230,11 +230,24 @@ Ver `docs/ONDA-13-OPERACAO.md`.
 
 ---
 
+## Onda 14 — Tarefas recorrentes
+
+| ID | Task | Status |
+|----|------|--------|
+| P14-T01 | Motor próxima instância na API | **done** |
+| P14-T02 | Badge + preview próxima data | **done** |
+| P14-T03 | daily / weekly / monthly | **done** |
+
+Ver `docs/ONDA-14-RECORRENCIA.md`.
+
+---
+
 ## Registro de ondas (atualizar a cada entrega)
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **13** | (este commit) | Smoke prod + sync API + health watchdog |
+| 2026-07-02 | **14** | (este commit) | Tarefas recorrentes motor + UI |
+| 2026-07-02 | **13** | `f514623` | Smoke prod + sync API + health watchdog |
 | 2026-07-02 | **12** | `fc5f3cc` | Mobile + deep links + PWA |
 | 2026-07-02 | **11** | `50b812b` | Gamificação discreta |
 | 2026-07-02 | **10** | `480393a` | Rituais presets + nav condicional |
