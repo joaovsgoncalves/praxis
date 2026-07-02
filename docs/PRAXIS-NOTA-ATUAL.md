@@ -1,8 +1,8 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–14**
+**Data:** 2026-07-02 · **Após ondas 0–15**
 
-## Nota geral: **9,1 / 10**
+## Nota geral: **9,3 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
@@ -12,7 +12,7 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 | **Hábitos & tarefas** | 8,5 | Recorrência de tarefas com motor na API + badge “Próxima: dd/MM”. |
 | **Auth & confiança** | 8,0 | Sessão + login Praxis; API protegida. |
 | **UX / marca Praxis** | 7,5 | Legado Forja fora da UI; copy em PT; ainda há densidade em telas secundárias. |
-| **Voz & captura** | 6,0 | Fluxo existe; STT depende de VPS (`faster-whisper`); fila/revisão ainda leve. |
+| **Voz & captura** | 7,5 | Fila no servidor, 2× STT, `/capturas` para retry e continuar. |
 | **Foco & ideias** | 7,5 | Foco pós-sessão; pipeline ideias → tarefa com `source_idea_id`. |
 | **Revisão semanal / metas** | 8,0 | Weekly insights + wizard de metas com vínculo obrigatório. |
 | **Operação (deploy, alias, API)** | 8,5 | Smoke `npm run smoke:prod`, sync API, watchdog health; build gate `prepush:check`. |
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 15** — voz confiável (fila + retry STT).
+**Onda 16** — cockpit “o que estou evitando” + PraxIA leve.
 
 ---

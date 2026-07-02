@@ -242,11 +242,24 @@ Ver `docs/ONDA-14-RECORRENCIA.md`.
 
 ---
 
+## Onda 15 — Voz confiável
+
+| ID | Task | Status |
+|----|------|--------|
+| P15-T01 | Fila `capture_queue` + persistência de áudio | **done** |
+| P15-T02 | Retry STT 2× + retry manual | **done** |
+| P15-T03 | `/capturas` + integração Captura | **done** |
+
+Ver `docs/ONDA-15-VOZ.md`.
+
+---
+
 ## Registro de ondas (atualizar a cada entrega)
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **14** | (este commit) | Tarefas recorrentes motor + UI |
+| 2026-07-02 | **15** | (este commit) | Voz: fila captura + retry STT + revisar capturas |
+| 2026-07-02 | **14** | `593cdec` | Tarefas recorrentes motor + UI |
 | 2026-07-02 | **13** | `f514623` | Smoke prod + sync API + health watchdog |
 | 2026-07-02 | **12** | `fc5f3cc` | Mobile + deep links + PWA |
 | 2026-07-02 | **11** | `50b812b` | Gamificação discreta |

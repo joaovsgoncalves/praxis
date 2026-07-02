@@ -16,6 +16,15 @@ import {
 } from './praxisAuth.js';
 import { buildWeeklyInsights } from './lib/weeklyInsights.js';
 import { nextRecurrenceDate } from './taskRecurrence.js';
+import {
+  initCaptureQueueSchema,
+  listCaptures,
+  getCapture,
+  runCaptureTranscription,
+  saveCaptureParsedItems,
+  archiveCapture,
+  CAPTURE_STATUSES,
+} from './captureQueue.js';
 
 // Category constants
 const CATEGORIES = {
@@ -113,6 +122,11 @@ const COOKIE_SECURE = !['0', 'false', 'no'].includes(
 
 // File upload
 const UPLOAD_DIR = '/tmp/forja-uploads/';
+const CAPTURE_DIR = path.join(__dirname, 'uploads', 'captures');
+try {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  fs.mkdirSync(CAPTURE_DIR, { recursive: true });
+} catch {}
 const ALLOWED_AUDIO_MIME_TYPES = new Set([
   'audio/webm',
   'audio/wav',
@@ -307,6 +321,7 @@ for (const a of defaultAchievements) {
 }
 
 initAuthSchema(db);
+initCaptureQueueSchema(db);
 ensureDefaultUser(db);
 registerAuthRoutes(app, db, { secureCookie: COOKIE_SECURE });
 app.use(createApiAuthMiddleware({ db, apiKey: FORJA_API_KEY }));
@@ -543,6 +558,135 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     if (transcriptionSlotAcquired) activeTranscriptions = Math.max(0, activeTranscriptions - 1);
     safeUnlink(audioPath);
   }
+});
+
+function audioExtensionForMime(mime) {
+  if (!mime) return 'webm';
+  if (mime.includes('ogg')) return 'ogg';
+  if (mime.includes('wav')) return 'wav';
+  if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+  return 'webm';
+}
+
+function persistCaptureAudio(tempPath, captureId, mime) {
+  const ext = audioExtensionForMime(mime);
+  const destPath = path.join(CAPTURE_DIR, `${captureId}.${ext}`);
+  fs.copyFileSync(tempPath, destPath);
+  return destPath;
+}
+
+// ==================== CAPTURE QUEUE (voz) ====================
+app.get('/api/captures', (req, res) => {
+  const status = req.query.status || 'failed,transcribed,parsed';
+  const limit = req.query.limit || 30;
+  res.json(listCaptures(db, { status, limit }));
+});
+
+app.get('/api/captures/pending-count', (req, res) => {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM capture_queue WHERE status IN ('failed', 'transcribed', 'parsed')`,
+    )
+    .get();
+  res.json({ count: row?.n || 0 });
+});
+
+app.get('/api/captures/:id', (req, res) => {
+  const cap = getCapture(db, req.params.id);
+  if (!cap) return res.status(404).json({ error: 'Capture not found' });
+  res.json(cap);
+});
+
+app.post('/api/captures', upload.single('audio'), async (req, res) => {
+  const startedAt = Date.now();
+  let tempPath = null;
+  let slot = false;
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
+    if (activeTranscriptions >= MAX_ACTIVE_TRANSCRIPTIONS) {
+      return res.status(429).json({ error: 'Transcription busy. Tente de novo em instantes.' });
+    }
+    activeTranscriptions += 1;
+    slot = true;
+    tempPath = req.file.path;
+
+    const captureId = randomUUID();
+    const destPath = persistCaptureAudio(tempPath, captureId, req.file.mimetype);
+    safeUnlink(tempPath);
+    tempPath = null;
+
+    db.prepare(`
+      INSERT INTO capture_queue (id, status, audio_path, audio_mime, audio_bytes, attempt_count, max_attempts)
+      VALUES (?, ?, ?, ?, ?, 0, 2)
+    `).run(
+      captureId,
+      CAPTURE_STATUSES.PENDING,
+      destPath,
+      req.file.mimetype || 'audio/webm',
+      req.file.size || 0,
+    );
+
+    const result = runCaptureTranscription(db, captureId, {
+      runLocalTranscription,
+      startedAt,
+    });
+
+    if (!result.ok) {
+      const status = result.exhausted ? 503 : 422;
+      return res.status(status).json(result);
+    }
+    return res.json(result);
+  } catch (error) {
+    console.error('Capture enqueue error:', error);
+    return res.status(500).json({ error: 'Capture failed', detail: error.message });
+  } finally {
+    if (slot) activeTranscriptions = Math.max(0, activeTranscriptions - 1);
+    safeUnlink(tempPath);
+  }
+});
+
+app.post('/api/captures/:id/retry', async (req, res) => {
+  const startedAt = Date.now();
+  let slot = false;
+  try {
+    const cap = getCapture(db, req.params.id);
+    if (!cap) return res.status(404).json({ error: 'Capture not found' });
+    if (activeTranscriptions >= MAX_ACTIVE_TRANSCRIPTIONS) {
+      return res.status(429).json({ error: 'Transcription busy. Tente de novo em instantes.' });
+    }
+    activeTranscriptions += 1;
+    slot = true;
+    db.prepare(
+      `UPDATE capture_queue SET attempt_count = 0, error_message = NULL, updated_date = datetime('now') WHERE id = ?`,
+    ).run(req.params.id);
+
+    const result = runCaptureTranscription(db, req.params.id, {
+      runLocalTranscription,
+      startedAt,
+    });
+    if (!result.ok) {
+      return res.status(result.exhausted ? 503 : 422).json(result);
+    }
+    return res.json(result);
+  } catch (error) {
+    console.error('Capture retry error:', error);
+    return res.status(500).json({ error: 'Retry failed', detail: error.message });
+  } finally {
+    if (slot) activeTranscriptions = Math.max(0, activeTranscriptions - 1);
+  }
+});
+
+app.patch('/api/captures/:id', (req, res) => {
+  const cap = getCapture(db, req.params.id);
+  if (!cap) return res.status(404).json({ error: 'Capture not found' });
+  const { parsed_items: parsedItems, status } = req.body || {};
+  if (parsedItems !== undefined) {
+    return res.json(saveCaptureParsedItems(db, req.params.id, parsedItems));
+  }
+  if (status === CAPTURE_STATUSES.ARCHIVED) {
+    return res.json(archiveCapture(db, req.params.id));
+  }
+  return res.status(400).json({ error: 'Nothing to update' });
 });
 
 // ==================== TASKS ====================

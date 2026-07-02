@@ -213,6 +213,43 @@ export const forjaApi = {
   // Parse Voice (LLM)
   parseVoice: (text) => request('/api/parse-voice', { method: 'POST', body: JSON.stringify({ text }) }),
 
+  captures: {
+    list: (params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/api/captures${q ? `?${q}` : ''}`);
+    },
+    pendingCount: () => request('/api/captures/pending-count'),
+    get: (id) => request(`/api/captures/${id}`),
+    retry: (id) => request(`/api/captures/${id}/retry`, { method: 'POST', body: '{}' }),
+    saveParsed: (id, parsedItems) =>
+      request(`/api/captures/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ parsed_items: parsedItems }),
+      }),
+    archive: (id) =>
+      request(`/api/captures/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'archived' }),
+      }),
+    submitAudio: async (audioBlob) => {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'audio.webm');
+      const res = await fetch(`${FORJA_API}/api/captures`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(body.detail || body.error || 'Capture failed');
+        err.status = res.status;
+        err.body = body;
+        throw err;
+      }
+      return body;
+    },
+  },
+
   // Gamification
   gamification: {
     get: () => request('/api/gamification'),

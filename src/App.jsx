@@ -15,6 +15,7 @@ import Rituais from '@/pages/Rituais';
 import History from '@/pages/History';
 import Settings from '@/pages/Settings';
 import VoiceCapture from '@/pages/VoiceCapture';
+import CaptureInbox from '@/pages/CaptureInbox';
 import Achievements from '@/pages/Achievements';
 import WeeklyReview from '@/pages/WeeklyReview';
 import Login from '@/pages/Login';
@@ -74,6 +75,7 @@ const AuthenticatedApp = () => {
         <Route path="/historico" element={<History />} />
         <Route path="/configuracoes" element={<Settings />} />
         <Route path="/captura" element={<VoiceCapture />} />
+        <Route path="/capturas" element={<CaptureInbox />} />
         <Route path="/conquistas" element={<Achievements />} />
         <Route path="/revisao-semanal" element={<WeeklyReview />} />
       </Route>
