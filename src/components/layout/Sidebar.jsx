@@ -10,7 +10,7 @@ const navItems = [
   { path: '/habitos-tarefas', label: 'Hábitos & Tarefas', icon: ListTodo },
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
-  { path: '/metas', label: 'Metas', icon: Target },
+  { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
   { path: '/rituais', label: 'Rituais', icon: Link2 },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy },
   { path: '/revisao-semanal', label: 'Revisão Semanal', icon: BookOpen },
@@ -85,6 +85,17 @@ function SidebarGamificationBar() {
 
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
+  const { data: goals = [] } = useQuery({
+    queryKey: ['allGoals'],
+    queryFn: () => forjaApi.goals.list(),
+    staleTime: 60_000,
+  });
+  const activeGoalCount = goals.filter((g) => g.status === 'active').length;
+
+  const visibleNav = navItems.filter((item) => {
+    if (item.requiresActiveGoals) return activeGoalCount > 0;
+    return true;
+  });
 
   return (
     <>
@@ -113,7 +124,7 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Nav */}
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 space-y-1.5">
-          {navItems.map(item => {
+          {visibleNav.map(item => {
             const isActive = location.pathname === item.path;
             return (
               <Link

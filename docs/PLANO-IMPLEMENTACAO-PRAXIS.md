@@ -152,9 +152,9 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P9-T01 | Empty state metas: wizard 3 passos (meta → prazo → 1 hábito OU 1 tarefa) | M | Não salva meta “solta” sem vínculo | todo |
-| P9-T02 | Esconder nav “Metas” se zero metas ativas (feature flag user ou auto) | S | Sidebar condicional | todo |
-| P9-T03 | Card meta mostra progresso via linked tasks/habits | M | Goals.jsx | todo |
+| P9-T01 | Empty state metas: wizard 3 passos (meta → prazo → 1 hábito OU 1 tarefa) | M | Não salva meta “solta” sem vínculo | **done** |
+| P9-T02 | Esconder nav “Metas” se zero metas ativas (feature flag user ou auto) | S | Sidebar condicional | **done** |
+| P9-T03 | Card meta mostra progresso via linked tasks/habits | M | Goals.jsx | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **8** | (este commit) | Revisão semanal automática |
+| 2026-07-02 | **9** | (este commit) | Metas wizard + nav condicional |
+| 2026-07-02 | **8** | `d2e8623` | Revisão semanal automática |
 | 2026-07-02 | **7** | `5a8a1ad` | Ideias — status + virar tarefa |
 | 2026-07-02 | **6** | `55b64d1` | Modo Foco — pós-sessão + copy PT |
 | 2026-07-02 | **5** | `f74af68` | Hábitos & Tarefas — menos ruído |

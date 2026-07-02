@@ -1171,11 +1171,13 @@ app.get('/api/habits/:id/streak', (req, res) => {
 
 // ==================== HABIT LOGS ====================
 app.get('/api/habit-logs', (req, res) => {
-  const { date, habit_id } = req.query;
+  const { date, habit_id, from, to } = req.query;
   let query = 'SELECT * FROM habit_logs WHERE 1=1';
   const params = [];
 
   if (date) { query += ' AND date = ?'; params.push(date); }
+  if (from) { query += ' AND date >= ?'; params.push(from); }
+  if (to) { query += ' AND date <= ?'; params.push(to); }
   if (habit_id) { query += ' AND habit_id = ?'; params.push(habit_id); }
 
   const logs = db.prepare(query).all(...params);
@@ -1301,17 +1303,54 @@ app.get('/api/goals/:id', (req, res) => {
 
 app.post('/api/goals', (req, res) => {
   const id = randomUUID();
-  const { title, description = '', deadline, timeframe = 'short', category = 'personal', status = 'active', manual_progress = 0 } = req.body;
+  const {
+    title, description = '', deadline, timeframe = 'short', category = 'personal',
+    status = 'active', manual_progress = 0, initial_link,
+  } = req.body;
 
   if (!title) return res.status(400).json({ error: 'Title is required' });
+  if (!deadline) {
+    return res.status(400).json({ error: 'Deadline is required', code: 'goal_deadline_required' });
+  }
+  if (!initial_link || !initial_link.type || !['task', 'habit'].includes(initial_link.type)) {
+    return res.status(400).json({
+      error: 'Goal must include initial_link (task or habit)',
+      code: 'goal_link_required',
+    });
+  }
+  const linkTitle = (initial_link.title || title).trim();
+  if (!linkTitle) {
+    return res.status(400).json({ error: 'Link title is required', code: 'goal_link_title_required' });
+  }
 
   db.prepare(`
     INSERT INTO goals (id, title, description, deadline, timeframe, category, status, manual_progress)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, description, deadline || null, timeframe, category, status, manual_progress);
+  `).run(id, title, description, deadline, timeframe, category, status, manual_progress);
+
+  let linked = null;
+  if (initial_link.type === 'task') {
+    const taskId = randomUUID();
+    const taskDate = initial_link.date || deadline || getLocalDateString();
+    const sort = nextSortOrder('tasks');
+    db.prepare(`
+      INSERT INTO tasks (id, title, description, date, status, priority, category, goal_id, source, sort_order)
+      VALUES (?, ?, ?, ?, 'pending', 'medium', 'pessoal', ?, 'goal_wizard', ?)
+    `).run(taskId, linkTitle, description || '', taskDate, id, sort);
+    linked = { type: 'task', id: taskId, title: linkTitle };
+  } else {
+    const habitId = randomUUID();
+    const sort = nextSortOrder('habits');
+    const freq = initial_link.frequency || 'daily';
+    db.prepare(`
+      INSERT INTO habits (id, title, description, frequency, category, goal_id, source, sort_order, status)
+      VALUES (?, ?, ?, ?, 'wellness', ?, 'goal_wizard', ?, 'active')
+    `).run(habitId, linkTitle, description || '', freq, id, sort);
+    linked = { type: 'habit', id: habitId, title: linkTitle };
+  }
 
   const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(id);
-  res.status(201).json(goal);
+  res.status(201).json({ goal, linked });
 });
 
 app.put('/api/goals/:id', (req, res) => {

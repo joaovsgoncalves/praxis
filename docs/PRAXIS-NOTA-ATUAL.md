@@ -1,8 +1,8 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–8**
+**Data:** 2026-07-02 · **Após ondas 0–9**
 
-## Nota geral: **8,0 / 10**
+## Nota geral: **8,2 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Onda 9 — Metas** (progresso real + link tarefa ↔ meta).
+**Onda 10 — Rituais** (nav condicional + templates).
 
 ---

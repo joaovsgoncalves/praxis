@@ -24,7 +24,7 @@ export default function Login({ onSuccess }) {
       if (msg.includes('503') || status === 503) {
         setError('Login ainda não configurado no servidor. Defina PRAXIS_APP_PASSWORD na VPS.');
       } else if (msg.includes('401') || status === 401) {
-        setError('Senha incorreta. Confere maiúsculas (o V no final é maiúsculo) e tenta de novo.');
+        setError('Senha incorreta. Confere maiúsculas, símbolos e tenta de novo.');
       } else if (msg.includes('429') || status === 429) {
         setError('Muitas tentativas — espera uns 15 min e tenta de novo.');
       } else {
