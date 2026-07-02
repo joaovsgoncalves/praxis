@@ -299,7 +299,8 @@ Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
 **Onda 20:** `docs/ONDA-20-OPERACAO.md`  
 **Onda 21:** `docs/ONDA-21-VOZ-UX.md`  
 **Onda 22:** `docs/ONDA-22-LISTA.md`  
-**Onda 23:** `docs/ONDA-23-METAS-RITUAIS.md`
+**Onda 23:** `docs/ONDA-23-METAS-RITUAIS.md`  
+**Onda 24:** `docs/ONDA-24-ENTRADA-RAPIDA.md` · fechamento `docs/PRAXIS-FECHAMENTO-ONDAS-19-24.md`
 
 ---
 
@@ -307,6 +308,7 @@ Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
+| 2026-07-02 | **24** | `b622d1c` | Webhook texto + share PWA |
 | 2026-07-02 | **23** | `85c7246` | Metas templates + ritual Hoje + 3 tarefas/semana |
 | 2026-07-02 | **22** | `b95bd3c` | Lista: chips, arquivar, atrasadas |
 | 2026-07-02 | **21** | `236344f` | UX voz: fases, fila Hoje, erros PT |
