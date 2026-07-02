@@ -304,7 +304,8 @@ Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **19** | `309a6f1` | Smoke E2E tarefa + recorrência + voz |
+| 2026-07-02 | **20** | `66886e2` | Health cron + ship:api + redirect URL |
+| 2026-07-02 | **19** | `309a6f1` | Smoke E2E |
 | 2026-07-02 | **18** | `ad65b60` | Backup SQLite + checklist |
 | 2026-07-02 | **17** | `c717f84` | Nav mobile + PWA |
 | 2026-07-02 | **16** | `66a92a0` | Cockpit evitando + PraxIA |

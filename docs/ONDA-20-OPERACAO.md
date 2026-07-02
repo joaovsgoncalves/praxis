@@ -11,7 +11,7 @@
 
 **Use sempre:** https://praxis-jota.vercel.app  
 
-`forja-do-jota.vercel.app` → redirect **308** para `praxis-jota` (após deploy Vercel).
+`forja-do-jota.vercel.app` → redirect **308** para `praxis-jota` (`middleware.js` + `vercel.json`).
 
 ## Cron health (VPS)
 
