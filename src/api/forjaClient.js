@@ -107,7 +107,10 @@ export const forjaApi = {
     config: () => request('/api/auth/config'),
     me: () => request('/api/auth/me'),
     login: (password) =>
-      request('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) }),
+      request('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ password: String(password ?? '').trim() }),
+      }),
     logout: () => request('/api/auth/logout', { method: 'POST', body: '{}' }),
   },
 

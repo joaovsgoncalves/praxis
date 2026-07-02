@@ -12,18 +12,23 @@ export default function Login({ onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const pwd = password.trim();
+    if (!pwd) return;
     setLoading(true);
     try {
-      await forjaApi.auth.login(password);
-      onSuccess?.();
+      const session = await forjaApi.auth.login(pwd);
+      onSuccess?.(session);
     } catch (err) {
       const msg = err?.message || '';
-      if (msg.includes('503')) {
+      const status = err?.status;
+      if (msg.includes('503') || status === 503) {
         setError('Login ainda não configurado no servidor. Defina PRAXIS_APP_PASSWORD na VPS.');
-      } else if (msg.includes('401')) {
-        setError('Senha incorreta.');
+      } else if (msg.includes('401') || status === 401) {
+        setError('Senha incorreta. Confere maiúsculas (o V no final é maiúsculo) e tenta de novo.');
+      } else if (msg.includes('429') || status === 429) {
+        setError('Muitas tentativas — espera uns 15 min e tenta de novo.');
       } else {
-        setError('Não foi possível entrar. Tenta de novo.');
+        setError('Não foi possível entrar. Tenta de novo ou abre em aba anônima.');
       }
     } finally {
       setLoading(false);

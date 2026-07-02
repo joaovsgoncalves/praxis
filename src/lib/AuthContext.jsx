@@ -76,9 +76,16 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
-  const onLoginSuccess = () => {
+  const onLoginSuccess = (session) => {
     setAuthError(null);
-    checkUserAuth();
+    if (session?.user) {
+      setUser(session.user);
+      setIsAuthenticated(true);
+      setAuthChecked(true);
+      setIsLoadingAuth(false);
+    } else {
+      checkUserAuth();
+    }
   };
 
   const checkAppState = () => {};

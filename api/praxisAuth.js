@@ -220,14 +220,15 @@ export function registerAuthRoutes(app, db, { secureCookie = true } = {}) {
       return res.status(400).json({ error: 'Web auth is disabled on this server' });
     }
     const { password } = req.body || {};
-    if (!password || typeof password !== 'string') {
+    const normalized = typeof password === 'string' ? password.trim() : '';
+    if (!normalized) {
       return res.status(400).json({ error: 'Password is required' });
     }
     const user = db.prepare('SELECT * FROM praxis_users WHERE username = ?').get('jota');
     if (!user) {
       return res.status(503).json({ error: 'Login not configured. Set PRAXIS_APP_PASSWORD on the server.' });
     }
-    if (!bcrypt.compareSync(password, user.password_hash)) {
+    if (!bcrypt.compareSync(normalized, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid password' });
     }
     createSession(db, user.id, res, { secureCookie });
