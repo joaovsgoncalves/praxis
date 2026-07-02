@@ -305,6 +305,7 @@ Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
+| 2026-07-02 | **21** | `236344f` | UX voz: fases, fila Hoje, erros PT |
 | 2026-07-02 | **20** | `66886e2` | Health cron + ship:api + redirect URL |
 | 2026-07-02 | **19** | `309a6f1` | Smoke E2E |
 | 2026-07-02 | **18** | `ad65b60` | Backup SQLite + checklist |
