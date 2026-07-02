@@ -76,6 +76,7 @@ export default function HabitsTasks() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
+  const [editingHabit, setEditingHabit] = useState(null);
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
@@ -102,6 +103,16 @@ export default function HabitsTasks() {
   const createHabit = useMutation({
     mutationFn: (data) => forjaApi.habits.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allHabits'] }); queryClient.invalidateQueries({ queryKey: ['habits'] }); setShowHabitForm(false); },
+  });
+
+  const updateHabit = useMutation({
+    mutationFn: ({ id, data }) => forjaApi.habits.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['goalHabits'] });
+      setEditingHabit(null);
+    },
   });
 
   const deleteTask = useMutation({
@@ -190,6 +201,21 @@ export default function HabitsTasks() {
     if (orderedIds) reorderHabits.mutate(orderedIds);
   };
 
+  const confirmDeleteTask = (task) => {
+    const title = cleanPriorityPrefix(task.title);
+    const open = task.status === 'pending' || task.status === 'in_progress';
+    const message = open
+      ? `Excluir a tarefa aberta "${title}"? Isso não pode ser desfeito.`
+      : `Excluir a tarefa "${title}"? Isso não pode ser desfeito.`;
+    if (window.confirm(message)) deleteTask.mutate(task.id);
+  };
+
+  const confirmDeleteHabit = (habit) => {
+    const title = cleanPriorityPrefix(habit.title);
+    const message = `Excluir o hábito "${title}"? O histórico de check-ins também será apagado.`;
+    if (window.confirm(message)) deleteHabit.mutate(habit.id);
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
@@ -206,7 +232,11 @@ export default function HabitsTasks() {
             <Button onClick={() => setShowTaskForm(true)} className="h-10 rounded-full px-4 shadow-lg shadow-primary/20">
               <Plus className="mr-1.5 h-4 w-4" /> Tarefa
             </Button>
-            <Button onClick={() => setShowHabitForm(true)} className="h-10 rounded-full px-4" variant="outline">
+            <Button
+              onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
+              className="h-10 rounded-full px-4"
+              variant="outline"
+            >
               <Plus className="mr-1.5 h-4 w-4" /> Hábito
             </Button>
           </div>
@@ -340,7 +370,8 @@ export default function HabitsTasks() {
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => deleteTask.mutate(task.id)}
+                          type="button"
+                          onClick={() => confirmDeleteTask(task)}
                           className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           aria-label={`Excluir ${cleanPriorityPrefix(task.title)}`}
                         >
@@ -425,7 +456,16 @@ export default function HabitsTasks() {
                             onMoveDown={() => moveHabit(habit.id, 1)}
                           />
                           <button
-                            onClick={() => deleteHabit.mutate(habit.id)}
+                            type="button"
+                            onClick={() => { setShowHabitForm(false); setEditingHabit(habit); }}
+                            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                            aria-label={`Editar ${cleanPriorityPrefix(habit.title)}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => confirmDeleteHabit(habit)}
                             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                             aria-label={`Excluir ${cleanPriorityPrefix(habit.title)}`}
                           >
@@ -463,9 +503,27 @@ export default function HabitsTasks() {
       </Dialog>
 
       <Dialog open={showHabitForm} onOpenChange={setShowHabitForm}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Novo Hábito</DialogTitle></DialogHeader>
-          <HabitForm onSubmit={(data) => createHabit.mutate(data)} onCancel={() => setShowHabitForm(false)} />
+          <HabitForm
+            key="habit-create"
+            onSubmit={(data) => createHabit.mutate(data)}
+            onCancel={() => setShowHabitForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editingHabit)} onOpenChange={(open) => { if (!open) setEditingHabit(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar hábito</DialogTitle></DialogHeader>
+          {editingHabit && (
+            <HabitForm
+              key={editingHabit.id}
+              initial={editingHabit}
+              onSubmit={(data) => updateHabit.mutate({ id: editingHabit.id, data })}
+              onCancel={() => setEditingHabit(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

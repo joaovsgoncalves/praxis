@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {} }) {
+  const isEditing = Boolean(initial.id);
+
   const [form, setForm] = useState({
     title: initial.title || '',
     description: initial.description || '',
@@ -60,7 +62,9 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
       )}
       <div className="flex gap-2 justify-end">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>}
-        <Button type="submit" className="bg-primary hover:bg-primary/90">Criar Hábito</Button>
+        <Button type="submit" className="bg-primary hover:bg-primary/90">
+          {isEditing ? 'Salvar alterações' : 'Criar Hábito'}
+        </Button>
       </div>
     </form>
   );
