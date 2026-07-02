@@ -7,10 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, CheckCircle2, Circle, Clock, Trash2, Flame, ArrowUp, ArrowDown, Pencil, MoreHorizontal, Pause, Play, Archive } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import HabitForm from '@/components/habits-tasks/HabitForm';
+import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
+import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
@@ -24,13 +26,11 @@ import {
   isQuantitativeHabit,
   todayLogForHabit,
 } from '@/lib/habits';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+
+function cleanPriorityPrefix(title = '') {
+  const cleaned = String(title).replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
+  return cleaned || title;
+}
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -44,45 +44,6 @@ const priorityLabels = {
   low: 'Baixa',
 };
 
-function cleanPriorityPrefix(title = '') {
-  const cleaned = String(title).replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
-  return cleaned || title;
-}
-
-function ReorderControls({ onMoveUp, onMoveDown, disableUp, disableDown, busy, label }) {
-  return (
-    <div className="flex gap-1" aria-label={`Reordenar ${label}`}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 rounded-full text-muted-foreground hover:bg-white/5 hover:text-foreground"
-        onClick={onMoveUp}
-        disabled={busy || disableUp}
-        aria-label={`Subir ${label}`}
-        title="Subir"
-      >
-        <ArrowUp className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 rounded-full text-muted-foreground hover:bg-white/5 hover:text-foreground"
-        onClick={onMoveDown}
-        disabled={busy || disableDown}
-        aria-label={`Descer ${label}`}
-        title="Descer"
-      >
-        <ArrowDown className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-const statusLabels = { pending: 'Pendente', in_progress: 'Em andamento', completed: 'Concluída', cancelled: 'Cancelada' };
-// categoryLabels replaced by CATEGORIES from @/lib/categories
-
 export default function HabitsTasks() {
   const [view, setView] = useState('all');
   const [habitStatusFilter, setHabitStatusFilter] = useState('active');
@@ -92,6 +53,7 @@ export default function HabitsTasks() {
   const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
+  const [noiseDialogOpen, setNoiseDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
@@ -105,6 +67,17 @@ export default function HabitsTasks() {
   const { data: activeHabitsList = [] } = useQuery({
     queryKey: ['habits', 'active'],
     queryFn: () => forjaApi.habits.list({ status: 'active' }),
+  });
+  const { data: userSettings } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => forjaApi.user.getSettings(),
+    staleTime: 60_000,
+  });
+  const compact = userSettings?.list_density === 'compact';
+
+  const updateListDensity = useMutation({
+    mutationFn: (list_density) => forjaApi.user.updateSettings({ list_density }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
   });
 
   const createTask = useMutation({
@@ -204,6 +177,20 @@ export default function HabitsTasks() {
     },
   });
 
+  const bulkCancelTasks = useMutation({
+    mutationFn: async (ids) => {
+      for (const id of ids) {
+        await forjaApi.tasks.update(id, { status: 'cancelled' });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      setNoiseDialogOpen(false);
+    },
+  });
+
   const handleToggleHabit = (habit, isDone, evt) => {
     if (isQuantitativeHabit(habit) && !isDone) {
       const current = todayLogForHabit(habitLogs, habit.id, today);
@@ -244,6 +231,13 @@ export default function HabitsTasks() {
     (h) => isHabitDueOnDate(h, today)
   );
   const completedHabits = activeHabitsDueToday.filter((h) => isHabitCompletedToday(h.id)).length;
+  const habitsDayPct = activeHabitsDueToday.length
+    ? Math.round((completedHabits / activeHabitsDueToday.length) * 100)
+    : 0;
+
+  const noiseTasks = tasks.filter(
+    (t) => (t.status === 'pending' || t.status === 'in_progress') && t.date && t.date < today,
+  );
 
   const moveTask = (taskId, direction) => {
     const orderedIds = buildMovedOrder(tasks, filteredTasks, taskId, direction);
@@ -330,7 +324,34 @@ export default function HabitsTasks() {
             </TabsList>
           </Tabs>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-full gap-1.5"
+              disabled={updateListDensity.isPending}
+              onClick={() => updateListDensity.mutate(compact ? 'comfortable' : 'compact')}
+              title={compact ? 'Modo confortável' : 'Modo compacto'}
+            >
+              {compact ? <AlignJustify className="h-4 w-4" /> : <Rows3 className="h-4 w-4" />}
+              {compact ? 'Confortável' : 'Compacto'}
+            </Button>
+            {noiseTasks.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={() => setNoiseDialogOpen(true)}
+              >
+                <Eraser className="h-4 w-4" />
+                Limpar ruído ({noiseTasks.length})
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 xl:justify-end">
             <button
               onClick={() => setCategoryFilter('all')}
               className={cn(
@@ -384,57 +405,63 @@ export default function HabitsTasks() {
               <div className="space-y-3">
                 {filteredTasks.map((task, index) => (
                   <Card key={task.id} className="card-domain domain-ember overflow-hidden bg-card/75">
-                    <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                    <CardContent
+                      className={cn(
+                        'flex items-center gap-2 sm:gap-3',
+                        compact ? 'p-2.5 sm:p-3' : 'flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5',
+                      )}
+                    >
                       <button
                         onClick={() => toggleTask.mutate(task)}
-                        className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground sm:mt-0"
+                        className="shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground"
                         aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
                       >
                         {task.status === 'completed' ? (
-                          <CheckCircle2 className="h-5 w-5 text-accent" />
+                          <CheckCircle2 className={cn(compact ? 'h-4 w-4' : 'h-5 w-5', 'text-accent')} />
                         ) : (
-                          <Circle className="h-5 w-5" />
+                          <Circle className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
                         )}
                       </button>
 
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <p className={cn('text-base font-semibold leading-snug', task.status === 'completed' && 'line-through opacity-60')}>
-                          {cleanPriorityPrefix(task.title)}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {task.date && <Badge variant="outline" className="text-xs">{task.date}</Badge>}
-                          {task.time && <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{task.time}</Badge>}
-                          <Badge className={cn('text-xs', priorityStyles[task.priority])}>{priorityLabels[task.priority] || task.priority}</Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', compact && 'gap-1')}>
+                          <p
+                            className={cn(
+                              'font-semibold leading-snug',
+                              compact ? 'text-sm truncate max-w-full' : 'text-base',
+                              task.status === 'completed' && 'line-through opacity-60',
+                            )}
+                          >
+                            {cleanPriorityPrefix(task.title)}
+                          </p>
+                          {task.time && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">
+                              <Clock className="mr-0.5 h-3 w-3" />
+                              {String(task.time).slice(0, 5)}
+                            </Badge>
+                          )}
+                          <Badge className={cn('text-[10px] sm:text-xs shrink-0', priorityStyles[task.priority])}>
+                            {priorityLabels[task.priority] || task.priority}
+                          </Badge>
                           <CategoryBadge category={task.category} />
                         </div>
+                        {!compact && task.date && (
+                          <div className="mt-1.5 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-xs">{task.date}</Badge>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center">
-                        <ReorderControls
-                          label={cleanPriorityPrefix(task.title)}
-                          busy={reorderTasks.isPending}
-                          disableUp={index === 0}
-                          disableDown={index === filteredTasks.length - 1}
-                          onMoveUp={() => moveTask(task.id, -1)}
-                          onMoveDown={() => moveTask(task.id, 1)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setEditingTask(task)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                          aria-label={`Editar ${cleanPriorityPrefix(task.title)}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => confirmDeleteTask(task)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`Excluir ${cleanPriorityPrefix(task.title)}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <TaskRowMenu
+                        label={cleanPriorityPrefix(task.title)}
+                        busy={reorderTasks.isPending}
+                        disableUp={index === 0}
+                        disableDown={index === filteredTasks.length - 1}
+                        onMoveUp={() => moveTask(task.id, -1)}
+                        onMoveDown={() => moveTask(task.id, 1)}
+                        onEdit={() => setEditingTask(task)}
+                        onDelete={() => confirmDeleteTask(task)}
+                      />
                     </CardContent>
                   </Card>
                 ))}
@@ -463,6 +490,26 @@ export default function HabitsTasks() {
               </Select>
             </div>
 
+            {habitStatusFilter === 'active' && activeHabitsDueToday.length > 0 && (
+              <div className="space-y-1.5 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Hábitos de hoje</span>
+                  <span>
+                    {completedHabits}/{activeHabitsDueToday.length} · {habitsDayPct}%
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-secondary rail-inset">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${habitsDayPct}%`,
+                      background: 'linear-gradient(90deg, hsl(var(--domain-wellness)), hsl(var(--domain-ember)))',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {filteredHabits.length === 0 ? (
               <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhum hábito registrado</CardContent></Card>
             ) : (
@@ -482,121 +529,82 @@ export default function HabitsTasks() {
                         done && 'border-domain-wellness/30 bg-domain-wellness/10'
                       )}
                     >
-                      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5 xl:items-start">
-                        {canCheckIn ? (
-                        <button
-                          type="button"
-                          onClick={(evt) => handleToggleHabit(habit, done, evt)}
-                          disabled={toggleHabit.isPending}
-                          className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 sm:mt-0"
-                          aria-label={`${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`}
-                          title={done ? 'Desmarcar hábito de hoje' : quant ? 'Registrar valor de hoje' : 'Concluir hábito de hoje'}
-                        >
-                          {done ? (
-                            <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
-                          ) : (
-                            <Circle className="h-5 w-5" />
-                          )}
-                        </button>
-                        ) : (
-                          <div className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+                      <CardContent
+                        className={cn(
+                          'flex items-center gap-2 sm:gap-3',
+                          compact ? 'p-2.5 sm:p-3' : 'flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5',
                         )}
-                        <Flame className={cn('mt-0.5 h-5 w-5 shrink-0 text-primary', done && 'text-domain-wellness')} />
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className={cn('text-base font-semibold leading-snug', done && 'text-domain-wellness line-through opacity-80')}>
+                      >
+                        {canCheckIn ? (
+                          <button
+                            type="button"
+                            onClick={(evt) => handleToggleHabit(habit, done, evt)}
+                            disabled={toggleHabit.isPending}
+                            className="shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                            aria-label={`${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`}
+                          >
+                            {done ? (
+                              <CheckCircle2 className={cn(compact ? 'h-4 w-4' : 'h-5 w-5', 'text-domain-wellness')} />
+                            ) : (
+                              <Circle className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+                            )}
+                          </button>
+                        ) : (
+                          <div className={cn('shrink-0', compact ? 'h-4 w-4' : 'h-5 w-5')} aria-hidden />
+                        )}
+                        {!compact && (
+                          <Flame className={cn('shrink-0 h-5 w-5 text-primary', done && 'text-domain-wellness')} />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', compact && 'gap-1')}>
+                            <p
+                              className={cn(
+                                'font-semibold leading-snug',
+                                compact ? 'text-sm truncate' : 'text-base',
+                                done && 'text-domain-wellness line-through opacity-80',
+                              )}
+                            >
                               {cleanPriorityPrefix(habit.title)}
                             </p>
                             <CategoryBadge category={habit.category} />
-                            {done && (
-                              <Badge className="border-domain-wellness/30 bg-domain-wellness/15 text-domain-wellness">
-                                Feito hoje
-                              </Badge>
+                            {habit.current_streak > 0 && (
+                              <span className="text-[10px] text-orange-400 shrink-0">🔥{habit.current_streak}</span>
                             )}
                             {habit.status !== 'active' && (
-                              <Badge variant="outline" className="text-xs">
-                                {HABIT_STATUS_LABELS[habit.status] || habit.status}
+                              <Badge variant="outline" className="text-[10px]">
+                                {HABIT_STATUS_LABELS[habit.status]}
                               </Badge>
                             )}
-                            {habit.current_streak > 0 && (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs text-orange-400">
-                                🔥 {habit.current_streak}
-                              </span>
-                            )}
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {formatFrequencyLabel(habit)}
-                            {quant && habit.target_value ? ` · meta ${habit.target_value}${habit.unit ? ` ${habit.unit}` : ''}` : ''}
-                          </Badge>
-                          {quant && todayLog?.value != null && (
-                            <p className="text-xs text-muted-foreground">
-                              Hoje: {todayLog.value}{habit.unit ? ` ${habit.unit}` : ''}
-                              {Number(habit.target_value) > 0 ? ` / ${habit.target_value}` : ''}
-                            </p>
-                          )}
-                          {!dueToday && habit.status === 'active' && (
-                            <p className="text-xs text-muted-foreground">Não previsto para hoje</p>
+                          {!compact && (
+                            <>
+                              <Badge variant="outline" className="mt-1.5 text-xs">
+                                {formatFrequencyLabel(habit)}
+                              </Badge>
+                              {quant && todayLog?.value != null && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Hoje: {todayLog.value}
+                                  {habit.unit ? ` ${habit.unit}` : ''}
+                                </p>
+                              )}
+                              {!dueToday && habit.status === 'active' && (
+                                <p className="text-xs text-muted-foreground">Não previsto para hoje</p>
+                              )}
+                            </>
                           )}
                         </div>
-
-                        <div className="flex shrink-0 items-center gap-1 self-end rounded-full border border-white/5 bg-black/20 p-1 sm:self-center xl:self-start">
-                          <ReorderControls
-                            label={cleanPriorityPrefix(habit.title)}
-                            busy={reorderHabits.isPending}
-                            disableUp={index === 0}
-                            disableDown={index === filteredHabits.length - 1}
-                            onMoveUp={() => moveHabit(habit.id, -1)}
-                            onMoveDown={() => moveHabit(habit.id, 1)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => { setShowHabitForm(false); setEditingHabit(habit); }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                            aria-label={`Editar ${cleanPriorityPrefix(habit.title)}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                                aria-label={`Mais ações — ${cleanPriorityPrefix(habit.title)}`}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              {habit.status === 'active' && (
-                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'paused' })}>
-                                  <Pause className="mr-2 h-4 w-4" /> Pausar
-                                </DropdownMenuItem>
-                              )}
-                              {habit.status === 'paused' && (
-                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'active' })}>
-                                  <Play className="mr-2 h-4 w-4" /> Retomar
-                                </DropdownMenuItem>
-                              )}
-                              {habit.status !== 'archived' && (
-                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'archived' })}>
-                                  <Archive className="mr-2 h-4 w-4" /> Arquivar
-                                </DropdownMenuItem>
-                              )}
-                              {habit.status === 'archived' && (
-                                <DropdownMenuItem onClick={() => setHabitStatus.mutate({ id: habit.id, status: 'active' })}>
-                                  <Play className="mr-2 h-4 w-4" /> Reativar
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={() => confirmDeleteHabit(habit)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" /> Excluir definitivo
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        <HabitRowMenu
+                          label={cleanPriorityPrefix(habit.title)}
+                          habit={habit}
+                          busy={reorderHabits.isPending}
+                          disableUp={index === 0}
+                          disableDown={index === filteredHabits.length - 1}
+                          onMoveUp={() => moveHabit(habit.id, -1)}
+                          onMoveDown={() => moveHabit(habit.id, 1)}
+                          onEdit={() => { setShowHabitForm(false); setEditingHabit(habit); }}
+                          onDelete={() => confirmDeleteHabit(habit)}
+                          onSetStatus={(status) => setHabitStatus.mutate({ id: habit.id, status })}
+                        />
                       </CardContent>
                     </Card>
                   );
@@ -651,6 +659,14 @@ export default function HabitsTasks() {
           )}
         </DialogContent>
       </Dialog>
+
+      <NoiseCleanupDialog
+        open={noiseDialogOpen}
+        onOpenChange={setNoiseDialogOpen}
+        tasks={noiseTasks}
+        busy={bulkCancelTasks.isPending}
+        onConfirm={(ids) => bulkCancelTasks.mutate(ids)}
+      />
 
       <VoiceCaptureButton />
     </div>

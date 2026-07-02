@@ -393,6 +393,10 @@ const habitLogsCols = db.prepare("PRAGMA table_info(habit_logs)").all().map(c =>
 if (!habitLogsCols.includes('value')) {
   db.exec('ALTER TABLE habit_logs ADD COLUMN value REAL');
 }
+const settingsCols = db.prepare("PRAGMA table_info(user_settings)").all().map((c) => c.name);
+if (!settingsCols.includes('list_density')) {
+  db.exec("ALTER TABLE user_settings ADD COLUMN list_density TEXT DEFAULT 'comfortable'");
+}
 const tasksCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
 if (!tasksCols.includes('goal_id')) {
   db.exec("ALTER TABLE tasks ADD COLUMN goal_id TEXT");
@@ -1290,16 +1294,26 @@ app.get('/api/user/settings', (req, res) => {
     pomodoro_break: settings.pomodoro_break,
     notif_habits: settings.notif_habits,
     notif_goals: settings.notif_goals,
+    list_density: settings.list_density || 'comfortable',
   });
 });
 
 app.put('/api/user/settings', (req, res) => {
-  const { full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals } = req.body;
+  const { full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals, list_density } = req.body;
 
   // Ensure row exists
   const existing = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
   if (!existing) {
     db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
+  }
+
+  let density = list_density;
+  if (density !== undefined && density !== null) {
+    const d = String(density);
+    if (!['compact', 'comfortable'].includes(d)) {
+      return res.status(400).json({ error: 'list_density must be compact or comfortable' });
+    }
+    density = d;
   }
 
   db.prepare(`
@@ -1309,9 +1323,10 @@ app.put('/api/user/settings', (req, res) => {
       pomodoro_focus = COALESCE(?, pomodoro_focus),
       pomodoro_break = COALESCE(?, pomodoro_break),
       notif_habits = COALESCE(?, notif_habits),
-      notif_goals = COALESCE(?, notif_goals)
+      notif_goals = COALESCE(?, notif_goals),
+      list_density = COALESCE(?, list_density)
     WHERE id = 'default'
-  `).run(full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals);
+  `).run(full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals, density ?? null);
 
   const settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
   res.json({
@@ -1323,6 +1338,7 @@ app.put('/api/user/settings', (req, res) => {
     pomodoro_break: settings.pomodoro_break,
     notif_habits: settings.notif_habits,
     notif_goals: settings.notif_goals,
+    list_density: settings.list_density || 'comfortable',
   });
 });
 

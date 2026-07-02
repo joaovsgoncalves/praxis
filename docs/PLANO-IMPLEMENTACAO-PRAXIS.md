@@ -109,11 +109,11 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P5-T01 | Card compacto: sempre visível checkbox + título + horário/prioridade/categoria | M | Layout mobile OK | todo |
-| P5-T02 | Menu ⋯: subir, descer, editar, excluir | M | Mesmas ações, menos botões | todo |
-| P5-T03 | Modo compacto toggle (densidade) persistido em `user settings` | M | Settings ou ícone na página | todo |
-| P5-T04 | Barra progresso hábitos do dia (já existe parcial no header — unificar) | S | Uma barra clara na seção hábitos | todo |
-| P5-T05 | Botão “Limpar ruído”: cancelar pendentes antigas selecionadas com confirmação em lote | L | Opcional; não apagar sem confirm | todo |
+| P5-T01 | Card compacto: sempre visível checkbox + título + horário/prioridade/categoria | M | Layout mobile OK | **done** |
+| P5-T02 | Menu ⋯: subir, descer, editar, excluir | M | Mesmas ações, menos botões | **done** |
+| P5-T03 | Modo compacto toggle (densidade) persistido em `user settings` | M | Settings ou ícone na página | **done** (`list_density`) |
+| P5-T04 | Barra progresso hábitos do dia (já existe parcial no header — unificar) | S | Uma barra clara na seção hábitos | **done** |
+| P5-T05 | Botão “Limpar ruído”: cancelar pendentes antigas selecionadas com confirmação em lote | L | Opcional; não apagar sem confirm | **done** |
 
 ---
 
@@ -221,7 +221,8 @@
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **4** | (este commit) | Dashboard Agora — NowBlock + cockpit |
+| 2026-07-02 | **5** | (este commit) | Hábitos & Tarefas — menos ruído |
+| 2026-07-02 | **4** | `02a09fd` | Dashboard Agora — NowBlock + cockpit |
 | 2026-07-02 | **3** | `22559a4` | Hábitos — ciclo de vida + quant + frequência |
 | 2026-07-02 | **2** | `7d8ab43` | UX Praxis — legado Forja fora da UI |
 | 2026-07-02 | **1** | `a5010e8` | Auth sessão + login Praxis |
