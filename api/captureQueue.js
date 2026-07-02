@@ -30,6 +30,10 @@ export function initCaptureQueueSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_capture_queue_status ON capture_queue(status);
   `);
+  const cols = db.prepare('PRAGMA table_info(capture_queue)').all().map((c) => c.name);
+  if (!cols.includes('source')) {
+    db.exec("ALTER TABLE capture_queue ADD COLUMN source TEXT DEFAULT 'voice'");
+  }
 }
 
 export function rowToCapture(row) {
@@ -177,4 +181,42 @@ export function saveCaptureParsedItems(db, captureId, items) {
 export function archiveCapture(db, captureId) {
   touchCapture(db, captureId, { status: CAPTURE_STATUSES.ARCHIVED });
   return getCapture(db, captureId);
+}
+
+/** Texto rápido (Telegram webhook, share PWA, app) — pula STT. */
+export function enqueueTextCapture(db, { text, source = 'text' }) {
+  const trimmed = String(text || '').trim();
+  if (trimmed.length < 2) {
+    return { ok: false, error: 'Text too short', code: 'text_empty' };
+  }
+  if (trimmed.length > 8000) {
+    return { ok: false, error: 'Text too long', code: 'text_too_long' };
+  }
+  const captureId = randomUUID();
+  const transcriptionId = randomUUID();
+  db.prepare(`
+    INSERT INTO transcriptions (id, audio_path, text, language, duration_ms)
+    VALUES (?, '', ?, 'pt', 0)
+  `).run(transcriptionId, trimmed);
+  db.prepare(`
+    INSERT INTO capture_queue (
+      id, status, audio_path, audio_mime, audio_bytes,
+      transcription_id, transcript, source, attempt_count, max_attempts
+    )
+    VALUES (?, ?, NULL, NULL, 0, ?, ?, ?, 0, 0)
+  `).run(
+    captureId,
+    CAPTURE_STATUSES.TRANSCRIBED,
+    transcriptionId,
+    trimmed,
+    source,
+  );
+  return {
+    ok: true,
+    capture_id: captureId,
+    id: transcriptionId,
+    text: trimmed,
+    status: CAPTURE_STATUSES.TRANSCRIBED,
+    source,
+  };
 }

@@ -149,6 +149,7 @@ export const PUBLIC_API_PATHS = new Set([
   '/api/health',
   '/api/auth/login',
   '/api/auth/config',
+  '/api/webhooks/capture-text',
 ]);
 
 export function createApiAuthMiddleware({ db, apiKey }) {

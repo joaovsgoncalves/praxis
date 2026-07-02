@@ -20,6 +20,14 @@ const STATUS_LABELS = {
   pending: { label: 'Na fila', variant: 'outline' },
 };
 
+const SOURCE_LABELS = {
+  voice: 'Voz',
+  text: 'Texto',
+  share: 'Compartilhar',
+  telegram: 'Telegram',
+  app: 'App',
+};
+
 function formatWhen(iso) {
   if (!iso) return '';
   try {
@@ -110,6 +118,11 @@ export default function CaptureInbox() {
                   <Badge variant={meta.variant === 'destructive' ? 'destructive' : 'outline'}>
                     {meta.label}
                   </Badge>
+                  {cap.source && cap.source !== 'voice' && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {SOURCE_LABELS[cap.source] || cap.source}
+                    </Badge>
+                  )}
                   <span className="text-xs text-muted-foreground">{formatWhen(cap.updated_date || cap.created_date)}</span>
                 </div>
                 <p className="text-sm italic text-muted-foreground">&quot;{preview}&quot;</p>

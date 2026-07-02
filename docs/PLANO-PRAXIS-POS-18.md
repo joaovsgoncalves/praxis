@@ -120,16 +120,14 @@ Ver `docs/ONDA-21-VOZ-UX.md`.
 
 ---
 
-## Onda 24 — Entrada rápida (futuro)
+## Onda 24 — Entrada rápida
 
-Só se fizer sentido depois do EncarteZap estável.
+| ID | Entrega | Status |
+|----|---------|--------|
+| P24-T01 | Webhook texto → `capture_queue` | **done** |
+| P24-T02 | Share target PWA → `/compartilhar` | **done** |
 
-| ID | Ideia |
-|----|--------|
-| P24-T01 | Webhook ou bot Telegram → fila `capture_queue` (texto) |
-| P24-T02 | Compartilhar para Praxis (mobile share target PWA) |
-
-**Não priorizar** enquanto Praxis ainda não estiver 9,5 na confiança.
+Ver `docs/ONDA-24-ENTRADA-RAPIDA.md`. Bot Telegram = plug no webhook (fora do escopo mínimo).
 
 ---
 

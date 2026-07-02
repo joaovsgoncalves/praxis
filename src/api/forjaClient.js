@@ -225,6 +225,11 @@ export const forjaApi = {
     },
     pendingCount: () => request('/api/captures/pending-count'),
     get: (id) => request(`/api/captures/${id}`),
+    createText: (text, source = 'share') =>
+      request('/api/captures/text', {
+        method: 'POST',
+        body: JSON.stringify({ text, source }),
+      }),
     retry: async (id) => {
       const res = await fetch(`${FORJA_API}/api/captures/${id}/retry`, {
         method: 'POST',

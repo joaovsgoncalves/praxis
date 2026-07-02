@@ -25,6 +25,7 @@ import {
   saveCaptureParsedItems,
   archiveCapture,
   CAPTURE_STATUSES,
+  enqueueTextCapture,
 } from './captureQueue.js';
 
 // Category constants
@@ -67,6 +68,7 @@ function loadEnvFile(filePath, allowedPrefixes = []) {
 
 loadEnvFile('/root/.openclaw/secrets/gog.env', ['GOG_']);
 loadEnvFile('/root/.hermes/secrets/gog.env', ['GOG_']);
+loadEnvFile('/root/.hermes/secrets/forja-api.env', ['PRAXIS_', 'FORJA_']);
 
 // Load OpenAI API key
 let OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -151,6 +153,7 @@ let activeTranscriptions = 0;
 const MAX_ACTIVE_TRANSCRIPTIONS = Number(process.env.FORJA_MAX_ACTIVE_TRANSCRIPTIONS || 1);
 const TRANSCRIBE_TIMEOUT_MS = Number(process.env.FORJA_TRANSCRIBE_TIMEOUT_MS || 120000);
 const TRANSCRIBE_PYTHON = process.env.FORJA_TRANSCRIBE_PYTHON || '/root/.hermes/venvs/forja-stt/bin/python3';
+const CAPTURE_WEBHOOK_SECRET = String(process.env.PRAXIS_CAPTURE_WEBHOOK_SECRET || '').trim();
 
 // Database
 const db = new Database(path.join(__dirname, 'forja.db'));
@@ -669,6 +672,42 @@ app.post('/api/captures', upload.single('audio'), async (req, res) => {
     if (slot) activeTranscriptions = Math.max(0, activeTranscriptions - 1);
     safeUnlink(tempPath);
   }
+});
+
+function handleTextCapture(req, res, source) {
+  const body = req.body || {};
+  const text =
+    body.text
+    ?? body.message
+    ?? (body.title && body.url ? `${body.title}\n${body.url}` : null)
+    ?? body.title
+    ?? '';
+  const result = enqueueTextCapture(db, {
+    text,
+    source: body.source || source,
+  });
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.status(201).json(result);
+}
+
+app.post('/api/captures/text', (req, res) => {
+  return handleTextCapture(req, res, 'app');
+});
+
+app.post('/api/webhooks/capture-text', (req, res) => {
+  if (!CAPTURE_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Webhook not configured', code: 'webhook_disabled' });
+  }
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ')
+    ? header.slice(7)
+    : String(req.headers['x-praxis-capture-token'] || '');
+  if (!token || token !== CAPTURE_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized', code: 'webhook_unauthorized' });
+  }
+  return handleTextCapture(req, res, 'telegram');
 });
 
 app.post('/api/captures/:id/retry', async (req, res) => {

@@ -1,6 +1,6 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após onda 23** · `docs/ONDA-23-METAS-RITUAIS.md`
+**Data:** 2026-07-02 · **Após onda 24** · `docs/PRAXIS-FECHAMENTO-ONDAS-19-24.md`
 
 ## Notas (duas leituras)
 
@@ -17,7 +17,7 @@
 | **Hábitos & tarefas** | 9,2 | Chips + arquivar em lote + atrasadas |
 | **Auth & confiança** | 9,0 | Login prod; API 401 anônima |
 | **UX / marca Praxis** | 8,5 | PWA; uso mobile = você |
-| **Voz & captura** | 9,0 | Fases UX + fila no Hoje + revisar capturas |
+| **Voz & captura** | 9,2 | Voz + texto/share + webhook |
 | **Foco & ideias** | 8,0 | Fora do smoke |
 | **Revisão semanal / metas** | 9,2 | 3 tarefas da semana + templates meta |
 | **Operação** | 9,6 | Backup + health cron + drift check |

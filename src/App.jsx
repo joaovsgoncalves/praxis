@@ -18,6 +18,7 @@ import VoiceCapture from '@/pages/VoiceCapture';
 import CaptureInbox from '@/pages/CaptureInbox';
 import Achievements from '@/pages/Achievements';
 import WeeklyReview from '@/pages/WeeklyReview';
+import ShareCapture from '@/pages/ShareCapture';
 import Login from '@/pages/Login';
 
 const AuthenticatedApp = () => {
@@ -75,6 +76,7 @@ const AuthenticatedApp = () => {
         <Route path="/historico" element={<History />} />
         <Route path="/configuracoes" element={<Settings />} />
         <Route path="/captura" element={<VoiceCapture />} />
+        <Route path="/compartilhar" element={<ShareCapture />} />
         <Route path="/capturas" element={<CaptureInbox />} />
         <Route path="/conquistas" element={<Achievements />} />
         <Route path="/revisao-semanal" element={<WeeklyReview />} />
