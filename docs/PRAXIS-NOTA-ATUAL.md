@@ -1,8 +1,8 @@
 # Praxis — nota de produto (atual)
 
-**Data:** 2026-07-02 · **Após ondas 0–16**
+**Data:** 2026-07-02 · **Após ondas 0–17**
 
-## Nota geral: **9,5 / 10**
+## Nota geral: **9,7 / 10**
 
 Escala: 10 = app diário confiável, claro e “executável” para o João; 5 = protótipo bonito com buracos operacionais.
 
@@ -11,7 +11,7 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 | **Clareza do dia (cockpit)** | 8,5 | Agora + **O que estou evitando?** + PraxIA espelho. |
 | **Hábitos & tarefas** | 8,5 | Recorrência de tarefas com motor na API + badge “Próxima: dd/MM”. |
 | **Auth & confiança** | 8,0 | Sessão + login Praxis; API protegida. |
-| **UX / marca Praxis** | 7,5 | Legado Forja fora da UI; copy em PT; ainda há densidade em telas secundárias. |
+| **UX / marca Praxis** | 8,5 | Nav inferior no celular, títulos no top bar, PWA shortcuts. |
 | **Voz & captura** | 7,5 | Fila no servidor, 2× STT, `/capturas` para retry e continuar. |
 | **Foco & ideias** | 7,5 | Foco pós-sessão; pipeline ideias → tarefa com `source_idea_id`. |
 | **Revisão semanal / metas** | 8,0 | Weekly insights + wizard de metas com vínculo obrigatório. |
@@ -29,6 +29,6 @@ Escala: 10 = app diário confiável, claro e “executável” para o João; 5 =
 4. **Voz**: fila persistente + revisão em lote (melhoria além do plano por fase).
 
 ## Próximo passo recomendado
-**Ondas 17–18** — polish celular, backup SQLite, checklist 10/10.
+**Onda 18** — backup SQLite agendado + checklist 10/10.
 
 ---

@@ -1,20 +1,30 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Mic } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+/** FAB de voz — só em telas grandes; no celular use a barra inferior. */
 export default function VoiceCaptureButton() {
+  const location = useLocation();
+  const hideOnRoute =
+    location.pathname === '/captura' ||
+    location.pathname === '/capturas' ||
+    location.pathname === '/login';
+
+  if (hideOnRoute) return null;
+
   return (
-    <Link to="/captura">
+    <Link to="/captura" className="hidden lg:block">
       <motion.div
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        className="fixed bottom-6 right-6 z-50 lg:bottom-8 lg:right-8"
+        className="fixed bottom-8 right-8 z-50"
+        style={{ bottom: 'max(2rem, env(safe-area-inset-bottom))' }}
       >
         <div className="relative">
-          <div className="absolute inset-0 bg-primary/30 rounded-full animate-ping" />
-          <div className="relative w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/25 cursor-pointer">
-            <Mic className="w-6 h-6 text-primary-foreground" />
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/30" />
+          <div className="relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/25">
+            <Mic className="h-6 w-6 text-primary-foreground" />
           </div>
         </div>
       </motion.div>

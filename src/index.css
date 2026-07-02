@@ -220,6 +220,11 @@
     -webkit-overflow-scrolling: touch;
   }
   .praxis-touch-target {
-    @apply min-h-11 touch-manipulation;
+    @apply min-h-11 min-w-11 touch-manipulation;
+  }
+
+  /* Onda 17 — safe areas (notch / home indicator) */
+  .praxis-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

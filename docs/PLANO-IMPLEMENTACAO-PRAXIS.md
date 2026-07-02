@@ -266,11 +266,25 @@ Ver `docs/ONDA-16-COCKPIT.md`.
 
 ---
 
+## Onda 17 — Polish celular
+
+| ID | Task | Status |
+|----|------|--------|
+| P17-T01 | Mobile bottom nav | **done** |
+| P17-T02 | Top bar + safe area | **done** |
+| P17-T03 | FAB desktop only | **done** |
+| P17-T04 | PWA shortcuts + install banner | **done** |
+
+Ver `docs/ONDA-17-MOBILE.md`.
+
+---
+
 ## Registro de ondas (atualizar a cada entrega)
 
 | Data | Onda | Commit | Notas |
 |------|------|--------|-------|
-| 2026-07-02 | **16** | (este commit) | Cockpit evitando + PraxIA leve |
+| 2026-07-02 | **17** | (este commit) | Nav mobile + PWA polish |
+| 2026-07-02 | **16** | `66a92a0` | Cockpit evitando + PraxIA |
 | 2026-07-02 | **15** | `144386b` | Voz fila + retry STT |
 | 2026-07-02 | **14** | `593cdec` | Tarefas recorrentes motor + UI |
 | 2026-07-02 | **13** | `f514623` | Smoke prod + sync API + health watchdog |

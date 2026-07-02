@@ -20,6 +20,7 @@ import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
 import AvoidanceCockpit from '@/components/dashboard/AvoidanceCockpit';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
 import OfflineBanner from '@/components/shared/OfflineBanner';
+import PwaInstallBanner from '@/components/shared/PwaInstallBanner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { ChevronDown } from 'lucide-react';
@@ -190,8 +191,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-5 sm:space-y-8 lg:space-y-10">
+    <div className="space-y-4 sm:space-y-5 lg:space-y-8">
       <OfflineBanner />
+      <PwaInstallBanner />
 
       <HeroDay
         habitsDone={completedHabits}

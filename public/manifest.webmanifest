@@ -22,5 +22,31 @@
       "type": "image/svg+xml",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Hoje",
+      "short_name": "Hoje",
+      "url": "/",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Captura por voz",
+      "short_name": "Voz",
+      "url": "/captura",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Tarefas",
+      "short_name": "Tarefas",
+      "url": "/habitos-tarefas?tab=tasks",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Modo Foco",
+      "short_name": "Foco",
+      "url": "/foco",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    }
   ]
 }

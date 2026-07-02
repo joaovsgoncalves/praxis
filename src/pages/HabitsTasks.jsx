@@ -295,8 +295,8 @@ export default function HabitsTasks() {
       <section className="glass-surface rounded-3xl p-4 sm:p-5 lg:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
-            <p className="forja-kicker">Painel operacional</p>
-            <h1 className="forja-title text-3xl font-bold sm:text-4xl">Hábitos & Tarefas</h1>
+            <p className="forja-kicker hidden lg:block">Painel operacional</p>
+            <h1 className="forja-title hidden text-3xl font-bold sm:text-4xl lg:block">Hábitos & Tarefas</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
               Só o dia de hoje no radar — pendentes com data de hoje e o que você concluiu agora.
             </p>

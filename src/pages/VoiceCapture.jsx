@@ -218,11 +218,13 @@ export default function VoiceCapture() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="w-5 h-5" /></Link>
-          <h1 className="text-2xl font-bold">Captura por Voz</h1>
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to="/" className="hidden lg:inline-flex text-muted-foreground hover:text-foreground shrink-0">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="hidden lg:block text-2xl font-bold truncate">Captura por Voz</h1>
         </div>
-        <Button asChild variant="outline" size="sm" className="relative">
+        <Button asChild variant="outline" size="sm" className="relative praxis-touch-target shrink-0">
           <Link to="/capturas">
             <Inbox className="w-4 h-4 mr-1" />
             Revisar
@@ -258,7 +260,7 @@ export default function VoiceCapture() {
             ) : (
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
                 <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={startRecording}
-                  className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors">
+                  className="praxis-touch-target w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors">
                   <Mic className="w-10 h-10 text-primary" />
                 </motion.button>
                 <p className="text-sm text-muted-foreground">Toque para gravar. Diga suas tarefas e hábitos.</p>
