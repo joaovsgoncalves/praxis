@@ -21,6 +21,9 @@ import Achievements from '@/pages/Achievements';
 import WeeklyReview from '@/pages/WeeklyReview';
 import ShareCapture from '@/pages/ShareCapture';
 import Login from '@/pages/Login';
+import { PraxisLoadingSplash, PraxisCenteredShell } from '@/components/layout/PraxisPage';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const AuthenticatedApp = () => {
   const {
@@ -33,14 +36,7 @@ const AuthenticatedApp = () => {
   } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm">Carregando...</p>
-        </div>
-      </div>
-    );
+    return <PraxisLoadingSplash message="Carregando o Praxis…" />;
   }
 
   if (authError) {
@@ -54,9 +50,18 @@ const AuthenticatedApp = () => {
     }
     if (authError.type === 'network') {
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 text-center text-muted-foreground">
-          <p>Não consegui falar com a API. {authError.message}</p>
-        </div>
+        <PraxisCenteredShell>
+          <Card className="glass-surface border-white/10">
+            <CardContent className="p-8 text-center space-y-4">
+              <p className="forja-kicker text-destructive">Sem conexão</p>
+              <h1 className="forja-title text-xl font-semibold">API fora do ar</h1>
+              <p className="text-sm text-muted-foreground">{authError.message}</p>
+              <Button type="button" variant="outline" className="rounded-full" onClick={() => window.location.reload()}>
+                Tentar de novo
+              </Button>
+            </CardContent>
+          </Card>
+        </PraxisCenteredShell>
       );
     }
   }

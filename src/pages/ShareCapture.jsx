@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
-import { Loader2, Share2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Share2, Mic } from 'lucide-react';
+import { PageHero } from '@/components/layout/PraxisPage';
 
 function buildSharedText({ title, text, url }) {
   const parts = [];
@@ -47,22 +50,50 @@ export default function ShareCapture() {
   }, [payload, navigate]);
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16 text-center space-y-4">
-      <Share2 className="mx-auto h-10 w-10 text-primary" />
-      <h1 className="text-xl font-semibold">Enviando para o Praxis…</h1>
-      {error ? (
-        <>
-          <p className="text-sm text-destructive">{error}</p>
-          <Button asChild variant="outline" className="rounded-full">
-            <Link to="/captura">Ir para captura</Link>
-          </Button>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Organizando tarefas a partir do que você compartilhou.
-        </p>
-      )}
+    <div className="praxis-page mx-auto max-w-lg">
+      <PageHero
+        kicker="Captura"
+        kickerIcon={Share2}
+        title="Compartilhamento"
+        description="O Praxis organiza o que você mandou de outro app em tarefas e ideias."
+      />
+
+      <Card className="mt-6 border-border/80 bg-card/60">
+        <CardContent className="py-12 px-6 text-center space-y-5">
+          <Share2 className="mx-auto h-10 w-10 text-primary" aria-hidden />
+
+          {error ? (
+            <>
+              <Alert variant="destructive" className="text-left">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                <Button asChild variant="default" className="rounded-full praxis-touch-target">
+                  <Link to="/captura">
+                    <Mic className="mr-2 h-4 w-4" /> Ir para captura
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-full praxis-touch-target">
+                  <Link to="/">Voltar ao Hoje</Link>
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="forja-title text-lg font-semibold">Enviando para o Praxis…</p>
+              <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                Organizando a partir do que você compartilhou.
+              </p>
+              {payload ? (
+                <p className="text-xs text-muted-foreground/80 line-clamp-3 max-w-sm mx-auto border-t border-border/40 pt-4">
+                  {payload}
+                </p>
+              ) : null}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

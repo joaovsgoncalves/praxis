@@ -55,3 +55,27 @@ export function SectionHeading({ kicker, title, trailing }) {
     </div>
   );
 }
+
+/** Tela cheia centrada — login, 404, erros de rede. */
+export function PraxisCenteredShell({ children, maxWidth = 'max-w-md', className }) {
+  return (
+    <div className={cn('min-h-screen flex items-center justify-center bg-background px-4 py-10', className)}>
+      <div className={cn('w-full', maxWidth)}>{children}</div>
+    </div>
+  );
+}
+
+/** Splash de boot / auth — mesma linguagem visual do app. */
+export function PraxisLoadingSplash({ message = 'Carregando o Praxis…' }) {
+  return (
+    <PraxisCenteredShell maxWidth="max-w-sm">
+      <div className="glass-surface rounded-2xl border border-white/10 p-8 text-center space-y-5">
+        <p className="forja-kicker text-primary">Praxis</p>
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10">
+          <div className="h-6 w-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" aria-hidden />
+        </div>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+    </PraxisCenteredShell>
+  );
+}

@@ -1,44 +1,44 @@
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { Hammer, Home } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { PraxisCenteredShell } from '@/components/layout/PraxisPage';
 
+export default function PageNotFound() {
+  const location = useLocation();
+  const path = location.pathname || '/';
 
-export default function PageNotFound({}) {
-    const location = useLocation();
-    const pageName = location.pathname.substring(1);
-    
-    return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-            <div className="max-w-md w-full">
-                <div className="text-center space-y-6">
-                    {/* 404 Error Code */}
-                    <div className="space-y-2">
-                        <h1 className="text-7xl font-light text-slate-300">404</h1>
-                        <div className="h-0.5 w-16 bg-slate-200 mx-auto"></div>
-                    </div>
-                    
-                    {/* Main Message */}
-                    <div className="space-y-3">
-                        <h2 className="text-2xl font-medium text-slate-800">
-                            Page Not Found
-                        </h2>
-                        <p className="text-slate-600 leading-relaxed">
-                            The page <span className="font-medium text-slate-700">"{pageName}"</span> could not be found in this application.
-                        </p>
-                    </div>
-                    
-                    {/* Action Button */}
-                    <div className="pt-6">
-                        <button 
-                            onClick={() => window.location.href = '/'} 
-                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
-                        >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                            Go Home
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+  return (
+    <PraxisCenteredShell maxWidth="max-w-lg">
+      <Card className="glass-surface border-white/10">
+        <CardContent className="p-8 sm:p-10 text-center space-y-6">
+          <p className="forja-kicker text-muted-foreground">Praxis</p>
+          <p className="text-6xl font-light tabular-nums text-muted-foreground/40" aria-hidden>
+            404
+          </p>
+          <div className="space-y-2">
+            <h1 className="forja-title text-2xl font-bold">Página não encontrada</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Não existe rota para{' '}
+              <span className="font-mono text-xs text-foreground/90 break-all">{path}</span>
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center pt-2">
+            <Button asChild className="rounded-full praxis-touch-target gap-2">
+              <Link to="/">
+                <Home className="h-4 w-4" aria-hidden />
+                Ir para o Hoje
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-full praxis-touch-target gap-2">
+              <Link to="/captura">
+                <Hammer className="h-4 w-4" aria-hidden />
+                Captura
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </PraxisCenteredShell>
+  );
 }

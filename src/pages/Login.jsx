@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import { Hammer, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { forjaApi } from '@/api/forjaClient';
+import { PraxisCenteredShell } from '@/components/layout/PraxisPage';
 
 export default function Login({ onSuccess }) {
   const [password, setPassword] = useState('');
@@ -36,36 +40,56 @@ export default function Login({ onSuccess }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-6 forja-panel p-8">
-        <div className="text-center space-y-2">
-          <p className="forja-kicker text-primary">Praxis</p>
-          <h1 className="forja-title text-2xl">Entrar</h1>
-          <p className="text-sm text-muted-foreground">
-            Uso pessoal — senha definida no servidor.
-          </p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              disabled={loading}
-            />
+    <PraxisCenteredShell>
+      <Card className="glass-surface border-white/10 shadow-xl shadow-black/20">
+        <CardContent className="p-8 space-y-6">
+          <div className="text-center space-y-3">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-domain-gold/30 bg-domain-gold/10">
+              <Hammer className="h-7 w-7 text-domain-gold" aria-hidden />
+            </div>
+            <p className="forja-kicker text-primary">Praxis</p>
+            <h1 className="forja-title text-2xl font-bold">Entrar</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Uso pessoal — a senha fica só no servidor, não no navegador.
+            </p>
           </div>
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">{error}</p>
-          ) : null}
-          <Button type="submit" className="w-full" disabled={loading || !password}>
-            {loading ? 'Entrando…' : 'Entrar'}
-          </Button>
-        </form>
-      </div>
-    </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-muted-foreground">
+                Senha
+              </Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  className="pl-10 praxis-touch-target"
+                />
+              </div>
+            </div>
+
+            {error ? (
+              <Alert variant="destructive" className="text-left">
+                <AlertDescription role="alert">{error}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <Button
+              type="submit"
+              className="w-full rounded-full praxis-touch-target"
+              disabled={loading || !password.trim()}
+            >
+              {loading ? 'Entrando…' : 'Entrar no Praxis'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </PraxisCenteredShell>
   );
 }
