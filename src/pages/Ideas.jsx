@@ -38,6 +38,10 @@ export default function Ideas() {
       setShowIdeaForm(true);
       setSearchParams(stripQueryParam(searchParams, 'from'), { replace: true });
     }
+    if (searchParams.get('new') === '1') {
+      setShowIdeaForm(true);
+      setSearchParams(stripQueryParam(searchParams, 'new'), { replace: true });
+    }
   }, [searchParams, setSearchParams]);
 
   const { data: ideas = [], isLoading } = useQuery({
@@ -155,9 +159,20 @@ export default function Ideas() {
           {isLoading ? (
             <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent></Card>
           ) : sortedIdeas.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                Nada neste filtro. Capture uma ideia sem compromisso de data ou prioridade.
+            <Card className="border-dashed border-border/80 bg-card/40">
+              <CardContent className="py-12 px-6 text-center space-y-4">
+                <Lightbulb className="mx-auto h-10 w-10 text-cyan-300/80" aria-hidden />
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Nada neste filtro. Guarde uma ideia sem data — quando fizer sentido, vira tarefa.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                  <Button type="button" className="rounded-full" onClick={() => setShowIdeaForm(true)}>
+                    <Plus className="mr-1.5 h-4 w-4" /> Nova ideia
+                  </Button>
+                  <Button asChild variant="outline" className="rounded-full">
+                    <Link to="/revisao-semanal">Revisão semanal</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -259,7 +274,7 @@ export default function Ideas() {
                 </ul>
               )}
               <Button asChild variant="outline" size="sm" className="w-full rounded-full">
-                <Link to="/habitos-tarefas">Abrir tarefas de hoje</Link>
+                <Link to="/revisao-semanal">Abrir revisão semanal</Link>
               </Button>
             </CardContent>
           </Card>

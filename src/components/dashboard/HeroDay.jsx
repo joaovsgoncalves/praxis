@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
@@ -6,7 +7,8 @@ import { forjaApi } from '@/api/forjaClient';
 import { useTimeOfDay } from '@/hooks/useTimeOfDay';
 import EmberCanvas from './EmberCanvas';
 import ProgressRings, { RingLegend } from './ProgressRings';
-import { Flame, Hammer, Target, Timer } from 'lucide-react';
+import { Flame, Hammer, Target, Timer, Mic, Lightbulb } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { fortalezaDateKey, fortalezaDisplayDate } from '@/lib/dates';
 
 const QUOTES = [
@@ -120,6 +122,24 @@ export default function HeroDay({
                 <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-foreground">{value}</div>
               </div>
             ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline" className="rounded-full praxis-touch-target gap-1.5">
+              <Link to="/foco">
+                <Timer className="h-3.5 w-3.5" aria-hidden /> Foco
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="rounded-full praxis-touch-target gap-1.5">
+              <Link to="/ideias?new=1">
+                <Lightbulb className="h-3.5 w-3.5" aria-hidden /> Ideia
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="rounded-full praxis-touch-target gap-1.5">
+              <Link to="/captura">
+                <Mic className="h-3.5 w-3.5" aria-hidden /> Voz
+              </Link>
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { forjaApi } from '@/api/forjaClient';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,17 +14,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle2, Play, Pause, Square, Timer } from 'lucide-react';
-import { PageHero } from '@/components/layout/PraxisPage';
+import {
+  Brain,
+  CheckCircle2,
+  Coffee,
+  Play,
+  Pause,
+  Square,
+  Timer,
+  Zap,
+  Hourglass,
+} from 'lucide-react';
+import { PageHero, StatGrid, StatTile, SectionHeading } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
-import { fortalezaDateKey } from '@/lib/dates';
+import { buildSnoozeTomorrowUpdate, fortalezaDateKey } from '@/lib/dates';
 import { toast } from '@/components/ui/use-toast';
 
 const PRESETS = [
-  { label: 'Pomodoro clássico', shortLabel: 'Clássico', focus: 25, brk: 5, icon: '🍅' },
-  { label: 'Foco profundo', shortLabel: 'Profundo', focus: 50, brk: 10, icon: '🧠' },
-  { label: 'Sprint rápido', shortLabel: 'Rápido', focus: 15, brk: 3, icon: '⚡' },
-  { label: 'Maratona', shortLabel: 'Maratona', focus: 90, brk: 20, icon: '🏃' },
+  { label: 'Pomodoro clássico', shortLabel: 'Clássico', focus: 25, brk: 5, Icon: Timer },
+  { label: 'Foco profundo', shortLabel: 'Profundo', focus: 50, brk: 10, Icon: Brain },
+  { label: 'Sprint rápido', shortLabel: 'Rápido', focus: 15, brk: 3, Icon: Zap },
+  { label: 'Maratona', shortLabel: 'Maratona', focus: 90, brk: 20, Icon: Hourglass },
 ];
 
 export default function Focus() {
@@ -89,6 +99,20 @@ export default function Focus() {
       toast({
         title: 'Tarefa concluída',
         description: task?.title || 'Marcada como feita no Praxis.',
+      });
+    },
+  });
+
+  const snoozeTaskMutation = useMutation({
+    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      setPostSessionOpen(false);
+      toast({
+        title: 'Adiada para amanhã',
+        description: task?.title ? `"${task.title}" volta amanhã.` : 'Tarefa reagendada.',
       });
     },
   });
@@ -193,6 +217,11 @@ export default function Focus() {
 
   const topFocusStats = focusStats.filter((s) => s.task_id).slice(0, 5);
 
+  const todayFocusMinutes = useMemo(
+    () => Math.round(todaySessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0) / 60),
+    [todaySessions],
+  );
+
   const dismissPostSession = () => {
     setPostSessionOpen(false);
     toast({
@@ -208,7 +237,19 @@ export default function Focus() {
         kickerIcon={Timer}
         title="Modo Foco"
         description="Pomodoro com tarefa opcional. O tempo fica no histórico."
-      />
+      >
+        {!inSession && (
+          <StatGrid className="sm:grid-cols-3">
+            <StatTile label="Minutos hoje" value={`${todayFocusMinutes} min`} tone="amber" valueClassName="tabular-nums" />
+            <StatTile label="Sessões hoje" value={String(todaySessions.length)} valueClassName="tabular-nums" />
+            <StatTile
+              label="Tarefas (30 dias)"
+              value={String(focusStats.filter((s) => s.task_id).length)}
+              valueClassName="tabular-nums"
+            />
+          </StatGrid>
+        )}
+      </PageHero>
 
       <Dialog open={postSessionOpen} onOpenChange={(open) => !open && dismissPostSession()}>
         <DialogContent className="sm:max-w-md">
@@ -234,17 +275,35 @@ export default function Focus() {
               </div>
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            {postSession?.task && (
-              <Button
-                className="w-full"
-                onClick={() => completeTaskMutation.mutate(postSession.task.id)}
-                disabled={completeTaskMutation.isPending}
-              >
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                {completeTaskMutation.isPending ? 'Concluindo…' : 'Concluir tarefa'}
-              </Button>
-            )}
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            {postSession?.task ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => completeTaskMutation.mutate(postSession.task.id)}
+                  disabled={completeTaskMutation.isPending}
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {completeTaskMutation.isPending ? 'Concluindo…' : 'Concluir tarefa'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={snoozeTaskMutation.isPending}
+                  onClick={() =>
+                    snoozeTaskMutation.mutate({
+                      id: postSession.task.id,
+                      data: buildSnoozeTomorrowUpdate(postSession.task, today),
+                    })
+                  }
+                >
+                  Adiar para amanhã
+                </Button>
+              </>
+            ) : null}
             <Button type="button" variant="outline" className="w-full" onClick={dismissPostSession}>
               Só registrar tempo
             </Button>
@@ -288,37 +347,38 @@ export default function Focus() {
       )}
 
       {!inSession ? (
-        <div className="space-y-6">
-          <Card className="bg-card border-border">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="font-semibold">Presets</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {PRESETS.map((preset, i) => (
+        <div className="space-y-6 mt-6">
+          <section className="space-y-3">
+            <SectionHeading kicker="Ritmo" title="Durações" />
+            <div className="grid grid-cols-2 gap-3">
+              {PRESETS.map((preset, i) => {
+                const PresetIcon = preset.Icon;
+                return (
                   <button
                     key={preset.label}
                     type="button"
                     onClick={() => applyPreset(i)}
                     className={cn(
-                      'p-4 rounded-lg border text-left transition-all',
+                      'rounded-xl border p-4 text-left transition-all praxis-touch-target',
                       selectedPreset === i
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-secondary/30 hover:bg-secondary/50',
                     )}
                   >
-                    <span className="text-2xl">{preset.icon}</span>
-                    <p className="font-medium mt-1">{preset.shortLabel}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <PresetIcon className="h-5 w-5 text-primary" aria-hidden />
+                    <p className="mt-2 font-medium">{preset.shortLabel}</p>
+                    <p className="text-sm text-muted-foreground tabular-nums">
                       {preset.focus} min foco · {preset.brk} min pausa
                     </p>
                   </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                );
+              })}
+            </div>
+          </section>
 
           <Card className="bg-card border-border">
             <CardContent className="p-6 space-y-4">
-              <h2 className="font-semibold">Tarefa (opcional)</h2>
+              <h2 className="font-semibold text-sm">Tarefa (opcional)</h2>
               <Select value={selectedTaskId || 'none'} onValueChange={setSelectedTaskId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma tarefa" />
@@ -346,15 +406,23 @@ export default function Focus() {
             <CardContent className="py-12 flex flex-col items-center gap-6">
               <Badge
                 className={cn(
-                  'text-lg px-4 py-1',
+                  'gap-1.5 text-base px-4 py-1',
                   isBreak ? 'bg-accent/20 text-accent' : 'bg-primary/20 text-primary',
                 )}
               >
-                {isBreak ? '☕ Pausa' : '🧠 Foco'}
+                {isBreak ? (
+                  <>
+                    <Coffee className="h-4 w-4" aria-hidden /> Pausa
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4" aria-hidden /> Foco
+                  </>
+                )}
               </Badge>
 
               <div className="relative">
-                <svg className="w-48 h-48 -rotate-90" aria-hidden>
+                <svg className="w-48 h-48 sm:w-56 sm:h-56 -rotate-90" aria-hidden>
                   <circle cx="96" cy="96" r="90" fill="none" stroke="currentColor" className="text-border" strokeWidth="4" />
                   <circle
                     cx="96"
@@ -370,7 +438,9 @@ export default function Focus() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-4xl font-mono font-bold">{formatTime(timeLeft)}</span>
+                  <span className="text-5xl sm:text-6xl font-semibold tabular-nums tracking-tight">
+                    {formatTime(timeLeft)}
+                  </span>
                 </div>
               </div>
 
@@ -393,26 +463,16 @@ export default function Focus() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <Card className="bg-card border-border">
-              <CardContent className="py-4">
-                <p className="text-2xl font-bold text-primary">{cycles}</p>
-                <p className="text-xs text-muted-foreground">Ciclos</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="py-4">
-                <p className="text-2xl font-bold text-accent">{Math.floor(totalFocusTime / 60)}m</p>
-                <p className="text-xs text-muted-foreground">Foco total</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border">
-              <CardContent className="py-4">
-                <p className="text-2xl font-bold">{todaySessions.length}</p>
-                <p className="text-xs text-muted-foreground">Sessões hoje</p>
-              </CardContent>
-            </Card>
-          </div>
+          <StatGrid className="grid-cols-3">
+            <StatTile label="Ciclos" value={String(cycles)} valueClassName="tabular-nums" />
+            <StatTile
+              label="Foco total"
+              value={`${Math.floor(totalFocusTime / 60)} min`}
+              tone="amber"
+              valueClassName="tabular-nums"
+            />
+            <StatTile label="Sessões hoje" value={String(todaySessions.length)} valueClassName="tabular-nums" />
+          </StatGrid>
         </div>
       )}
     </div>
