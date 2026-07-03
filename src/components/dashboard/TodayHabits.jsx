@@ -30,7 +30,7 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle>{title}</CardTitle>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground tabular-nums">
             {completedCount}/{habits.length} feitos
           </span>
         </div>

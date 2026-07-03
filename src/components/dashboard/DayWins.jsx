@@ -10,7 +10,7 @@ import { isTaskDone } from '@/lib/tasks';
 import { sparkFromElement } from '@/lib/celebration';
 
 /**
- * Vitórias do dia — cockpit Praxis alinhado a “ganhar o dia”, não resolver a vida.
+ * Vitórias do dia — só o que importa para fechar o dia com clareza.
  */
 export default function DayWins({ tasks = [], today, onToggleComplete, onEditTask }) {
   const rowRefs = useRef(new Map());
@@ -35,14 +35,14 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="w-5 h-5 text-domain-gold shrink-0" />
-              Tarefas de hoje
+              Vitórias do dia
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Só o que vale para ganhar este dia.
+              Pendências de hoje — marque e siga.
             </p>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-2xl font-bold font-mono text-domain-gold">{pct}%</p>
+            <p className="text-2xl font-semibold tabular-nums text-domain-gold">{pct}%</p>
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
               do dia
             </p>

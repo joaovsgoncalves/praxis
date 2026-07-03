@@ -212,39 +212,44 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="praxis-page space-y-4 sm:space-y-5 lg:space-y-8">
-      <OfflineBanner />
-      <PwaInstallBanner />
-      <CapturePendingBanner />
-      <OverdueTasksBanner count={overdueOpenCount} />
+    <div className="praxis-page flex flex-col gap-4 sm:gap-5 lg:gap-8">
+      <div className="flex flex-col gap-2">
+        <OfflineBanner />
+        <PwaInstallBanner />
+      </div>
 
-      <HeroDay
-        habitsDone={completedHabits}
-        habitsTotal={essentialHabits.length}
-        tasksDone={completedTasks}
-        tasksTotal={tasks.length}
-        userName={settings?.full_name}
-      />
+      <div className="order-1 lg:order-2">
+        <NowBlock
+          task={nowTask}
+          today={today}
+          busy={updateTaskMutation.isPending || toggleTaskMutation.isPending}
+          onComplete={(t) => toggleTaskMutation.mutate(t)}
+          onSnooze15={handleSnooze15}
+          onSnoozeTomorrow={handleSnoozeTomorrow}
+          onVoiceCapture={() => navigate('/captura')}
+          onAddTask={() => setShowNewTaskForm(true)}
+        />
+      </div>
 
-      <NowBlock
-        task={nowTask}
-        today={today}
-        busy={updateTaskMutation.isPending || toggleTaskMutation.isPending}
-        onComplete={(t) => toggleTaskMutation.mutate(t)}
-        onSnooze15={handleSnooze15}
-        onSnoozeTomorrow={handleSnoozeTomorrow}
-        onVoiceCapture={() => navigate('/captura')}
-        onAddTask={() => setShowNewTaskForm(true)}
-      />
+      <div className="order-2 lg:order-3">
+        <OverdueTasksBanner count={overdueOpenCount} />
+      </div>
 
-      <OpeningRitualCollapsible />
-      <SuggestedGoalCard />
+      <div className="order-3 lg:order-4">
+        <CapturePendingBanner />
+      </div>
 
-      <WeeklyReviewPrompt />
+      <div className="order-4 lg:order-1">
+        <HeroDay
+          habitsDone={completedHabits}
+          habitsTotal={essentialHabits.length}
+          tasksDone={completedTasks}
+          tasksTotal={tasks.length}
+          userName={settings?.full_name}
+        />
+      </div>
 
-      <AvoidanceCockpit />
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)] gap-7 lg:gap-8 items-start">
+      <div className="order-5 lg:order-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)] gap-7 lg:gap-8 items-start">
         <div className="space-y-7 lg:space-y-8">
           <Slot domain="ember">
             <TodayTasks
@@ -283,11 +288,18 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="order-6 lg:order-5 flex flex-col gap-4 sm:gap-5">
+        <OpeningRitualCollapsible />
+        <SuggestedGoalCard />
+        <WeeklyReviewPrompt />
+        <AvoidanceCockpit />
+      </div>
+
       {showAnalyticsSection ? (
-        <Collapsible defaultOpen={false} className="rounded-2xl border border-white/5 bg-black/20">
+        <Collapsible defaultOpen={false} className="order-7 rounded-2xl border border-white/5 bg-black/20">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-6 h-auto">
-              <span className="forja-kicker text-left">Resumo · consistência</span>
+              <span className="forja-kicker text-left">Depois · gráficos e heatmap</span>
               <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
             </Button>
           </CollapsibleTrigger>
@@ -311,12 +323,12 @@ export default function Dashboard() {
           </CollapsibleContent>
         </Collapsible>
       ) : (
-        <p className="text-center text-sm text-muted-foreground py-2">
-          Heatmap e resumo aparecem quando você começar a executar o dia.
+        <p className="order-7 text-center text-sm text-muted-foreground py-2">
+          Gráficos aparecem quando você começar a marcar tarefas e hábitos.
         </p>
       )}
 
-      {showAnalyticsSection && <XpProgressStrip className="mt-2" />}
+      {showAnalyticsSection && <XpProgressStrip className="order-8 mt-2" />}
 
       <Dialog
         open={Boolean(editingTask)}

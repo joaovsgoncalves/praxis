@@ -4,7 +4,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronDown, Flame, Sparkles } from 'lucide-react';
+import { ChevronDown, Flame, Sparkles, Sunrise } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
 
@@ -74,7 +74,7 @@ export default function OpeningRitualCollapsible() {
   return (
     <Collapsible open={open} onOpenChange={onOpenChange} className="rounded-2xl border border-gold/20 bg-gold/5">
       <CollapsibleTrigger className="flex w-full items-center gap-3 px-4 py-3 text-left">
-        <span className="text-xl">🌅</span>
+        <Sunrise className="h-5 w-5 shrink-0 text-gold" aria-hidden />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-snug">Abertura do dia · ~3 min</p>
           <p className="text-xs text-muted-foreground truncate">

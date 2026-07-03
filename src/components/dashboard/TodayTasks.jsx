@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { CategoryBadge } from '@/lib/categories';
 import { sparkFromElement } from '@/lib/celebration';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
 import { sortPendingWithOverdueFirst } from '@/lib/taskListFilters';
+import { SectionHeading } from '@/components/layout/PraxisPage';
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -66,9 +67,11 @@ export default function TodayTasks({
   return (
     <Card>
       <CardHeader className="pb-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-lg">Tarefas de Hoje</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
+        <SectionHeading
+          kicker="Hoje"
+          title="Tarefas"
+          trailing={
+            <div className="flex flex-wrap items-center gap-2">
             {overdueCount > 0 && (
               <Badge
                 variant="outline"
@@ -85,11 +88,12 @@ export default function TodayTasks({
                 {cleanedOverdueCount} limpa{cleanedOverdueCount === 1 ? '' : 's'} hoje
               </Badge>
             )}
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground tabular-nums">
               {completed.length}/{tasks.length} concluídas
             </span>
-          </div>
-        </div>
+            </div>
+          }
+        />
         {tasks.length > 0 && (
           <div className="h-1.5 bg-secondary rounded-full overflow-hidden mt-2 rail-inset">
             <motion.div

@@ -43,7 +43,7 @@ export default function CapturePendingBanner() {
       <div className="flex items-center gap-2 text-sm">
         <Inbox className="w-4 h-4 text-primary shrink-0" />
         <span>
-          <strong>{count}</strong> {count === 1 ? 'captura' : 'capturas'} para revisar (voz)
+          <strong>{count}</strong> {count === 1 ? 'captura na fila' : 'capturas na fila'}
         </span>
       </div>
       <Button asChild size="sm" variant="secondary" className="praxis-touch-target">

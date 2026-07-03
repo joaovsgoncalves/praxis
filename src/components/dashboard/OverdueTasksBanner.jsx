@@ -11,7 +11,7 @@ export default function OverdueTasksBanner({ count }) {
       <div className="flex items-center gap-2 text-sm">
         <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
         <span>
-          <strong>{count}</strong> {count === 1 ? 'tarefa atrasada' : 'tarefas atrasadas'} no radar
+          <strong>{count}</strong> {count === 1 ? 'tarefa atrasada' : 'tarefas atrasadas'}
         </span>
       </div>
       <Button asChild size="sm" variant="secondary" className="praxis-touch-target">

@@ -40,7 +40,7 @@ export default function AvoidanceCockpit() {
               O que estou evitando?
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {isLoading ? 'Lendo padrões…' : data?.headline}
+              {isLoading ? 'Lendo seus padrões…' : data?.headline}
             </p>
           </div>
           {data?.pressure > 0 && (
@@ -81,7 +81,7 @@ export default function AvoidanceCockpit() {
 
         {!isLoading && items.length === 0 && !isError && (
           <p className="text-sm text-muted-foreground text-center py-2">
-            Radar limpo. Se algo incomoda, grava na captura por voz.
+            Nada pesando no radar. Se algo incomoda, grave na captura.
           </p>
         )}
 
@@ -99,7 +99,7 @@ export default function AvoidanceCockpit() {
             ) : (
               <Sparkles className="w-4 h-4 mr-2 text-primary" />
             )}
-            PraxIA — espelhar padrão
+            PraxIA — olhar o padrão
           </Button>
 
           {praxiaMutation.data?.lines?.length > 0 && (

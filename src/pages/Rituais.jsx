@@ -240,7 +240,7 @@ export default function Rituais() {
                 <Sparkles className="mx-auto h-8 w-8 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">Nenhum ritual ativo.</p>
                 <p className="text-xs text-muted-foreground/70">
-                  Use os presets acima ou monte o seu. O item <strong>Rituais</strong> volta no menu quando houver um ativo.
+                  Use os modelos acima ou monte o seu. O item <strong>Rituais</strong> volta no menu quando houver um ativo.
                 </p>
               </div>
             )}

@@ -212,10 +212,13 @@ export default function RitualWidget() {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2.5">
+        <CardTitle className="flex items-center gap-2.5 text-lg">
           <Sparkles className="w-5 h-5 text-gold" />
-          Rituais do Dia
+          Rituais do dia
         </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Hábitos agrupados por manhã, tarde e noite.
+        </p>
       </CardHeader>
       <CardContent>
         {isLoading && (
@@ -235,8 +238,10 @@ export default function RitualWidget() {
         {!isLoading && !isError && rituals.length === 0 && (
           <div className="flex flex-col items-center py-6 gap-2">
             <Sparkles className="w-8 h-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Nenhum ritual configurado</p>
-            <p className="text-xs text-muted-foreground/60">Crie rituais para organizar seus hábitos por período</p>
+            <p className="text-sm text-muted-foreground">Nenhum ritual ainda</p>
+            <p className="text-xs text-muted-foreground/60 text-center max-w-xs">
+              Monte uma sequência em Rituais — manhã, tarde ou noite.
+            </p>
           </div>
         )}
 

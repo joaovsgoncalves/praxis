@@ -92,11 +92,11 @@ export default function HeroDay({
       <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-domain-gold/60 to-transparent" />
 
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[minmax(245px,0.72fr)_minmax(0,1fr)] gap-5 md:gap-7 lg:gap-12 items-center">
-        <div className="flex items-center justify-center lg:justify-start order-2 lg:order-1">
+        <div className="hidden lg:flex items-center justify-center lg:justify-start order-2 lg:order-1">
           <div className="sm:hidden">
             <ProgressRings habits={habitsPct} tasks={tasksPct} focus={focusPct} overall={dayPct} size={200} />
           </div>
-          <div className="hidden sm:block">
+          <div className="hidden sm:block lg:block">
             <ProgressRings habits={habitsPct} tasks={tasksPct} focus={focusPct} overall={dayPct} size={260} />
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function HeroDay({
             <p className="forja-kicker mb-2 md:mb-3">
               {emoji} Praxis · {dateStr}
             </p>
-            <h1 className="forja-title text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold leading-[0.95] max-w-3xl">
+            <h1 className="forja-title text-2xl sm:text-4xl md:text-5xl xl:text-6xl font-bold leading-[0.95] max-w-3xl">
               {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
             </h1>
             <p className="mt-3 max-w-2xl text-base md:text-lg text-muted-foreground">{tagline}</p>
@@ -119,7 +119,7 @@ export default function HeroDay({
                   <span className="text-xs uppercase tracking-widest text-muted-foreground/70">{label}</span>
                   <Icon className={`w-4 h-4 ${tone}`} />
                 </div>
-                <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-foreground">{value}</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</div>
               </div>
             ))}
           </div>
