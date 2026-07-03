@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ShoppingBag, ExternalLink, Check, Pause, Trash2 } from 'lucide-react';
-import { PageHero, StatGrid, StatTile, SectionHeading } from '@/components/layout/PraxisPage';
+import { PageHero, StatGrid, StatTile, SectionHeading, PraxisEmptyState, PraxisColumnsSkeleton } from '@/components/layout/PraxisPage';
 import PurchaseForm from '@/components/purchases/PurchaseForm';
 import {
   PURCHASE_HORIZON_LABELS,
@@ -96,13 +96,18 @@ export default function Compras() {
         )}
       >
         <StatGrid>
-          <StatTile label="Curto prazo" value={counts.short} tone="cyan" />
-          <StatTile label="Médio prazo" value={counts.medium} />
-          <StatTile label="Longo prazo" value={counts.long} tone="amber" />
-          <StatTile label="Total na lista" value={counts.short + counts.medium + counts.long} />
+          <StatTile label="Curto prazo" value={String(counts.short)} tone="cyan" valueClassName="tabular-nums" />
+          <StatTile label="Médio prazo" value={String(counts.medium)} valueClassName="tabular-nums" />
+          <StatTile label="Longo prazo" value={String(counts.long)} tone="amber" valueClassName="tabular-nums" />
+          <StatTile
+            label="Total na lista"
+            value={String(counts.short + counts.medium + counts.long)}
+            valueClassName="tabular-nums"
+          />
         </StatGrid>
       </PageHero>
 
+      <div className="mt-6 space-y-6">
       <SectionHeading
         kicker="Filtro"
         title="Sua lista"
@@ -134,13 +139,18 @@ export default function Compras() {
       />
 
       {isLoading ? (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent></Card>
+        <PraxisColumnsSkeleton columns={3} rowsPerColumn={2} />
       ) : visible.length === 0 ? (
-        <Card className="border-dashed border-white/10">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Nada neste filtro. Anota o que você quer comprar — sem pressão de data.
-          </CardContent>
-        </Card>
+        <PraxisEmptyState
+          icon={ShoppingBag}
+          title="Lista vazia neste filtro"
+          description="Anote o que quer comprar — curto, médio ou longo prazo. Sem data obrigatória."
+          action={(
+            <Button onClick={() => setShowForm(true)} className="rounded-full praxis-touch-target">
+              <Plus className="mr-1.5 h-4 w-4" /> Novo item
+            </Button>
+          )}
+        />
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
           {HORIZON_ORDER.map((h) => {
@@ -151,8 +161,10 @@ export default function Compras() {
                 <div key={h} className="space-y-2">
                   <p className="praxis-kicker-row">{PURCHASE_HORIZON_LABELS[h]}</p>
                   <p className="text-xs text-muted-foreground">{PURCHASE_HORIZON_HINTS[h]}</p>
-                  <Card className="border-dashed border-white/5">
-                    <CardContent className="py-8 text-center text-xs text-muted-foreground">Vazio</CardContent>
+                  <Card className="border-dashed border-white/5 bg-card/30">
+                    <CardContent className="py-8 text-center text-xs text-muted-foreground leading-relaxed px-4">
+                      Nenhum item aqui ainda.
+                    </CardContent>
                   </Card>
                 </div>
               );
@@ -239,8 +251,10 @@ export default function Compras() {
         </div>
       )}
 
+      </div>
+
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle>Novo item</DialogTitle>
           </DialogHeader>

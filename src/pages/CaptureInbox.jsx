@@ -5,8 +5,8 @@ import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { PageHero } from '@/components/layout/PraxisPage';
-import { Inbox, Loader2, Mic, RefreshCw } from 'lucide-react';
+import { PageHero, PraxisListSkeleton, PraxisEmptyState } from '@/components/layout/PraxisPage';
+import { Inbox, Mic, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/components/ui/use-toast';
@@ -87,19 +87,21 @@ export default function CaptureInbox() {
 
       <Link to="/captura" className="sr-only">Voltar à captura</Link>
 
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center py-12 gap-2">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-xs text-muted-foreground">Carregando fila…</p>
-        </div>
-      )}
+      {isLoading && <PraxisListSkeleton rows={4} />}
 
       {!isLoading && captures.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-10 text-center text-muted-foreground text-sm">
-            Nenhuma captura pendente. Tudo em dia.
-          </CardContent>
-        </Card>
+        <PraxisEmptyState
+          icon={Inbox}
+          title="Fila zerada"
+          description="Nenhuma captura pendente. Grave algo por voz quando surgir."
+          action={(
+            <Button asChild className="rounded-full praxis-touch-target">
+              <Link to="/captura">
+                <Mic className="mr-1.5 h-4 w-4" /> Nova captura
+              </Link>
+            </Button>
+          )}
+        />
       )}
 
       <div className="space-y-3">

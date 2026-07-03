@@ -1,5 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /** Cabeçalho de página — kicker, título e descrição alinhados ao grid do conteúdo. */
 export function PageHero({ kicker, kickerIcon: Icon, kickerClassName, title, description, action, children }) {
@@ -77,5 +79,57 @@ export function PraxisLoadingSplash({ message = 'Carregando o Praxis…' }) {
         <p className="text-sm text-muted-foreground">{message}</p>
       </div>
     </PraxisCenteredShell>
+  );
+}
+
+/** Empty padronizado — lista vazia ou filtro sem resultado. */
+export function PraxisEmptyState({ icon: Icon, title, description, action, className }) {
+  return (
+    <Card className={cn('border-dashed border-white/10 bg-card/40', className)}>
+      <CardContent className="py-12 px-6 text-center space-y-4">
+        {Icon ? (
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+            <Icon className="h-6 w-6 text-primary" aria-hidden />
+          </div>
+        ) : null}
+        <div className="space-y-2">
+          <p className="text-base font-semibold">{title}</p>
+          {description ? (
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto">{description}</p>
+          ) : null}
+        </div>
+        {action ? <div className="flex justify-center pt-1">{action}</div> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Skeleton de lista (cards empilhados). */
+export function PraxisListSkeleton({ rows = 4, className }) {
+  return (
+    <Card className={cn('border-white/8', className)}>
+      <CardContent className="p-4 space-y-3">
+        {Array.from({ length: rows }, (_, i) => (
+          <Skeleton key={i} className="h-[4.5rem] w-full rounded-xl" />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Skeleton em colunas (ex.: Compras por prazo). */
+export function PraxisColumnsSkeleton({ columns = 3, rowsPerColumn = 2 }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      {Array.from({ length: columns }, (_, c) => (
+        <div key={c} className="space-y-3">
+          <Skeleton className="h-4 w-28 rounded-md" />
+          <Skeleton className="h-3 w-44 rounded-md" />
+          {Array.from({ length: rowsPerColumn }, (_, r) => (
+            <Skeleton key={r} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

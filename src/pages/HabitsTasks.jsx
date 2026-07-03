@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive, ListTodo } from 'lucide-react';
-import { PageHero, StatGrid, StatTile } from '@/components/layout/PraxisPage';
+import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
@@ -531,7 +531,16 @@ export default function HabitsTasks() {
             <p className="text-[10px] text-muted-foreground">Lista carrega até 50 tarefas recentes da API.</p>
 
             {filteredTasks.length === 0 ? (
-              <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhuma tarefa encontrada</CardContent></Card>
+              <PraxisEmptyState
+                icon={ListTodo}
+                title="Nenhuma tarefa neste filtro"
+                description="Crie uma tarefa ou mude o filtro acima."
+                action={(
+                  <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
+                    <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
+                  </Button>
+                )}
+              />
             ) : (
               <div className="space-y-3">
                 {filteredTasks.map((task, index) => (
@@ -659,7 +668,19 @@ export default function HabitsTasks() {
             )}
 
             {filteredHabits.length === 0 ? (
-              <Card className="bg-secondary/30"><CardContent className="py-10 text-center text-muted-foreground">Nenhum hábito registrado</CardContent></Card>
+              <PraxisEmptyState
+                icon={Flame}
+                title="Nenhum hábito ainda"
+                description="Cadastre hábitos essenciais — eles aparecem no Hoje e nos rituais."
+                action={(
+                  <Button
+                    onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
+                    className="rounded-full praxis-touch-target"
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" /> Novo hábito
+                  </Button>
+                )}
+              />
             ) : (
               <div className="space-y-3">
                 {filteredHabits.map((habit, index) => {

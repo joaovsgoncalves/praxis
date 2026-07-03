@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Flame, Sparkles } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -223,9 +224,8 @@ export default function RitualWidget() {
       <CardContent>
         {isLoading && (
           <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-20 rounded-lg bg-secondary/40 animate-pulse" />
-            ))}
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
           </div>
         )}
 
