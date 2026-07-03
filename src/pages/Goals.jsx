@@ -96,9 +96,9 @@ export default function Goals() {
         )}
       >
         <StatGrid className="sm:grid-cols-3 lg:grid-cols-3">
-          <StatTile label="Ativas" value={activeGoals.length} />
-          <StatTile label="Progresso médio" value={`${averageProgress}%`} tone="cyan" />
-          <StatTile label="Concluídas" value={completedGoals.length} />
+          <StatTile label="Ativas" value={String(activeGoals.length)} valueClassName="tabular-nums" />
+          <StatTile label="Progresso médio" value={`${averageProgress}%`} tone="cyan" valueClassName="tabular-nums" />
+          <StatTile label="Concluídas" value={String(completedGoals.length)} valueClassName="tabular-nums" />
         </StatGrid>
       </PageHero>
 
@@ -123,7 +123,7 @@ export default function Goals() {
           <CardContent className="flex flex-col items-center gap-3 px-5 py-12 text-center sm:py-16">
             <Target className="h-10 w-10 text-primary" />
             <p className="text-lg font-semibold">Primeira meta em 3 passos</p>
-            <p className="max-w-md text-sm text-muted-foreground">Meta → prazo → tarefa ou hábito. Ou use um template abaixo.</p>
+            <p className="max-w-md text-sm text-muted-foreground">Meta → prazo → tarefa ou hábito. Ou use um modelo abaixo.</p>
             <div className="flex flex-wrap justify-center gap-2">
               {GOAL_STARTER_TEMPLATES.map((t) => (
                 <Button

@@ -73,21 +73,21 @@ export default function History() {
         <Card className="bg-card border-border">
           <CardContent className="py-4 text-center">
             <Timer className="w-5 h-5 text-primary mx-auto mb-1" />
-            <p className="text-2xl font-bold">{Math.round(totalFocusMinutes)}min</p>
+            <p className="text-2xl font-bold tabular-nums">{Math.round(totalFocusMinutes)}min</p>
             <p className="text-xs text-muted-foreground">Tempo de foco total</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="py-4 text-center">
             <Zap className="w-5 h-5 text-chart-4 mx-auto mb-1" />
-            <p className="text-2xl font-bold">{totalCycles}</p>
+            <p className="text-2xl font-bold tabular-nums">{totalCycles}</p>
             <p className="text-xs text-muted-foreground">Ciclos Pomodoro</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="py-4 text-center">
             <Flame className="w-5 h-5 text-accent mx-auto mb-1" />
-            <p className="text-2xl font-bold">{habitLogs.filter(l => l.completed).length}</p>
+            <p className="text-2xl font-bold tabular-nums">{habitLogs.filter(l => l.completed).length}</p>
             <p className="text-xs text-muted-foreground">Hábitos concluídos</p>
           </CardContent>
         </Card>

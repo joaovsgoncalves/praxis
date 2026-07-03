@@ -5,6 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown, Flame, Sparkles, Sunrise } from 'lucide-react';
+import { PraxisListSkeleton } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
 
@@ -88,7 +89,7 @@ export default function OpeningRitualCollapsible() {
         <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-4 pb-4 space-y-3">
-        {isLoading && <p className="text-xs text-muted-foreground">Carregando…</p>}
+        {isLoading && <PraxisListSkeleton rows={2} className="border-0 bg-transparent shadow-none" />}
         {!isLoading && !opening && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground leading-relaxed">

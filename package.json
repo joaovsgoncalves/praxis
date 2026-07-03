@@ -11,6 +11,9 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "smoke:prod": "bash scripts/smoke-praxis-prod.sh",
+    "test:e2e": "playwright test",
+    "test:e2e:mobile": "playwright test --project=mobile-390",
+    "test:e2e:mobile:prod": "PRAXIS_E2E_BASE=https://praxis-jota.vercel.app playwright test --project=mobile-390",
     "smoke:e2e": "bash scripts/smoke-praxis-e2e.sh",
     "checklist:10": "bash scripts/checklist-praxis-10.sh",
     "backup:local": "bash scripts/praxis-backup.sh",
@@ -87,6 +90,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@playwright/test": "^1.51.0",
     "@types/node": "^22.13.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",

@@ -1,0 +1,29 @@
+// @ts-check
+import { defineConfig } from '@playwright/test';
+
+const baseURL = process.env.PRAXIS_E2E_BASE || 'https://praxis-jota.vercel.app';
+
+export default defineConfig({
+  testDir: 'e2e',
+  timeout: 90_000,
+  expect: { timeout: 15_000 },
+  retries: process.env.CI ? 1 : 0,
+  reporter: [['list']],
+  use: {
+    baseURL,
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+  },
+  projects: [
+    {
+      name: 'mobile-390',
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        deviceScaleFactor: 3,
+      },
+    },
+  ],
+});

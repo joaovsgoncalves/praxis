@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Calendar } from 'lucide-react';
 import { PageHero } from '@/components/layout/PraxisPage';
+import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -111,14 +112,15 @@ export default function Achievements() {
         kickerIcon={Trophy}
         kickerClassName="text-gold"
         title="Conquistas"
-        description={
-          isLoading
-            ? 'Carregando…'
-            : unlockedCount > 0
-              ? `${unlockedCount} desbloqueada${unlockedCount !== 1 ? 's' : ''}`
-              : 'Complete tarefas e hábitos para desbloquear a primeira.'
-        }
+        description="Complete tarefas e hábitos para desbloquear medalhas."
       />
+
+      {!isLoading && unlockedCount > 0 && (
+        <p className="text-sm text-muted-foreground -mt-4">
+          <span className="tabular-nums font-medium text-foreground">{unlockedCount}</span>
+          {' '}desbloqueada{unlockedCount !== 1 ? 's' : ''}
+        </p>
+      )}
 
       {data && (
         <Card className="bg-card border-gold/20">
@@ -128,7 +130,7 @@ export default function Achievements() {
               <p className="text-lg font-bold text-gold">
                 Nível {data.level} — {data.level_name}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground tabular-nums">
                 {data.xp_total} XP total · Próximo nível em {data.next_level_xp - data.xp_total} XP
               </p>
             </div>
@@ -140,7 +142,7 @@ export default function Achievements() {
       {isLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-48 rounded-xl bg-secondary/40 animate-pulse" />
+            <Skeleton key={i} className="h-48 w-full rounded-xl" />
           ))}
         </div>
       )}

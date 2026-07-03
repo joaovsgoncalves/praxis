@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { pickWeeklyTaskTitles, taskDatesForNextWeek } from '@/lib/weeklyReviewTasks';
 import { PageHero } from '@/components/layout/PraxisPage';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SCORE_OPTIONS = [
   { value: 1, emoji: '😞', label: 'Difícil' },
@@ -174,7 +175,11 @@ export default function WeeklyReview() {
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           {autoLoading ? (
-            <p className="text-muted-foreground">Calculando a semana…</p>
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-full max-w-md" />
+              <Skeleton className="h-4 w-full max-w-lg" />
+              <Skeleton className="h-20 w-full rounded-xl" />
+            </div>
           ) : auto ? (
             <>
               <div className="grid gap-3 sm:grid-cols-2">

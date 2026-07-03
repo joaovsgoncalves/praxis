@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { forjaApi } from '@/api/forjaClient';
 import { Link2, Sparkles, Flame, CheckCircle2, Trash2, Sun, Moon } from 'lucide-react';
-import { PageHero } from '@/components/layout/PraxisPage';
+import { PageHero, SectionHeading, PraxisListSkeleton, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { RITUAL_TEMPLATES } from '@/lib/ritualTemplates';
 
 const timeOptions = [
@@ -16,7 +16,7 @@ const timeOptions = [
   { value: 'evening', label: 'Noite', emoji: '🌙' },
 ];
 
-const presets = [
+const mindsetCards = [
   {
     title: 'Ritual normal',
     description: 'Sequência completa para entrar no modo certo do dia.',
@@ -115,6 +115,8 @@ export default function Rituais() {
         description="Sequências por período do dia. Em dia pesado, faça só o primeiro passo."
       />
 
+      <div className="mt-6 space-y-8">
+      <SectionHeading kicker="Modelos" title="Instalar sequência" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {RITUAL_TEMPLATES.map((tpl) => (
           <Card key={tpl.id} className="border-primary/20 bg-primary/5">
@@ -141,8 +143,9 @@ export default function Rituais() {
         ))}
       </div>
 
+      <SectionHeading kicker="Mindset" title="Como encarar o dia" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {presets.map(({ title, description, icon: Icon, tone }) => (
+        {mindsetCards.map(({ title, description, icon: Icon, tone }) => (
           <Card key={title} className="bg-card border-border">
             <CardContent className="p-4 space-y-2">
               <Icon className={`w-5 h-5 ${tone}`} />
@@ -193,7 +196,7 @@ export default function Rituais() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Passos / hábitos
               </p>
-              {loadingHabits && <p className="text-sm text-muted-foreground">Carregando hábitos...</p>}
+              {loadingHabits && <PraxisListSkeleton rows={3} className="border-0 bg-transparent shadow-none" />}
               {!loadingHabits && habits.length === 0 && (
                 <p className="text-sm text-muted-foreground">Crie hábitos primeiro para montar rituais.</p>
               )}
@@ -234,15 +237,13 @@ export default function Rituais() {
             <CardTitle className="text-base font-semibold">Rituais ativos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loadingRituals && <p className="text-sm text-muted-foreground">Carregando rituais...</p>}
+            {loadingRituals && <PraxisListSkeleton rows={3} />}
             {!loadingRituals && rituals.length === 0 && (
-              <div className="space-y-3 py-10 text-center">
-                <Sparkles className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">Nenhum ritual ativo.</p>
-                <p className="text-xs text-muted-foreground/70">
-                  Use os modelos acima ou monte o seu. O item <strong>Rituais</strong> volta no menu quando houver um ativo.
-                </p>
-              </div>
+              <PraxisEmptyState
+                icon={Sparkles}
+                title="Nenhum ritual ativo"
+                description="Use os modelos acima ou monte o seu. O item Rituais volta no menu quando houver um ativo."
+              />
             )}
 
             {rituals.map((ritual) => {
@@ -301,6 +302,7 @@ export default function Rituais() {
             })}
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

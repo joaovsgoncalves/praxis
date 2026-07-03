@@ -36,7 +36,13 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - Subtítulo “cockpit” na marca.
 - Cards dentro de cards sem necessidade.
 
+## E2E mobile (390px)
+
+```bash
+npm run test:e2e:mobile:prod
+# rotas logadas: PRAXIS_E2E_PASSWORD='…' npm run test:e2e:mobile:prod
+```
+
 ## Opcional (pós-fechamento)
 
-- Playwright 390px após mudanças visuais.
 - Status vivo: `docs/ONDE-ESTAMOS.md`.
