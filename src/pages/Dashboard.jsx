@@ -72,7 +72,7 @@ export default function Dashboard() {
 
   const { data: allTasks = [] } = useQuery({
     queryKey: ['dashboardTasks', today],
-    queryFn: () => forjaApi.tasks.list({ limit: 50 }),
+    queryFn: () => forjaApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
 
   const overdueOpenCount = React.useMemo(

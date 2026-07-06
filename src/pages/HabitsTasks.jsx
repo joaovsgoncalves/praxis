@@ -99,9 +99,9 @@ export default function HabitsTasks() {
     setSearchParams(setHabitTasksTabInSearchParams(searchParams, next), { replace: true });
   };
 
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['allTasks', today],
-    queryFn: () => forjaApi.tasks.list({ limit: 50 }),
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+    queryKey: ['tasks', today],
+    queryFn: () => forjaApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
   const { data: habits = [] } = useQuery({
     queryKey: ['allHabits', habitStatusFilter],

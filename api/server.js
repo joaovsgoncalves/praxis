@@ -946,7 +946,11 @@ function syncTaskToCalendar(task) {
 }
 
 app.get('/api/tasks', (req, res) => {
-  const { date, status, category, idea_status, limit = 100 } = req.query;
+  const { date, status, category, idea_status, limit = 100, include_overdue, today: todayParam } = req.query;
+  const limitN = Math.min(200, Math.max(1, Number(limit) || 100));
+  const today = String(todayParam || getLocalDateString()).slice(0, 10);
+  const mergeOverdue = include_overdue === '1' || include_overdue === 'true';
+
   let query = 'SELECT * FROM tasks WHERE 1=1';
   const params = [];
 
@@ -956,10 +960,37 @@ app.get('/api/tasks', (req, res) => {
   if (idea_status) { query += ' AND idea_status = ?'; params.push(idea_status); }
 
   query += ' ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC LIMIT ?';
-  params.push(Number(limit));
+  params.push(limitN);
 
-  const tasks = db.prepare(query).all(...params);
-  res.json(tasks.map(enrichCategory));
+  const recent = db.prepare(query).all(...params);
+
+  if (!mergeOverdue) {
+    return res.json(recent.map(enrichCategory));
+  }
+
+  const overdueRows = db.prepare(`
+    SELECT * FROM tasks
+    WHERE status NOT IN ('completed', 'done', 'cancelled')
+      AND category != 'ideias'
+      AND date IS NOT NULL AND date < ?
+    ORDER BY date ASC, priority DESC
+    LIMIT 120
+  `).all(today);
+
+  const byId = new Map();
+  for (const t of overdueRows) byId.set(t.id, t);
+  for (const t of recent) byId.set(t.id, t);
+
+  const merged = [...byId.values()].sort((a, b) => {
+    const aOver = a.date && a.date < today && !['completed', 'done', 'cancelled'].includes(a.status);
+    const bOver = b.date && b.date < today && !['completed', 'done', 'cancelled'].includes(b.status);
+    if (aOver !== bOver) return aOver ? -1 : 1;
+    const so = (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9);
+    if (so !== 0) return so;
+    return String(b.created_date || '').localeCompare(String(a.created_date || ''));
+  });
+
+  res.json(merged.map(enrichCategory));
 });
 
 app.patch('/api/tasks/reorder', (req, res) => {
