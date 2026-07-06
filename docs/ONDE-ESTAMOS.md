@@ -1,6 +1,6 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-06 · **URL:** https://praxis-jota.vercel.app · **Lote 7** (app quieto + calendar atrasadas) em ship
+**Atualizado:** 2026-07-06 · **URL:** https://praxis-jota.vercel.app · **Lote 7** `122f688` no ar
 
 ---
 

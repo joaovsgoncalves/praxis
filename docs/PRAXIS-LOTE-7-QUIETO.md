@@ -19,6 +19,6 @@
 - PraxIA nova / Compras features
 - Playwright suite inteira (só se Dashboard mudar forte)
 
-## Pergunta pro João (uma)
+Ordem recomendada: **Fase 1–5** num deploy (João escolheu **B**).
 
-**Calendar primeiro** (só API hoje) ou **espera** e sobe tudo junto no fim do Lote 7?
+**Ship:** `122f688` — API restart + Vercel praxis-jota.
