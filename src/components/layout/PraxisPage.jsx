@@ -85,11 +85,11 @@ export function PraxisLoadingSplash({ message = 'Carregando o Praxis…' }) {
 /** Empty padronizado — lista vazia ou filtro sem resultado. */
 export function PraxisEmptyState({ icon: Icon, title, description, action, className }) {
   return (
-    <Card className={cn('border-dashed border-white/10 bg-card/40', className)}>
-      <CardContent className="py-12 px-6 text-center space-y-4">
+    <Card className={cn('border-dashed border-border/60 bg-card/40', className)}>
+      <CardContent className="py-10 px-6 text-center space-y-4">
         {Icon ? (
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-            <Icon className="h-6 w-6 text-primary" aria-hidden />
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/15">
+            <Icon className="h-5 w-5 text-primary/90" aria-hidden />
           </div>
         ) : null}
         <div className="space-y-2">

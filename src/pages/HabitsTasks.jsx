@@ -281,6 +281,7 @@ export default function HabitsTasks() {
 
   const scopedTasks = filterTasksByScope(tasks, taskScope, today);
   const overdueInScope = countOpenOverdue(scopedTasks, today);
+  const overdueOpenTotal = countOpenOverdue(tasks, today);
 
   const filteredTasks = scopedTasks
     .filter((t) => {
@@ -370,7 +371,7 @@ export default function HabitsTasks() {
         description="Hoje, semana ou atrasadas — arquive em lote o que não vale mais."
         action={(
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
-            <Button onClick={() => setShowTaskForm(true)} className="praxis-touch-target h-11 w-full rounded-full px-4 shadow-lg shadow-primary/20 sm:w-auto">
+            <Button onClick={() => setShowTaskForm(true)} className="praxis-touch-target h-11 w-full rounded-full px-4 sm:w-auto">
               <Plus className="mr-1.5 h-4 w-4" /> Tarefa
             </Button>
             <Button
@@ -464,12 +465,10 @@ export default function HabitsTasks() {
         {(view === 'all' || view === 'tasks') && (
           <section className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="forja-kicker">Execução</p>
-                <h2 className="forja-title text-2xl font-semibold">Tarefas</h2>
-                {overdueInScope > 0 && (
-                  <p className="text-xs text-destructive mt-1">
-                    {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste filtro
+              <div className="min-w-0">
+                {overdueInScope > 0 && taskScope !== 'overdue' && (
+                  <p className="text-xs text-destructive">
+                    {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste recorte
                   </p>
                 )}
               </div>
@@ -517,7 +516,7 @@ export default function HabitsTasks() {
                   className={cn(
                     'rounded-full px-3 py-1.5 text-xs font-medium transition-colors shrink-0',
                     taskScope === chip.id
-                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                      ? 'bg-primary/90 text-primary-foreground'
                       : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground',
                   )}
                 >
@@ -528,23 +527,40 @@ export default function HabitsTasks() {
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground">Lista carrega até 50 tarefas recentes da API.</p>
 
             {filteredTasks.length === 0 ? (
               <PraxisEmptyState
                 icon={ListTodo}
                 title="Nenhuma tarefa neste filtro"
-                description="Crie uma tarefa ou mude o filtro acima."
+                description={
+                  taskScope === 'today' && overdueOpenTotal > 0
+                    ? `Nada para hoje no calendário. Você tem ${overdueOpenTotal} atrasada${
+                        overdueOpenTotal === 1 ? '' : 's'
+                      } — vale abrir esse filtro.`
+                    : 'Crie uma tarefa ou mude o filtro acima.'
+                }
                 action={(
-                  <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
-                    <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    {taskScope === 'today' && overdueOpenTotal > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full praxis-touch-target"
+                        onClick={() => handleTaskScopeChange('overdue')}
+                      >
+                        Ver atrasadas ({overdueOpenTotal})
+                      </Button>
+                    )}
+                    <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
+                      <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
+                    </Button>
+                  </div>
                 )}
               />
             ) : (
               <div className="space-y-3">
                 {filteredTasks.map((task, index) => (
-                  <Card key={task.id} className="card-domain domain-ember overflow-hidden bg-card/75">
+                  <Card key={task.id} className="border-border/80 bg-card/50 overflow-hidden shadow-none">
                     <CardContent
                       className={cn(
                         'flex items-center gap-2 sm:gap-3',
