@@ -36,6 +36,12 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - Subtítulo “cockpit” na marca.
 - Cards dentro de cards sem necessidade.
 
+## Lote 7 — app quieto (2026-07-06)
+
+- **Subtrair:** mesh fraco, glass flat, kickers sentence-case, `card-domain` sem hover lift, sidebar menos ouro/sombra, Dashboard sem glow por widget.
+- **Manter:** Agora, voz, hierarquia `PageHero`, ouro só nav/XP.
+- Calendar: ver `docs/PRAXIS-CALENDAR-SYNC.md`.
+
 ## E2E mobile (390px)
 
 ```bash

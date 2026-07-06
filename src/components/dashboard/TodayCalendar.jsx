@@ -66,7 +66,7 @@ export default function TodayCalendar() {
                     'bg-secondary/50 hover:bg-secondary group'
                   )}
                 >
-                  <span className="text-xs font-mono text-muted-foreground pt-0.5 min-w-[3.2rem]">
+                  <span className="text-xs tabular-nums text-muted-foreground pt-0.5 min-w-[3.2rem]">
                     {formatTime(event.start)}
                   </span>
                   <div className="flex-1 min-w-0">

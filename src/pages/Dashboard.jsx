@@ -42,11 +42,8 @@ import OverdueTasksBanner from '@/components/dashboard/OverdueTasksBanner';
 import SuggestedGoalCard from '@/components/dashboard/SuggestedGoalCard';
 import OpeningRitualCollapsible from '@/components/dashboard/OpeningRitualCollapsible';
 
-// Widgets are wrapped in domain-aware sections so each block has a hover-glow
-// in its semantic color (defined via .card-domain in index.css).
-const Slot = ({ domain = 'focus', children }) => (
-  <div className={`rounded-2xl card-domain domain-${domain}`}>{children}</div>
-);
+// Lote 7: widgets sem glow de domínio (app mais quieto)
+const Slot = ({ children }) => <div>{children}</div>;
 
 export default function Dashboard() {
   const navigate = useNavigate();

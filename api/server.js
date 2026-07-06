@@ -844,7 +844,31 @@ function taskCalendarWindow(task) {
 function shouldSyncTaskToCalendar(task) {
   if (!FORJA_CALENDAR_SYNC_ENABLED) return false;
   if (!task?.date || !task?.time) return false;
-  return !['completed', 'done', 'cancelled'].includes(String(task.status || '').toLowerCase());
+  if (['completed', 'done', 'cancelled'].includes(String(task.status || '').toLowerCase())) return false;
+  const today = getLocalDateString();
+  // Atrasadas não vão pro Google — evita lembrete fantasma no dia errado.
+  if (String(task.date) < today) return false;
+  return true;
+}
+
+function purgeOverdueTasksFromGoogleCalendar() {
+  if (!FORJA_CALENDAR_SYNC_ENABLED) return;
+  const today = getLocalDateString();
+  const rows = db
+    .prepare(
+      `SELECT * FROM tasks
+       WHERE date < ? AND calendar_event_id IS NOT NULL
+       AND status NOT IN ('completed', 'done', 'cancelled')`,
+    )
+    .all(today);
+  for (const task of rows) {
+    try {
+      syncTaskToCalendar(task);
+    } catch (err) {
+      console.error('purgeOverdueCalendar', task.id, err.message);
+    }
+  }
+  if (rows.length) console.log(`Calendar: removed ${rows.length} overdue task event(s) from Google`);
 }
 
 function taskCalendarDescription(task) {
@@ -2696,4 +2720,5 @@ app.delete('/api/weekly-reviews/:id', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔥 Praxis API running on port ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
+  setImmediate(() => purgeOverdueTasksFromGoogleCalendar());
 });

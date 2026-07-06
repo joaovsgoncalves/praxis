@@ -1,6 +1,13 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-02 · **URL:** https://praxis-jota.vercel.app · **Último commit relevante:** `03de6bd` (+ polish design em andamento)
+**Atualizado:** 2026-07-06 · **URL:** https://praxis-jota.vercel.app · **Lote 7** (app quieto + calendar atrasadas) em ship
+
+---
+
+## Novo (jul/2026) — Lote 7
+
+- Visual **mais quieto** (tokens, sidebar, Hoje sem glow por widget) — `docs/DESIGN.md`, `docs/PRAXIS-LOTE-7-QUIETO.md`
+- **Google Calendar:** tarefa atrasada não sincroniza; purge no boot da API — `docs/PRAXIS-CALENDAR-SYNC.md`
 
 ---
 

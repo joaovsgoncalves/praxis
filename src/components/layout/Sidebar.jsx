@@ -40,7 +40,7 @@ function AvatarRing({ progress, level }) {
           strokeDashoffset={offset}
           style={{
             transition: 'stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1)',
-            filter: 'drop-shadow(0 0 4px hsl(var(--domain-gold) / 0.6))',
+            filter: 'none',
           }}
         />
       </svg>
@@ -65,11 +65,11 @@ function SidebarGamificationBar() {
 
   return (
     <div className="px-4 pb-4 pt-3 border-t border-sidebar-border">
-      <div className="flex items-center gap-3.5 px-3 py-3.5 rounded-2xl glass-surface">
+      <div className="flex items-center gap-3.5 px-3 py-3.5 rounded-xl border border-sidebar-border bg-sidebar-accent/40">
         <AvatarRing progress={progress_pct} level={level} />
         <div className="flex-1 min-w-0">
           <p className="font-display text-sm font-semibold text-domain-gold truncate">{level_name}</p>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">
+          <p className="text-xs text-muted-foreground mt-1 tabular-nums">
             {xp_total.toLocaleString('pt-BR')} XP
           </p>
           {next_level_xp && (
@@ -145,7 +145,7 @@ export default function Sidebar({ open, onClose }) {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 h-20 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gold/20 border border-gold/20 flex items-center justify-center shadow-lg shadow-gold/10">
+            <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/15 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-gold" />
             </div>
             <div>
@@ -169,7 +169,7 @@ export default function Sidebar({ open, onClose }) {
                 className={cn(
                   "flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-all",
                   isActive
-                    ? "bg-gold text-sidebar-primary-foreground font-semibold shadow-lg shadow-gold/20"
+                    ? "bg-gold/90 text-sidebar-primary-foreground font-semibold"
                     : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 )}
               >

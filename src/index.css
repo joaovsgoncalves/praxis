@@ -16,20 +16,20 @@
     --card-foreground: 0 0% 95%;
     --popover: 240 5% 10%;
     --popover-foreground: 0 0% 95%;
-    --primary: 265 85% 65%;
+    --primary: 265 42% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 5% 14%;
     --secondary-foreground: 0 0% 85%;
     --muted: 240 4% 16%;
     --muted-foreground: 240 5% 55%;
-    --accent: 160 80% 50%;
-    --accent-foreground: 0 0% 5%;
+    --accent: 160 45% 42%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 4% 18%;
     --input: 240 4% 18%;
-    --ring: 265 85% 65%;
-    --chart-1: 265 85% 65%;
+    --ring: 265 42% 58%;
+    --chart-1: 265 42% 58%;
     --chart-2: 160 80% 50%;
     --chart-3: 200 80% 60%;
     --chart-4: 40 90% 60%;
@@ -38,7 +38,7 @@
     --radius: 0.75rem;
     --sidebar-background: 240 7% 8%;
     --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 40 95% 55%;
+    --sidebar-primary: 40 70% 50%;
     --sidebar-primary-foreground: 20 10% 8%;
     --sidebar-accent: 240 5% 13%;
     --sidebar-accent-foreground: 0 0% 95%;
@@ -46,12 +46,12 @@
     --sidebar-ring: 40 95% 55%;
 
     /* Domain palette — semantic colors per area of the app */
-    --domain-ember: 22 95% 58%;     /* streaks, rituals (fire) */
-    --domain-gold: 40 95% 55%;      /* XP, level, achievements */
-    --domain-focus: 265 85% 65%;    /* deep work, pomodoro */
-    --domain-wellness: 160 80% 50%; /* habits done, health */
-    --domain-sky: 200 85% 60%;      /* calendar, time */
-    --domain-pink: 330 80% 65%;     /* @jotav.fit, content */
+    --domain-ember: 22 55% 48%;
+    --domain-gold: 40 70% 50%;
+    --domain-focus: 265 42% 58%;
+    --domain-wellness: 160 45% 42%;
+    --domain-sky: 200 50% 48%;
+    --domain-pink: 330 45% 52%;
   }
 
   .dark {
@@ -61,20 +61,20 @@
     --card-foreground: 0 0% 95%;
     --popover: 240 5% 10%;
     --popover-foreground: 0 0% 95%;
-    --primary: 265 85% 65%;
+    --primary: 265 42% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 5% 14%;
     --secondary-foreground: 0 0% 85%;
     --muted: 240 4% 16%;
     --muted-foreground: 240 5% 55%;
-    --accent: 160 80% 50%;
-    --accent-foreground: 0 0% 5%;
+    --accent: 160 45% 42%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 4% 18%;
     --input: 240 4% 18%;
-    --ring: 265 85% 65%;
-    --chart-1: 265 85% 65%;
+    --ring: 265 42% 58%;
+    --chart-1: 265 42% 58%;
     --chart-2: 160 80% 50%;
     --chart-3: 200 80% 60%;
     --chart-4: 40 90% 60%;
@@ -82,19 +82,19 @@
     --gold: 40 95% 55%;
     --sidebar-background: 240 7% 8%;
     --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 40 95% 55%;
+    --sidebar-primary: 40 70% 50%;
     --sidebar-primary-foreground: 20 10% 8%;
     --sidebar-accent: 240 5% 13%;
     --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 240 4% 14%;
     --sidebar-ring: 40 95% 55%;
 
-    --domain-ember: 22 95% 58%;
-    --domain-gold: 40 95% 55%;
-    --domain-focus: 265 85% 65%;
-    --domain-wellness: 160 80% 50%;
-    --domain-sky: 200 85% 60%;
-    --domain-pink: 330 80% 65%;
+    --domain-ember: 22 55% 48%;
+    --domain-gold: 40 70% 50%;
+    --domain-focus: 265 42% 58%;
+    --domain-wellness: 160 45% 42%;
+    --domain-sky: 200 50% 48%;
+    --domain-pink: 330 45% 52%;
   }
 }
 
@@ -109,10 +109,8 @@
     /* Ambient mesh — barely-there warm/cool gradient pinned to viewport */
     background-color: hsl(var(--background));
     background-image:
-      radial-gradient(circle at 12% -8%, hsl(265 70% 18% / 0.55), transparent 45%),
-      radial-gradient(circle at 95% 0%, hsl(22 80% 28% / 0.30), transparent 40%),
-      radial-gradient(circle at 50% 110%, hsl(265 60% 14% / 0.45), transparent 55%),
-      radial-gradient(circle at -5% 70%, hsl(40 85% 18% / 0.20), transparent 40%);
+      radial-gradient(circle at 50% -20%, hsl(265 35% 14% / 0.35), transparent 50%),
+      radial-gradient(circle at 100% 100%, hsl(240 8% 10% / 0.5), transparent 45%);
     background-attachment: fixed;
   }
 }
@@ -120,36 +118,24 @@
 @layer components {
   /* Glass surface for hero and key elevated cards */
   .glass-surface {
-    background: linear-gradient(
-      145deg,
-      hsl(var(--card) / 0.78) 0%,
-      hsl(var(--card) / 0.55) 100%
-    );
-    backdrop-filter: blur(12px) saturate(140%);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    border: 1px solid hsl(0 0% 100% / 0.06);
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.04),
-      0 6px 24px hsl(0 0% 0% / 0.35);
+    background: hsl(var(--card) / 0.92);
+    border: 1px solid hsl(0 0% 100% / 0.05);
+    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03);
   }
 
   .forja-panel {
-    background:
-      linear-gradient(145deg, hsl(var(--card) / 0.88), hsl(var(--card) / 0.64)),
-      radial-gradient(circle at top left, hsl(var(--domain-gold) / 0.10), transparent 38%);
-    border: 1px solid hsl(0 0% 100% / 0.075);
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.045),
-      0 16px 48px hsl(0 0% 0% / 0.32);
+    background: hsl(var(--card) / 0.94);
+    border: 1px solid hsl(0 0% 100% / 0.06);
+    box-shadow: none;
   }
 
   .forja-kicker {
-    @apply font-sans text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:text-xs sm:tracking-[0.16em];
+    @apply font-sans text-xs font-medium tracking-wide text-muted-foreground normal-case;
   }
 
   /* Kicker com ícone — baseline alinhada ao bloco */
   .praxis-kicker-row {
-    @apply flex items-center gap-2 font-sans text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground sm:text-xs sm:tracking-[0.16em];
+    @apply flex items-center gap-2 font-sans text-xs font-medium tracking-wide text-muted-foreground normal-case;
   }
 
   .praxis-page {
@@ -157,30 +143,29 @@
   }
 
   .praxis-page-hero {
-    @apply glass-surface rounded-3xl p-5 sm:p-6;
-  }
-
-  .praxis-stat-tile {
-    @apply rounded-2xl px-4 py-3.5 text-left;
+    @apply rounded-2xl border border-border/80 bg-card/40 p-5 sm:p-6;
   }
 
   .praxis-stat-label {
-    @apply text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground leading-tight;
+    @apply text-xs font-medium text-muted-foreground leading-tight normal-case tracking-normal;
+  }
+
+  .praxis-stat-tile {
+    @apply rounded-xl border border-border/60 bg-card/30 px-4 py-3 text-left;
   }
 
   .praxis-stat-value {
-    @apply mt-2 text-2xl font-semibold tabular-nums leading-none tracking-tight;
+    @apply mt-1.5 text-xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl;
   }
 
   .forja-title {
     @apply font-display tracking-[-0.045em];
   }
 
-  /* Domain card — adds a soft outer glow + accent border in the domain hue */
+  /* Domain card — borda sutil (Lote 7 quiet) */
   .card-domain {
     --domain: var(--domain-focus);
     position: relative;
-    transition: box-shadow 240ms ease, border-color 240ms ease, transform 240ms ease;
   }
   .card-domain::before {
     content: '';
@@ -188,17 +173,7 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    box-shadow: inset 0 0 0 1px hsl(var(--domain) / 0.18);
-    transition: box-shadow 240ms ease;
-  }
-  .card-domain:hover {
-    box-shadow:
-      0 8px 28px hsl(var(--domain) / 0.10),
-      0 0 0 1px hsl(var(--domain) / 0.32);
-    transform: translateY(-1px);
-  }
-  .card-domain:hover::before {
-    box-shadow: inset 0 0 0 1px hsl(var(--domain) / 0.40);
+    box-shadow: inset 0 0 0 1px hsl(var(--domain) / 0.08);
   }
 
   /* Inset shadow for progress fill rails */
@@ -210,7 +185,7 @@
   .ember-canvas {
     pointer-events: none;
     mix-blend-mode: screen;
-    opacity: 0.85;
+    opacity: 0.35;
   }
 }
 
