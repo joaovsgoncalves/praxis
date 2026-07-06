@@ -1,10 +1,15 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-06 · **URL:** https://praxis-jota.vercel.app · **Lote 7** `122f688` no ar
+**Atualizado:** 2026-07-06 · **URL:** https://praxis-jota.vercel.app · **Lote 8** `45f29c2` no ar
 
 ---
 
-## Novo (jul/2026) — Lote 7
+## Novo (jul/2026) — Lote 8
+
+- **Equilíbrio visual** no Hoje: `PraxisInlinePromo`, seção “Sugestões e reflexão”, revisão sem CTA roxo cheio — `docs/PRAXIS-DESIGN-AUDIT-LOTE-8.md`
+- **Modo Foco:** select de tarefa sem card pesado
+
+## Lote 7 (mesmo mês)
 
 - Visual **mais quieto** (tokens, sidebar, Hoje sem glow por widget) — `docs/DESIGN.md`, `docs/PRAXIS-LOTE-7-QUIETO.md`
 - **Google Calendar:** tarefa atrasada não sincroniza; purge no boot da API — `docs/PRAXIS-CALENDAR-SYNC.md`
