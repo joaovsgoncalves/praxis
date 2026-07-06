@@ -13,6 +13,25 @@ function daysBetween(ymdA, ymdB) {
   return Math.round((b - a) / (24 * 60 * 60 * 1000));
 }
 
+const MONTHS_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function formatDateShortPt(ymd) {
+  if (!ymd) return '';
+  const [y, m, d] = String(ymd).slice(0, 10).split('-');
+  const mi = Number(m) - 1;
+  if (!d || mi < 0 || mi > 11) return ymd;
+  return `${Number(d)} ${MONTHS_PT[mi]}`;
+}
+
+function overdueReason(days, dateYmd) {
+  const when = formatDateShortPt(dateYmd);
+  if (days <= 0) return when ? `Venceu hoje · ${when}` : 'Venceu hoje';
+  const dLabel = days === 1 ? '1 dia' : `${days} dias`;
+  return when ? `Atrasada ${dLabel} · era ${when}` : `Atrasada ${dLabel}`;
+}
+
+const DISPLAY_LIMIT = 8;
+
 /**
  * @param {import('better-sqlite3').Database} db
  * @param {string} today YYYY-MM-DD
@@ -22,26 +41,40 @@ export function buildAvoidanceInsights(db, today) {
   const weekAgo = addDaysYmd(today, -7);
   const items = [];
 
-  const overdue = db.prepare(`
+  const overdueRaw = db.prepare(`
     SELECT id, title, date, priority, category
     FROM tasks
     WHERE status NOT IN ('completed', 'done', 'cancelled')
       AND category != 'ideias'
       AND date IS NOT NULL AND date < ?
     ORDER BY date ASC, priority DESC
-    LIMIT 8
+    LIMIT 24
   `).all(today);
 
-  for (const t of overdue) {
+  /** Mesmo título em várias datas (recorrência) → uma linha, a mais atrasada. */
+  const overdueByTitle = new Map();
+  for (const t of overdueRaw) {
+    const key = cleanTitle(t.title).toLowerCase() || `id-${t.id}`;
     const days = daysBetween(t.date, today);
+    const prev = overdueByTitle.get(key);
+    if (!prev || days > prev._days || (days === prev._days && t.date < prev.date)) {
+      overdueByTitle.set(key, { ...t, _days: days });
+    }
+  }
+  const overdue = [...overdueByTitle.values()]
+    .sort((a, b) => a.date.localeCompare(b.date) || (b._days - a._days))
+    .slice(0, DISPLAY_LIMIT);
+
+  for (const t of overdue) {
+    const days = t._days ?? daysBetween(t.date, today);
     items.push({
       id: `task-overdue-${t.id}`,
       entity_id: t.id,
       type: 'task',
       title: cleanTitle(t.title),
-      reason: `Atrasada há ${days} dia(s) (prevista ${t.date})`,
+      reason: overdueReason(days, t.date),
       severity: days >= 3 || t.priority === 'high' ? 'high' : 'medium',
-      action: { label: 'Abrir em tarefas', href: '/habitos-tarefas?tab=tasks' },
+      action: { label: 'Abrir em tarefas', href: '/habitos-tarefas?tab=tasks&scope=overdue' },
     });
   }
 
@@ -168,23 +201,33 @@ export function buildAvoidanceInsights(db, today) {
   const severityRank = { high: 0, medium: 1, low: 2 };
   items.sort((a, b) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9));
 
-  const highCount = items.filter((i) => i.severity === 'high').length;
-  const pressure = Math.min(100, highCount * 25 + items.length * 8);
+  const totalCount = items.length;
+  const displayed = items.slice(0, DISPLAY_LIMIT);
+
+  const highCount = displayed.filter((i) => i.severity === 'high').length;
+  const pressure = totalCount === 0 ? 0 : Math.min(100, highCount * 25 + totalCount * 8);
 
   let headline = 'Nada gritando no radar — bom sinal.';
-  if (items.length === 1) headline = '1 coisa pedindo atenção';
-  else if (items.length > 1) headline = `${items.length} coisas que você pode estar empurrando`;
+  if (totalCount === 1) headline = '1 coisa pedindo atenção';
+  else if (totalCount > 1) {
+    headline =
+      totalCount <= DISPLAY_LIMIT
+        ? `${totalCount} coisas que você pode estar empurrando`
+        : `${totalCount} no radar — ${DISPLAY_LIMIT} mais urgentes abaixo`;
+  }
 
-  const bullets = items.slice(0, 6).map((i) => `${i.title}: ${i.reason}`);
+  const bullets = displayed.slice(0, 6).map((i) => `${i.title}: ${i.reason}`);
 
   return {
     today,
     pressure,
     headline,
-    items: items.slice(0, 8),
+    total_count: totalCount,
+    items: displayed,
     bullets,
     stats: {
       overdue_count: overdue.length,
+      overdue_rows_db: overdueRaw.length,
       floating_count: floating.length,
       pending_today: pendingToday,
       focus_minutes: Math.round(focusSec / 60),

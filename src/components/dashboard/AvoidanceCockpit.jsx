@@ -30,6 +30,10 @@ export default function AvoidanceCockpit() {
 
   const items = data?.items ?? [];
 
+  if (!isLoading && !isError && (data?.total_count ?? items.length) === 0) {
+    return null;
+  }
+
   return (
     <Card className="border-border/80 bg-card/40">
       <CardHeader className="pb-2">
@@ -43,9 +47,11 @@ export default function AvoidanceCockpit() {
               {isLoading ? 'Lendo seus padrões…' : data?.headline}
             </p>
           </div>
-          {data?.pressure > 0 && (
+          {data?.total_count > 0 && (
             <Badge variant="outline" className="shrink-0 tabular-nums font-normal">
-              {items.length} {items.length === 1 ? 'item' : 'itens'}
+              {items.length}
+              {data.total_count > items.length ? ` de ${data.total_count}` : ''}{' '}
+              {data.total_count === 1 ? 'item' : 'itens'}
             </Badge>
           )}
         </div>
