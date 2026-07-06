@@ -85,6 +85,7 @@ Arquivos:
 ## Fora deste lote (registrar)
 
 - `HeroDay` + ember + anéis — equilibrar com quiet (Lote 8b).
+- **Água (Lote 8c):** grid 16×250 ml → barra + 8 copos; copy “X de 8 copos” / “Faltam 2 L”.
 - Páginas secundárias com `glass-surface` residual.
 - Playwright 390px após mudanças no Hoje.
 

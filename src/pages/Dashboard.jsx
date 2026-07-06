@@ -270,6 +270,7 @@ export default function Dashboard() {
           </Slot>
         </div>
         <div className="space-y-7 lg:space-y-8">
+          <p className="text-xs font-medium text-muted-foreground px-0.5 -mb-3 lg:-mb-4">Corpo e agenda</p>
           <Slot domain="wellness">
             <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
           </Slot>
