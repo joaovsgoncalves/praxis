@@ -22,3 +22,5 @@
 Ordem recomendada: **Fase 1–5** num deploy (João escolheu **B**).
 
 **Ship:** `122f688` — API restart + Vercel praxis-jota.
+
+**Próximo:** Lote 8 equilíbrio — `docs/PRAXIS-DESIGN-AUDIT-LOTE-8.md`.

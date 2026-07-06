@@ -72,21 +72,25 @@ export default function OpeningRitualCollapsible() {
   const done = habits.filter((h) => h.completed_today).length;
   const allDone = habits.length > 0 && done === habits.length;
 
+  const subtitle = opening
+    ? allDone
+      ? 'Ritual de hoje completo'
+      : `${done}/${habits.length} passos`
+    : 'Água, movimento e prioridade';
+
   return (
-    <Collapsible open={open} onOpenChange={onOpenChange} className="rounded-2xl border border-gold/20 bg-gold/5">
+    <Collapsible
+      open={open}
+      onOpenChange={onOpenChange}
+      className="rounded-2xl border border-border/80 bg-card/40"
+    >
       <CollapsibleTrigger className="flex w-full items-center gap-3 px-4 py-3 text-left">
-        <Sunrise className="h-5 w-5 shrink-0 text-gold" aria-hidden />
+        <Sunrise className="h-5 w-5 shrink-0 text-gold/80" aria-hidden />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-snug">Abertura do dia · ~3 min</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {opening
-              ? allDone
-                ? 'Ritual de hoje completo'
-                : `${done}/${habits.length} passos`
-              : 'Água, movimento e prioridade'}
-          </p>
+          <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
         </div>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-4 pb-4 space-y-3">
         {isLoading && <PraxisListSkeleton rows={2} className="border-0 bg-transparent shadow-none" />}
@@ -99,7 +103,7 @@ export default function OpeningRitualCollapsible() {
               type="button"
               size="sm"
               variant="outline"
-              className="rounded-full gap-1.5 border-gold/30"
+              className="rounded-full gap-1.5"
               disabled={createFromTemplate.isPending}
               onClick={() => createFromTemplate.mutate()}
             >
@@ -134,7 +138,7 @@ export default function OpeningRitualCollapsible() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-gold"
+                className="h-7 text-xs"
                 onClick={() => {
                   const next = habits.find((x) => !x.completed_today);
                   if (next) toggleHabit.mutate({ habitId: next.id, isDone: false });

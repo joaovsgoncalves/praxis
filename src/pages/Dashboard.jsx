@@ -285,11 +285,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="order-6 lg:order-5 flex flex-col gap-4 sm:gap-5">
-        <OpeningRitualCollapsible />
-        <SuggestedGoalCard />
-        <WeeklyReviewPrompt />
-        <AvoidanceCockpit />
+      <div className="order-6 lg:order-5 flex flex-col gap-3 sm:gap-4">
+        <p className="text-xs font-medium text-muted-foreground px-0.5">Sugestões e reflexão</p>
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <OpeningRitualCollapsible />
+          <SuggestedGoalCard />
+          <WeeklyReviewPrompt />
+          <AvoidanceCockpit />
+        </div>
       </div>
 
       {showAnalyticsSection ? (

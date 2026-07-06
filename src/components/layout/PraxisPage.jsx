@@ -117,6 +117,41 @@ export function PraxisListSkeleton({ rows = 4, className }) {
   );
 }
 
+/** Banner / onboarding inline — Lote 8 (uma família visual no Hoje). */
+export function PraxisInlinePromo({
+  icon: Icon,
+  iconClassName,
+  title,
+  subtitle,
+  trailing,
+  children,
+  className,
+  bodyClassName,
+}) {
+  return (
+    <div className={cn('rounded-2xl border border-border/80 bg-card/40', className)}>
+      <div className="flex items-start gap-3 p-4">
+        {Icon ? (
+          <Icon
+            className={cn('h-5 w-5 shrink-0 mt-0.5 text-muted-foreground', iconClassName)}
+            aria-hidden
+          />
+        ) : null}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold leading-snug">{title}</p>
+          {subtitle ? (
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{subtitle}</p>
+          ) : null}
+        </div>
+        {trailing ? <div className="shrink-0">{trailing}</div> : null}
+      </div>
+      {children ? (
+        <div className={cn('px-4 pb-4 pt-0 space-y-3', bodyClassName)}>{children}</div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Skeleton em colunas (ex.: Compras por prazo). */
 export function PraxisColumnsSkeleton({ columns = 3, rowsPerColumn = 2 }) {
   return (

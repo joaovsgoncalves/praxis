@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Target, X } from 'lucide-react';
+import { PraxisInlinePromo } from '@/components/layout/PraxisPage';
 import {
   GOAL_STARTER_TEMPLATES,
   isGoalSuggestDismissed,
@@ -34,37 +34,38 @@ export default function SuggestedGoalCard() {
   };
 
   return (
-    <Card className="border-white/10 bg-card/80">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <Target className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-snug">Criar sua primeira meta</p>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Atalhos para RCA, Encarte ou corpo. Depois você ajusta em Metas.
-            </p>
-          </div>
-          <Button type="button" variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={handleDismiss} aria-label="Agora não">
-            <X className="h-4 w-4" />
+    <PraxisInlinePromo
+      icon={Target}
+      iconClassName="text-primary/80"
+      title="Criar sua primeira meta"
+      subtitle="Atalhos para RCA, Encarte ou corpo. Depois você ajusta em Metas."
+      trailing={
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={handleDismiss}
+          aria-label="Agora não"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        {GOAL_STARTER_TEMPLATES.map((t) => (
+          <Button
+            key={t.id}
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => handlePick(t.id)}
+          >
+            {t.emoji} {t.label}
           </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {GOAL_STARTER_TEMPLATES.map((t) => (
-            <Button
-              key={t.id}
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="rounded-full"
-              onClick={() => handlePick(t.id)}
-            >
-              {t.emoji} {t.label}
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+    </PraxisInlinePromo>
   );
 }

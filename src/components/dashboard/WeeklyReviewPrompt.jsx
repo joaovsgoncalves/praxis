@@ -2,15 +2,12 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { forjaApi } from '@/api/forjaClient';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BookOpen, ArrowRight } from 'lucide-react';
+import { PraxisInlinePromo } from '@/components/layout/PraxisPage';
 
-// Show the prompt only on Sunday or Monday, and only if the *previous* week's
-// review hasn't been written yet — Saturday's bias should not nag someone
-// who already reviewed.
 function shouldShowPrompt(today, lastReviewWeekStart) {
-  const dow = today.getDay(); // 0 Sun, 1 Mon
+  const dow = today.getDay();
   if (dow !== 0 && dow !== 1) return false;
 
   const monday = new Date(today);
@@ -36,21 +33,18 @@ export default function WeeklyReviewPrompt() {
   if (!shouldShowPrompt(new Date(), lastReviewWeekStart)) return null;
 
   return (
-    <Card className="bg-gradient-to-br from-primary/15 to-primary/5 border-primary/30">
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-          <BookOpen className="w-5 h-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">Revisão da semana passada</p>
-          <p className="text-xs text-muted-foreground">5 minutos pra olhar pra trás antes de seguir.</p>
-        </div>
-        <Button asChild size="sm">
+    <PraxisInlinePromo
+      icon={BookOpen}
+      iconClassName="text-primary/80"
+      title="Revisão da semana passada"
+      subtitle="5 minutos pra olhar pra trás antes de seguir."
+      trailing={
+        <Button asChild size="sm" variant="outline">
           <Link to="/revisao-semanal">
             Revisar <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Link>
         </Button>
-      </CardContent>
-    </Card>
+      }
+    />
   );
 }

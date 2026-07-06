@@ -376,24 +376,22 @@ export default function Focus() {
             </div>
           </section>
 
-          <Card className="bg-card border-border">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="font-semibold text-sm">Tarefa (opcional)</h2>
-              <Select value={selectedTaskId || 'none'} onValueChange={setSelectedTaskId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma tarefa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma (foco livre)</SelectItem>
-                  {tasks.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+          <section className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Vincular tarefa (opcional)</p>
+            <Select value={selectedTaskId || 'none'} onValueChange={setSelectedTaskId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione uma tarefa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma (foco livre)</SelectItem>
+                {tasks.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </section>
 
           <Button onClick={startSession} size="lg" className="w-full gap-2">
             <Timer className="w-5 h-5" />

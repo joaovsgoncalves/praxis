@@ -20,7 +20,7 @@ export default function NowBlock({
 }) {
   if (!task) {
     return (
-      <Card className="border-primary/25 bg-gradient-to-br from-primary/10 via-background to-background">
+      <Card className="border-primary/25 bg-card/50">
         <CardContent className="p-6 sm:p-8 space-y-4">
           <p className="forja-kicker text-primary">Agora</p>
           <h2 className="forja-title text-xl sm:text-2xl font-semibold">
@@ -56,7 +56,7 @@ export default function NowBlock({
   const timeLabel = formatTaskTimeLabel(task);
 
   return (
-    <Card className="border-primary/30 bg-gradient-to-br from-primary/15 via-background to-background shadow-lg shadow-primary/5">
+    <Card className="border-primary/30 bg-card/50">
       <CardContent className="p-6 sm:p-8 space-y-5">
         <div className="space-y-2">
           <p className="praxis-kicker-row text-primary">

@@ -9,10 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Sparkles, AlertCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const SEVERITY_STYLES = {
-  high: 'border-destructive/40 bg-destructive/5',
-  medium: 'border-amber-500/30 bg-amber-500/5',
-  low: 'border-border bg-secondary/20',
+const SEVERITY_BORDER = {
+  high: 'border-l-destructive',
+  medium: 'border-l-amber-500',
+  low: 'border-l-border',
 };
 
 export default function AvoidanceCockpit() {
@@ -31,12 +31,12 @@ export default function AvoidanceCockpit() {
   const items = data?.items ?? [];
 
   return (
-    <Card className="border-white/10 bg-gradient-to-br from-card via-card to-primary/5 overflow-hidden">
+    <Card className="border-border/80 bg-card/40">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-500" />
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500/90" />
               O que estou evitando?
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
@@ -44,7 +44,7 @@ export default function AvoidanceCockpit() {
             </p>
           </div>
           {data?.pressure > 0 && (
-            <Badge variant="outline" className="shrink-0 tabular-nums">
+            <Badge variant="outline" className="shrink-0 tabular-nums font-normal">
               {items.length} {items.length === 1 ? 'item' : 'itens'}
             </Badge>
           )}
@@ -58,14 +58,14 @@ export default function AvoidanceCockpit() {
         )}
 
         {!isLoading && items.length > 0 && (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {items.map((item) => (
               <li key={item.id}>
                 <Link
                   to={item.action?.href || '/'}
                   className={cn(
-                    'flex items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-white/5',
-                    SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.low,
+                    'flex items-start gap-3 rounded-xl border border-border/70 border-l-4 bg-card/30 p-3 transition-colors hover:bg-card/50',
+                    SEVERITY_BORDER[item.severity] || SEVERITY_BORDER.low,
                   )}
                 >
                   <div className="flex-1 min-w-0">
@@ -85,10 +85,10 @@ export default function AvoidanceCockpit() {
           </p>
         )}
 
-        <div className="border-t border-white/5 pt-4 space-y-3">
+        <div className="border-t border-border/60 pt-4 space-y-3">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="sm"
             className="w-full sm:w-auto"
             disabled={praxiaMutation.isPending || isLoading}
@@ -97,14 +97,14 @@ export default function AvoidanceCockpit() {
             {praxiaMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
-              <Sparkles className="w-4 h-4 mr-2 text-primary" />
+              <Sparkles className="w-4 h-4 mr-2 text-primary/80" />
             )}
             PraxIA — olhar o padrão
           </Button>
 
           {praxiaMutation.data?.lines?.length > 0 && (
-            <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 space-y-2">
-              <p className="text-xs forja-kicker text-primary">PraxIA</p>
+            <div className="rounded-xl border border-border/70 bg-card/30 p-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">PraxIA</p>
               {praxiaMutation.data.lines.map((line, i) => (
                 <p key={i} className="text-sm text-foreground/90 leading-relaxed">
                   {line}
