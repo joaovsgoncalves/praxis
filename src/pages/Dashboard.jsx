@@ -201,13 +201,13 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="praxis-page flex flex-col gap-4 sm:gap-5 lg:gap-8">
+    <div className="praxis-page praxis-page--tight flex flex-col gap-3 sm:gap-4">
       <div className="flex flex-col gap-2">
         <OfflineBanner />
         <PwaInstallBanner />
       </div>
 
-      <div className="order-1 lg:order-2">
+      <div className="order-1">
         <NowBlock
           task={nowTask}
           today={today}
@@ -228,7 +228,7 @@ export default function Dashboard() {
         <CapturePendingBanner />
       </div>
 
-      <div className="order-4 lg:order-1">
+      <div className="order-4">
         <HeroDay
           habitsDone={completedHabits}
           habitsTotal={essentialHabits.length}
@@ -238,8 +238,8 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="order-5 lg:order-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)] gap-7 lg:gap-8 items-start">
-        <div className="space-y-7 lg:space-y-8">
+      <div className="order-5 lg:order-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)] gap-4 lg:gap-5 items-start">
+        <div className="space-y-4 lg:space-y-5">
           <Slot domain="ember">
             <TodayTasks
               tasks={tasks}
@@ -261,7 +261,7 @@ export default function Dashboard() {
             />
           </Slot>
         </div>
-        <div className="space-y-7 lg:space-y-8">
+        <div className="space-y-4">
           <Collapsible defaultOpen={false} className="rounded-2xl border border-white/5 bg-black/20">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-5 h-auto">

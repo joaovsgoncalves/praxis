@@ -31,7 +31,7 @@ export default function AppLayout() {
           className={
             isLogin
               ? 'p-4 max-w-[1480px] mx-auto'
-              : 'mx-auto max-w-[1480px] p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-7 md:pb-10 lg:p-10 lg:pb-10'
+              : 'mx-auto max-w-[1480px] p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-5 md:pb-10 lg:p-6 lg:pb-10'
           }
         >
           <Outlet />

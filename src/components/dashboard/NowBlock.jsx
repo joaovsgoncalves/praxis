@@ -21,9 +21,9 @@ export default function NowBlock({
   if (!task) {
     return (
       <Card className="border-primary/25 bg-card/50">
-        <CardContent className="p-6 sm:p-8 space-y-4">
-          <p className="forja-kicker text-primary">Agora</p>
-          <h2 className="forja-title text-xl sm:text-2xl font-semibold">
+        <CardContent className="p-4 sm:p-5 space-y-3">
+          <p className="forja-kicker text-primary text-xs">Agora</p>
+          <h2 className="forja-title text-lg sm:text-xl font-semibold leading-snug">
             Nada urgente na fila — bom momento para capturar ou planejar.
           </h2>
           <p className="text-sm text-muted-foreground max-w-xl">
@@ -57,7 +57,7 @@ export default function NowBlock({
 
   return (
     <Card className="border-primary/30 bg-card/50">
-      <CardContent className="p-6 sm:p-8 space-y-5">
+      <CardContent className="p-4 sm:p-5 space-y-4">
         <div className="space-y-2">
           <p className="praxis-kicker-row text-primary">
             <span>Agora</span>

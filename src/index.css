@@ -142,6 +142,10 @@
     @apply mx-auto max-w-6xl space-y-6;
   }
 
+  .praxis-page--tight {
+    @apply space-y-3 sm:space-y-4;
+  }
+
   .praxis-page-hero {
     @apply rounded-2xl border border-border/80 bg-card/40 p-5 sm:p-6;
   }
