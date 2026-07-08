@@ -8,6 +8,10 @@ import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Timer, Flame, Smile, Zap, BarChart3 } from 'lucide-react';
 import { PageHero } from '@/components/layout/PraxisPage';
+import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
+import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
+import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
+import WeeklyProgress from '@/components/dashboard/WeeklyProgress';
 
 export default function History() {
   const [range, setRange] = useState('30');
@@ -151,6 +155,16 @@ export default function History() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="space-y-6 pt-4 border-t border-border">
+        <p className="text-sm font-medium text-muted-foreground">Extras (antes no Hoje)</p>
+        <HabitsHeatmap />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <WeeklyProgress habits={habits} habitLogs={habitLogs} />
+          <CorrelationWidget />
+        </div>
+        <UpcomingPosts />
+      </div>
     </div>
   );
 }

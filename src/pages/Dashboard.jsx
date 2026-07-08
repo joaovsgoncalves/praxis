@@ -2,24 +2,19 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { forjaApi } from '@/api/forjaClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import DayWins from '@/components/dashboard/DayWins';
 import HeroDay from '@/components/dashboard/HeroDay';
 import NowBlock from '@/components/dashboard/NowBlock';
 import TodayTasks from '@/components/dashboard/TodayTasks';
 import TodayHabits from '@/components/dashboard/TodayHabits';
 import WellnessWidget from '@/components/dashboard/WellnessWidget';
-import WeeklyProgress from '@/components/dashboard/WeeklyProgress';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import WaterTracker from '@/components/dashboard/WaterTracker';
 import TodayCalendar from '@/components/dashboard/TodayCalendar';
 import RitualWidget from '@/components/dashboard/RitualWidget';
-import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
 import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
-import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
+import CapturePendingBanner from '@/components/dashboard/CapturePendingBanner';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
 import AvoidanceCockpit from '@/components/dashboard/AvoidanceCockpit';
-import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
-import CapturePendingBanner from '@/components/dashboard/CapturePendingBanner';
 import OfflineBanner from '@/components/shared/OfflineBanner';
 import PwaInstallBanner from '@/components/shared/PwaInstallBanner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -195,9 +190,6 @@ export default function Dashboard() {
     todayLogs.some(l => l.habit_id === h.id && l.completed)
   ).length;
 
-  const hasNowBlock = Boolean(nowTask);
-  const showAnalyticsSection = hasNowBlock || completedTasks > 0 || completedHabits > 0;
-
   const handleSnooze15 = (task) => {
     const data = buildSnooze15Update(task, today);
     updateTaskMutation.mutate({ id: task.id, data });
@@ -270,66 +262,39 @@ export default function Dashboard() {
           </Slot>
         </div>
         <div className="space-y-7 lg:space-y-8">
-          <p className="text-xs font-medium text-muted-foreground px-0.5 -mb-3 lg:-mb-4">Corpo e agenda</p>
-          <Slot domain="wellness">
-            <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
-          </Slot>
-          <Slot domain="sky">
-            <TodayCalendar />
-          </Slot>
-          <Slot domain="ember">
-            <RitualWidget />
-          </Slot>
-          <Slot domain="sky">
-            <WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} />
-          </Slot>
+          <Collapsible defaultOpen={false} className="rounded-2xl border border-white/5 bg-black/20">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-5 h-auto">
+                <span className="text-sm font-medium text-left">Corpo e agenda</span>
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-5 px-2 pb-5 sm:px-3">
+              <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
+              <TodayCalendar />
+              <RitualWidget />
+              <WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} />
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
 
-      <div className="order-6 lg:order-5 flex flex-col gap-3 sm:gap-4">
-        <p className="text-xs font-medium text-muted-foreground px-0.5">Sugestões e reflexão</p>
-        <div className="flex flex-col gap-3 sm:gap-4">
+      <Collapsible defaultOpen={false} className="order-6 rounded-2xl border border-white/5 bg-black/20">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-5 h-auto">
+            <span className="text-sm font-medium text-left">Sugestões e reflexão</span>
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 px-2 pb-5 sm:px-3">
           <OpeningRitualCollapsible />
           <SuggestedGoalCard />
           <WeeklyReviewPrompt />
           <AvoidanceCockpit />
-        </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
 
-      {showAnalyticsSection ? (
-        <Collapsible defaultOpen={false} className="order-7 rounded-2xl border border-white/5 bg-black/20">
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-6 h-auto">
-              <span className="forja-kicker text-left">Depois · gráficos e heatmap</span>
-              <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-7 px-2 pb-6 sm:px-4">
-            <div className="grid grid-cols-1 gap-7">
-              <Slot domain="gold">
-                <DayWins
-                  tasks={tasks}
-                  today={today}
-                  onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
-                  onEditTask={setEditingTask}
-                />
-              </Slot>
-            </div>
-            <HabitsHeatmap />
-            <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-7">
-              <Slot domain="focus"><WeeklyProgress habits={habits} habitLogs={habitLogs} /></Slot>
-              <Slot domain="wellness"><CorrelationWidget /></Slot>
-            </div>
-            <Slot domain="pink"><UpcomingPosts /></Slot>
-          </CollapsibleContent>
-        </Collapsible>
-      ) : (
-        <p className="order-7 text-center text-sm text-muted-foreground py-2">
-          Gráficos aparecem quando você começar a marcar tarefas e hábitos.
-        </p>
-      )}
-
-      {showAnalyticsSection && <XpProgressStrip className="order-8 mt-2" />}
+      <XpProgressStrip className="order-7 mt-2" />
 
       <Dialog
         open={Boolean(editingTask)}

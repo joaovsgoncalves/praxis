@@ -33,9 +33,8 @@ test('login visível em 390px (quando auth web ativa)', async ({ page }) => {
 
 const AUTH_ROUTES = [
   { path: '/', name: 'Hoje' },
-  { path: '/compras', name: 'Compras' },
-  { path: '/ideias', name: 'Ideias' },
-  { path: '/foco', name: 'Foco' },
+  { path: '/mais', name: 'Mais' },
+  { path: '/habitos-tarefas', name: 'Tarefas' },
   { path: '/metas', name: 'Metas' },
   { path: '/rituais', name: 'Rituais' },
   { path: '/historico', name: 'Histórico' },

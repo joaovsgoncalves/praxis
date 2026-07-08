@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
-import { LayoutDashboard, ListTodo, Mic, Timer, Menu } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Mic, BookOpen, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const linkClass = ({ isActive }) =>
@@ -11,9 +11,10 @@ const linkClass = ({ isActive }) =>
     isActive ? 'text-primary' : 'text-muted-foreground',
   );
 
-export default function MobileBottomNav({ onOpenMenu }) {
+export default function MobileBottomNav() {
   const location = useLocation();
   const onCaptura = location.pathname === '/captura' || location.pathname === '/capturas';
+  const onMais = location.pathname === '/mais';
 
   const { data: pending } = useQuery({
     queryKey: ['captures', 'pending-count'],
@@ -35,13 +36,9 @@ export default function MobileBottomNav({ onOpenMenu }) {
         </NavLink>
 
         <NavLink
-          to="/habitos-tarefas?tab=tasks"
+          to="/habitos-tarefas"
           className={({ isActive }) =>
-            linkClass({
-              isActive:
-                isActive ||
-                (location.pathname === '/habitos-tarefas' && location.search.includes('tab=tasks')),
-            })
+            linkClass({ isActive: isActive || location.pathname === '/habitos-tarefas' })
           }
         >
           <ListTodo className="h-5 w-5 shrink-0" aria-hidden />
@@ -54,14 +51,12 @@ export default function MobileBottomNav({ onOpenMenu }) {
             'flex flex-1 flex-col items-center justify-center -mt-5 praxis-touch-target',
             onCaptura && 'text-primary',
           )}
-          aria-label="Captura por voz"
+          aria-label="Falar — captura por voz"
         >
           <span
             className={cn(
               'relative flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform active:scale-95',
-              onCaptura
-                ? 'bg-primary text-primary-foreground shadow-primary/30'
-                : 'bg-primary text-primary-foreground shadow-primary/25',
+              'bg-primary text-primary-foreground shadow-primary/25',
             )}
           >
             <Mic className="h-6 w-6" />
@@ -71,23 +66,25 @@ export default function MobileBottomNav({ onOpenMenu }) {
               </span>
             )}
           </span>
-          <span className="mt-1 text-[10px] font-medium text-muted-foreground">Voz</span>
+          <span className="mt-1 text-[10px] font-medium text-muted-foreground">Falar</span>
         </NavLink>
 
-        <NavLink to="/foco" className={linkClass}>
-          <Timer className="h-5 w-5 shrink-0" aria-hidden />
-          <span>Foco</span>
-        </NavLink>
-
-        <button
-          type="button"
-          onClick={onOpenMenu}
-          className={cn(linkClass({ isActive: false }), 'border-0 bg-transparent')}
-          aria-label="Abrir menu"
+        <NavLink
+          to="/revisao-semanal"
+          className={({ isActive }) => linkClass({ isActive })}
         >
-          <Menu className="h-5 w-5 shrink-0" />
+          <BookOpen className="h-5 w-5 shrink-0" aria-hidden />
+          <span>Revisar</span>
+        </NavLink>
+
+        <NavLink
+          to="/mais"
+          className={({ isActive }) => linkClass({ isActive: isActive || onMais })}
+          aria-label="Mais ferramentas"
+        >
+          <LayoutGrid className="h-5 w-5 shrink-0" />
           <span>Mais</span>
-        </button>
+        </NavLink>
       </div>
     </nav>
   );

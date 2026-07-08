@@ -1,25 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ListTodo, Target, Timer, BarChart3, Settings, Mic, X, Sparkles, Link2, Trophy, BookOpen, Lightbulb, ShoppingBag } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
+import { primaryNavItems } from '@/lib/praxisNav';
 
-const navItems = [
-  { path: '/', label: 'Hoje', icon: LayoutDashboard },
-  { path: '/habitos-tarefas', label: 'Hábitos & Tarefas', icon: ListTodo },
-  { path: '/ideias', label: 'Ideias', icon: Lightbulb },
-  { path: '/compras', label: 'Compras', icon: ShoppingBag },
-  { path: '/foco', label: 'Modo Foco', icon: Timer },
-  { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
-  { path: '/rituais', label: 'Rituais', icon: Link2, requiresActiveRituals: true },
-  { path: '/conquistas', label: 'Conquistas', icon: Trophy, requiresUnlockedAchievements: true },
-  { path: '/revisao-semanal', label: 'Revisão Semanal', icon: BookOpen, requiresWeeklyReviewValue: true },
-  { path: '/historico', label: 'Histórico', icon: BarChart3 },
-  { path: '/configuracoes', label: 'Configurações', icon: Settings },
-];
-
-// Apple-Watch-style ring — status compacto na sidebar.
 function AvatarRing({ progress, level }) {
   const size = 68;
   const stroke = 5;
@@ -31,17 +17,16 @@ function AvatarRing({ progress, level }) {
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(0 0% 100% / 0.07)" strokeWidth={stroke} />
         <circle
-          cx={size / 2} cy={size / 2} r={r}
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
           fill="none"
           stroke="hsl(var(--domain-gold))"
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={offset}
-          style={{
-            transition: 'stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1)',
-            filter: 'none',
-          }}
+          style={{ transition: 'stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1)' }}
         />
       </svg>
       <div className="absolute inset-2 rounded-full bg-gradient-to-br from-domain-gold/30 to-domain-ember/20 flex items-center justify-center">
@@ -83,122 +68,66 @@ function SidebarGamificationBar() {
   );
 }
 
+function isNavActive(location, item) {
+  if (item.end) return location.pathname === '/';
+  if (item.path === '/habitos-tarefas') {
+    return location.pathname === '/habitos-tarefas';
+  }
+  if (item.path === '/captura') {
+    return location.pathname === '/captura' || location.pathname === '/capturas';
+  }
+  return location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+}
+
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
-  const { data: goals = [] } = useQuery({
-    queryKey: ['allGoals'],
-    queryFn: () => forjaApi.goals.list(),
-    staleTime: 60_000,
-  });
-  const activeGoalCount = goals.filter((g) => g.status === 'active').length;
-
-  const { data: rituals = [] } = useQuery({
-    queryKey: ['rituals', 'nav'],
-    queryFn: () => forjaApi.rituals.list({ status: 'active' }),
-    staleTime: 60_000,
-  });
-  const activeRitualCount = rituals.length;
-
-  const { data: weeklyReviews = [] } = useQuery({
-    queryKey: ['weeklyReviews', 'nav'],
-    queryFn: () => forjaApi.weeklyReviews.list(1),
-    staleTime: 120_000,
-  });
-
-  const { data: weeklyInsight } = useQuery({
-    queryKey: ['insights', 'weekly', 'nav'],
-    queryFn: () => forjaApi.insights.weekly(),
-    staleTime: 300_000,
-    enabled: weeklyReviews.length === 0,
-  });
-
-  const weeklyReviewNavVisible =
-    weeklyReviews.length > 0
-    || (weeklyInsight?.victories?.tasks_completed ?? 0) > 0
-    || (weeklyInsight?.victories?.habit_done ?? 0) > 0
-    || (weeklyInsight?.ideas?.new_captures ?? 0) > 0;
-
-  const { data: gamificationNav } = useQuery({
-    queryKey: ['gamification'],
-    queryFn: () => forjaApi.gamification.get(),
-    staleTime: 120_000,
-  });
-  const unlockedAchievementCount = (gamificationNav?.achievements || []).filter((a) => a.unlocked).length;
-
-  const visibleNav = navItems.filter((item) => {
-    if (item.requiresActiveGoals) return activeGoalCount > 0;
-    if (item.requiresActiveRituals) return activeRitualCount > 0;
-    if (item.requiresWeeklyReviewValue) return weeklyReviewNavVisible;
-    if (item.requiresUnlockedAchievements) return unlockedAchievementCount > 0;
-    return true;
-  });
 
   return (
     <>
       {open && (
         <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={onClose} />
       )}
-      <aside className={cn(
-        "fixed top-0 left-0 h-full w-72 bg-sidebar z-50 flex flex-col border-r border-sidebar-border transition-transform duration-300 lg:translate-x-0",
-        open ? "translate-x-0" : "-translate-x-full"
-      )}>
-        {/* Logo */}
+      <aside
+        className={cn(
+          'fixed top-0 left-0 h-full w-72 bg-sidebar z-50 flex flex-col border-r border-sidebar-border transition-transform duration-300 lg:translate-x-0',
+          open ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
         <div className="flex items-center justify-between px-5 h-20 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/15 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-gold" />
             </div>
-            <div>
-              <span className="block font-display text-lg font-bold text-sidebar-foreground tracking-tight">Praxis</span>
-            </div>
+            <span className="font-display text-lg font-bold text-sidebar-foreground tracking-tight">Praxis</span>
           </div>
-          <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 space-y-1.5">
-          {visibleNav.map(item => {
-            const isActive = location.pathname === item.path;
+          {primaryNavItems.map((item) => {
+            const isActive = isNavActive(location, item);
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-all",
+                  'flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-all',
                   isActive
-                    ? "bg-gold/90 text-sidebar-primary-foreground font-semibold"
-                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    ? 'bg-gold/90 text-sidebar-primary-foreground font-semibold'
+                    : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
                 )}
               >
-                <item.icon className={cn("w-[18px] h-[18px] shrink-0", isActive ? "text-sidebar-primary-foreground" : "")} />
+                <item.icon className={cn('w-[18px] h-[18px] shrink-0', isActive ? 'text-sidebar-primary-foreground' : '')} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        {/* Gamification bar */}
         <SidebarGamificationBar />
-
-        {/* Voice capture */}
-        <div className="p-4 border-t border-sidebar-border">
-          <Link
-            to="/captura"
-            onClick={onClose}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3.5 rounded-2xl text-[15px] font-semibold transition-all",
-              location.pathname === '/captura'
-                ? "bg-gold text-sidebar-primary-foreground font-semibold"
-                : "bg-gold/10 text-gold hover:bg-gold/20 border border-gold/20"
-            )}
-          >
-            <Mic className="w-4 h-4" />
-            Captura por Voz
-          </Link>
-        </div>
       </aside>
     </>
   );

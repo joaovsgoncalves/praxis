@@ -68,7 +68,11 @@ export default function AvoidanceCockpit() {
             {items.map((item) => (
               <li key={item.id}>
                 <Link
-                  to={item.action?.href || '/'}
+                  to={
+                    item.entity_id && item.type === 'task'
+                      ? `/habitos-tarefas?tab=tasks&scope=overdue`
+                      : item.action?.href || '/'
+                  }
                   className={cn(
                     'flex items-start gap-3 rounded-xl border border-border/70 border-l-4 bg-card/30 p-3 transition-colors hover:bg-card/50',
                     SEVERITY_BORDER[item.severity] || SEVERITY_BORDER.low,
