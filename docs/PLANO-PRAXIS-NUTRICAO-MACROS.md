@@ -42,18 +42,16 @@ A Praxis já tem hábitos quantitativos, água no Hoje, captura, revisão semana
 7. **Ship por fase** — cada fase fecha com `prepush:check` + push + `ship:api` se API + `deploy:prod` + smoke do endpoint novo.
 8. **Feature flag** — `nutrition_enabled` em settings (default on pra João single-user; fácil desligar UI se regredir).
 
-### 3.1 Decisão de produto (2026-07-09) — voz na Nutrição
+### 3.1 Decisão de produto (2026-07-09) — texto/voz na Nutrição
 
-**João:** áudio no Telegram / Web UI com a A.N.A. já cobre “falei o que comi”. Duplicar STT + parse de comida **dentro** do app Nutrição é fricção e escopo morto no uso real de single-user.
+**João:** no dia a dia o áudio vai pro Telegram/Web UI com a A.N.A. Mesmo assim pediu **base funcional** da fase 8 no app pra evoluir depois e não bloquear as próximas fases.
 
 | O quê | Status |
 |-------|--------|
-| **Fase 8** (parse-text + captura Praxis “comi X no almoço”) | **Cancelada por agora** — não implementar; não reabrir sem pedido explícito |
-| Captura por voz **geral** da Praxis (`/captura`, fila, tarefas) | **Intocada** — continua no app; não é Nutrição |
-| Comer por áudio no dia a dia | **Fora do app:** João → A.N.A. (Telegram/Web UI); no futuro pode virar handoff A.N.A. → API nutrition se fizer sentido |
-| Site multi-usuário / produto público | Reavaliar voz *in-app* só se o público não tiver o canal A.N.A. |
-
-Plano: **deixa parado no papel** (esta secção + linha fase 8 = cancelled). **Não** apagar módulo Nutrição 0–7 nem seed/diário.
+| **Fase 8** parse-text + confirmação + `from-text` | **Shipped** (`eb319b2`) — UI **Texto** no diário; API pronta p/ transcript/A.N.A. |
+| STT microfone *dentro* da Nutrição | **Não** prioridade — opcional futuro |
+| Captura voz **geral** da Praxis | Intocada |
+| Comer por áudio com A.N.A. | Continua válido; A.N.A. pode chamar `parse-text` / `logs/from-text` |
 
 ---
 
