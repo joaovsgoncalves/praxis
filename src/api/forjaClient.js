@@ -149,6 +149,13 @@ export const forjaApi = {
 
   nutrition: {
     profile: () => request('/api/nutrition/profile'),
+    updateProfile: (data) =>
+      request('/api/nutrition/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    suggestProfile: (data = {}) =>
+      request('/api/nutrition/profile/suggest', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     day: (date) => {
       const q = date ? `?date=${encodeURIComponent(date)}` : '';
       return request(`/api/nutrition/day${q}`);

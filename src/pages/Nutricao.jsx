@@ -1,56 +1,73 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { UtensilsCrossed } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
-import { Card, CardContent } from '@/components/ui/card';
 import { PageHero, PraxisEmptyState } from '@/components/layout/PraxisPage';
-import { formatKcal } from '@/lib/nutrition';
+import NutritionMetaForm from '@/components/nutrition/NutritionMetaForm';
+import { formatKcal, formatGrams, GOAL_LABELS } from '@/lib/nutrition';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function Nutricao() {
-  const { data: day, isLoading, isError } = useQuery({
+  const {
+    data: profile,
+    isLoading: loadingProfile,
+    isError: profileError,
+  } = useQuery({
+    queryKey: ['nutrition', 'profile'],
+    queryFn: () => forjaApi.nutrition.profile(),
+    retry: 1,
+  });
+
+  const { data: day } = useQuery({
     queryKey: ['nutrition', 'day'],
     queryFn: () => forjaApi.nutrition.day(),
     retry: 1,
   });
 
-  const apiLine = (() => {
-    if (isLoading) return 'Conferindo API…';
-    if (isError) return 'Não deu pra carregar o diário agora. Tenta de novo em instantes.';
-    if (day?.totals) return `API ok · ${formatKcal(day.totals.kcal)} hoje`;
-    return null;
-  })();
+  const goalLabel = GOAL_LABELS[profile?.goal] || 'Manter';
+  const hasTargets = profile?.target_kcal != null;
 
   return (
-    <div className="praxis-page space-y-6 pb-24">
+    <div className="praxis-page space-y-6 pb-24 max-w-xl">
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Macros e refeições do dia — em construção."
+        description="Defina a meta do dia. Log de comida vem nas próximas fases."
       />
 
-      <Card className="border-border/80 bg-card/40 shadow-none">
-        <CardContent className="p-5 sm:p-6 space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary/60">
-              <UtensilsCrossed className="h-5 w-5 text-muted-foreground" aria-hidden />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-semibold">Fase 0: base pronta</p>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Em breve você registra qualquer alimento ou refeição aqui, com barras de
-                proteína, carbo e gordura no dia.
+      {hasTargets && (
+        <Card className="border-border/80 bg-card/40 shadow-none">
+          <CardContent className="px-5 py-4 space-y-1">
+            <p className="text-xs text-muted-foreground">Meta de hoje · {goalLabel}</p>
+            <p className="text-lg font-semibold tabular-nums tracking-tight">
+              {formatKcal(profile.target_kcal)}
+            </p>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              P {formatGrams(profile.target_protein_g)} · C {formatGrams(profile.target_carbs_g)} · G{' '}
+              {formatGrams(profile.target_fat_g)}
+            </p>
+            {day?.totals ? (
+              <p className="text-xs text-muted-foreground/90 pt-1 tabular-nums">
+                Registrado hoje: {formatKcal(day.totals.kcal)} (diário ainda em construção)
               </p>
-              {apiLine ? (
-                <p className="text-xs text-muted-foreground/90 tabular-nums pt-1">{apiLine}</p>
-              ) : null}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+
+      {loadingProfile ? (
+        <p className="text-sm text-muted-foreground">Carregando perfil…</p>
+      ) : profileError ? (
+        <PraxisEmptyState
+          title="Não carregou o perfil"
+          description="A API de nutrição não respondeu. Tenta de novo ou confere se está logado."
+        />
+      ) : (
+        <NutritionMetaForm profile={profile} />
+      )}
 
       <PraxisEmptyState
-        title="Ainda sem diário de comida"
-        description="Quando as próximas fases saírem, o log rápido e as metas de macros aparecem nesta tela."
+        title="Diário de comida em breve"
+        description="Fase 2–3: cadastrar alimentos e registrar refeições. Agora o foco é acertar a meta."
       />
     </div>
   );

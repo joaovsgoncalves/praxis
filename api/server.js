@@ -37,6 +37,8 @@ import {
 import {
   initNutritionSchema,
   getNutritionProfile,
+  updateNutritionProfile,
+  suggestNutritionTargets,
   buildDayPayload,
   isValidDateString,
 } from './nutrition.js';
@@ -526,9 +528,35 @@ app.delete('/api/purchases/:id', (req, res) => {
   res.status(204).end();
 });
 
-// ==================== NUTRIÇÃO (macros — fase 0) ====================
+// ==================== NUTRIÇÃO (macros — fase 0–1) ====================
 app.get('/api/nutrition/profile', (req, res) => {
   res.json(getNutritionProfile(db));
+});
+
+app.put('/api/nutrition/profile', (req, res) => {
+  try {
+    const row = updateNutritionProfile(db, req.body || {});
+    res.json(row);
+  } catch (err) {
+    console.error('nutrition profile put', err);
+    res.status(400).json({ error: err?.message || 'não deu pra salvar o perfil' });
+  }
+});
+
+app.post('/api/nutrition/profile/suggest', (req, res) => {
+  const body = { ...getNutritionProfile(db), ...(req.body || {}) };
+  const suggestion = suggestNutritionTargets(body);
+  if (suggestion.error) {
+    return res.status(400).json({ error: suggestion.error });
+  }
+  res.json({
+    target_kcal: suggestion.target_kcal,
+    target_protein_g: suggestion.target_protein_g,
+    target_carbs_g: suggestion.target_carbs_g,
+    target_fat_g: suggestion.target_fat_g,
+    target_fiber_g: suggestion.target_fiber_g,
+    note: 'Sugestão com base no seu peso, altura e objetivo — pode mudar à vontade.',
+  });
 });
 
 app.get('/api/nutrition/day', (req, res) => {
