@@ -51,6 +51,7 @@ import {
   deleteLog,
   listRecentFoods,
   copyDayLogs,
+  ensureNutritionSeed,
   listMeals,
   getMeal,
   createMeal,
@@ -589,6 +590,16 @@ app.get('/api/nutrition/day', (req, res) => {
 app.get('/api/nutrition/foods', (req, res) => {
   const { q, favorites, status, limit } = req.query;
   res.json(listFoods(db, { q, favorites, status, limit }));
+});
+
+// seed BR (fase 7) — re-run seguro
+app.post('/api/nutrition/seed', (req, res) => {
+  try {
+    const result = ensureNutritionSeed(db);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err?.message || 'seed falhou' });
+  }
 });
 
 app.get('/api/nutrition/foods/recent', (req, res) => {

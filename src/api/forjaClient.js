@@ -215,6 +215,7 @@ export const forjaApi = {
     },
     copyDay: (data = {}) =>
       request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
+    seed: () => request('/api/nutrition/seed', { method: 'POST', body: '{}' }),
   },
 
   // Habits

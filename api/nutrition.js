@@ -1,6 +1,7 @@
 /** Nutrição / macros — schema + helpers (fase 0–2: day/profile/foods) */
 
 import { randomUUID } from 'crypto';
+import { seedBrazilianFoods } from './nutritionSeedBr.js';
 
 export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner', 'other'];
 
@@ -45,6 +46,7 @@ export function initNutritionSchema(db) {
       target_fat_g REAL,
       target_fiber_g REAL,
       use_net_carbs INTEGER DEFAULT 0,
+      onboarding_done INTEGER DEFAULT 0,
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -116,6 +118,20 @@ export function initNutritionSchema(db) {
       INSERT INTO nutrition_profile (id, goal, use_net_carbs)
       VALUES ('default', 'maintain', 0)
     `).run();
+  }
+
+
+  // migrate onboarding_done
+  const profCols = db.prepare("PRAGMA table_info(nutrition_profile)").all().map((c) => c.name);
+  if (!profCols.includes('onboarding_done')) {
+    db.exec('ALTER TABLE nutrition_profile ADD COLUMN onboarding_done INTEGER DEFAULT 0');
+  }
+
+  // fase 7: catálogo BR (idempotente)
+  try {
+    seedBrazilianFoods(db);
+  } catch (err) {
+    console.error('nutrition seed BR failed', err);
   }
 }
 
@@ -265,6 +281,14 @@ export function updateNutritionProfile(db, body = {}) {
           ? 1
           : 0
         : existing.use_net_carbs ?? 0,
+    onboarding_done:
+      body.onboarding_done !== undefined
+        ? body.onboarding_done === true ||
+          body.onboarding_done === 1 ||
+          body.onboarding_done === '1'
+          ? 1
+          : 0
+        : existing.onboarding_done ?? 0,
   };
 
   // soft bounds
@@ -289,6 +313,7 @@ export function updateNutritionProfile(db, body = {}) {
       target_fat_g = ?,
       target_fiber_g = ?,
       use_net_carbs = ?,
+      onboarding_done = ?,
       updated_at = datetime('now')
     WHERE id = 'default'
   `).run(
@@ -304,6 +329,7 @@ export function updateNutritionProfile(db, body = {}) {
     next.target_fat_g,
     next.target_fiber_g,
     next.use_net_carbs,
+    next.onboarding_done,
   );
 
   return getNutritionProfile(db);
@@ -1120,4 +1146,9 @@ export function createLogsFromMeal(db, body = {}, { today } = {}) {
     logs: created,
     day: buildDayPayload(db, String(date).slice(0, 10)),
   };
+}
+
+/** Re-run seed BR (admin/smoke). Idempotente. */
+export function ensureNutritionSeed(db) {
+  return seedBrazilianFoods(db);
 }
