@@ -1,15 +1,15 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição fase 9**
+**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição 0–11 fechada**
 
 ---
 
 ## Novo (jul/2026) — Nutrição (macros)
 
-- **Fase 9 shipped:** histórico + macros na revisão semanal — commit `63967de`
-- **Fase 8:** parse-text / Texto no diário
-- **Fase 7–0:** seed, refeições, UX, barras, diário, catálogo, meta
-- Próximo opcional: peso (10), polish (11)…
+- **Fases 10–11 shipped:** peso + sparkline + polish/smoke — commit `b3f0b98`
+- **0–9:** meta → diário → histórico → texto/parse → seed/refeições
+- Fechamento: `docs/PRAXIS-NUTRICAO-FECHAMENTO.md`
+- Fase 12 barcode só sob pedido
 - Docs: `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`
 
 ## Lote 9

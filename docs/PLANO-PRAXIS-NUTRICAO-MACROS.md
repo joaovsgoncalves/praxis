@@ -307,8 +307,8 @@ Dashboard: card abaixo/acima da água (ordem a definir no design da fase 4 — d
 | **7** | Seed BR + onboarding | ~40–80 alimentos comuns PT-BR; wizard 1ª visita (peso + objetivo → meta) | Conta nova (ou flag reset) cai em setup; seed idempotente |
 | **8** | Texto / parse | parse-text + UI Texto + from-text (base p/ A.N.A.) | **done** 2026-07-09 — STT in-app opcional depois |
 | **9** | Histórico e revisão | Calendário simples / lista dias; bloco macros em `/revisao-semanal` | **done** 2026-07-09 — summary API + aba Histórico + weekly insights |
-| **10** | Peso e tendência | Log de peso (tabela `body_weight_logs` ou wellness) + sparkline leve na Nutrição | Peso semanal visível; não vira app de antropometria |
-| **11** | Polish produto | Copy, motion leve, a11y barras, smoke E2E nutrition, checklist, nota de produto | `smoke` cobre day+log; doc `ONDA-NUTRICAO` ou fechamento no plano |
+| **10** | Peso e tendência | Log de peso (`body_weight_logs`) + sparkline leve na Nutrição | **done** 2026-07-09 |
+| **11** | Polish produto | Copy, a11y barras, smoke nutrition, nota de produto | **done** — `PRAXIS-NUTRICAO-FECHAMENTO.md` + `smoke-praxis-nutrition.sh` |
 | **12** | Opcional barcode | Integração OFF **opt-in** (rede); cache local do produto | Só se João pedir depois de usar 2+ semanas o core |
 
 ### Dependências entre fases
@@ -428,9 +428,9 @@ npm run deploy:prod
 
 | | |
 |---|---|
-| **Fases totais** | **0–9 shipped**; 10–11 opcionais; 12 barcode sob pedido |
-| **MVP diário bom** | **0–9** (inclui histórico) |
-| **Texto/parse** | Done — UI + API |
-| **Próximo passo** | “arrocha fase 10” (peso) / 11 (polish) **ou** deixa quieto |
+| **Fases totais** | **0–11 shipped**; 12 barcode sob pedido |
+| **MVP diário bom** | **0–11** fechado |
+| **Fechamento** | `docs/PRAXIS-NUTRICAO-FECHAMENTO.md` |
+| **Próximo passo** | usar no dia a dia · barcode só se pedir |
 
-**Fases 0–9 implementadas (2026-07).**
+**Fases 0–11 implementadas (2026-07).**

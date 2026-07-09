@@ -2,6 +2,7 @@
 
 **Data:** 2026-07-09 · **Após Lote 9 + motion Emil P0** · evidência: `npm run smoke:prod` + `npm run checklist:10` (VPS)
 
+**Nutrição 0–11:** módulo macros + peso shipped (`b3f0b98`); smoke `scripts/smoke-praxis-nutrition.sh`.
 **Contexto de código:** `1a7463d` Lote 9 distill · `a5d1b93` Emil motion P0 · bundle prod com Agora (`urgente na fila`)
 
 ## Notas (duas leituras)
