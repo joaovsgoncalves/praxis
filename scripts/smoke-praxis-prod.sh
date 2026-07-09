@@ -27,7 +27,11 @@ ok "GET / → 200"
 HTML=$(curl -sS "$BASE/")
 JS_PATH=$(echo "$HTML" | grep -oE 'assets/index-[^"]+\.js' | head -1)
 [[ -n "$JS_PATH" ]] || fail "index.html sem bundle JS"
-if ! curl -sS "$BASE/$JS_PATH" | grep -q 'urgente na fila'; then
+# curl|grep -q com pipefail dá falso FAIL (curl 23 / SIGPIPE quando grep acha cedo)
+JS_TMP=$(mktemp)
+trap 'rm -f "$COOKIE_JAR" "$JS_TMP"' EXIT
+curl -sS "$BASE/$JS_PATH" -o "$JS_TMP" || fail "download bundle $JS_PATH"
+if ! grep -q 'urgente na fila' "$JS_TMP"; then
   fail "Bundle em $BASE parece ANTIGO (sem bloco Agora). Rode docs/PRAXIS-DEPLOY-ALIASES.md"
 fi
 ok "Front bundle contém Agora (alias OK)"
