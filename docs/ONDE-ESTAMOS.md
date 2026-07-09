@@ -6,8 +6,10 @@
 
 ## Novo (jul/2026) — Nutrição (macros)
 
-- **Fase 0 shipped:** schema + `GET /api/nutrition/day|profile` + placeholder `/nutricao` na sidebar — `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`, `docs/PRAXIS-NUTRICAO-FASE-0.md`
-- Ainda **sem** log de comida / barras no Hoje (fases 1+)
+- **Fase 1 shipped:** meta + perfil em `/nutricao` (PUT profile + sugestão) — commit `13f8f7d`
+- **Fase 0:** schema + GET day/profile + nav
+- Ainda **sem** log de comida / barras no Hoje (fases 2+)
+- Docs: `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`
 
 ## Lote 9
 
