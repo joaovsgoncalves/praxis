@@ -160,6 +160,24 @@ export const forjaApi = {
       const q = date ? `?date=${encodeURIComponent(date)}` : '';
       return request(`/api/nutrition/day${q}`);
     },
+    foods: {
+      list: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.q) query.set('q', params.q);
+        if (params.favorites) query.set('favorites', '1');
+        if (params.status) query.set('status', params.status);
+        if (params.limit) query.set('limit', String(params.limit));
+        const qs = query.toString();
+        return request(`/api/nutrition/foods${qs ? `?${qs}` : ''}`);
+      },
+      get: (id) => request(`/api/nutrition/foods/${id}`),
+      create: (data) =>
+        request('/api/nutrition/foods', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/nutrition/foods/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id, { hard = false } = {}) =>
+        request(`/api/nutrition/foods/${id}${hard ? '?hard=1' : ''}`, { method: 'DELETE' }),
+    },
   },
 
   // Habits

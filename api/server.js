@@ -41,6 +41,11 @@ import {
   suggestNutritionTargets,
   buildDayPayload,
   isValidDateString,
+  listFoods,
+  getFood,
+  createFood,
+  updateFood,
+  deleteFood,
 } from './nutrition.js';
 
 // Category constants
@@ -567,6 +572,47 @@ app.get('/api/nutrition/day', (req, res) => {
     return res.status(400).json({ error: 'data inválida (use YYYY-MM-DD)' });
   }
   res.json(buildDayPayload(db, raw));
+});
+
+// foods catalog (fase 2)
+app.get('/api/nutrition/foods', (req, res) => {
+  const { q, favorites, status, limit } = req.query;
+  res.json(listFoods(db, { q, favorites, status, limit }));
+});
+
+app.get('/api/nutrition/foods/:id', (req, res) => {
+  const row = getFood(db, req.params.id);
+  if (!row) return res.status(404).json({ error: 'alimento não encontrado' });
+  res.json(row);
+});
+
+app.post('/api/nutrition/foods', (req, res) => {
+  try {
+    const row = createFood(db, req.body || {});
+    res.status(201).json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra criar o alimento' });
+  }
+});
+
+app.patch('/api/nutrition/foods/:id', (req, res) => {
+  try {
+    const row = updateFood(db, req.params.id, req.body || {});
+    if (!row) return res.status(404).json({ error: 'alimento não encontrado' });
+    res.json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra atualizar o alimento' });
+  }
+});
+
+app.delete('/api/nutrition/foods/:id', (req, res) => {
+  const hard = req.query.hard === '1' || req.query.hard === 'true';
+  if (!deleteFood(db, req.params.id, { hard })) {
+    return res.status(404).json({ error: 'alimento não encontrado' });
+  }
+  res.status(204).end();
 });
 
 // ==================== HEALTH ====================

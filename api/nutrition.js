@@ -1,4 +1,6 @@
-/** Nutrição / macros — schema + helpers (fase 0–1: day/profile/meta) */
+/** Nutrição / macros — schema + helpers (fase 0–2: day/profile/foods) */
+
+import { randomUUID } from 'crypto';
 
 export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner', 'other'];
 
@@ -305,6 +307,182 @@ export function updateNutritionProfile(db, body = {}) {
   );
 
   return getNutritionProfile(db);
+}
+
+// ==================== food items (fase 2) ====================
+
+function foodNum(v, fallback = 0) {
+  if (v === undefined || v === null || v === '') return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function foodNumOrNull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeFoodBody(body = {}, existing = null) {
+  const name = body.name !== undefined
+    ? String(body.name || '').trim()
+    : existing?.name;
+  if (!name) {
+    const err = new Error('nome do alimento é obrigatório');
+    err.status = 400;
+    throw err;
+  }
+
+  const kcal = body.kcal !== undefined ? foodNum(body.kcal, 0) : (existing?.kcal ?? 0);
+  const protein_g = body.protein_g !== undefined ? foodNum(body.protein_g, 0) : (existing?.protein_g ?? 0);
+  const carbs_g = body.carbs_g !== undefined ? foodNum(body.carbs_g, 0) : (existing?.carbs_g ?? 0);
+  const fat_g = body.fat_g !== undefined ? foodNum(body.fat_g, 0) : (existing?.fat_g ?? 0);
+  const fiber_g = body.fiber_g !== undefined ? foodNum(body.fiber_g, 0) : (existing?.fiber_g ?? 0);
+
+  return {
+    name,
+    brand: body.brand !== undefined ? String(body.brand || '').trim() : (existing?.brand || ''),
+    serving_label:
+      body.serving_label !== undefined
+        ? String(body.serving_label || '').trim() || '100 g'
+        : existing?.serving_label || '100 g',
+    serving_grams:
+      body.serving_grams !== undefined
+        ? foodNumOrNull(body.serving_grams)
+        : existing?.serving_grams ?? null,
+    kcal: Math.max(0, Math.round(kcal * 10) / 10),
+    protein_g: Math.max(0, Math.round(protein_g * 10) / 10),
+    carbs_g: Math.max(0, Math.round(carbs_g * 10) / 10),
+    fat_g: Math.max(0, Math.round(fat_g * 10) / 10),
+    fiber_g: Math.max(0, Math.round(fiber_g * 10) / 10),
+    is_favorite:
+      body.is_favorite !== undefined
+        ? body.is_favorite === true || body.is_favorite === 1 || body.is_favorite === '1'
+          ? 1
+          : 0
+        : existing?.is_favorite ?? 0,
+    source:
+      body.source !== undefined
+        ? String(body.source || 'custom')
+        : existing?.source || 'custom',
+    status:
+      body.status !== undefined && ['active', 'archived'].includes(body.status)
+        ? body.status
+        : existing?.status || 'active',
+  };
+}
+
+export function listFoods(db, { q, favorites, status = 'active', limit = 100 } = {}) {
+  let sql = 'SELECT * FROM food_items WHERE 1=1';
+  const params = [];
+
+  if (status === 'all') {
+    // no status filter
+  } else if (status === 'archived') {
+    sql += " AND status = 'archived'";
+  } else {
+    sql += " AND status = 'active'";
+  }
+
+  if (favorites === true || favorites === 1 || favorites === '1') {
+    sql += ' AND is_favorite = 1';
+  }
+
+  const query = q != null ? String(q).trim() : '';
+  if (query) {
+    sql += ' AND (name LIKE ? OR brand LIKE ?)';
+    const like = `%${query}%`;
+    params.push(like, like);
+  }
+
+  sql += ' ORDER BY is_favorite DESC, name COLLATE NOCASE ASC LIMIT ?';
+  const lim = Math.min(200, Math.max(1, Number(limit) || 100));
+  params.push(lim);
+
+  return db.prepare(sql).all(...params);
+}
+
+export function getFood(db, id) {
+  return db.prepare('SELECT * FROM food_items WHERE id = ?').get(id) || null;
+}
+
+export function createFood(db, body = {}) {
+  const data = normalizeFoodBody(body);
+  const id = body.id || randomUUID();
+  db.prepare(`
+    INSERT INTO food_items (
+      id, name, brand, serving_label, serving_grams,
+      kcal, protein_g, carbs_g, fat_g, fiber_g,
+      is_favorite, source, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    data.name,
+    data.brand,
+    data.serving_label,
+    data.serving_grams,
+    data.kcal,
+    data.protein_g,
+    data.carbs_g,
+    data.fat_g,
+    data.fiber_g,
+    data.is_favorite,
+    data.source,
+    data.status,
+  );
+  return getFood(db, id);
+}
+
+export function updateFood(db, id, body = {}) {
+  const existing = getFood(db, id);
+  if (!existing) return null;
+  const data = normalizeFoodBody(body, existing);
+  db.prepare(`
+    UPDATE food_items SET
+      name = ?,
+      brand = ?,
+      serving_label = ?,
+      serving_grams = ?,
+      kcal = ?,
+      protein_g = ?,
+      carbs_g = ?,
+      fat_g = ?,
+      fiber_g = ?,
+      is_favorite = ?,
+      source = ?,
+      status = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(
+    data.name,
+    data.brand,
+    data.serving_label,
+    data.serving_grams,
+    data.kcal,
+    data.protein_g,
+    data.carbs_g,
+    data.fat_g,
+    data.fiber_g,
+    data.is_favorite,
+    data.source,
+    data.status,
+    id,
+  );
+  return getFood(db, id);
+}
+
+/** Soft archive (default). Pass hard=true to DELETE. */
+export function deleteFood(db, id, { hard = false } = {}) {
+  if (hard) {
+    const r = db.prepare('DELETE FROM food_items WHERE id = ?').run(id);
+    return r.changes > 0;
+  }
+  const existing = getFood(db, id);
+  if (!existing) return false;
+  db.prepare(`
+    UPDATE food_items SET status = 'archived', updated_at = datetime('now') WHERE id = ?
+  `).run(id);
+  return true;
 }
 
 export function listLogsByDate(db, date) {

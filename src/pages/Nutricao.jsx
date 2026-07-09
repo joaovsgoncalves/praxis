@@ -1,12 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
 import { PageHero, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import NutritionMetaForm from '@/components/nutrition/NutritionMetaForm';
+import FoodCatalog from '@/components/nutrition/FoodCatalog';
 import { formatKcal, formatGrams, GOAL_LABELS } from '@/lib/nutrition';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+
+const TABS = [
+  { id: 'alimentos', label: 'Alimentos' },
+  { id: 'meta', label: 'Meta' },
+];
 
 export default function Nutricao() {
+  const [tab, setTab] = useState('alimentos');
+
   const {
     data: profile,
     isLoading: loadingProfile,
@@ -31,7 +40,7 @@ export default function Nutricao() {
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Defina a meta do dia. Log de comida vem nas próximas fases."
+        description="Catálogo de alimentos e meta do dia. Log de refeições na próxima fase."
       />
 
       {hasTargets && (
@@ -47,14 +56,34 @@ export default function Nutricao() {
             </p>
             {day?.totals ? (
               <p className="text-xs text-muted-foreground/90 pt-1 tabular-nums">
-                Registrado hoje: {formatKcal(day.totals.kcal)} (diário ainda em construção)
+                Registrado hoje: {formatKcal(day.totals.kcal)} (diário em breve)
               </p>
             ) : null}
           </CardContent>
         </Card>
       )}
 
-      {loadingProfile ? (
+      <div className="flex gap-1 rounded-full bg-secondary/40 p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors',
+              tab === t.id
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'alimentos' ? (
+        <FoodCatalog />
+      ) : loadingProfile ? (
         <p className="text-sm text-muted-foreground">Carregando perfil…</p>
       ) : profileError ? (
         <PraxisEmptyState
@@ -64,11 +93,6 @@ export default function Nutricao() {
       ) : (
         <NutritionMetaForm profile={profile} />
       )}
-
-      <PraxisEmptyState
-        title="Diário de comida em breve"
-        description="Fase 2–3: cadastrar alimentos e registrar refeições. Agora o foco é acertar a meta."
-      />
     </div>
   );
 }
