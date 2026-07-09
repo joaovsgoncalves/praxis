@@ -171,6 +171,12 @@ export const forjaApi = {
         return request(`/api/nutrition/foods${qs ? `?${qs}` : ''}`);
       },
       get: (id) => request(`/api/nutrition/foods/${id}`),
+      recent: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.limit) query.set('limit', String(params.limit));
+        const qs = query.toString();
+        return request(`/api/nutrition/foods/recent${qs ? `?${qs}` : ''}`);
+      },
       create: (data) =>
         request('/api/nutrition/foods', { method: 'POST', body: JSON.stringify(data) }),
       update: (id, data) =>
@@ -185,6 +191,8 @@ export const forjaApi = {
         request(`/api/nutrition/logs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
       delete: (id) => request(`/api/nutrition/logs/${id}`, { method: 'DELETE' }),
     },
+    copyDay: (data = {}) =>
+      request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
   },
 
   // Habits

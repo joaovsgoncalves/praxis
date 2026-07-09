@@ -811,3 +811,86 @@ export function getDayEmpty(date) {
     by_slot: emptyBySlot(),
   };
 }
+
+/** Alimentos usados recentemente em food_logs (com food_item_id ativo). */
+export function listRecentFoods(db, { limit = 12 } = {}) {
+  const lim = Math.min(50, Math.max(1, Number(limit) || 12));
+  return db
+    .prepare(
+      `
+    SELECT f.*, MAX(l.created_at) AS last_logged_at
+    FROM food_logs l
+    INNER JOIN food_items f ON f.id = l.food_item_id
+    WHERE l.food_item_id IS NOT NULL
+      AND f.status = 'active'
+    GROUP BY f.id
+    ORDER BY last_logged_at DESC
+    LIMIT ?
+  `,
+    )
+    .all(lim);
+}
+
+/**
+ * Copia logs de fromDate para toDate.
+ * skipIfTargetHasLogs: se toDate já tem logs, não copia (evita duplicar sem querer).
+ */
+export function copyDayLogs(db, { fromDate, toDate, skipIfTargetHasLogs = true } = {}) {
+  if (!fromDate || !toDate || !isValidDateString(fromDate) || !isValidDateString(toDate)) {
+    const err = new Error('datas inválidas (use YYYY-MM-DD)');
+    err.status = 400;
+    throw err;
+  }
+  if (fromDate === toDate) {
+    const err = new Error('origem e destino são o mesmo dia');
+    err.status = 400;
+    throw err;
+  }
+  const existing = listLogsByDate(db, toDate);
+  if (skipIfTargetHasLogs && existing.length > 0) {
+    const err = new Error('este dia já tem comida registrada — esvazia antes ou desliga a proteção');
+    err.status = 409;
+    throw err;
+  }
+  const source = listLogsByDate(db, fromDate);
+  if (source.length === 0) {
+    return { copied: 0, logs: [] };
+  }
+  const created = [];
+  const run = db.transaction((rows) => {
+    for (const row of rows) {
+      if (row.food_item_id) {
+        created.push(
+          createLog(db, {
+            date: toDate,
+            meal_slot: row.meal_slot,
+            food_item_id: row.food_item_id,
+            servings: row.servings,
+            grams: row.grams,
+            note: row.note,
+            source: 'copy',
+          }),
+        );
+      } else {
+        created.push(
+          createLog(db, {
+            date: toDate,
+            meal_slot: row.meal_slot,
+            name_snapshot: row.name_snapshot,
+            servings: row.servings,
+            grams: row.grams,
+            kcal: row.kcal,
+            protein_g: row.protein_g,
+            carbs_g: row.carbs_g,
+            fat_g: row.fat_g,
+            fiber_g: row.fiber_g,
+            note: row.note,
+            source: 'copy',
+          }),
+        );
+      }
+    }
+  });
+  run(source);
+  return { copied: created.length, logs: created };
+}

@@ -1,6 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Search } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Trash2,
+  Search,
+  Star,
+  Clock,
+  Minus,
+  Copy,
+} from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +71,61 @@ function defaultSlotForHour() {
   return 'other';
 }
 
+function parseServings(v) {
+  const n = Number(String(v).replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.round(n * 100) / 100;
+}
+
+function stepServings(current, delta) {
+  const n = parseServings(current);
+  const next = Math.max(0.5, Math.round((n + delta) * 2) / 2);
+  return String(next);
+}
+
+function ServingsStepper({ value, onChange, id }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="h-10 w-10 rounded-full shrink-0"
+        onClick={() => onChange(stepServings(value, -0.5))}
+        aria-label="Menos meia porção"
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      <Input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        step="0.5"
+        min="0.5"
+        className="tabular-nums bg-secondary/40 text-center"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="h-10 w-10 rounded-full shrink-0"
+        onClick={() => onChange(stepServings(value, 0.5))}
+        aria-label="Mais meia porção"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+const PICKER_TABS = [
+  { id: 'recent', label: 'Recentes', icon: Clock },
+  { id: 'fav', label: 'Favoritos', icon: Star },
+  { id: 'search', label: 'Buscar', icon: Search },
+];
+
 export default function DayDiary({ date: controlledDate, onDateChange }) {
   const queryClient = useQueryClient();
   const [internalDate, setInternalDate] = useState(todayLocalISO);
@@ -72,6 +137,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addSlot, setAddSlot] = useState(defaultSlotForHour);
+  const [pickerTab, setPickerTab] = useState('recent');
   const [foodQ, setFoodQ] = useState('');
   const [selectedFood, setSelectedFood] = useState(null);
   const [servings, setServings] = useState('1');
@@ -84,19 +150,34 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     retry: 1,
   });
 
-  const { data: foods = [] } = useQuery({
+  const { data: recentFoods = [] } = useQuery({
+    queryKey: ['nutrition', 'foods', 'recent'],
+    queryFn: () => forjaApi.nutrition.foods.recent({ limit: 12 }),
+    enabled: addOpen,
+    retry: 1,
+  });
+
+  const { data: favFoods = [] } = useQuery({
+    queryKey: ['nutrition', 'foods', { favorites: true }],
+    queryFn: () => forjaApi.nutrition.foods.list({ favorites: true, limit: 30 }),
+    enabled: addOpen,
+    retry: 1,
+  });
+
+  const { data: searchFoods = [] } = useQuery({
     queryKey: ['nutrition', 'foods', { q: foodQ, forAdd: true }],
     queryFn: () =>
       forjaApi.nutrition.foods.list({
         q: foodQ.trim() || undefined,
         limit: 30,
       }),
-    enabled: addOpen,
+    enabled: addOpen && pickerTab === 'search',
     retry: 1,
   });
 
   const invalidateDay = () => {
     queryClient.invalidateQueries({ queryKey: ['nutrition', 'day'] });
+    queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods', 'recent'] });
   };
 
   const createMut = useMutation({
@@ -131,9 +212,33 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     onError: () => toast.error('Não deu pra remover'),
   });
 
+  const copyYesterdayMut = useMutation({
+    mutationFn: () =>
+      forjaApi.nutrition.copyDay({
+        to_date: date,
+        from_date: shiftDate(date, -1),
+      }),
+    onSuccess: (res) => {
+      invalidateDay();
+      toast.success(
+        res?.copied
+          ? `Copiei ${res.copied} item(ns) de ontem`
+          : 'Ontem estava vazio — nada pra copiar',
+      );
+    },
+    onError: (err) => {
+      const msg =
+        err?.status === 409
+          ? 'Este dia já tem comida. Apaga os itens se quiser copiar ontem.'
+          : 'Não deu pra copiar ontem';
+      toast.error(msg);
+    },
+  });
+
   const totals = day?.totals;
   const targets = day?.targets;
   const bySlot = day?.by_slot;
+  const isEmptyDay = !isLoading && !isError && !(day?.logs?.length > 0);
 
   const remaining = useMemo(() => {
     if (!totals || !targets) return null;
@@ -151,25 +256,52 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     setSelectedFood(null);
     setServings('1');
     setFoodQ('');
+    setPickerTab('recent');
     setAddOpen(true);
+  };
+
+  const quickAdd = (food, slot = addSlot) => {
+    createMut.mutate({
+      date,
+      meal_slot: slot,
+      food_item_id: food.id,
+      servings: 1,
+    });
   };
 
   const submitAdd = () => {
     if (!selectedFood) return;
-    const s = Number(String(servings).replace(',', '.')) || 1;
     createMut.mutate({
       date,
       meal_slot: addSlot,
       food_item_id: selectedFood.id,
-      servings: s,
+      servings: parseServings(servings),
     });
   };
 
   const submitEdit = () => {
     if (!editLog) return;
-    const s = Number(String(editServings).replace(',', '.')) || 1;
-    updateMut.mutate({ id: editLog.id, data: { servings: s } });
+    updateMut.mutate({
+      id: editLog.id,
+      data: { servings: parseServings(editServings) },
+    });
   };
+
+  const pickerList =
+    pickerTab === 'recent'
+      ? recentFoods
+      : pickerTab === 'fav'
+        ? favFoods
+        : searchFoods;
+
+  const pickerEmptyMsg =
+    pickerTab === 'recent'
+      ? 'Nada recente ainda. Busca ou cadastra um alimento e loga uma vez.'
+      : pickerTab === 'fav'
+        ? 'Sem favoritos. Marca ⭐ na aba Alimentos.'
+        : foodQ.trim()
+          ? 'Nenhum alimento com esse nome.'
+          : 'Digita pra buscar no catálogo.';
 
   return (
     <div className="space-y-4">
@@ -231,15 +363,31 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                   </p>
                 ) : null}
               </div>
-              <MacroBars
-                totals={totals || {}}
-                targets={targets || {}}
-                variant="full"
-              />
+              <MacroBars totals={totals || {}} targets={targets || {}} variant="full" />
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            {isEmptyDay ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                disabled={copyYesterdayMut.isPending}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'Copiar tudo que registrou no dia anterior para este dia?',
+                    )
+                  ) {
+                    copyYesterdayMut.mutate();
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4 mr-1.5" />
+                {copyYesterdayMut.isPending ? 'Copiando…' : 'Copiar ontem'}
+              </Button>
+            ) : null}
             <Button type="button" className="rounded-full" onClick={() => openAdd()}>
               <Plus className="w-4 h-4 mr-1.5" />
               Adicionar comida
@@ -312,15 +460,26 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
             );
           })}
 
-          {!day?.logs?.length ? (
+          {isEmptyDay ? (
             <PraxisEmptyState
               title="Diário vazio neste dia"
-              description="Escolhe um alimento do catálogo e adiciona no café, almoço, lanche ou jantar."
+              description="Toque num recente/favorito pra logar em 1 segundo, ou copie o dia de ontem."
               action={
-                <Button className="rounded-full" onClick={() => openAdd()}>
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  Adicionar comida
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button className="rounded-full" onClick={() => openAdd()}>
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    Adicionar comida
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={copyYesterdayMut.isPending}
+                    onClick={() => copyYesterdayMut.mutate()}
+                  >
+                    <Copy className="w-4 h-4 mr-1.5" />
+                    Copiar ontem
+                  </Button>
+                </div>
               }
             />
           ) : null}
@@ -348,8 +507,33 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Buscar alimento</Label>
+
+            <div className="flex gap-1 rounded-full bg-secondary/40 p-1">
+              {PICKER_TABS.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      setPickerTab(t.id);
+                      setSelectedFood(null);
+                    }}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium transition-colors',
+                      pickerTab === t.id
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {pickerTab === 'search' ? (
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -357,61 +541,88 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                   onChange={(e) => setFoodQ(e.target.value)}
                   placeholder="Ovo, arroz…"
                   className="pl-9 bg-secondary/40"
+                  autoFocus
                 />
               </div>
-            </div>
-            <ul className="max-h-48 overflow-y-auto space-y-1 border border-border/60 rounded-lg p-1">
-              {foods.length === 0 ? (
-                <li className="text-xs text-muted-foreground p-3">
-                  Nenhum alimento. Cadastra na aba Alimentos.
+            ) : null}
+
+            <ul className="max-h-52 overflow-y-auto space-y-1 border border-border/60 rounded-lg p-1">
+              {pickerList.length === 0 ? (
+                <li className="text-xs text-muted-foreground p-3 leading-relaxed">
+                  {pickerEmptyMsg}
                 </li>
               ) : (
-                foods.map((f) => (
+                pickerList.map((f) => (
                   <li key={f.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFood(f)}
+                    <div
                       className={cn(
-                        'w-full text-left rounded-md px-3 py-2 text-sm transition-colors',
-                        selectedFood?.id === f.id
-                          ? 'bg-primary/15 text-foreground'
-                          : 'hover:bg-secondary/50 text-muted-foreground',
+                        'flex items-center gap-1 rounded-md',
+                        selectedFood?.id === f.id && 'bg-primary/15',
                       )}
                     >
-                      <span className="font-medium text-foreground">{f.name}</span>
-                      <span className="block text-xs tabular-nums">
-                        {f.serving_label} · {formatKcal(f.kcal)}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFood(f)}
+                        className={cn(
+                          'min-w-0 flex-1 text-left rounded-md px-3 py-2 text-sm transition-colors',
+                          selectedFood?.id === f.id
+                            ? 'text-foreground'
+                            : 'hover:bg-secondary/50 text-muted-foreground',
+                        )}
+                      >
+                        <span className="font-medium text-foreground flex items-center gap-1.5">
+                          {f.name}
+                          {f.is_favorite ? (
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                          ) : null}
+                        </span>
+                        <span className="block text-xs tabular-nums">
+                          {f.serving_label} · {formatKcal(f.kcal)}
+                        </span>
+                      </button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 rounded-full shrink-0 text-xs mr-1"
+                        disabled={createMut.isPending}
+                        onClick={() => quickAdd(f)}
+                        title="Adicionar 1 porção"
+                      >
+                        +1
+                      </Button>
+                    </div>
                   </li>
                 ))
               )}
             </ul>
-            <div className="space-y-1.5">
-              <Label>Porções</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                step="0.5"
-                min="0.1"
-                className="tabular-nums bg-secondary/40"
-                value={servings}
-                onChange={(e) => setServings(e.target.value)}
-              />
-              {selectedFood ? (
+
+            {selectedFood ? (
+              <div className="space-y-2 rounded-xl border border-border/60 bg-secondary/20 p-3">
+                <p className="text-sm font-medium truncate">{selectedFood.name}</p>
+                <Label className="text-xs text-muted-foreground">Porções</Label>
+                <ServingsStepper value={servings} onChange={setServings} id="add-servings" />
                 <p className="text-xs text-muted-foreground tabular-nums">
-                  Preview ≈ {formatKcal((Number(selectedFood.kcal) || 0) * (Number(String(servings).replace(',', '.')) || 1))}
+                  Preview ≈{' '}
+                  {formatKcal(
+                    (Number(selectedFood.kcal) || 0) * parseServings(servings),
+                  )}
                 </p>
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              className="w-full rounded-full"
-              disabled={!selectedFood || createMut.isPending}
-              onClick={submitAdd}
-            >
-              {createMut.isPending ? 'Salvando…' : 'Salvar no diário'}
-            </Button>
+                <Button
+                  type="button"
+                  className="w-full rounded-full"
+                  disabled={createMut.isPending}
+                  onClick={submitAdd}
+                >
+                  {createMut.isPending ? 'Salvando…' : 'Salvar no diário'}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center">
+                Toque no alimento pra ajustar porções, ou em <strong>+1</strong> pra
+                logar na hora.
+              </p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -426,14 +637,10 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
               <p className="text-sm font-medium">{editLog.name_snapshot}</p>
               <div className="space-y-1.5">
                 <Label>Porções</Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.5"
-                  min="0.1"
-                  className="tabular-nums bg-secondary/40"
+                <ServingsStepper
                   value={editServings}
-                  onChange={(e) => setEditServings(e.target.value)}
+                  onChange={setEditServings}
+                  id="edit-servings"
                 />
               </div>
               <Button

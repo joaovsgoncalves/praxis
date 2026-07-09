@@ -49,6 +49,8 @@ import {
   createLog,
   updateLog,
   deleteLog,
+  listRecentFoods,
+  copyDayLogs,
 } from './nutrition.js';
 
 // Category constants
@@ -583,6 +585,11 @@ app.get('/api/nutrition/foods', (req, res) => {
   res.json(listFoods(db, { q, favorites, status, limit }));
 });
 
+app.get('/api/nutrition/foods/recent', (req, res) => {
+  const limit = req.query.limit;
+  res.json(listRecentFoods(db, { limit }));
+});
+
 app.get('/api/nutrition/foods/:id', (req, res) => {
   const row = getFood(db, req.params.id);
   if (!row) return res.status(404).json({ error: 'alimento não encontrado' });
@@ -645,6 +652,41 @@ app.delete('/api/nutrition/logs/:id', (req, res) => {
     return res.status(404).json({ error: 'registro não encontrado' });
   }
   res.status(204).end();
+});
+
+// copy day (fase 5 — copiar ontem)
+app.post('/api/nutrition/day/copy', (req, res) => {
+  try {
+    const body = req.body || {};
+    const toDate = body.to_date || getLocalDateString();
+    let fromDate = body.from_date;
+    if (!fromDate) {
+      // ontem no fuso app: reusa getLocalDateString com Date -1d
+      const parts = getLocalDateString().split('-').map(Number);
+      const dt = new Date(parts[0], parts[1] - 1, parts[2] - 1);
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      const d = String(dt.getDate()).padStart(2, '0');
+      fromDate = `${y}-${m}-${d}`;
+    }
+    const skip = body.force === true || body.force === 1 || body.force === '1'
+      ? false
+      : true;
+    const result = copyDayLogs(db, {
+      fromDate: String(fromDate).slice(0, 10),
+      toDate: String(toDate).slice(0, 10),
+      skipIfTargetHasLogs: skip,
+    });
+    res.status(201).json({
+      ...result,
+      from_date: String(fromDate).slice(0, 10),
+      to_date: String(toDate).slice(0, 10),
+      day: buildDayPayload(db, String(toDate).slice(0, 10)),
+    });
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra copiar o dia' });
+  }
 });
 
 // ==================== HEALTH ====================
