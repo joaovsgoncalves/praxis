@@ -4,6 +4,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { PageHero, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import NutritionMetaForm from '@/components/nutrition/NutritionMetaForm';
 import FoodCatalog from '@/components/nutrition/FoodCatalog';
+import MealsCatalog from '@/components/nutrition/MealsCatalog';
 import DayDiary from '@/components/nutrition/DayDiary';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatKcal, GOAL_LABELS } from '@/lib/nutrition';
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { id: 'diario', label: 'Diário' },
   { id: 'alimentos', label: 'Alimentos' },
+  { id: 'refeicoes', label: 'Refeições' },
   { id: 'meta', label: 'Meta' },
 ];
 
@@ -52,7 +54,7 @@ export default function Nutricao() {
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Registre o que comeu e acompanhe a meta do dia."
+        description="Diário, catálogo e refeições salvas pra logar em 1 toque."
       />
 
       {(hasTargets || (totals.kcal ?? 0) > 0) && (
@@ -79,14 +81,14 @@ export default function Nutricao() {
         </Card>
       )}
 
-      <div className="flex gap-1 rounded-full bg-secondary/40 p-1">
+      <div className="flex gap-1 rounded-full bg-secondary/40 p-1 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              'flex-1 rounded-full px-2 py-2 text-sm font-medium transition-colors',
+              'flex-1 min-w-[4.5rem] rounded-full px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap',
               tab === t.id
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
@@ -101,6 +103,8 @@ export default function Nutricao() {
         <DayDiary date={diaryDate || undefined} onDateChange={setDiaryDate} />
       ) : tab === 'alimentos' ? (
         <FoodCatalog />
+      ) : tab === 'refeicoes' ? (
+        <MealsCatalog />
       ) : loadingProfile ? (
         <p className="text-sm text-muted-foreground">Carregando perfil…</p>
       ) : profileError ? (

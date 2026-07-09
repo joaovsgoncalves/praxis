@@ -10,6 +10,7 @@ import {
   Clock,
   Minus,
   Copy,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
@@ -123,6 +124,7 @@ function ServingsStepper({ value, onChange, id }) {
 const PICKER_TABS = [
   { id: 'recent', label: 'Recentes', icon: Clock },
   { id: 'fav', label: 'Favoritos', icon: Star },
+  { id: 'meals', label: 'Refeições', icon: UtensilsCrossed },
   { id: 'search', label: 'Buscar', icon: Search },
 ];
 
@@ -164,6 +166,13 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     retry: 1,
   });
 
+  const { data: savedMeals = [] } = useQuery({
+    queryKey: ['nutrition', 'meals', { forAdd: true }],
+    queryFn: () => forjaApi.nutrition.meals.list({ limit: 30 }),
+    enabled: addOpen,
+    retry: 1,
+  });
+
   const { data: searchFoods = [] } = useQuery({
     queryKey: ['nutrition', 'foods', { q: foodQ, forAdd: true }],
     queryFn: () =>
@@ -191,6 +200,21 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       toast.success('Adicionado ao diário');
     },
     onError: () => toast.error('Não deu pra adicionar'),
+  });
+
+  const fromMealMut = useMutation({
+    mutationFn: (data) => forjaApi.nutrition.logs.fromMeal(data),
+    onSuccess: (res) => {
+      invalidateDay();
+      setAddOpen(false);
+      setSelectedFood(null);
+      toast.success(
+        res?.created
+          ? `Refeição adicionada (${res.created} item(ns))`
+          : 'Refeição adicionada',
+      );
+    },
+    onError: () => toast.error('Não deu pra adicionar a refeição'),
   });
 
   const updateMut = useMutation({
@@ -269,6 +293,15 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     });
   };
 
+  const quickAddMeal = (meal, slot = addSlot) => {
+    fromMealMut.mutate({
+      meal_id: meal.id,
+      date,
+      meal_slot: slot,
+      servings: 1,
+    });
+  };
+
   const submitAdd = () => {
     if (!selectedFood) return;
     createMut.mutate({
@@ -287,21 +320,27 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     });
   };
 
+  const isMealsTab = pickerTab === 'meals';
+
   const pickerList =
     pickerTab === 'recent'
       ? recentFoods
       : pickerTab === 'fav'
         ? favFoods
-        : searchFoods;
+        : pickerTab === 'meals'
+          ? savedMeals
+          : searchFoods;
 
   const pickerEmptyMsg =
     pickerTab === 'recent'
       ? 'Nada recente ainda. Busca ou cadastra um alimento e loga uma vez.'
       : pickerTab === 'fav'
         ? 'Sem favoritos. Marca ⭐ na aba Alimentos.'
-        : foodQ.trim()
-          ? 'Nenhum alimento com esse nome.'
-          : 'Digita pra buscar no catálogo.';
+        : pickerTab === 'meals'
+          ? 'Nenhuma refeição salva. Cria na aba Refeições.'
+          : foodQ.trim()
+            ? 'Nenhum alimento com esse nome.'
+            : 'Digita pra buscar no catálogo.';
 
   return (
     <div className="space-y-4">
@@ -551,6 +590,35 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                 <li className="text-xs text-muted-foreground p-3 leading-relaxed">
                   {pickerEmptyMsg}
                 </li>
+              ) : isMealsTab ? (
+                pickerList.map((m) => (
+                  <li key={m.id}>
+                    <div className="flex items-center gap-1 rounded-md">
+                      <div className="min-w-0 flex-1 rounded-md px-3 py-2 text-sm">
+                        <span className="font-medium text-foreground flex items-center gap-1.5">
+                          {m.name}
+                          {m.is_favorite ? (
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                          ) : null}
+                        </span>
+                        <span className="block text-xs tabular-nums text-muted-foreground">
+                          {m.item_count} item(ns) · {formatKcal(m.totals?.kcal)}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 rounded-full shrink-0 text-xs mr-1"
+                        disabled={fromMealMut.isPending}
+                        onClick={() => quickAddMeal(m)}
+                        title="Adicionar refeição inteira"
+                      >
+                        +tudo
+                      </Button>
+                    </div>
+                  </li>
+                ))
               ) : (
                 pickerList.map((f) => (
                   <li key={f.id}>
@@ -597,7 +665,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
               )}
             </ul>
 
-            {selectedFood ? (
+            {!isMealsTab && selectedFood ? (
               <div className="space-y-2 rounded-xl border border-border/60 bg-secondary/20 p-3">
                 <p className="text-sm font-medium truncate">{selectedFood.name}</p>
                 <Label className="text-xs text-muted-foreground">Porções</Label>

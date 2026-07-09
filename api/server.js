@@ -51,6 +51,12 @@ import {
   deleteLog,
   listRecentFoods,
   copyDayLogs,
+  listMeals,
+  getMeal,
+  createMeal,
+  updateMeal,
+  deleteMeal,
+  createLogsFromMeal,
 } from './nutrition.js';
 
 // Category constants
@@ -623,6 +629,57 @@ app.delete('/api/nutrition/foods/:id', (req, res) => {
     return res.status(404).json({ error: 'alimento não encontrado' });
   }
   res.status(204).end();
+});
+
+// meals (fase 6)
+app.get('/api/nutrition/meals', (req, res) => {
+  const { status, favorites, limit } = req.query;
+  res.json(listMeals(db, { status, favorites, limit }));
+});
+
+app.get('/api/nutrition/meals/:id', (req, res) => {
+  const row = getMeal(db, req.params.id);
+  if (!row) return res.status(404).json({ error: 'refeição não encontrada' });
+  res.json(row);
+});
+
+app.post('/api/nutrition/meals', (req, res) => {
+  try {
+    const row = createMeal(db, req.body || {});
+    res.status(201).json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra criar a refeição' });
+  }
+});
+
+app.patch('/api/nutrition/meals/:id', (req, res) => {
+  try {
+    const row = updateMeal(db, req.params.id, req.body || {});
+    if (!row) return res.status(404).json({ error: 'refeição não encontrada' });
+    res.json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra atualizar a refeição' });
+  }
+});
+
+app.delete('/api/nutrition/meals/:id', (req, res) => {
+  const hard = req.query.hard === '1' || req.query.hard === 'true';
+  if (!deleteMeal(db, req.params.id, { hard })) {
+    return res.status(404).json({ error: 'refeição não encontrada' });
+  }
+  res.status(204).end();
+});
+
+app.post('/api/nutrition/logs/from-meal', (req, res) => {
+  try {
+    const result = createLogsFromMeal(db, req.body || {}, { today: getLocalDateString() });
+    res.status(201).json(result);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra adicionar a refeição' });
+  }
 });
 
 // food logs (fase 3)

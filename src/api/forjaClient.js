@@ -184,12 +184,34 @@ export const forjaApi = {
       delete: (id, { hard = false } = {}) =>
         request(`/api/nutrition/foods/${id}${hard ? '?hard=1' : ''}`, { method: 'DELETE' }),
     },
+    meals: {
+      list: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.status) query.set('status', params.status);
+        if (params.favorites) query.set('favorites', '1');
+        if (params.limit) query.set('limit', String(params.limit));
+        const qs = query.toString();
+        return request(`/api/nutrition/meals${qs ? `?${qs}` : ''}`);
+      },
+      get: (id) => request(`/api/nutrition/meals/${id}`),
+      create: (data) =>
+        request('/api/nutrition/meals', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/nutrition/meals/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id, { hard = false } = {}) =>
+        request(`/api/nutrition/meals/${id}${hard ? '?hard=1' : ''}`, { method: 'DELETE' }),
+    },
     logs: {
       create: (data) =>
         request('/api/nutrition/logs', { method: 'POST', body: JSON.stringify(data) }),
       update: (id, data) =>
         request(`/api/nutrition/logs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
       delete: (id) => request(`/api/nutrition/logs/${id}`, { method: 'DELETE' }),
+      fromMeal: (data) =>
+        request('/api/nutrition/logs/from-meal', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
     },
     copyDay: (data = {}) =>
       request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),

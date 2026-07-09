@@ -894,3 +894,230 @@ export function copyDayLogs(db, { fromDate, toDate, skipIfTargetHasLogs = true }
   run(source);
   return { copied: created.length, logs: created };
 }
+
+
+// ==================== meals (fase 6) ====================
+
+export function getMealItems(db, mealId) {
+  return db
+    .prepare(
+      `
+    SELECT mi.*, f.name AS food_name, f.brand AS food_brand,
+           f.serving_label, f.kcal, f.protein_g, f.carbs_g, f.fat_g, f.fiber_g,
+           f.serving_grams, f.status AS food_status
+    FROM food_meal_items mi
+    LEFT JOIN food_items f ON f.id = mi.food_item_id
+    WHERE mi.meal_id = ?
+    ORDER BY mi.sort_order ASC, mi.id ASC
+  `,
+    )
+    .all(mealId);
+}
+
+function mealTotalsFromItems(items) {
+  let kcal = 0;
+  let protein_g = 0;
+  let carbs_g = 0;
+  let fat_g = 0;
+  let fiber_g = 0;
+  for (const it of items) {
+    if (it.food_status === 'archived') continue;
+    const s = Number(it.servings) || 1;
+    kcal += (Number(it.kcal) || 0) * s;
+    protein_g += (Number(it.protein_g) || 0) * s;
+    carbs_g += (Number(it.carbs_g) || 0) * s;
+    fat_g += (Number(it.fat_g) || 0) * s;
+    fiber_g += (Number(it.fiber_g) || 0) * s;
+  }
+  return {
+    kcal: Math.round(kcal),
+    protein_g: Math.round(protein_g * 10) / 10,
+    carbs_g: Math.round(carbs_g * 10) / 10,
+    fat_g: Math.round(fat_g * 10) / 10,
+    fiber_g: Math.round(fiber_g * 10) / 10,
+  };
+}
+
+export function getMeal(db, id) {
+  const meal = db.prepare('SELECT * FROM food_meals WHERE id = ?').get(id);
+  if (!meal) return null;
+  const items = getMealItems(db, id);
+  return {
+    ...meal,
+    items,
+    totals: mealTotalsFromItems(items),
+    item_count: items.length,
+  };
+}
+
+export function listMeals(db, { status = 'active', favorites, limit = 50 } = {}) {
+  let sql = 'SELECT * FROM food_meals WHERE 1=1';
+  const params = [];
+  if (status === 'all') {
+    // no filter
+  } else if (status === 'archived') {
+    sql += " AND status = 'archived'";
+  } else {
+    sql += " AND status = 'active'";
+  }
+  if (favorites === true || favorites === 1 || favorites === '1') {
+    sql += ' AND is_favorite = 1';
+  }
+  sql += ' ORDER BY is_favorite DESC, name COLLATE NOCASE ASC LIMIT ?';
+  const lim = Math.min(100, Math.max(1, Number(limit) || 50));
+  params.push(lim);
+  const rows = db.prepare(sql).all(...params);
+  return rows.map((m) => {
+    const items = getMealItems(db, m.id);
+    return {
+      ...m,
+      items,
+      totals: mealTotalsFromItems(items),
+      item_count: items.length,
+    };
+  });
+}
+
+function replaceMealItems(db, mealId, items = []) {
+  db.prepare('DELETE FROM food_meal_items WHERE meal_id = ?').run(mealId);
+  const insert = db.prepare(`
+    INSERT INTO food_meal_items (id, meal_id, food_item_id, servings, sort_order)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  let order = 0;
+  for (const raw of items) {
+    const foodId = raw.food_item_id || raw.id;
+    if (!foodId) continue;
+    const food = getFood(db, foodId);
+    if (!food || food.status === 'archived') continue;
+    const servings = Math.max(0.1, Number(raw.servings) || 1);
+    insert.run(randomUUID(), mealId, foodId, servings, order++);
+  }
+}
+
+export function createMeal(db, body = {}) {
+  const name = String(body.name || '').trim();
+  if (!name) {
+    const err = new Error('nome da refeição é obrigatório');
+    err.status = 400;
+    throw err;
+  }
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (items.length === 0) {
+    const err = new Error('adicione pelo menos 1 alimento');
+    err.status = 400;
+    throw err;
+  }
+  const id = body.id || randomUUID();
+  db.prepare(`
+    INSERT INTO food_meals (id, name, notes, is_favorite, status)
+    VALUES (?, ?, ?, ?, 'active')
+  `).run(
+    id,
+    name,
+    String(body.notes || ''),
+    body.is_favorite === true || body.is_favorite === 1 || body.is_favorite === '1' ? 1 : 0,
+  );
+  replaceMealItems(db, id, items);
+  return getMeal(db, id);
+}
+
+export function updateMeal(db, id, body = {}) {
+  const existing = db.prepare('SELECT * FROM food_meals WHERE id = ?').get(id);
+  if (!existing) return null;
+
+  const name =
+    body.name !== undefined ? String(body.name || '').trim() : existing.name;
+  if (!name) {
+    const err = new Error('nome da refeição é obrigatório');
+    err.status = 400;
+    throw err;
+  }
+  const notes = body.notes !== undefined ? String(body.notes || '') : existing.notes;
+  const is_favorite =
+    body.is_favorite !== undefined
+      ? body.is_favorite === true || body.is_favorite === 1 || body.is_favorite === '1'
+        ? 1
+        : 0
+      : existing.is_favorite;
+  const status =
+    body.status !== undefined && ['active', 'archived'].includes(body.status)
+      ? body.status
+      : existing.status;
+
+  db.prepare(`
+    UPDATE food_meals SET name = ?, notes = ?, is_favorite = ?, status = ?
+    WHERE id = ?
+  `).run(name, notes, is_favorite, status, id);
+
+  if (Array.isArray(body.items)) {
+    if (body.items.length === 0) {
+      const err = new Error('adicione pelo menos 1 alimento');
+      err.status = 400;
+      throw err;
+    }
+    replaceMealItems(db, id, body.items);
+  }
+  return getMeal(db, id);
+}
+
+export function deleteMeal(db, id, { hard = false } = {}) {
+  const existing = db.prepare('SELECT id FROM food_meals WHERE id = ?').get(id);
+  if (!existing) return false;
+  if (hard) {
+    db.prepare('DELETE FROM food_meal_items WHERE meal_id = ?').run(id);
+    db.prepare('DELETE FROM food_meals WHERE id = ?').run(id);
+    return true;
+  }
+  db.prepare("UPDATE food_meals SET status = 'archived' WHERE id = ?").run(id);
+  return true;
+}
+
+/** Expande refeição salva em N food_logs no diário. */
+export function createLogsFromMeal(db, body = {}, { today } = {}) {
+  const mealId = body.meal_id || body.id;
+  if (!mealId) {
+    const err = new Error('meal_id é obrigatório');
+    err.status = 400;
+    throw err;
+  }
+  const meal = getMeal(db, mealId);
+  if (!meal || meal.status === 'archived') {
+    const err = new Error('refeição não encontrada');
+    err.status = 404;
+    throw err;
+  }
+  const date = body.date || today;
+  const meal_slot = MEAL_SLOTS.includes(body.meal_slot) ? body.meal_slot : 'other';
+  const scale = Math.max(0.1, Number(body.servings) || 1);
+  const created = [];
+  const run = db.transaction(() => {
+    for (const it of meal.items) {
+      if (!it.food_item_id || it.food_status === 'archived') continue;
+      const servings = (Number(it.servings) || 1) * scale;
+      created.push(
+        createLog(db, {
+          date,
+          meal_slot,
+          food_item_id: it.food_item_id,
+          servings,
+          meal_id: mealId,
+          source: 'meal',
+        }, { today }),
+      );
+    }
+  });
+  run();
+  if (created.length === 0) {
+    const err = new Error('refeição sem alimentos ativos');
+    err.status = 400;
+    throw err;
+  }
+  return {
+    meal_id: mealId,
+    meal_name: meal.name,
+    created: created.length,
+    logs: created,
+    day: buildDayPayload(db, String(date).slice(0, 10)),
+  };
+}
