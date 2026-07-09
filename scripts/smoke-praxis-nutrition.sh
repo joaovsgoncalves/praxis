@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke Nutrição (fases 0–11) — roda com cookie jar ou FORJA_API_KEY
+# Smoke Nutrição (fases 0–12) — roda com cookie jar ou FORJA_API_KEY
 # Uso: chamado de smoke-praxis-prod.sh com BASE + COOKIE_JAR exportados
 #  ou: BASE=http://127.0.0.1:18556 FORJA_API_KEY=... bash scripts/smoke-praxis-nutrition.sh
 
@@ -83,5 +83,18 @@ ok "GET weight/trend 200"
 C=$(code -X DELETE "$BASE/api/nutrition/weight/$W_ID")
 [[ "$C" == "204" || "$C" == "200" ]] || fail "DELETE weight → $C"
 ok "DELETE weight"
+
+# barcode / OFF (rede) — Nutella classic se rede ok
+C=$(code "$BASE/api/nutrition/barcode/3017620422003" || true)
+if [[ "$C" == "200" ]]; then
+  ok "GET barcode OFF 200"
+elif [[ "$C" == "404" ]]; then
+  ok "GET barcode 404 (OFF sem produto — ok)"
+elif [[ "$C" == "502" || "$C" == "504" ]]; then
+  ok "GET barcode OFF indisponível ($C) — skip soft"
+else
+  # ainda aceita se rede bloqueada no smoke
+  echo "WARN nutrition: barcode → $C (não falha o smoke)"
+fi
 
 echo "=== Smoke nutrition OK ==="

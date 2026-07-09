@@ -65,6 +65,8 @@ import {
   upsertWeightLog,
   deleteWeightLog,
   buildWeightTrend,
+  lookupBarcode,
+  findFoodByBarcode,
 } from './nutrition.js';
 
 // Category constants
@@ -657,6 +659,47 @@ app.post('/api/nutrition/seed', (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err?.message || 'seed falhou' });
+  }
+});
+
+
+// barcode / Open Food Facts (fase 12) — opt-in rede
+app.get('/api/nutrition/barcode/:code', async (req, res) => {
+  try {
+    const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    const cacheOnly = req.query.cache_only === '1' || req.query.cacheOnly === '1';
+    const result = await lookupBarcode(db, req.params.code, { refresh, cacheOnly });
+    if (result.source === 'not_found') {
+      return res.status(404).json({
+        error: 'produto não encontrado no catálogo local nem no Open Food Facts',
+        barcode: result.barcode,
+        source: 'not_found',
+      });
+    }
+    res.json(result);
+  } catch (err) {
+    const code = err?.status || 500;
+    console.error('barcode lookup', err?.message || err);
+    res.status(code).json({ error: err?.message || 'falha no barcode' });
+  }
+});
+
+app.post('/api/nutrition/barcode/lookup', async (req, res) => {
+  try {
+    const code = req.body?.code ?? req.body?.barcode;
+    const refresh = !!req.body?.refresh;
+    const result = await lookupBarcode(db, code, { refresh, cacheOnly: !!req.body?.cache_only });
+    if (result.source === 'not_found') {
+      return res.status(404).json({
+        error: 'produto não encontrado no catálogo local nem no Open Food Facts',
+        barcode: result.barcode,
+        source: 'not_found',
+      });
+    }
+    res.json(result);
+  } catch (err) {
+    const code = err?.status || 500;
+    res.status(code).json({ error: err?.message || 'falha no barcode' });
   }
 });
 

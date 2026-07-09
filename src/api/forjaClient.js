@@ -223,6 +223,22 @@ export const forjaApi = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    barcode: {
+      lookup: (code, params = {}) => {
+        const q = new URLSearchParams();
+        if (params.refresh) q.set('refresh', '1');
+        if (params.cacheOnly) q.set('cache_only', '1');
+        const qs = q.toString();
+        return request(
+          `/api/nutrition/barcode/${encodeURIComponent(String(code).replace(/\D/g, ''))}${qs ? `?${qs}` : ''}`,
+        );
+      },
+      lookupPost: (data) =>
+        request('/api/nutrition/barcode/lookup', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+    },
     summary: (params = {}) => {
       const query = new URLSearchParams();
       if (params.from) query.set('from', params.from);

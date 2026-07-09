@@ -1,6 +1,11 @@
 /** Nutrição / macros — schema + helpers (fase 0–2: day/profile/foods) */
 
 import { randomUUID } from 'crypto';
+import {
+  normalizeBarcode,
+  mapOffProductToFoodBody,
+  fetchOpenFoodFactsProduct,
+} from './nutritionOpenFoodFacts.js';
 import { seedBrazilianFoods } from './nutritionSeedBr.js';
 
 export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner', 'other'];
@@ -121,6 +126,13 @@ export function initNutritionSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_food_meals_status ON food_meals(status);
     CREATE INDEX IF NOT EXISTS idx_body_weight_date ON body_weight_logs(date);
   `);
+
+  // fase 12: barcode no catálogo (cache OFF)
+  const foodCols = db.prepare('PRAGMA table_info(food_items)').all().map((c) => c.name);
+  if (!foodCols.includes('barcode')) {
+    db.exec('ALTER TABLE food_items ADD COLUMN barcode TEXT');
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_food_items_barcode ON food_items(barcode)');
 
   const row = db.prepare('SELECT id FROM nutrition_profile WHERE id = ?').get('default');
   if (!row) {
@@ -466,7 +478,15 @@ export function createFood(db, body = {}) {
     data.source,
     data.status,
   );
-  return getFood(db, id);
+    const bc = body.barcode != null ? normalizeBarcode(body.barcode) : null;
+  if (bc) {
+    try {
+      db.prepare('UPDATE food_items SET barcode = ? WHERE id = ?').run(bc, id);
+    } catch {
+      /* ignore */
+    }
+  }
+return getFood(db, id);
 }
 
 export function updateFood(db, id, body = {}) {
@@ -1633,5 +1653,117 @@ export function buildWeightTrend(db, { days = 30 } = {}) {
         : null,
     min_kg: Math.min(...weights),
     max_kg: Math.max(...weights),
+  };
+}
+
+// ==================== barcode / OFF (fase 12) ====================
+
+export function findFoodByBarcode(db, code) {
+  const bc = normalizeBarcode(code);
+  if (!bc) return null;
+  // prefer stable off_ id, else any row with barcode
+  const byId = getFood(db, `off_${bc}`);
+  if (byId && byId.status !== 'archived') return byId;
+  const row = db
+    .prepare(
+      "SELECT * FROM food_items WHERE barcode = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1",
+    )
+    .get(bc);
+  return row || byId || null;
+}
+
+/**
+ * Cache OFF product into food_items (id off_<barcode>).
+ * refresh=true updates macros from fresh OFF body.
+ */
+export function cacheOffFood(db, mapped, { refresh = false } = {}) {
+  const barcode = normalizeBarcode(mapped.barcode || mapped.id?.replace(/^off_/, ''));
+  if (!barcode) {
+    const err = new Error('barcode inválido no cache');
+    err.status = 400;
+    throw err;
+  }
+  const id = mapped.id || `off_${barcode}`;
+  const existing = getFood(db, id);
+  const body = {
+    name: mapped.name,
+    brand: mapped.brand || '',
+    serving_label: mapped.serving_label,
+    serving_grams: mapped.serving_grams,
+    kcal: mapped.kcal,
+    protein_g: mapped.protein_g,
+    carbs_g: mapped.carbs_g,
+    fat_g: mapped.fat_g,
+    fiber_g: mapped.fiber_g,
+    source: 'openfoodfacts',
+    status: 'active',
+  };
+
+  if (existing) {
+    if (refresh) {
+      updateFood(db, id, body);
+      db.prepare(
+        "UPDATE food_items SET barcode = ?, updated_at = datetime('now') WHERE id = ?",
+      ).run(barcode, id);
+    } else {
+      // ensure barcode set
+      if (!existing.barcode) {
+        db.prepare('UPDATE food_items SET barcode = ? WHERE id = ?').run(barcode, id);
+      }
+    }
+    return getFood(db, id);
+  }
+
+  createFood(db, { ...body, id });
+  db.prepare('UPDATE food_items SET barcode = ? WHERE id = ?').run(barcode, id);
+  return getFood(db, id);
+}
+
+/**
+ * Lookup: local cache first, then Open Food Facts (unless cacheOnly).
+ * Returns { source: 'cache'|'openfoodfacts'|'not_found', food?, off?, barcode }
+ */
+export async function lookupBarcode(db, rawCode, { refresh = false, cacheOnly = false } = {}) {
+  const barcode = normalizeBarcode(rawCode);
+  if (!barcode) {
+    const err = new Error('código de barras inválido (use 8–14 dígitos)');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!refresh) {
+    const cached = findFoodByBarcode(db, barcode);
+    if (cached) {
+      return { source: 'cache', barcode, food: cached, off: null };
+    }
+  }
+
+  if (cacheOnly) {
+    return { source: 'not_found', barcode, food: null, off: null };
+  }
+
+  const data = await fetchOpenFoodFactsProduct(barcode);
+  // OFF v0/v2: status 1 = found, 0 = not found
+  if (!data || data.status === 0 || !data.product) {
+    return {
+      source: 'not_found',
+      barcode,
+      food: null,
+      off: { status: data?.status, status_verbose: data?.status_verbose || 'product not found' },
+    };
+  }
+
+  const mapped = mapOffProductToFoodBody(data.product, barcode);
+  const food = cacheOffFood(db, mapped, { refresh: true });
+  return {
+    source: 'openfoodfacts',
+    barcode,
+    food,
+    off: {
+      status: data.status,
+      image_url: mapped.off_meta?.image_url || null,
+      per: mapped.off_meta?.per,
+      quantity: mapped.off_meta?.quantity,
+    },
   };
 }

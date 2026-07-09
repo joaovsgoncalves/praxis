@@ -34,6 +34,7 @@ import {
 } from '@/lib/nutrition';
 import MacroBars from '@/components/nutrition/MacroBars';
 import NutritionTextEntry from '@/components/nutrition/NutritionTextEntry';
+import NutritionBarcodeEntry from '@/components/nutrition/NutritionBarcodeEntry';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -429,6 +430,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
               </Button>
             ) : null}
             <NutritionTextEntry date={date} defaultSlot={defaultSlotForHour()} />
+            <NutritionBarcodeEntry date={date} defaultSlot={defaultSlotForHour()} />
             <Button type="button" className="rounded-full" onClick={() => openAdd()}>
               <Plus className="w-4 h-4 mr-1.5" />
               Adicionar comida
