@@ -1,15 +1,15 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição fase 6**
+**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição fase 7**
 
 ---
 
 ## Novo (jul/2026) — Nutrição (macros)
 
-- **Fase 6 shipped:** refeições salvas + from-meal (+tudo no diário) — commit `c8dfcdc`
-- **Fase 5:** recentes/favoritos/stepper/copiar ontem
-- **Fase 4–0:** barras, diário, catálogo, meta, schema
-- Próximo opcional: seed BR (7), voz (8), histórico (9)…
+- **Fase 7 shipped:** seed BR (~63 alimentos) + onboarding de meta — commit `2b0de63`
+- **Fase 6:** refeições salvas
+- **Fase 5–0:** UX rápida, barras, diário, catálogo, meta, schema
+- Próximo opcional: texto/voz (8), histórico (9), peso (10)…
 - Docs: `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`
 
 ## Lote 9
