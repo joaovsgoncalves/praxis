@@ -1,14 +1,15 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição fase 0**
+**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição fase 2**
 
 ---
 
 ## Novo (jul/2026) — Nutrição (macros)
 
-- **Fase 1 shipped:** meta + perfil em `/nutricao` (PUT profile + sugestão) — commit `13f8f7d`
+- **Fase 2 shipped:** catálogo de alimentos (CRUD, busca, favoritos) em `/nutricao` — commit `7258ee0`
+- **Fase 1:** meta + perfil + sugestão
 - **Fase 0:** schema + GET day/profile + nav
-- Ainda **sem** log de comida / barras no Hoje (fases 2+)
+- Ainda **sem** log de refeição / barras no Hoje (fases 3–4)
 - Docs: `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`
 
 ## Lote 9
