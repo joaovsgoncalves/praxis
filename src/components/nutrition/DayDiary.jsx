@@ -11,6 +11,8 @@ import {
   Minus,
   Copy,
   UtensilsCrossed,
+  Type,
+  ScanBarcode,
 } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
@@ -25,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { PraxisEmptyState } from '@/components/layout/PraxisPage';
+import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
 import {
   MEAL_SLOTS,
   MEAL_SLOT_LABELS,
@@ -147,6 +149,8 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   const [servings, setServings] = useState('1');
   const [editLog, setEditLog] = useState(null);
   const [editServings, setEditServings] = useState('1');
+  const [textOpen, setTextOpen] = useState(false);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
 
   const { data: day, isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'day', date],
@@ -374,7 +378,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando diário…</p>
+        <PraxisListSkeleton rows={3} />
       ) : isError ? (
         <PraxisEmptyState
           title="Não carregou o diário"
@@ -395,47 +399,70 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                     </span>
                   ) : null}
                 </p>
-                {remaining && remaining.kcal != null ? (
-                  <p className="text-xs text-muted-foreground tabular-nums pt-0.5">
-                    Faltam {formatKcal(Math.max(0, remaining.kcal))}
-                    {remaining.protein_g != null
-                      ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
-                      : ''}
-                  </p>
-                ) : null}
               </div>
               <MacroBars totals={totals || {}} targets={targets || {}} variant="full" />
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap justify-end gap-2">
-            {isEmptyDay ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              {remaining && remaining.kcal != null ? (
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  Faltam {formatKcal(Math.max(0, remaining.kcal))}
+                  {remaining.protein_g != null
+                    ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
+                    : ''}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Diário do dia</p>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              {isEmptyDay ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full min-h-11"
+                  disabled={copyYesterdayMut.isPending}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Copiar tudo que registrou no dia anterior para este dia?',
+                      )
+                    ) {
+                      copyYesterdayMut.mutate();
+                    }
+                  }}
+                >
+                  <Copy className="w-4 h-4 mr-1.5" />
+                  {copyYesterdayMut.isPending ? 'Copiando…' : 'Copiar ontem'}
+                </Button>
+              ) : null}
               <Button
                 type="button"
-                variant="outline"
-                className="rounded-full"
-                disabled={copyYesterdayMut.isPending}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      'Copiar tudo que registrou no dia anterior para este dia?',
-                    )
-                  ) {
-                    copyYesterdayMut.mutate();
-                  }
-                }}
+                className="rounded-full min-h-11"
+                onClick={() => openAdd()}
               >
-                <Copy className="w-4 h-4 mr-1.5" />
-                {copyYesterdayMut.isPending ? 'Copiando…' : 'Copiar ontem'}
+                <Plus className="w-4 h-4 mr-1.5" />
+                Adicionar
               </Button>
-            ) : null}
-            <NutritionTextEntry date={date} defaultSlot={defaultSlotForHour()} />
-            <NutritionBarcodeEntry date={date} defaultSlot={defaultSlotForHour()} />
-            <Button type="button" className="rounded-full" onClick={() => openAdd()}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Adicionar comida
-            </Button>
+            </div>
           </div>
+
+          <NutritionTextEntry
+            date={date}
+            defaultSlot={addSlot}
+            showTrigger={false}
+            open={textOpen}
+            onOpenChange={setTextOpen}
+          />
+          <NutritionBarcodeEntry
+            date={date}
+            defaultSlot={addSlot}
+            showTrigger={false}
+            open={barcodeOpen}
+            onOpenChange={setBarcodeOpen}
+          />
 
           {MEAL_SLOTS.map((slot) => {
             const items = bySlot?.[slot] || [];
@@ -535,6 +562,32 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
             <DialogTitle>Adicionar ao diário</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full min-h-11"
+                onClick={() => {
+                  setAddOpen(false);
+                  setTextOpen(true);
+                }}
+              >
+                <Type className="w-4 h-4 mr-1.5" />
+                Texto
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full min-h-11"
+                onClick={() => {
+                  setAddOpen(false);
+                  setBarcodeOpen(true);
+                }}
+              >
+                <ScanBarcode className="w-4 h-4 mr-1.5" />
+                Código
+              </Button>
+            </div>
             <div className="space-y-1.5">
               <Label>Refeição</Label>
               <Select value={addSlot} onValueChange={setAddSlot}>

@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PraxisEmptyState } from '@/components/layout/PraxisPage';
+import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatGrams, formatKcal } from '@/lib/nutrition';
 import { cn } from '@/lib/utils';
@@ -122,7 +122,7 @@ export default function NutritionHistory({ onOpenDay }) {
       )}
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando histórico…</p>
+        <PraxisListSkeleton rows={3} />
       ) : isError ? (
         <PraxisEmptyState
           title="Não carregou o histórico"

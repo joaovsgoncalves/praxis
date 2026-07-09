@@ -26,9 +26,22 @@ import { cn } from '@/lib/utils';
  * Fase 8 — entrada por texto (base p/ transcript/A.N.A. no futuro).
  * Parse heurístico → confirmação → grava logs.
  */
-export default function NutritionTextEntry({ date, defaultSlot = 'other', onLogged }) {
+export default function NutritionTextEntry({
+  date,
+  defaultSlot = 'other',
+  onLogged,
+  showTrigger = true,
+  open: openProp,
+  onOpenChange,
+}) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+  const setOpen = (o) => {
+    if (!controlled) setUncontrolledOpen(o);
+    onOpenChange?.(o);
+  };
   const [text, setText] = useState('');
   const [slot, setSlot] = useState(defaultSlot);
   const [parsed, setParsed] = useState(null);
@@ -97,22 +110,25 @@ export default function NutritionTextEntry({ date, defaultSlot = 'other', onLogg
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        className="rounded-full"
-        onClick={() => {
-          setSlot(defaultSlot || 'other');
-          setOpen(true);
-        }}
-      >
-        <Type className="w-4 h-4 mr-1.5" />
-        Texto
-      </Button>
+      {showTrigger ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={() => {
+            setSlot(defaultSlot || 'other');
+            setOpen(true);
+          }}
+        >
+          <Type className="w-4 h-4 mr-1.5" />
+          Texto
+        </Button>
+      ) : null}
 
       <Dialog
         open={open}
         onOpenChange={(o) => {
+          if (o) setSlot(defaultSlot || 'other');
           setOpen(o);
           if (!o) reset();
         }}

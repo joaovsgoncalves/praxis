@@ -29,9 +29,18 @@ export default function NutritionBarcodeEntry({
   date,
   defaultSlot = 'other',
   onLogged,
+  showTrigger = true,
+  open: openProp,
+  onOpenChange,
 }) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+  const setOpen = (o) => {
+    if (!controlled) setUncontrolledOpen(o);
+    onOpenChange?.(o);
+  };
   const [code, setCode] = useState('');
   const [slot, setSlot] = useState(defaultSlot);
   const [servings, setServings] = useState('1');
@@ -96,22 +105,25 @@ export default function NutritionBarcodeEntry({
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        className="rounded-full"
-        onClick={() => {
-          setSlot(defaultSlot || 'other');
-          setOpen(true);
-        }}
-      >
-        <ScanBarcode className="w-4 h-4 mr-1.5" />
-        Código
-      </Button>
+      {showTrigger ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={() => {
+            setSlot(defaultSlot || 'other');
+            setOpen(true);
+          }}
+        >
+          <ScanBarcode className="w-4 h-4 mr-1.5" />
+          Código
+        </Button>
+      ) : null}
 
       <Dialog
         open={open}
         onOpenChange={(o) => {
+          if (o) setSlot(defaultSlot || 'other');
           setOpen(o);
           if (!o) reset();
         }}

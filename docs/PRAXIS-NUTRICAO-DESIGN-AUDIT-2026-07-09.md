@@ -138,12 +138,14 @@ Experiência Nutrição .. ~7.5
 
 ## Critérios de aceite se “arrocha polish Nutrição”
 
-- [ ] ≤ 4 tabs visíveis sem scroll horizontal em 390px  
-- [ ] Um único bloco de MacroBars no Diário  
-- [ ] Adicionar comida = 1 primary CTA → sheet unificado  
-- [ ] Skeleton em day/profile (não só “Carregando…”)  
-- [ ] `impeccable detect src/components/nutrition` continua `[]`  
-- [ ] Copy e tokens ainda alinhados a `DESIGN.md` (sem verde fitness genérico)
+- [x] ≤ 4 tabs visíveis sem scroll horizontal em 390px — **Diário · Histórico · Peso · Mais** (ship polish 2026-07-09)  
+- [x] Um único bloco de MacroBars no Diário  
+- [x] Adicionar = 1 primary CTA → sheet com Texto/Código + recentes/refeições  
+- [x] Skeleton em day/histórico (`PraxisListSkeleton`)  
+- [x] `impeccable detect src/components/nutrition` continua `[]`  
+- [x] Copy e tokens alinhados a `DESIGN.md`
+
+**Polish shipped** com o restante do módulo 0–12.
 
 ---
 

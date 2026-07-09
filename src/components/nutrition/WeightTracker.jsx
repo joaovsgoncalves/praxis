@@ -166,7 +166,7 @@ export default function WeightTracker() {
           </div>
 
           {isLoading ? (
-            <p className="text-xs text-muted-foreground">Carregando…</p>
+            <p className="text-xs text-muted-foreground">…</p>
           ) : points.length >= 2 ? (
             <WeightSparkline points={points} />
           ) : points.length === 1 ? (
