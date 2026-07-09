@@ -41,6 +41,7 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - **Subtrair:** mesh fraco, glass flat, kickers sentence-case, `card-domain` sem hover lift, sidebar menos ouro/sombra, Dashboard sem glow por widget.
 - **Manter:** Agora, voz, hierarquia `PageHero`, ouro só nav/XP.
 - **Lote 8:** `PraxisInlinePromo` — promos do Hoje com mesma shell; 1 gradiente forte só se necessário (evitar em revisão/meta).
+- **Lote 9 (2026-07-09):** empty Agora ≤2 CTAs; HeroDay strip `bg-card/40` (sem glass no Hoje); Avoidance com **dot** de severidade (sem `border-l-4`); glass residual só login/splash/404.
 - Calendar: ver `docs/PRAXIS-CALENDAR-SYNC.md`.
 
 ## E2E mobile (390px)

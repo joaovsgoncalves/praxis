@@ -63,50 +63,50 @@ export default function HeroDay({
   ];
 
   return (
-    <div className="relative overflow-hidden rounded-2xl glass-surface border border-white/5 p-3 sm:p-4 md:p-5">
-      <div className="relative z-10 space-y-3 md:space-y-3.5">
-        <div className="flex flex-wrap items-end justify-between gap-2 gap-y-1">
+    <div className="rounded-2xl border border-border/80 bg-card/40 p-3 sm:p-3.5">
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 gap-y-1">
           <div className="min-w-0">
-            <p className="forja-kicker mb-1 text-[11px] sm:text-xs">
+            <p className="forja-kicker mb-0.5 text-[11px] sm:text-xs">
               {emoji} Praxis · {dateStr}
             </p>
-            <h1 className="forja-title text-xl sm:text-2xl md:text-3xl font-bold leading-tight">
+            <h1 className="forja-title text-lg sm:text-xl md:text-2xl font-bold leading-tight">
               {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{tagline}</p>
+            <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground line-clamp-1">{tagline}</p>
           </div>
-          <div className="shrink-0 rounded-full border border-domain-gold/30 bg-domain-gold/10 px-3 py-1 text-xs font-semibold text-domain-gold tabular-nums">
+          <div className="shrink-0 rounded-full border border-domain-gold/30 bg-domain-gold/10 px-2.5 py-0.5 text-xs font-semibold text-domain-gold tabular-nums">
             Dia · {Math.round(dayPct)}%
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {missionStats.map(({ label, value, icon: Icon, tone }) => (
-            <div key={label} className="rounded-xl border border-white/8 bg-white/[0.03] px-2.5 py-2 sm:px-3 sm:py-2.5">
+            <div key={label} className="rounded-xl border border-border/60 bg-card/30 px-2 py-1.5 sm:px-2.5 sm:py-2">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground/80">{label}</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground/80">{label}</span>
                 <Icon className={`h-3.5 w-3.5 ${tone}`} aria-hidden />
               </div>
-              <div className="mt-0.5 text-lg sm:text-xl font-semibold tabular-nums leading-none">{value}</div>
+              <div className="mt-0.5 text-base sm:text-lg font-semibold tabular-nums leading-none">{value}</div>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {bestStreak > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-domain-ember/25 bg-domain-ember/10 px-2.5 py-1 text-xs font-medium text-domain-ember">
-              <Flame className="h-3.5 w-3.5" aria-hidden />
+            <span className="inline-flex items-center gap-1 rounded-full border border-domain-ember/25 bg-domain-ember/10 px-2 py-0.5 text-[11px] font-medium text-domain-ember">
+              <Flame className="h-3 w-3" aria-hidden />
               {bestStreak}d sequência
             </span>
           )}
-          <Button asChild size="sm" variant="outline" className="h-8 rounded-full px-3 text-xs gap-1">
-            <Link to="/foco"><Timer className="h-3.5 w-3.5" /> Foco</Link>
+          <Button asChild size="sm" variant="outline" className="h-7 rounded-full px-2.5 text-[11px] gap-1">
+            <Link to="/foco"><Timer className="h-3 w-3" /> Foco</Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="h-8 rounded-full px-3 text-xs gap-1">
-            <Link to="/ideias?new=1"><Lightbulb className="h-3.5 w-3.5" /> Ideia</Link>
+          <Button asChild size="sm" variant="outline" className="h-7 rounded-full px-2.5 text-[11px] gap-1">
+            <Link to="/ideias?new=1"><Lightbulb className="h-3 w-3" /> Ideia</Link>
           </Button>
-          <Button asChild size="sm" variant="outline" className="h-8 rounded-full px-3 text-xs gap-1">
-            <Link to="/captura"><Mic className="h-3.5 w-3.5" /> Voz</Link>
+          <Button asChild size="sm" variant="outline" className="h-7 rounded-full px-2.5 text-[11px] gap-1">
+            <Link to="/captura"><Mic className="h-3 w-3" /> Voz</Link>
           </Button>
         </div>
       </div>

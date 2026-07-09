@@ -1,18 +1,21 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-06 · **URL:** https://praxis-jota.vercel.app · **Lote 8** `45f29c2` no ar
+**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Lote 9** distill Hoje
 
 ---
 
-## Novo (jul/2026) — Lote 8
+## Novo (jul/2026) — Lote 9
 
-- **Equilíbrio visual** no Hoje: `PraxisInlinePromo`, seção “Sugestões e reflexão”, revisão sem CTA roxo cheio — `docs/PRAXIS-DESIGN-AUDIT-LOTE-8.md`
-- **Modo Foco:** select de tarefa sem card pesado
+- **Hoje mais calmo:** Agora vazio com 2 CTAs; HeroDay strip flat; Avoidance sem side-tab — `docs/PRAXIS-LOTE-9-DISTILL.md`, auditoria `docs/PRAXIS-DESIGN-AUDIT-2026-07-09.md`
 
-## Lote 7 (mesmo mês)
+## Lote 8
 
-- Visual **mais quieto** (tokens, sidebar, Hoje sem glow por widget) — `docs/DESIGN.md`, `docs/PRAXIS-LOTE-7-QUIETO.md`
-- **Google Calendar:** tarefa atrasada não sincroniza; purge no boot da API — `docs/PRAXIS-CALENDAR-SYNC.md`
+- **Equilíbrio visual** no Hoje: `PraxisInlinePromo`, seção “Sugestões e reflexão” — `docs/PRAXIS-DESIGN-AUDIT-LOTE-8.md`
+
+## Lote 7
+
+- Visual **mais quieto** — `docs/DESIGN.md`, `docs/PRAXIS-LOTE-7-QUIETO.md`
+- **Google Calendar:** atrasada não sincroniza — `docs/PRAXIS-CALENDAR-SYNC.md`
 
 ---
 

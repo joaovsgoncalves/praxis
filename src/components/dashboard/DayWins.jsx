@@ -29,7 +29,7 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
   };
 
   return (
-    <Card className="border-domain-gold/25 bg-gradient-to-br from-domain-gold/5 via-transparent to-domain-ember/5">
+    <Card className="border-border/80 bg-card/40">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -43,7 +43,7 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
           </div>
           <div className="text-right shrink-0">
             <p className="text-2xl font-semibold tabular-nums text-domain-gold">{pct}%</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               do dia
             </p>
           </div>

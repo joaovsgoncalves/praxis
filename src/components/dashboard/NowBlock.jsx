@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from '@/lib/categories';
 import { formatTaskTimeLabel, isTaskOverdue } from '@/lib/nowTask';
-import { Timer, CheckCircle2, Clock, AlertTriangle, Mic, Plus, Lightbulb } from 'lucide-react';
+import { Timer, CheckCircle2, Clock, AlertTriangle, Mic, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function NowBlock({
@@ -36,17 +36,18 @@ export default function NowBlock({
             <Button type="button" variant="outline" className="praxis-touch-target w-full gap-2 sm:w-auto" onClick={onAddTask}>
               <Plus className="h-4 w-4" /> Nova tarefa
             </Button>
-            <Button asChild variant="outline" className="praxis-touch-target w-full gap-2 sm:w-auto">
-              <Link to="/foco">
-                <Timer className="h-4 w-4" /> Modo foco
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="praxis-touch-target w-full gap-2 sm:w-auto">
-              <Link to="/ideias?new=1">
-                <Lightbulb className="h-4 w-4" /> Nova ideia
-              </Link>
-            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Também dá pra ir em{' '}
+            <Link to="/foco" className="text-primary underline-offset-2 hover:underline">
+              Modo foco
+            </Link>
+            {' '}ou{' '}
+            <Link to="/ideias?new=1" className="text-primary underline-offset-2 hover:underline">
+              Ideias
+            </Link>
+            .
+          </p>
         </CardContent>
       </Card>
     );

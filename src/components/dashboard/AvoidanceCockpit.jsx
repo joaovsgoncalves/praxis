@@ -9,10 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Sparkles, AlertCircle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const SEVERITY_BORDER = {
-  high: 'border-l-destructive',
-  medium: 'border-l-amber-500',
-  low: 'border-l-border',
+const SEVERITY_DOT = {
+  high: 'bg-destructive',
+  medium: 'bg-amber-500',
+  low: 'bg-muted-foreground/40',
 };
 
 export default function AvoidanceCockpit() {
@@ -73,11 +73,15 @@ export default function AvoidanceCockpit() {
                       ? `/habitos-tarefas?tab=tasks&scope=overdue`
                       : item.action?.href || '/'
                   }
-                  className={cn(
-                    'flex items-start gap-3 rounded-xl border border-border/70 border-l-4 bg-card/30 p-3 transition-colors hover:bg-card/50',
-                    SEVERITY_BORDER[item.severity] || SEVERITY_BORDER.low,
-                  )}
+                  className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/30 p-3 transition-colors hover:bg-card/50"
                 >
+                  <span
+                    className={cn(
+                      'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+                      SEVERITY_DOT[item.severity] || SEVERITY_DOT.low,
+                    )}
+                    aria-hidden
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{item.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{item.reason}</p>
