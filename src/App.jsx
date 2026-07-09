@@ -10,6 +10,7 @@ import Dashboard from '@/pages/Dashboard';
 import HabitsTasks from '@/pages/HabitsTasks';
 import Ideas from '@/pages/Ideas';
 import Compras from '@/pages/Compras';
+import Nutricao from '@/pages/Nutricao';
 import Focus from '@/pages/Focus';
 import Goals from '@/pages/Goals';
 import Rituais from '@/pages/Rituais';
@@ -77,6 +78,7 @@ const AuthenticatedApp = () => {
         <Route path="/habitos-tarefas" element={<HabitsTasks />} />
         <Route path="/ideias" element={<Ideas />} />
         <Route path="/compras" element={<Compras />} />
+        <Route path="/nutricao" element={<Nutricao />} />
         <Route path="/foco" element={<Focus />} />
         <Route path="/metas" element={<Goals />} />
         <Route path="/rituais" element={<Rituais />} />

@@ -1,10 +1,15 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Lote 9** distill Hoje
+**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição fase 0**
 
 ---
 
-## Novo (jul/2026) — Lote 9
+## Novo (jul/2026) — Nutrição (macros)
+
+- **Fase 0 shipped:** schema + `GET /api/nutrition/day|profile` + placeholder `/nutricao` na sidebar — `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`, `docs/PRAXIS-NUTRICAO-FASE-0.md`
+- Ainda **sem** log de comida / barras no Hoje (fases 1+)
+
+## Lote 9
 
 - **Hoje mais calmo:** Agora vazio com 2 CTAs; HeroDay strip flat; Avoidance sem side-tab — `docs/PRAXIS-LOTE-9-DISTILL.md`, auditoria `docs/PRAXIS-DESIGN-AUDIT-2026-07-09.md`
 

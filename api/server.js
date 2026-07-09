@@ -34,6 +34,12 @@ import {
   updatePurchase,
   deletePurchase,
 } from './purchaseList.js';
+import {
+  initNutritionSchema,
+  getNutritionProfile,
+  buildDayPayload,
+  isValidDateString,
+} from './nutrition.js';
 
 // Category constants
 const CATEGORIES = {
@@ -334,6 +340,7 @@ for (const a of defaultAchievements) {
 initAuthSchema(db);
 initCaptureQueueSchema(db);
 initPurchaseSchema(db);
+initNutritionSchema(db);
 ensureDefaultUser(db);
 registerAuthRoutes(app, db, { secureCookie: COOKIE_SECURE });
 app.use(createApiAuthMiddleware({ db, apiKey: FORJA_API_KEY }));
@@ -426,6 +433,12 @@ const settingsCols = db.prepare("PRAGMA table_info(user_settings)").all().map((c
 if (!settingsCols.includes('list_density')) {
   db.exec("ALTER TABLE user_settings ADD COLUMN list_density TEXT DEFAULT 'comfortable'");
 }
+if (!settingsCols.includes('nutrition_enabled')) {
+  db.exec('ALTER TABLE user_settings ADD COLUMN nutrition_enabled INTEGER DEFAULT 1');
+}
+if (!settingsCols.includes('nutrition_show_on_today')) {
+  db.exec('ALTER TABLE user_settings ADD COLUMN nutrition_show_on_today INTEGER DEFAULT 1');
+}
 const tasksCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
 if (!tasksCols.includes('goal_id')) {
   db.exec("ALTER TABLE tasks ADD COLUMN goal_id TEXT");
@@ -511,6 +524,21 @@ app.patch('/api/purchases/:id', (req, res) => {
 app.delete('/api/purchases/:id', (req, res) => {
   if (!deletePurchase(db, req.params.id)) return res.status(404).json({ error: 'Not found' });
   res.status(204).end();
+});
+
+// ==================== NUTRIÇÃO (macros — fase 0) ====================
+app.get('/api/nutrition/profile', (req, res) => {
+  res.json(getNutritionProfile(db));
+});
+
+app.get('/api/nutrition/day', (req, res) => {
+  const raw = req.query.date != null && String(req.query.date).trim() !== ''
+    ? String(req.query.date).trim().slice(0, 10)
+    : getLocalDateString();
+  if (!isValidDateString(raw)) {
+    return res.status(400).json({ error: 'data inválida (use YYYY-MM-DD)' });
+  }
+  res.json(buildDayPayload(db, raw));
 });
 
 // ==================== HEALTH ====================
@@ -1690,11 +1718,24 @@ app.get('/api/user/settings', (req, res) => {
     notif_habits: settings.notif_habits,
     notif_goals: settings.notif_goals,
     list_density: settings.list_density || 'comfortable',
+    nutrition_enabled: settings.nutrition_enabled == null ? 1 : settings.nutrition_enabled,
+    nutrition_show_on_today:
+      settings.nutrition_show_on_today == null ? 1 : settings.nutrition_show_on_today,
   });
 });
 
 app.put('/api/user/settings', (req, res) => {
-  const { full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals, list_density } = req.body;
+  const {
+    full_name,
+    avatar_url,
+    pomodoro_focus,
+    pomodoro_break,
+    notif_habits,
+    notif_goals,
+    list_density,
+    nutrition_enabled,
+    nutrition_show_on_today,
+  } = req.body;
 
   // Ensure row exists
   const existing = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
@@ -1711,6 +1752,15 @@ app.put('/api/user/settings', (req, res) => {
     density = d;
   }
 
+  const toFlag = (v) => {
+    if (v === undefined || v === null) return null;
+    if (v === true || v === 1 || v === '1') return 1;
+    if (v === false || v === 0 || v === '0') return 0;
+    return null;
+  };
+  const nutrEnabled = toFlag(nutrition_enabled);
+  const nutrToday = toFlag(nutrition_show_on_today);
+
   db.prepare(`
     UPDATE user_settings SET
       full_name = COALESCE(?, full_name),
@@ -1719,9 +1769,21 @@ app.put('/api/user/settings', (req, res) => {
       pomodoro_break = COALESCE(?, pomodoro_break),
       notif_habits = COALESCE(?, notif_habits),
       notif_goals = COALESCE(?, notif_goals),
-      list_density = COALESCE(?, list_density)
+      list_density = COALESCE(?, list_density),
+      nutrition_enabled = COALESCE(?, nutrition_enabled),
+      nutrition_show_on_today = COALESCE(?, nutrition_show_on_today)
     WHERE id = 'default'
-  `).run(full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals, density ?? null);
+  `).run(
+    full_name,
+    avatar_url,
+    pomodoro_focus,
+    pomodoro_break,
+    notif_habits,
+    notif_goals,
+    density ?? null,
+    nutrEnabled,
+    nutrToday,
+  );
 
   const settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
   res.json({
@@ -1734,6 +1796,9 @@ app.put('/api/user/settings', (req, res) => {
     notif_habits: settings.notif_habits,
     notif_goals: settings.notif_goals,
     list_density: settings.list_density || 'comfortable',
+    nutrition_enabled: settings.nutrition_enabled == null ? 1 : settings.nutrition_enabled,
+    nutrition_show_on_today:
+      settings.nutrition_show_on_today == null ? 1 : settings.nutrition_show_on_today,
   });
 });
 

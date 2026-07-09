@@ -147,6 +147,14 @@ export const forjaApi = {
     delete: (id) => request(`/api/purchases/${id}`, { method: 'DELETE' }),
   },
 
+  nutrition: {
+    profile: () => request('/api/nutrition/profile'),
+    day: (date) => {
+      const q = date ? `?date=${encodeURIComponent(date)}` : '';
+      return request(`/api/nutrition/day${q}`);
+    },
+  },
+
   // Habits
   habits: {
     list: (params = {}) => {

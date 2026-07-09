@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   Inbox,
+  UtensilsCrossed,
 } from 'lucide-react';
 
 /** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
@@ -27,6 +28,7 @@ export const secondaryNavItems = [
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
   { path: '/compras', label: 'Compras', icon: ShoppingBag },
+  { path: '/nutricao', label: 'Nutrição', icon: UtensilsCrossed },
   { path: '/capturas', label: 'Fila de capturas', icon: Inbox },
   { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
   { path: '/rituais', label: 'Rituais', icon: Link2, requiresActiveRituals: true },
