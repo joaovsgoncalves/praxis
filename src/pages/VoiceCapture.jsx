@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Mic, Square, Loader2, Check, X, Sparkles, Inbox, Upload, FileAudio } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   VOICE_CAPTURE_MAX_BYTES,
@@ -28,6 +28,7 @@ const PHASE_COPY = {
 };
 
 export default function VoiceCapture() {
+  const reduceMotion = useReducedMotion();
   const [searchParams, setSearchParams] = useSearchParams();
   const captureParam = searchParams.get('capture');
 
@@ -298,20 +299,33 @@ export default function VoiceCapture() {
         <CardContent className="py-12 flex flex-col items-center gap-6">
           <AnimatePresence mode="wait">
             {busy && phaseMeta ? (
-              <motion.div key={capturePhase} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4 text-center">
-                <PhaseIcon className={cn('w-12 h-12 text-primary', capturePhase !== 'loading_capture' && 'animate-pulse')} />
+              <motion.div
+                key={capturePhase}
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
+                transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+                className="flex flex-col items-center gap-4 text-center"
+              >
+                <PhaseIcon className={cn('w-12 h-12 text-primary', capturePhase !== 'loading_capture' && !reduceMotion && 'animate-pulse')} />
                 <div>
                   <p className="font-medium text-sm">{phaseMeta.title}</p>
                   <p className="text-muted-foreground text-xs mt-1">{phaseMeta.hint}</p>
                 </div>
               </motion.div>
             ) : capturePhase === 'recording' ? (
-              <motion.div key="recording" initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="flex flex-col items-center gap-4">
-                <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="w-24 h-24 rounded-full bg-destructive/20 flex items-center justify-center">
+              <motion.div
+                key="recording"
+                initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="flex flex-col items-center gap-4"
+              >
+                <div className={cn('w-24 h-24 rounded-full bg-destructive/20 flex items-center justify-center', !reduceMotion && 'praxis-opacity-pulse')}>
                   <div className="w-16 h-16 rounded-full bg-destructive/40 flex items-center justify-center">
                     <Mic className="w-8 h-8 text-destructive" />
                   </div>
-                </motion.div>
+                </div>
                 <p className="text-sm text-muted-foreground">Gravando — fale tarefas e hábitos em frases curtas</p>
                 <p className="text-xs tabular-nums text-muted-foreground">
                   {Math.floor(recordingElapsed / 1000)}s / {VOICE_CAPTURE_MAX_DURATION_MS / 1000}s
@@ -324,11 +338,17 @@ export default function VoiceCapture() {
                 </Button>
               </motion.div>
             ) : (
-              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
+              <motion.div
+                key="idle"
+                initial={reduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+                className="flex flex-col items-center gap-4"
+              >
                 <motion.button
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={reduceMotion ? undefined : { scale: 1.04 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.96 }}
                   onClick={startRecording}
                   disabled={busy}
                   className="praxis-touch-target w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center hover:bg-primary/30 transition-colors disabled:opacity-50"
@@ -379,7 +399,13 @@ export default function VoiceCapture() {
 
           <AnimatePresence>
             {items.map((item) => (
-              <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -50 }}>
+              <motion.div
+                  key={item.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
+                  transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+                >
                 <Card className={cn('bg-card border-border', item.confirmed && 'opacity-60')}>
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">

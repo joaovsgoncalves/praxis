@@ -41,7 +41,7 @@ export default function DayProgressBar({ habits = [], habitLogs = [], tasks = []
       </div>
       <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-700"
+          className="h-full rounded-full transition-[width] duration-200 ease-out"
           style={{
             width: `${pct}%`,
             background: pct >= 80

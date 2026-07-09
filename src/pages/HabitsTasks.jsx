@@ -673,7 +673,7 @@ export default function HabitsTasks() {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-secondary rail-inset">
                   <div
-                    className="h-full rounded-full transition-all duration-500"
+                    className="h-full rounded-full transition-[width] duration-200 ease-out"
                     style={{
                       width: `${habitsDayPct}%`,
                       background: 'linear-gradient(90deg, hsl(var(--domain-wellness)), hsl(var(--domain-ember)))',

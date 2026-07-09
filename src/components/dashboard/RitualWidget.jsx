@@ -66,7 +66,7 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
 
   return (
     <div className={cn(
-      'relative p-3 rounded-lg border transition-all',
+      'relative p-3 rounded-lg border transition-colors',
       isComplete
         ? 'bg-green-500/10 border-green-500/30'
         : isMinimum
@@ -135,7 +135,7 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
             <label
               htmlFor={`ritual-habit-${ritual.id}-${habit.id}`}
               className={cn(
-                'text-xs cursor-pointer transition-all select-none',
+                'text-xs cursor-pointer transition-colors select-none',
                 habit.completed_today
                   ? 'line-through text-muted-foreground'
                   : 'text-foreground/80 group-hover:text-foreground'

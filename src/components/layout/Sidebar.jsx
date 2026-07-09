@@ -114,7 +114,7 @@ export default function Sidebar({ open, onClose }) {
                 to={item.path}
                 onClick={onClose}
                 className={cn(
-                  'flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-all',
+                  'flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-colors',
                   isActive
                     ? 'bg-gold/90 text-sidebar-primary-foreground font-semibold'
                     : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',

@@ -122,9 +122,9 @@ export default function GamificationWidget() {
         <div className="flex items-center gap-5">
           <motion.div
             key={level}
-            initial={{ scale: 0.5, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
             className="text-6xl"
           >
             {emoji}

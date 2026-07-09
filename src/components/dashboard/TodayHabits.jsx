@@ -37,7 +37,7 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
         {habits.length > 0 && (
           <div className="h-1 bg-secondary rounded-full overflow-hidden mt-2 rail-inset">
             <div
-              className="h-full rounded-full transition-all duration-500"
+              className="h-full rounded-full transition-[width] duration-200 ease-out"
               style={{
                 width: `${Math.round((completedCount / habits.length) * 100)}%`,
                 background: 'linear-gradient(90deg, hsl(var(--domain-wellness)), hsl(var(--domain-ember)))',

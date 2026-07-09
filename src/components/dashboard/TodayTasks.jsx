@@ -97,11 +97,12 @@ export default function TodayTasks({
         {tasks.length > 0 && (
           <div className="h-1.5 bg-secondary rounded-full overflow-hidden mt-2 rail-inset">
             <motion.div
-              className="h-full rounded-full"
+              className="h-full w-full origin-left rounded-full"
               initial={false}
-              animate={{ width: `${donePct}%` }}
-              transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+              animate={{ scaleX: Math.max(0, Math.min(1, donePct / 100)) }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
               style={{
+                transformOrigin: 'left center',
                 background: 'linear-gradient(90deg, hsl(var(--domain-ember)), hsl(var(--domain-gold)))',
               }}
             />
@@ -247,8 +248,9 @@ export default function TodayTasks({
             <motion.div
               key={task.id}
               layout
-              initial={{ opacity: 0, scale: 0.92 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
               className="flex items-center gap-4 p-4 rounded-2xl bg-domain-wellness/10 border border-domain-wellness/25"
             >
               <Checkbox

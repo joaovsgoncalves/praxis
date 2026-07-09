@@ -206,17 +206,48 @@
 
   /* Sparkle keyframe used by habit complete micro-animation */
   @keyframes spark-burst {
-    0%   { transform: scale(0.4) translate(0, 0); opacity: 1; }
+    0%   { transform: scale(0.95) translate(0, 0); opacity: 1; }
     60%  { opacity: 1; }
     100% { transform: scale(1) translate(var(--sx, 0), var(--sy, 0)); opacity: 0; }
   }
-  .spark { animation: spark-burst 700ms ease-out forwards; }
+  .spark { animation: spark-burst 400ms ease-out forwards; }
 
   @keyframes ring-pulse {
     0%, 100% { opacity: 0.6; }
     50%      { opacity: 1; }
   }
   .ring-pulse { animation: ring-pulse 2.5s ease-in-out infinite; }
+
+  /* Recording / ambient pulse — opacity only (GPU-friendly, no scale thrash) */
+  @keyframes praxis-opacity-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+  .praxis-opacity-pulse {
+    animation: praxis-opacity-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* Emil motion P0 — honor reduced motion (keep color/opacity; kill loops & big moves) */
+  @media (prefers-reduced-motion: reduce) {
+    .spark {
+      animation: none;
+      opacity: 0;
+    }
+    .ring-pulse,
+    .praxis-opacity-pulse {
+      animation: none !important;
+      opacity: 1;
+    }
+    .animate-ping {
+      animation: none !important;
+    }
+    .animate-pulse {
+      animation: none !important;
+    }
+    .animate-spin {
+      animation-duration: 1.5s;
+    }
+  }
 
   /* Onda 12 — viewport estreito (~390px): CTAs e listas sem overflow horizontal */
   .praxis-scroll-x {

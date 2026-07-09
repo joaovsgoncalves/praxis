@@ -359,7 +359,7 @@ export default function Focus() {
                     type="button"
                     onClick={() => applyPreset(i)}
                     className={cn(
-                      'rounded-xl border p-4 text-left transition-all praxis-touch-target',
+                      'rounded-xl border p-4 text-left transition-colors praxis-touch-target',
                       selectedPreset === i
                         ? 'border-primary bg-primary/10'
                         : 'border-border bg-secondary/30 hover:bg-secondary/50',

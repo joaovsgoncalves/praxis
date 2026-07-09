@@ -15,7 +15,7 @@ function ScoreButton({ value, current, onClick, emoji }) {
   return (
     <button
       onClick={() => onClick(value)}
-      className={`flex-1 py-2 rounded-lg text-lg transition-all ${
+      className={`flex-1 py-2 rounded-lg text-lg transition-colors ${
         current === value
           ? 'bg-primary/20 ring-2 ring-primary scale-105'
           : 'bg-secondary/60 hover:bg-secondary'
@@ -175,7 +175,7 @@ export default function WellnessWidget({ todayCheck, onSave }) {
               <button
                 key={v}
                 onClick={() => setData(d => ({ ...d, productivity: v }))}
-                className={`flex-1 h-2 rounded-full transition-all ${
+                className={`flex-1 h-2 rounded-full transition-colors ${
                   v <= data.productivity ? 'bg-primary' : 'bg-secondary'
                 }`}
               />

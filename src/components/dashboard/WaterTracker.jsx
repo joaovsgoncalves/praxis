@@ -59,7 +59,7 @@ export default function WaterTracker({ amountMl = 0, onUpdate }) {
           aria-label="Progresso de água no dia"
         >
           <div
-            className="h-full rounded-full bg-blue-500/75 transition-all duration-300"
+            className="h-full rounded-full bg-blue-500/75 transition-[width] duration-200 ease-out"
             style={{ width: `${pct}%` }}
           />
         </div>

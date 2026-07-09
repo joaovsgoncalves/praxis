@@ -31,7 +31,7 @@ function AchievementCard({ achievement, index }) {
     >
       <Card
         className={cn(
-          'h-full transition-all duration-200',
+          'h-full transition-colors duration-200',
           unlocked
             ? 'bg-card border-gold/30 hover:border-gold/50 hover:shadow-lg hover:shadow-gold/10'
             : 'bg-card/50 border-border/50 opacity-60 grayscale hover:opacity-75'

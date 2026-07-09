@@ -51,10 +51,11 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
         {todayTotal > 0 && (
           <div className="h-1.5 bg-secondary/80 rounded-full overflow-hidden mt-3">
             <motion.div
-              className="h-full rounded-full bg-domain-gold"
+              className="h-full w-full origin-left rounded-full bg-domain-gold"
               initial={false}
-              animate={{ width: `${pct}%` }}
-              transition={{ type: 'spring', stiffness: 100, damping: 16 }}
+              animate={{ scaleX: Math.max(0, Math.min(1, pct / 100)) }}
+              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+              style={{ transformOrigin: 'left center' }}
             />
           </div>
         )}
@@ -76,7 +77,7 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
                 key={task.id}
                 layout
                 ref={(el) => { if (el) rowRefs.current.set(task.id, el); else rowRefs.current.delete(task.id); }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
                 whileTap={{ scale: 0.98 }}
                 className={cn(
                   'flex flex-col gap-2.5 p-3.5 rounded-xl border border-white/10',

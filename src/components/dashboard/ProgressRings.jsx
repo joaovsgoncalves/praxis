@@ -53,7 +53,7 @@ export default function ProgressRings({ habits = 0, tasks = 0, focus = 0, overal
                 strokeDasharray={c}
                 initial={{ strokeDashoffset: c }}
                 animate={{ strokeDashoffset: offset }}
-                transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
                 filter={`url(#glow-${r.key})`}
               />
             </g>

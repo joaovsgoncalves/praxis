@@ -31,7 +31,7 @@ export default function WeeklyProgress({ habits = [], habitLogs = [] }) {
                 <div className="w-full max-w-[32px] h-24 bg-secondary rounded-lg relative overflow-hidden">
                   <div
                     className={cn(
-                      "absolute bottom-0 w-full rounded-lg transition-all duration-500",
+                      "absolute bottom-0 w-full rounded-lg transition-[height] duration-200 ease-out",
                       rate > 80 ? "bg-accent" : rate > 50 ? "bg-primary" : rate > 0 ? "bg-chart-4" : "bg-transparent"
                     )}
                     style={{ height: `${rate}%` }}
