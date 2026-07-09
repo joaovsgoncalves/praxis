@@ -9,6 +9,7 @@ import TodayHabits from '@/components/dashboard/TodayHabits';
 import WellnessWidget from '@/components/dashboard/WellnessWidget';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import WaterTracker from '@/components/dashboard/WaterTracker';
+import NutritionTodayCard from '@/components/nutrition/NutritionTodayCard';
 import TodayCalendar from '@/components/dashboard/TodayCalendar';
 import RitualWidget from '@/components/dashboard/RitualWidget';
 import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
@@ -262,6 +263,7 @@ export default function Dashboard() {
           </Slot>
         </div>
         <div className="space-y-4">
+          <NutritionTodayCard />
           <Collapsible defaultOpen={false} className="rounded-2xl border border-white/5 bg-black/20">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-5 h-auto">

@@ -21,6 +21,7 @@ import {
   formatGrams,
   formatKcal,
 } from '@/lib/nutrition';
+import MacroBars from '@/components/nutrition/MacroBars';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -209,33 +210,32 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       ) : (
         <>
           <Card className="border-border/80 bg-card/40 shadow-none">
-            <CardContent className="px-4 py-3 space-y-1">
-              <p className="text-xs text-muted-foreground">Total do dia</p>
-              <p className="text-lg font-semibold tabular-nums">
-                {formatKcal(totals?.kcal)}
-                {targets?.kcal != null ? (
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {' '}
-                    / {formatKcal(targets.kcal)}
-                  </span>
-                ) : null}
-              </p>
-              <p className="text-sm text-muted-foreground tabular-nums">
-                P {formatGrams(totals?.protein_g)}
-                {targets?.protein_g != null ? ` / ${formatGrams(targets.protein_g)}` : ''}
-                {' · '}C {formatGrams(totals?.carbs_g)}
-                {targets?.carbs_g != null ? ` / ${formatGrams(targets.carbs_g)}` : ''}
-                {' · '}G {formatGrams(totals?.fat_g)}
-                {targets?.fat_g != null ? ` / ${formatGrams(targets.fat_g)}` : ''}
-              </p>
-              {remaining && remaining.kcal != null ? (
-                <p className="text-xs text-muted-foreground tabular-nums pt-0.5">
-                  Faltam {formatKcal(Math.max(0, remaining.kcal))}
-                  {remaining.protein_g != null
-                    ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
-                    : ''}
+            <CardContent className="px-4 py-3 space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Total do dia</p>
+                <p className="text-lg font-semibold tabular-nums">
+                  {formatKcal(totals?.kcal)}
+                  {targets?.kcal != null ? (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {' '}
+                      / {formatKcal(targets.kcal)}
+                    </span>
+                  ) : null}
                 </p>
-              ) : null}
+                {remaining && remaining.kcal != null ? (
+                  <p className="text-xs text-muted-foreground tabular-nums pt-0.5">
+                    Faltam {formatKcal(Math.max(0, remaining.kcal))}
+                    {remaining.protein_g != null
+                      ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
+                      : ''}
+                  </p>
+                ) : null}
+              </div>
+              <MacroBars
+                totals={totals || {}}
+                targets={targets || {}}
+                variant="full"
+              />
             </CardContent>
           </Card>
 
