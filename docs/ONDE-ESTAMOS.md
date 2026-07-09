@@ -9,7 +9,8 @@
 - **Fase 7 shipped:** seed BR (~63 alimentos) + onboarding de meta — commit `2b0de63`
 - **Fase 6:** refeições salvas
 - **Fase 5–0:** UX rápida, barras, diário, catálogo, meta, schema
-- Próximo opcional: texto/voz (8), histórico (9), peso (10)…
+- **Fase 8 voz/texto in-app Nutrição: cancelada** (João usa A.N.A. no Telegram/Web UI; ver PRD §3.1)
+- Próximo opcional: histórico (9), peso (10), polish (11)…
 - Docs: `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`
 
 ## Lote 9

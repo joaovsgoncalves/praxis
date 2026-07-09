@@ -15,7 +15,7 @@ João precisa **bater macros no dia a dia** (qualquer alimento ou refeição), d
 
 1. **rápida** (menos fricção que abrir app de nutrição separado);
 2. **visual** (barras claras de kcal + P/C/G);
-3. **dentro da Praxis** (mesmo login, mesmo “Hoje”, mesma voz/captura no futuro).
+3. **dentro da Praxis** (mesmo login, mesmo “Hoje”; captura por voz *no app Nutrição* **não** é prioridade — ver §3.1).
 
 A Praxis já tem hábitos quantitativos, água no Hoje, captura, revisão semanal e API SQLite. Nutrição entra como **módulo de ferramenta** (como Compras), com **resumo no Hoje**.
 
@@ -42,6 +42,19 @@ A Praxis já tem hábitos quantitativos, água no Hoje, captura, revisão semana
 7. **Ship por fase** — cada fase fecha com `prepush:check` + push + `ship:api` se API + `deploy:prod` + smoke do endpoint novo.
 8. **Feature flag** — `nutrition_enabled` em settings (default on pra João single-user; fácil desligar UI se regredir).
 
+### 3.1 Decisão de produto (2026-07-09) — voz na Nutrição
+
+**João:** áudio no Telegram / Web UI com a A.N.A. já cobre “falei o que comi”. Duplicar STT + parse de comida **dentro** do app Nutrição é fricção e escopo morto no uso real de single-user.
+
+| O quê | Status |
+|-------|--------|
+| **Fase 8** (parse-text + captura Praxis “comi X no almoço”) | **Cancelada por agora** — não implementar; não reabrir sem pedido explícito |
+| Captura por voz **geral** da Praxis (`/captura`, fila, tarefas) | **Intocada** — continua no app; não é Nutrição |
+| Comer por áudio no dia a dia | **Fora do app:** João → A.N.A. (Telegram/Web UI); no futuro pode virar handoff A.N.A. → API nutrition se fizer sentido |
+| Site multi-usuário / produto público | Reavaliar voz *in-app* só se o público não tiver o canal A.N.A. |
+
+Plano: **deixa parado no papel** (esta secção + linha fase 8 = cancelled). **Não** apagar módulo Nutrição 0–7 nem seed/diário.
+
 ---
 
 ## 4. Escopo
@@ -56,14 +69,14 @@ A Praxis já tem hábitos quantitativos, água no Hoje, captura, revisão semana
 - Log por: busca no catálogo, recente, favorito, quantidade × porção.
 - Totais do dia + barras % meta.
 - Histórico por dia + totais na revisão semanal (média P/C/G, dias com log).
-- Entrada rápida texto (fase depois): “150g frango 100g arroz”.
-- Seed BR enxuto (arroz, frango, ovo, whey, azeite, banana…) — dezenas, não milhões.
+- Seed BR enxuto (arroz, frango, ovo, whey, azeite, banana…) — dezenas, não milhões (fase 7).
 
 ### Out of scope (proposital v1–v1.5)
 
 - Scanner de código de barras (fase opcional no fim).
 - Open Food Facts online como dependência obrigatória.
 - Foto do prato → IA.
+- **Voz/STT in-app de Nutrição** e parse-text automático no app (fase 8 cancelada — §3.1).
 - Sync Garmin/Fitbit.
 - Micronutrientes completos (Cronometer).
 - Social / amigos / ranking.
@@ -236,7 +249,7 @@ Auth: igual ao resto (sessão cookie ou `FORJA_API_KEY`).
 | PATCH/DELETE | `/api/nutrition/logs/:id` | |
 | POST | `/api/nutrition/logs/from-meal` | expande meal → N logs |
 | GET | `/api/nutrition/summary?from=&to=` | agregados p/ revisão |
-| POST | `/api/nutrition/parse-text` | (fase 8) texto → candidatos |
+| POST | `/api/nutrition/parse-text` | **não fazer** (fase 8 cancelada) |
 
 **Cálculo servidor:** `scale = servings` (ou grams/serving_grams); macros = base × scale; arredondar 1 casa g / kcal inteiro na resposta UI.
 
@@ -293,7 +306,7 @@ Dashboard: card abaixo/acima da água (ordem a definir no design da fase 4 — d
 | **5** | UX rápida | Recentes, favoritos, stepper qtd, duplicar ontem (opcional), empty states bons | Fluxo ≤30 s alimento já existente |
 | **6** | Refeições salvas | Meals + from-meal + UI “salvar seleção como refeição” | 1 toque adiciona almoço cut inteiro |
 | **7** | Seed BR + onboarding | ~40–80 alimentos comuns PT-BR; wizard 1ª visita (peso + objetivo → meta) | Conta nova (ou flag reset) cai em setup; seed idempotente |
-| **8** | Texto / voz | `parse-text` heurístico + captura Praxis “comi X no almoço” (confirm sheet) | Áudio/texto vira candidatos; João confirma antes de gravar |
+| **8** | Texto / voz | ~~parse-text + captura Praxis comida~~ | **cancelled** 2026-07-09 — §3.1; canal = A.N.A. fora do app |
 | **9** | Histórico e revisão | Calendário simples / lista dias; bloco macros em `/revisao-semanal` | Semana mostra média kcal e P e dias logados |
 | **10** | Peso e tendência | Log de peso (tabela `body_weight_logs` ou wellness) + sparkline leve na Nutrição | Peso semanal visível; não vira app de antropometria |
 | **11** | Polish produto | Copy, motion leve, a11y barras, smoke E2E nutrition, checklist, nota de produto | `smoke` cobre day+log; doc `ONDA-NUTRICAO` ou fechamento no plano |
@@ -305,17 +318,17 @@ Dashboard: card abaixo/acima da água (ordem a definir no design da fase 4 — d
 0 → 1 → 2 → 3 → 4 → 5
               ↘ 6 (pode paralelizar após 3)
 4 → 7 (seed melhora 5)
-5 → 8
 3 → 9
 1 → 10 (peso)
 11 fecha qualidade
 12 só sob pedido
+8 cancelada (não depende de 5)
 ```
 
 **MVP usável de verdade:** fases **0–5** (idealmente + **6** refeições).  
-**MVP “bom visual diário”:** **0–6**.  
-**“Parecido com Macros free no dia a dia”:** **0–9**.  
-**Clone ambicioso:** +12.
+**MVP “bom visual diário”:** **0–6** (+ **7** seed).  
+**“Parecido com Macros free no dia a dia”:** **0–7** + **9** histórico (sem voz in-app).  
+**Clone ambicioso:** +10–12; **não** fase 8 sem reabrir §3.1.
 
 ---
 
@@ -364,7 +377,7 @@ Não são analytics SaaS — checklist do João:
 |--------|-----|
 | Hábitos quantitativos | **Não** reusar como diário de comida (modelo errado). Água pode continuar hábito/card. |
 | `wellness_checks` | Humor/sono; peso pode viver em tabela própria ou wellness estendido na fase 10. |
-| Captura voz / webhook | Fase 8: classificar intent comida → nutrition parse. |
+| Captura voz / webhook (Praxis geral) | Continua pro app (tarefas etc.). **Não** plugar em Nutrição por padrão (fase 8 cancelada). A.N.A. no Telegram pode, no futuro e sob pedido, chamar API de logs. |
 | Revisão semanal | Fase 9: seção macros no insight. |
 | Gamificação | Opcional depois: XP por “dia com proteína ≥ meta” — **não** no MVP. |
 | Compras | Padrão de módulo secondary nav + `api/*.js`. |
@@ -416,9 +429,9 @@ npm run deploy:prod
 
 | | |
 |---|---|
-| **Fases totais** | **12** (0–11 core+polish; 12 opcional barcode) |
-| **MVP diário bom** | **0–6** (fundação → refeições salvas + visual) |
-| **Esforço relativo** | Médio-alto (novo domínio de dados); padrão técnico já existe na Praxis |
-| **Próximo passo** | João: “arrocha fase 0” **ou** “arrocha MVP 0–5 ship B” **ou** ajuste de escopo |
+| **Fases totais** | 0–7 shipped; 8 **cancelled**; 9–11 opcionais; 12 barcode sob pedido |
+| **MVP diário bom** | **0–7** (fundação → seed + refeições + visual) |
+| **Voz Nutrição** | **Fora** — §3.1 (A.N.A. Telegram/Web UI) |
+| **Próximo passo** | “arrocha fase 9” (histórico) / 10 (peso) / 11 (polish) **ou** deixa quieto |
 
-**Não implementar até João disparar fase.**
+**Fases 0–7 já implementadas (2026-07).** Fase 8 não entra no roadmap ativo.
