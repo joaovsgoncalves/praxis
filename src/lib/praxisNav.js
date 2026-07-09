@@ -3,7 +3,6 @@ import {
   ListTodo,
   Mic,
   BookOpen,
-  LayoutGrid,
   Lightbulb,
   ShoppingBag,
   Timer,
@@ -15,16 +14,15 @@ import {
   Inbox,
 } from 'lucide-react';
 
-/** Menu principal fixo (5 itens) */
+/** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
 export const primaryNavItems = [
   { path: '/', label: 'Hoje', icon: LayoutDashboard, end: true },
   { path: '/habitos-tarefas', label: 'Tarefas', icon: ListTodo },
   { path: '/captura', label: 'Falar', icon: Mic },
   { path: '/revisao-semanal', label: 'Revisar', icon: BookOpen },
-  { path: '/mais', label: 'Mais', icon: LayoutGrid },
 ];
 
-/** Links secundários — página Mais + sidebar expandida */
+/** Ferramentas na aba lateral (sidebar / menu hambúrguer) — sem página hub */
 export const secondaryNavItems = [
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },

@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
-import { LayoutDashboard, ListTodo, Mic, BookOpen, LayoutGrid } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Mic, BookOpen, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const linkClass = ({ isActive }) =>
@@ -11,10 +11,9 @@ const linkClass = ({ isActive }) =>
     isActive ? 'text-primary' : 'text-muted-foreground',
   );
 
-export default function MobileBottomNav() {
+export default function MobileBottomNav({ onOpenMenu }) {
   const location = useLocation();
   const onCaptura = location.pathname === '/captura' || location.pathname === '/capturas';
-  const onMais = location.pathname === '/mais';
 
   const { data: pending } = useQuery({
     queryKey: ['captures', 'pending-count'],
@@ -77,14 +76,15 @@ export default function MobileBottomNav() {
           <span>Revisar</span>
         </NavLink>
 
-        <NavLink
-          to="/mais"
-          className={({ isActive }) => linkClass({ isActive: isActive || onMais })}
-          aria-label="Mais ferramentas"
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className={linkClass({ isActive: false })}
+          aria-label="Abrir menu — ferramentas na lateral"
         >
-          <LayoutGrid className="h-5 w-5 shrink-0" />
-          <span>Mais</span>
-        </NavLink>
+          <Menu className="h-5 w-5 shrink-0" aria-hidden />
+          <span>Menu</span>
+        </button>
       </div>
     </nav>
   );

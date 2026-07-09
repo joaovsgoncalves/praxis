@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -20,7 +20,6 @@ import CaptureInbox from '@/pages/CaptureInbox';
 import Achievements from '@/pages/Achievements';
 import WeeklyReview from '@/pages/WeeklyReview';
 import ShareCapture from '@/pages/ShareCapture';
-import Mais from '@/pages/Mais';
 import Login from '@/pages/Login';
 import { PraxisLoadingSplash, PraxisCenteredShell } from '@/components/layout/PraxisPage';
 import { Card, CardContent } from '@/components/ui/card';
@@ -88,7 +87,7 @@ const AuthenticatedApp = () => {
         <Route path="/capturas" element={<CaptureInbox />} />
         <Route path="/conquistas" element={<Achievements />} />
         <Route path="/revisao-semanal" element={<WeeklyReview />} />
-        <Route path="/mais" element={<Mais />} />
+        <Route path="/mais" element={<Navigate to="/" replace />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

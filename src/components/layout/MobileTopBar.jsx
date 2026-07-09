@@ -4,7 +4,6 @@ import { Menu } from 'lucide-react';
 
 const ROUTE_TITLES = [
   { prefix: '/habitos-tarefas', title: 'Tarefas' },
-  { prefix: '/mais', title: 'Mais' },
   { prefix: '/capturas', title: 'Revisar capturas' },
   { prefix: '/captura', title: 'Captura por voz' },
   { prefix: '/ideias', title: 'Ideias' },

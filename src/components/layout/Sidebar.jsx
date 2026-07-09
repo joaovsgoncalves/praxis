@@ -4,7 +4,7 @@ import { X, Sparkles } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
-import { primaryNavItems } from '@/lib/praxisNav';
+import { primaryNavItems, secondaryNavItems, filterSecondaryNav } from '@/lib/praxisNav';
 
 function AvatarRing({ progress, level }) {
   const size = 68;
@@ -74,13 +74,61 @@ function isNavActive(location, item) {
     return location.pathname === '/habitos-tarefas';
   }
   if (item.path === '/captura') {
-    return location.pathname === '/captura' || location.pathname === '/capturas';
+    return location.pathname === '/captura';
+  }
+  if (item.path === '/capturas') {
+    return location.pathname === '/capturas';
   }
   return location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
 }
 
+function NavLinkRow({ item, isActive, onClose, density = 'primary' }) {
+  return (
+    <Link
+      to={item.path}
+      onClick={onClose}
+      className={cn(
+        'flex items-center gap-3.5 rounded-xl font-medium transition-colors',
+        density === 'primary' ? 'px-3.5 py-3 text-[15px]' : 'px-3.5 py-2.5 text-[14px]',
+        isActive
+          ? 'bg-gold/90 text-sidebar-primary-foreground font-semibold'
+          : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+      )}
+    >
+      <item.icon className={cn('w-[18px] h-[18px] shrink-0', isActive ? 'text-sidebar-primary-foreground' : '')} />
+      {item.label}
+    </Link>
+  );
+}
+
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
+
+  const { data: goals = [] } = useQuery({
+    queryKey: ['allGoals'],
+    queryFn: () => forjaApi.goals.list(),
+    staleTime: 60_000,
+  });
+  const { data: rituals = [] } = useQuery({
+    queryKey: ['rituals', 'nav'],
+    queryFn: () => forjaApi.rituals.list({ status: 'active' }),
+    staleTime: 60_000,
+  });
+  const { data: gamificationNav } = useQuery({
+    queryKey: ['gamification'],
+    queryFn: () => forjaApi.gamification.get(),
+    staleTime: 120_000,
+  });
+
+  const activeGoalCount = goals.filter((g) => g.status === 'active').length;
+  const activeRitualCount = rituals.length;
+  const unlockedAchievementCount = (gamificationNav?.achievements || []).filter((a) => a.unlocked).length;
+
+  const secondary = filterSecondaryNav(secondaryNavItems, {
+    activeGoalCount,
+    activeRitualCount,
+    unlockedAchievementCount,
+  });
 
   return (
     <>
@@ -106,25 +154,34 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 space-y-1.5">
-          {primaryNavItems.map((item) => {
-            const isActive = isNavActive(location, item);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] font-medium transition-colors',
-                  isActive
-                    ? 'bg-gold/90 text-sidebar-primary-foreground font-semibold'
-                    : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                )}
-              >
-                <item.icon className={cn('w-[18px] h-[18px] shrink-0', isActive ? 'text-sidebar-primary-foreground' : '')} />
-                {item.label}
-              </Link>
-            );
-          })}
+          {primaryNavItems.map((item) => (
+            <NavLinkRow
+              key={item.path}
+              item={item}
+              isActive={isNavActive(location, item)}
+              onClose={onClose}
+              density="primary"
+            />
+          ))}
+
+          {secondary.length > 0 && (
+            <>
+              <div className="pt-4 pb-1.5 px-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/35">
+                  Ferramentas
+                </p>
+              </div>
+              {secondary.map((item) => (
+                <NavLinkRow
+                  key={item.path}
+                  item={item}
+                  isActive={isNavActive(location, item)}
+                  onClose={onClose}
+                  density="secondary"
+                />
+              ))}
+            </>
+          )}
         </nav>
 
         <SidebarGamificationBar />

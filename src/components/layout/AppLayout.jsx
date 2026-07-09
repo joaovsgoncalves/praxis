@@ -38,7 +38,7 @@ export default function AppLayout() {
         </main>
       </div>
 
-      {!isLogin && <MobileBottomNav />}
+      {!isLogin && <MobileBottomNav onOpenMenu={() => setSidebarOpen(true)} />}
     </div>
   );
 }
