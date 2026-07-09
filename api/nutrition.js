@@ -1378,3 +1378,135 @@ export function createLogsFromParsed(db, body = {}, { today } = {}) {
     day: buildDayPayload(db, String(date).slice(0, 10)),
   };
 }
+
+
+// ==================== summary / history (fase 9) ====================
+
+/**
+ * Agrega food_logs entre fromDate e toDate (inclusive).
+ * days_logged = dias com pelo menos 1 log.
+ */
+export function buildNutritionSummary(db, { from, to } = {}) {
+  if (!from || !to || !isValidDateString(from) || !isValidDateString(to)) {
+    const err = new Error('from e to obrigatórios (YYYY-MM-DD)');
+    err.status = 400;
+    throw err;
+  }
+  if (from > to) {
+    const err = new Error('from deve ser <= to');
+    err.status = 400;
+    throw err;
+  }
+
+  const logs = db
+    .prepare(
+      `
+    SELECT * FROM food_logs
+    WHERE date >= ? AND date <= ?
+    ORDER BY date ASC, created_at ASC
+  `,
+    )
+    .all(from, to);
+
+  const byDate = new Map();
+  for (const log of logs) {
+    if (!byDate.has(log.date)) byDate.set(log.date, []);
+    byDate.get(log.date).push(log);
+  }
+
+  const profile = getNutritionProfile(db);
+  const days = [];
+  // iterate all calendar days in range
+  const [ys, ms, ds] = from.split('-').map(Number);
+  const [ye, me, de] = to.split('-').map(Number);
+  let cur = new Date(ys, ms - 1, ds);
+  const end = new Date(ye, me - 1, de);
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    const key = `${y}-${m}-${d}`;
+    const dayLogs = byDate.get(key) || [];
+    const totals = sumTotals(dayLogs);
+    days.push({
+      date: key,
+      log_count: dayLogs.length,
+      totals,
+      has_log: dayLogs.length > 0,
+    });
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  const daysLogged = days.filter((d) => d.has_log);
+  const n = daysLogged.length;
+  const sum = { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 };
+  for (const d of daysLogged) {
+    sum.kcal += d.totals.kcal;
+    sum.protein_g += d.totals.protein_g;
+    sum.carbs_g += d.totals.carbs_g;
+    sum.fat_g += d.totals.fat_g;
+    sum.fiber_g += d.totals.fiber_g;
+  }
+  const avg = (v) => (n > 0 ? Math.round((v / n) * 10) / 10 : null);
+  const averages = {
+    kcal: n > 0 ? Math.round(sum.kcal / n) : null,
+    protein_g: avg(sum.protein_g),
+    carbs_g: avg(sum.carbs_g),
+    fat_g: avg(sum.fat_g),
+    fiber_g: avg(sum.fiber_g),
+  };
+
+  // top foods by name_snapshot frequency
+  const nameCount = {};
+  for (const log of logs) {
+    const name = log.name_snapshot || '—';
+    nameCount[name] = (nameCount[name] || 0) + 1;
+  }
+  const top_foods = Object.entries(nameCount)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  const targets = {
+    kcal: profile.target_kcal ?? null,
+    protein_g: profile.target_protein_g ?? null,
+    carbs_g: profile.target_carbs_g ?? null,
+    fat_g: profile.target_fat_g ?? null,
+  };
+
+  let days_hit_kcal = null;
+  let days_hit_protein = null;
+  if (targets.kcal != null || targets.protein_g != null) {
+    days_hit_kcal = 0;
+    days_hit_protein = 0;
+    for (const d of daysLogged) {
+      if (targets.kcal != null && d.totals.kcal >= targets.kcal * 0.9 && d.totals.kcal <= targets.kcal * 1.1) {
+        days_hit_kcal += 1;
+      }
+      if (targets.protein_g != null && d.totals.protein_g >= targets.protein_g * 0.9) {
+        days_hit_protein += 1;
+      }
+    }
+  }
+
+  return {
+    from,
+    to,
+    range_days: days.length,
+    days_logged: n,
+    log_count: logs.length,
+    totals_sum: {
+      kcal: Math.round(sum.kcal),
+      protein_g: Math.round(sum.protein_g * 10) / 10,
+      carbs_g: Math.round(sum.carbs_g * 10) / 10,
+      fat_g: Math.round(sum.fat_g * 10) / 10,
+      fiber_g: Math.round(sum.fiber_g * 10) / 10,
+    },
+    averages,
+    targets,
+    days_hit_kcal,
+    days_hit_protein,
+    top_foods,
+    days,
+  };
+}

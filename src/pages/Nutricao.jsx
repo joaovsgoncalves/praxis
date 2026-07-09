@@ -7,6 +7,7 @@ import NutritionOnboarding from '@/components/nutrition/NutritionOnboarding';
 import FoodCatalog from '@/components/nutrition/FoodCatalog';
 import MealsCatalog from '@/components/nutrition/MealsCatalog';
 import DayDiary from '@/components/nutrition/DayDiary';
+import NutritionHistory from '@/components/nutrition/NutritionHistory';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatKcal, GOAL_LABELS } from '@/lib/nutrition';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils';
 
 const TABS = [
   { id: 'diario', label: 'Diário' },
+  { id: 'historico', label: 'Histórico' },
   { id: 'alimentos', label: 'Alimentos' },
   { id: 'refeicoes', label: 'Refeições' },
   { id: 'meta', label: 'Meta' },
@@ -22,7 +24,6 @@ const TABS = [
 function needsOnboarding(profile) {
   if (!profile) return false;
   if (profile.onboarding_done === 1 || profile.onboarding_done === true) return false;
-  // sem meta de calorias = primeira configuração
   return profile.target_kcal == null;
 }
 
@@ -66,7 +67,7 @@ export default function Nutricao() {
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Diário, catálogo BR e refeições salvas pra logar em 1 toque."
+        description="Diário, histórico e refeições salvas."
       />
 
       {showOnboarding ? (
@@ -76,7 +77,7 @@ export default function Nutricao() {
         />
       ) : null}
 
-      {!showOnboarding && (hasTargets || (totals.kcal ?? 0) > 0) && (
+      {!showOnboarding && (hasTargets || (totals.kcal ?? 0) > 0) && tab !== 'historico' && (
         <Card className="border-border/80 bg-card/40 shadow-none">
           <CardContent className="px-5 py-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -109,7 +110,7 @@ export default function Nutricao() {
                 type="button"
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'flex-1 min-w-[4.5rem] rounded-full px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap',
+                  'flex-1 min-w-[4.2rem] rounded-full px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap',
                   tab === t.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -122,6 +123,13 @@ export default function Nutricao() {
 
           {tab === 'diario' ? (
             <DayDiary date={diaryDate || undefined} onDateChange={setDiaryDate} />
+          ) : tab === 'historico' ? (
+            <NutritionHistory
+              onOpenDay={(d) => {
+                setDiaryDate(d);
+                setTab('diario');
+              }}
+            />
           ) : tab === 'alimentos' ? (
             <FoodCatalog />
           ) : tab === 'refeicoes' ? (

@@ -60,6 +60,7 @@ import {
   createLogsFromMeal,
   parseNutritionText,
   createLogsFromParsed,
+  buildNutritionSummary,
 } from './nutrition.js';
 
 // Category constants
@@ -586,6 +587,28 @@ app.get('/api/nutrition/day', (req, res) => {
     return res.status(400).json({ error: 'data inválida (use YYYY-MM-DD)' });
   }
   res.json(buildDayPayload(db, raw));
+});
+
+// summary / history (fase 9)
+app.get('/api/nutrition/summary', (req, res) => {
+  try {
+    let from = req.query.from != null ? String(req.query.from).trim().slice(0, 10) : '';
+    let to = req.query.to != null ? String(req.query.to).trim().slice(0, 10) : '';
+    // default: últimos 14 dias incluindo hoje
+    if (!from || !to) {
+      to = getLocalDateString();
+      const parts = to.split('-').map(Number);
+      const dt = new Date(parts[0], parts[1] - 1, parts[2] - 13);
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      const d = String(dt.getDate()).padStart(2, '0');
+      from = `${y}-${m}-${d}`;
+    }
+    res.json(buildNutritionSummary(db, { from, to }));
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'summary falhou' });
+  }
 });
 
 // foods catalog (fase 2)

@@ -4,7 +4,8 @@ import { forjaApi } from '@/api/forjaClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2, ListChecks } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2, ListChecks, UtensilsCrossed } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -52,6 +53,24 @@ export default function WeeklyReview() {
     queryKey: ['weeklyInsights', weekStart],
     queryFn: () => forjaApi.insights.weekly(weekStart),
   });
+
+  // fallback se insights antigo não trouxer nutrition (API desatualizada)
+  const { data: nutritionSummary } = useQuery({
+    queryKey: ['nutrition', 'summary', weekStart, weekEnd],
+    queryFn: () => forjaApi.nutrition.summary({ from: weekStart, to: weekEnd }),
+    enabled: !autoLoading && !!weekStart && !auto?.nutrition,
+    retry: 1,
+  });
+  const nutrition = auto?.nutrition || (nutritionSummary
+    ? {
+        days_logged: nutritionSummary.days_logged,
+        log_count: nutritionSummary.log_count,
+        averages: nutritionSummary.averages,
+        targets: nutritionSummary.targets,
+        days_hit_protein: nutritionSummary.days_hit_protein,
+        top_foods: nutritionSummary.top_foods?.slice(0, 5) || [],
+      }
+    : null);
 
   const { data: history = [] } = useQuery({
     queryKey: ['weeklyReviewHistory'],
@@ -203,6 +222,47 @@ export default function WeeklyReview() {
                   <p className="text-muted-foreground">
                     {auto.ideas?.new_captures ?? 0} nova(s) · {auto.ideas?.promissoras_count ?? 0} promissora(s) no banco
                   </p>
+                </InsightBlock>
+                <InsightBlock title="Macros (nutrição)">
+                  {nutrition && nutrition.days_logged > 0 ? (
+                    <div className="space-y-1 text-muted-foreground">
+                      <p>
+                        {nutrition.days_logged} dia(s) com log · média{' '}
+                        <span className="text-foreground tabular-nums">
+                          {Math.round(nutrition.averages?.kcal ?? 0).toLocaleString('pt-BR')} kcal
+                        </span>
+                        {nutrition.targets?.kcal != null
+                          ? ` (meta ${Math.round(nutrition.targets.kcal).toLocaleString('pt-BR')})`
+                          : ''}
+                      </p>
+                      <p className="tabular-nums text-xs">
+                        P {nutrition.averages?.protein_g ?? '—'}g · C {nutrition.averages?.carbs_g ?? '—'}g · G{' '}
+                        {nutrition.averages?.fat_g ?? '—'}g
+                        {nutrition.days_hit_protein != null
+                          ? ` · proteína ok em ${nutrition.days_hit_protein}d`
+                          : ''}
+                      </p>
+                      {nutrition.top_foods?.length > 0 ? (
+                        <p className="text-xs">
+                          Top: {nutrition.top_foods.map((f) => f.name).slice(0, 3).join(', ')}
+                        </p>
+                      ) : null}
+                      <Link
+                        to="/nutricao"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline pt-1"
+                      >
+                        <UtensilsCrossed className="h-3 w-3" />
+                        Abrir Nutrição
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Sem refeições logadas nesta semana.{' '}
+                      <Link to="/nutricao" className="text-primary hover:underline">
+                        Registrar
+                      </Link>
+                    </p>
+                  )}
                 </InsightBlock>
               </div>
 
