@@ -4,17 +4,20 @@ import { forjaApi } from '@/api/forjaClient';
 import { PageHero, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import NutritionMetaForm from '@/components/nutrition/NutritionMetaForm';
 import FoodCatalog from '@/components/nutrition/FoodCatalog';
+import DayDiary from '@/components/nutrition/DayDiary';
 import { formatKcal, formatGrams, GOAL_LABELS } from '@/lib/nutrition';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 const TABS = [
+  { id: 'diario', label: 'Diário' },
   { id: 'alimentos', label: 'Alimentos' },
   { id: 'meta', label: 'Meta' },
 ];
 
 export default function Nutricao() {
-  const [tab, setTab] = useState('alimentos');
+  const [tab, setTab] = useState('diario');
+  const [diaryDate, setDiaryDate] = useState(null);
 
   const {
     data: profile,
@@ -26,39 +29,41 @@ export default function Nutricao() {
     retry: 1,
   });
 
+  const dayKey = diaryDate || undefined;
   const { data: day } = useQuery({
-    queryKey: ['nutrition', 'day'],
-    queryFn: () => forjaApi.nutrition.day(),
+    queryKey: ['nutrition', 'day', dayKey || 'today'],
+    queryFn: () => forjaApi.nutrition.day(dayKey),
     retry: 1,
   });
 
   const goalLabel = GOAL_LABELS[profile?.goal] || 'Manter';
   const hasTargets = profile?.target_kcal != null;
+  const totals = day?.totals;
 
   return (
     <div className="praxis-page space-y-6 pb-24 max-w-xl">
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Catálogo de alimentos e meta do dia. Log de refeições na próxima fase."
+        description="Registre o que comeu e acompanhe a meta do dia."
       />
 
       {hasTargets && (
         <Card className="border-border/80 bg-card/40 shadow-none">
           <CardContent className="px-5 py-4 space-y-1">
-            <p className="text-xs text-muted-foreground">Meta de hoje · {goalLabel}</p>
+            <p className="text-xs text-muted-foreground">Meta · {goalLabel}</p>
             <p className="text-lg font-semibold tabular-nums tracking-tight">
-              {formatKcal(profile.target_kcal)}
+              {formatKcal(totals?.kcal ?? 0)}
+              <span className="text-sm font-normal text-muted-foreground">
+                {' '}
+                / {formatKcal(profile.target_kcal)}
+              </span>
             </p>
             <p className="text-sm text-muted-foreground tabular-nums">
-              P {formatGrams(profile.target_protein_g)} · C {formatGrams(profile.target_carbs_g)} · G{' '}
-              {formatGrams(profile.target_fat_g)}
+              P {formatGrams(totals?.protein_g)} / {formatGrams(profile.target_protein_g)}
+              {' · '}C {formatGrams(totals?.carbs_g)} / {formatGrams(profile.target_carbs_g)}
+              {' · '}G {formatGrams(totals?.fat_g)} / {formatGrams(profile.target_fat_g)}
             </p>
-            {day?.totals ? (
-              <p className="text-xs text-muted-foreground/90 pt-1 tabular-nums">
-                Registrado hoje: {formatKcal(day.totals.kcal)} (diário em breve)
-              </p>
-            ) : null}
           </CardContent>
         </Card>
       )}
@@ -70,7 +75,7 @@ export default function Nutricao() {
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              'flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors',
+              'flex-1 rounded-full px-2 py-2 text-sm font-medium transition-colors',
               tab === t.id
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
@@ -81,7 +86,9 @@ export default function Nutricao() {
         ))}
       </div>
 
-      {tab === 'alimentos' ? (
+      {tab === 'diario' ? (
+        <DayDiary date={diaryDate || undefined} onDateChange={setDiaryDate} />
+      ) : tab === 'alimentos' ? (
         <FoodCatalog />
       ) : loadingProfile ? (
         <p className="text-sm text-muted-foreground">Carregando perfil…</p>

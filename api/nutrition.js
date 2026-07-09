@@ -493,6 +493,253 @@ export function listLogsByDate(db, date) {
     .all(date);
 }
 
+export function getLog(db, id) {
+  return db.prepare('SELECT * FROM food_logs WHERE id = ?').get(id) || null;
+}
+
+function logNum(v, fallback = 0) {
+  if (v === undefined || v === null || v === '') return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function logNumOrNull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
+/**
+ * Scale food macros into a log snapshot.
+ * grams + serving_grams → scale; senão servings (default 1).
+ */
+export function scaleFoodToSnapshot(food, { servings, grams } = {}) {
+  if (!food) {
+    const err = new Error('alimento não encontrado');
+    err.status = 404;
+    throw err;
+  }
+  let scale = 1;
+  const g = logNumOrNull(grams);
+  const s = logNumOrNull(servings);
+  if (g != null && g > 0 && food.serving_grams != null && Number(food.serving_grams) > 0) {
+    scale = g / Number(food.serving_grams);
+  } else if (s != null && s > 0) {
+    scale = s;
+  } else if (s === 0 || g === 0) {
+    scale = 0;
+  }
+
+  const servingsOut =
+    s != null
+      ? s
+      : g != null && food.serving_grams && Number(food.serving_grams) > 0
+        ? g / Number(food.serving_grams)
+        : 1;
+
+  return {
+    name_snapshot: food.name + (food.brand ? ` (${food.brand})` : ''),
+    food_item_id: food.id,
+    servings: servingsOut,
+    grams: g,
+    kcal: Math.round(logNum(food.kcal) * scale),
+    protein_g: round1(logNum(food.protein_g) * scale),
+    carbs_g: round1(logNum(food.carbs_g) * scale),
+    fat_g: round1(logNum(food.fat_g) * scale),
+    fiber_g: round1(logNum(food.fiber_g) * scale),
+  };
+}
+
+export function createLog(db, body = {}, { today } = {}) {
+  const date = body.date || today;
+  if (!date || !isValidDateString(String(date).slice(0, 10))) {
+    const err = new Error('data inválida (use YYYY-MM-DD)');
+    err.status = 400;
+    throw err;
+  }
+  const dateStr = String(date).slice(0, 10);
+  const meal_slot = MEAL_SLOTS.includes(body.meal_slot) ? body.meal_slot : 'other';
+
+  let snapshot;
+  if (body.food_item_id) {
+    const food = getFood(db, body.food_item_id);
+    snapshot = scaleFoodToSnapshot(food, {
+      servings: body.servings,
+      grams: body.grams,
+    });
+  } else {
+    const name = String(body.name_snapshot || body.name || '').trim();
+    if (!name) {
+      const err = new Error('food_item_id ou nome é obrigatório');
+      err.status = 400;
+      throw err;
+    }
+    snapshot = {
+      name_snapshot: name,
+      food_item_id: null,
+      servings: logNum(body.servings, 1),
+      grams: logNumOrNull(body.grams),
+      kcal: Math.round(logNum(body.kcal, 0)),
+      protein_g: round1(logNum(body.protein_g, 0)),
+      carbs_g: round1(logNum(body.carbs_g, 0)),
+      fat_g: round1(logNum(body.fat_g, 0)),
+      fiber_g: round1(logNum(body.fiber_g, 0)),
+    };
+  }
+
+  const id = body.id || randomUUID();
+  db.prepare(`
+    INSERT INTO food_logs (
+      id, date, meal_slot, food_item_id, meal_id, name_snapshot,
+      servings, grams, kcal, protein_g, carbs_g, fat_g, fiber_g, note, source
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    dateStr,
+    meal_slot,
+    snapshot.food_item_id,
+    body.meal_id || null,
+    snapshot.name_snapshot,
+    snapshot.servings,
+    snapshot.grams,
+    snapshot.kcal,
+    snapshot.protein_g,
+    snapshot.carbs_g,
+    snapshot.fat_g,
+    snapshot.fiber_g,
+    String(body.note || ''),
+    body.source || 'manual',
+  );
+  return getLog(db, id);
+}
+
+export function updateLog(db, id, body = {}) {
+  const existing = getLog(db, id);
+  if (!existing) return null;
+
+  const foodId =
+    body.food_item_id !== undefined ? body.food_item_id : existing.food_item_id;
+  const servings =
+    body.servings !== undefined ? body.servings : existing.servings;
+  const grams = body.grams !== undefined ? body.grams : existing.grams;
+  const rescale =
+    body.servings !== undefined ||
+    body.grams !== undefined ||
+    body.food_item_id !== undefined;
+
+  let next = {
+    date:
+      body.date !== undefined
+        ? String(body.date).slice(0, 10)
+        : existing.date,
+    meal_slot:
+      body.meal_slot !== undefined && MEAL_SLOTS.includes(body.meal_slot)
+        ? body.meal_slot
+        : existing.meal_slot,
+    food_item_id: foodId || null,
+    meal_id: body.meal_id !== undefined ? body.meal_id : existing.meal_id,
+    name_snapshot: existing.name_snapshot,
+    servings: existing.servings,
+    grams: existing.grams,
+    kcal: existing.kcal,
+    protein_g: existing.protein_g,
+    carbs_g: existing.carbs_g,
+    fat_g: existing.fat_g,
+    fiber_g: existing.fiber_g,
+    note: body.note !== undefined ? String(body.note) : existing.note,
+  };
+
+  if (body.date !== undefined && !isValidDateString(next.date)) {
+    const err = new Error('data inválida (use YYYY-MM-DD)');
+    err.status = 400;
+    throw err;
+  }
+
+  if (rescale && foodId) {
+    const food = getFood(db, foodId);
+    const snap = scaleFoodToSnapshot(food, { servings, grams });
+    next = { ...next, ...snap, food_item_id: foodId };
+  } else if (rescale && !foodId) {
+    const oldS = Number(existing.servings) || 1;
+    const newS = logNum(servings, oldS);
+    const ratio = oldS > 0 ? newS / oldS : 1;
+    next.servings = newS;
+    next.grams = logNumOrNull(grams);
+    if (body.kcal !== undefined || body.protein_g !== undefined) {
+      next.kcal = Math.round(logNum(body.kcal, existing.kcal));
+      next.protein_g = round1(logNum(body.protein_g, existing.protein_g));
+      next.carbs_g = round1(logNum(body.carbs_g, existing.carbs_g));
+      next.fat_g = round1(logNum(body.fat_g, existing.fat_g));
+      next.fiber_g = round1(logNum(body.fiber_g, existing.fiber_g));
+    } else {
+      next.kcal = Math.round(logNum(existing.kcal) * ratio);
+      next.protein_g = round1(logNum(existing.protein_g) * ratio);
+      next.carbs_g = round1(logNum(existing.carbs_g) * ratio);
+      next.fat_g = round1(logNum(existing.fat_g) * ratio);
+      next.fiber_g = round1(logNum(existing.fiber_g) * ratio);
+    }
+    if (body.name_snapshot !== undefined || body.name !== undefined) {
+      next.name_snapshot = String(
+        body.name_snapshot || body.name || existing.name_snapshot,
+      ).trim();
+    }
+  } else {
+    if (body.name_snapshot !== undefined || body.name !== undefined) {
+      next.name_snapshot = String(
+        body.name_snapshot || body.name || existing.name_snapshot,
+      ).trim();
+    }
+    if (body.kcal !== undefined) next.kcal = Math.round(logNum(body.kcal));
+    if (body.protein_g !== undefined) next.protein_g = round1(logNum(body.protein_g));
+    if (body.carbs_g !== undefined) next.carbs_g = round1(logNum(body.carbs_g));
+    if (body.fat_g !== undefined) next.fat_g = round1(logNum(body.fat_g));
+    if (body.fiber_g !== undefined) next.fiber_g = round1(logNum(body.fiber_g));
+  }
+
+  db.prepare(`
+    UPDATE food_logs SET
+      date = ?,
+      meal_slot = ?,
+      food_item_id = ?,
+      meal_id = ?,
+      name_snapshot = ?,
+      servings = ?,
+      grams = ?,
+      kcal = ?,
+      protein_g = ?,
+      carbs_g = ?,
+      fat_g = ?,
+      fiber_g = ?,
+      note = ?
+    WHERE id = ?
+  `).run(
+    next.date,
+    next.meal_slot,
+    next.food_item_id,
+    next.meal_id,
+    next.name_snapshot,
+    next.servings,
+    next.grams,
+    next.kcal,
+    next.protein_g,
+    next.carbs_g,
+    next.fat_g,
+    next.fiber_g,
+    next.note,
+    id,
+  );
+  return getLog(db, id);
+}
+
+export function deleteLog(db, id) {
+  const r = db.prepare('DELETE FROM food_logs WHERE id = ?').run(id);
+  return r.changes > 0;
+}
+
 export function sumTotals(logs = []) {
   const totals = {
     kcal: 0,

@@ -46,6 +46,9 @@ import {
   createFood,
   updateFood,
   deleteFood,
+  createLog,
+  updateLog,
+  deleteLog,
 } from './nutrition.js';
 
 // Category constants
@@ -533,7 +536,7 @@ app.delete('/api/purchases/:id', (req, res) => {
   res.status(204).end();
 });
 
-// ==================== NUTRIÇÃO (macros — fase 0–1) ====================
+// ==================== NUTRIÇÃO (macros — fase 0–3) ====================
 app.get('/api/nutrition/profile', (req, res) => {
   res.json(getNutritionProfile(db));
 });
@@ -611,6 +614,35 @@ app.delete('/api/nutrition/foods/:id', (req, res) => {
   const hard = req.query.hard === '1' || req.query.hard === 'true';
   if (!deleteFood(db, req.params.id, { hard })) {
     return res.status(404).json({ error: 'alimento não encontrado' });
+  }
+  res.status(204).end();
+});
+
+// food logs (fase 3)
+app.post('/api/nutrition/logs', (req, res) => {
+  try {
+    const row = createLog(db, req.body || {}, { today: getLocalDateString() });
+    res.status(201).json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra registrar' });
+  }
+});
+
+app.patch('/api/nutrition/logs/:id', (req, res) => {
+  try {
+    const row = updateLog(db, req.params.id, req.body || {});
+    if (!row) return res.status(404).json({ error: 'registro não encontrado' });
+    res.json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra atualizar' });
+  }
+});
+
+app.delete('/api/nutrition/logs/:id', (req, res) => {
+  if (!deleteLog(db, req.params.id)) {
+    return res.status(404).json({ error: 'registro não encontrado' });
   }
   res.status(204).end();
 });

@@ -178,6 +178,13 @@ export const forjaApi = {
       delete: (id, { hard = false } = {}) =>
         request(`/api/nutrition/foods/${id}${hard ? '?hard=1' : ''}`, { method: 'DELETE' }),
     },
+    logs: {
+      create: (data) =>
+        request('/api/nutrition/logs', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/nutrition/logs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/api/nutrition/logs/${id}`, { method: 'DELETE' }),
+    },
   },
 
   // Habits
