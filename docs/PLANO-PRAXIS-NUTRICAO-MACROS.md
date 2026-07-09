@@ -309,7 +309,7 @@ Dashboard: card abaixo/acima da água (ordem a definir no design da fase 4 — d
 | **9** | Histórico e revisão | Calendário simples / lista dias; bloco macros em `/revisao-semanal` | **done** 2026-07-09 — summary API + aba Histórico + weekly insights |
 | **10** | Peso e tendência | Log de peso (`body_weight_logs`) + sparkline leve na Nutrição | **done** 2026-07-09 |
 | **11** | Polish produto | Copy, a11y barras, smoke nutrition, nota de produto | **done** — `PRAXIS-NUTRICAO-FECHAMENTO.md` + `smoke-praxis-nutrition.sh` |
-| **12** | Opcional barcode | Integração OFF **opt-in** (rede); cache local do produto | Só se João pedir depois de usar 2+ semanas o core |
+| **12** | Opcional barcode | Integração OFF **opt-in** (rede); cache local do produto | **done** 2026-07-09 — colar EAN; câmera nativa depois |
 
 ### Dependências entre fases
 
@@ -428,9 +428,9 @@ npm run deploy:prod
 
 | | |
 |---|---|
-| **Fases totais** | **0–11 shipped**; 12 barcode sob pedido |
-| **MVP diário bom** | **0–11** fechado |
+| **Fases totais** | **0–12 shipped** (barcode OFF) |
+| **MVP diário bom** | **0–12** |
 | **Fechamento** | `docs/PRAXIS-NUTRICAO-FECHAMENTO.md` |
-| **Próximo passo** | usar no dia a dia · barcode só se pedir |
+| **Próximo passo** | usar · câmera nativa opcional se pedir |
 
-**Fases 0–11 implementadas (2026-07).**
+**Fases 0–12 implementadas (2026-07).**

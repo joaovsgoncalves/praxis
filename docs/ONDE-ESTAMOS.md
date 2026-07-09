@@ -1,15 +1,14 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição 0–11 fechada**
+**Atualizado:** 2026-07-09 · **URL:** https://praxis-jota.vercel.app · **Nutrição 0–12 (barcode)**
 
 ---
 
 ## Novo (jul/2026) — Nutrição (macros)
 
-- **Fases 10–11 shipped:** peso + sparkline + polish/smoke — commit `b3f0b98`
-- **0–9:** meta → diário → histórico → texto/parse → seed/refeições
+- **Fase 12 shipped:** barcode + Open Food Facts (cache local) — commit `2f7f91f`
+- **0–11:** diário, peso, histórico, seed, refeições, polish
 - Fechamento: `docs/PRAXIS-NUTRICAO-FECHAMENTO.md`
-- Fase 12 barcode só sob pedido
 - Docs: `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`
 
 ## Lote 9

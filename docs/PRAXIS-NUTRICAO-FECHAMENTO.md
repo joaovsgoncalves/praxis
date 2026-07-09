@@ -1,4 +1,4 @@
-# Praxis Nutrição — fechamento (fases 0–11)
+# Praxis Nutrição — fechamento (fases 0–12)
 
 **Data:** 2026-07-09  
 **PRD:** `docs/PLANO-PRAXIS-NUTRICAO-MACROS.md`  
@@ -20,7 +20,7 @@
 | 9 | Histórico + macros na revisão | done |
 | **10** | **Peso + sparkline** | **done** |
 | **11** | **Polish + smoke + nota** | **done** |
-| 12 | Barcode OFF | só sob pedido |
+| **12** | **Barcode + Open Food Facts** | **done** |
 
 ## Onde fica no produto
 
@@ -51,7 +51,7 @@ npm run smoke:prod   # inclui nutrition se logado
 
 ## Fora de escopo (proposital)
 
-- Barcode / Open Food Facts (fase 12)
+- Câmera nativa in-app (barcode ainda é colar código; OFF done)
 - STT microfone *dentro* da Nutrição (canal A.N.A. Telegram/Web UI)
 - Cronometer / micros / wearables
 - Foto-IA do prato
@@ -62,3 +62,11 @@ npm run smoke:prod   # inclui nutrition se logado
 - Tabs com `role=tablist` / `aria-selected`
 - Copy humana, sem jargão de lab
 - Um peso por dia; sincroniza `nutrition_profile.weight_kg` com o log mais recente
+
+## Barcode (fase 12)
+
+- `GET /api/nutrition/barcode/:code` — cache local → Open Food Facts
+- `POST /api/nutrition/barcode/lookup` — body `{ code, refresh? }`
+- Coluna `food_items.barcode`; ids estáveis `off_<ean>`
+- UI: botão **Código** no diário (colar EAN; sem câmera nativa ainda)
+- User-Agent: `PraxisNutrition/1.0 …` (política OFF)
