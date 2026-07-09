@@ -58,6 +58,8 @@ import {
   updateMeal,
   deleteMeal,
   createLogsFromMeal,
+  parseNutritionText,
+  createLogsFromParsed,
 } from './nutrition.js';
 
 // Category constants
@@ -690,6 +692,44 @@ app.post('/api/nutrition/logs/from-meal', (req, res) => {
   } catch (err) {
     const code = err?.status || 400;
     res.status(code).json({ error: err?.message || 'não deu pra adicionar a refeição' });
+  }
+});
+
+// parse-text (fase 8) — base p/ transcript/A.N.A./UI texto
+app.post('/api/nutrition/parse-text', (req, res) => {
+  try {
+    const result = parseNutritionText(db, req.body || {});
+    res.json(result);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra interpretar o texto' });
+  }
+});
+
+app.post('/api/nutrition/logs/from-text', (req, res) => {
+  try {
+    const body = req.body || {};
+    // optional: parse then confirm in one call if confirm:true + text
+    if (body.text && body.confirm === true && !Array.isArray(body.items)) {
+      const parsed = parseNutritionText(db, body);
+      const items = parsed.candidates.map((c) => ({
+        food_item_id: c.food_item_id,
+        servings: c.servings,
+        grams: c.grams,
+        meal_slot: c.meal_slot,
+      }));
+      const result = createLogsFromParsed(
+        db,
+        { ...body, items, source: body.source || 'text' },
+        { today: getLocalDateString() },
+      );
+      return res.status(201).json({ parsed, ...result });
+    }
+    const result = createLogsFromParsed(db, body, { today: getLocalDateString() });
+    res.status(201).json(result);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra gravar do texto' });
   }
 });
 

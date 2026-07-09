@@ -212,7 +212,17 @@ export const forjaApi = {
           method: 'POST',
           body: JSON.stringify(data),
         }),
+      fromText: (data) =>
+        request('/api/nutrition/logs/from-text', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
     },
+    parseText: (data) =>
+      request('/api/nutrition/parse-text', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     copyDay: (data = {}) =>
       request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
     seed: () => request('/api/nutrition/seed', { method: 'POST', body: '{}' }),

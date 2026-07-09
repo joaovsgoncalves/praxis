@@ -1152,3 +1152,229 @@ export function createLogsFromMeal(db, body = {}, { today } = {}) {
 export function ensureNutritionSeed(db) {
   return seedBrazilianFoods(db);
 }
+
+
+// ==================== parse-text (fase 8 — base p/ futuro) ====================
+
+const SLOT_HINTS = [
+  { slot: 'breakfast', re: /\b(caf[eé]|manh[aã]|breakfast)\b/i },
+  { slot: 'lunch', re: /\b(almo[cç]o|almocei|lunch)\b/i },
+  { slot: 'snack', re: /\b(lanche|lanchei|snack)\b/i },
+  { slot: 'dinner', re: /\b(jantar|jantei|dinner|ceia)\b/i },
+];
+
+function normalizeForMatch(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function detectMealSlot(text) {
+  for (const h of SLOT_HINTS) {
+    if (h.re.test(text)) return h.slot;
+  }
+  return null;
+}
+
+function tokenizeFoodPhrases(text) {
+  // split on e/, comma, plus, "com", newlines
+  let t = String(text || '');
+  t = t.replace(/\b(comi|tomei|almocei|jantei|lanhei|bebi)\b/gi, ' ');
+  const parts = t
+    .split(/\s*(?:,|\+|\/|\be\b|\bcom\b|\n|;)\s*/i)
+    .map((p) => p.trim())
+    .filter((p) => p.length >= 2);
+  return parts.length ? parts : [String(text || '').trim()].filter(Boolean);
+}
+
+/**
+ * Parse qty from phrase: "150g frango", "2 ovos", "1 colher azeite", "frango 100g"
+ * returns { grams?, servings?, rest }
+ */
+function extractQty(phrase) {
+  const p = String(phrase).trim();
+  let grams = null;
+  let servings = null;
+  let rest = p;
+
+  const g1 = p.match(/^(\d+(?:[.,]\d+)?)\s*(g|gr|gramas?)\b\s*(.+)$/i);
+  if (g1) {
+    grams = Number(g1[1].replace(',', '.'));
+    rest = g1[3].trim();
+    return { grams, servings, rest };
+  }
+  const g2 = p.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(g|gr|gramas?)\b\s*$/i);
+  if (g2) {
+    grams = Number(g2[2].replace(',', '.'));
+    rest = g2[1].trim();
+    return { grams, servings, rest };
+  }
+  const u1 = p.match(/^(\d+(?:[.,]\d+)?)\s*(un|unid|unidades?|x|por[cç][oõ]es?|scoops?|colheres?)?\s+(.+)$/i);
+  if (u1 && !/^(g|gr)/i.test(u1[2] || '')) {
+    servings = Number(u1[1].replace(',', '.'));
+    rest = u1[3].trim();
+    return { grams, servings, rest };
+  }
+  const u2 = p.match(/^(\d+(?:[.,]\d+)?)\s+(.+)$/);
+  if (u2 && !/\d\s*g/i.test(p)) {
+    // "2 ovos"
+    servings = Number(u2[1].replace(',', '.'));
+    rest = u2[2].trim();
+  }
+  return { grams, servings, rest };
+}
+
+function scoreFoodMatch(queryNorm, food) {
+  const name = normalizeForMatch(food.name);
+  const brand = normalizeForMatch(food.brand || '');
+  if (!queryNorm || !name) return 0;
+  if (name === queryNorm) return 100;
+  if (name.includes(queryNorm)) return 80 + Math.min(15, queryNorm.length);
+  if (queryNorm.includes(name) && name.length >= 4) return 70;
+  // token overlap
+  const qt = queryNorm.split(' ').filter((w) => w.length > 2);
+  const nt = name.split(' ').filter((w) => w.length > 2);
+  if (!qt.length || !nt.length) return 0;
+  let hit = 0;
+  for (const w of qt) {
+    if (nt.some((n) => n.startsWith(w) || w.startsWith(n))) hit += 1;
+  }
+  if (hit === 0) {
+    if (brand && brand.includes(queryNorm)) return 40;
+    return 0;
+  }
+  return 40 + (hit / qt.length) * 40;
+}
+
+/**
+ * Heurística PT: casa trechos do texto com food_items ativos.
+ * Não grava logs — só candidatos pra confirmação.
+ */
+export function parseNutritionText(db, { text, meal_slot, limitPerPhrase = 5 } = {}) {
+  const raw = String(text || '').trim();
+  if (!raw) {
+    const err = new Error('texto vazio');
+    err.status = 400;
+    throw err;
+  }
+  const slot = meal_slot && MEAL_SLOTS.includes(meal_slot)
+    ? meal_slot
+    : detectMealSlot(raw) || 'other';
+
+  const foods = listFoods(db, { status: 'active', limit: 200 });
+  const phrases = tokenizeFoodPhrases(raw);
+  const candidates = [];
+  const unmatched = [];
+
+  for (const phrase of phrases) {
+    const { grams, servings, rest } = extractQty(phrase);
+    const qNorm = normalizeForMatch(rest || phrase);
+    if (!qNorm || qNorm.length < 2) continue;
+
+    const ranked = foods
+      .map((f) => ({ food: f, score: scoreFoodMatch(qNorm, f) }))
+      .filter((x) => x.score >= 40)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limitPerPhrase);
+
+    if (!ranked.length) {
+      unmatched.push(phrase);
+      continue;
+    }
+
+    const best = ranked[0];
+    let useServings = servings != null ? servings : 1;
+    let useGrams = grams;
+    // if grams given and food has serving_grams, prefer grams path
+    if (useGrams != null && best.food.serving_grams) {
+      useServings = useGrams / Number(best.food.serving_grams);
+    }
+
+    const snap = scaleFoodToSnapshot(best.food, {
+      servings: useServings,
+      grams: useGrams,
+    });
+
+    candidates.push({
+      phrase,
+      query: rest || phrase,
+      meal_slot: slot,
+      food_item_id: best.food.id,
+      food_name: best.food.name,
+      servings: Math.round(useServings * 100) / 100,
+      grams: useGrams,
+      score: best.score,
+      preview: {
+        kcal: snap.kcal,
+        protein_g: snap.protein_g,
+        carbs_g: snap.carbs_g,
+        fat_g: snap.fat_g,
+      },
+      alternatives: ranked.slice(1, 4).map((r) => ({
+        food_item_id: r.food.id,
+        food_name: r.food.name,
+        score: r.score,
+      })),
+    });
+  }
+
+  return {
+    text: raw,
+    meal_slot: slot,
+    candidates,
+    unmatched,
+    note:
+      'Candidatos heurísticos — confirme antes de gravar. A.N.A./Telegram pode mandar transcript aqui.',
+  };
+}
+
+/**
+ * Confirma candidatos e grava logs.
+ * body: { date?, meal_slot?, items: [{ food_item_id, servings?, grams?, meal_slot? }] }
+ */
+export function createLogsFromParsed(db, body = {}, { today } = {}) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) {
+    const err = new Error('nenhum item pra gravar');
+    err.status = 400;
+    throw err;
+  }
+  const date = body.date || today;
+  const defaultSlot = MEAL_SLOTS.includes(body.meal_slot) ? body.meal_slot : 'other';
+  const created = [];
+  const run = db.transaction(() => {
+    for (const it of items) {
+      if (!it.food_item_id) continue;
+      created.push(
+        createLog(
+          db,
+          {
+            date,
+            meal_slot: MEAL_SLOTS.includes(it.meal_slot) ? it.meal_slot : defaultSlot,
+            food_item_id: it.food_item_id,
+            servings: it.servings,
+            grams: it.grams,
+            source: body.source || 'text',
+            note: it.note || '',
+          },
+          { today },
+        ),
+      );
+    }
+  });
+  run();
+  if (!created.length) {
+    const err = new Error('nenhum log criado');
+    err.status = 400;
+    throw err;
+  }
+  return {
+    created: created.length,
+    logs: created,
+    day: buildDayPayload(db, String(date).slice(0, 10)),
+  };
+}
