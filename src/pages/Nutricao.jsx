@@ -8,6 +8,7 @@ import FoodCatalog from '@/components/nutrition/FoodCatalog';
 import MealsCatalog from '@/components/nutrition/MealsCatalog';
 import DayDiary from '@/components/nutrition/DayDiary';
 import NutritionHistory from '@/components/nutrition/NutritionHistory';
+import WeightTracker from '@/components/nutrition/WeightTracker';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatKcal, GOAL_LABELS } from '@/lib/nutrition';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import { cn } from '@/lib/utils';
 const TABS = [
   { id: 'diario', label: 'Diário' },
   { id: 'historico', label: 'Histórico' },
+  { id: 'peso', label: 'Peso' },
   { id: 'alimentos', label: 'Alimentos' },
   { id: 'refeicoes', label: 'Refeições' },
   { id: 'meta', label: 'Meta' },
@@ -62,12 +64,14 @@ export default function Nutricao() {
     fat_g: profile?.target_fat_g ?? day?.targets?.fat_g ?? null,
   };
 
+  const hideHeroMacros = tab === 'historico' || tab === 'peso';
+
   return (
     <div className="praxis-page space-y-6 pb-24 max-w-xl">
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Diário, histórico e refeições salvas."
+        description="Macros do dia, peso e refeições — simples e visual."
       />
 
       {showOnboarding ? (
@@ -77,7 +81,7 @@ export default function Nutricao() {
         />
       ) : null}
 
-      {!showOnboarding && (hasTargets || (totals.kcal ?? 0) > 0) && tab !== 'historico' && (
+      {!showOnboarding && (hasTargets || (totals.kcal ?? 0) > 0) && !hideHeroMacros && (
         <Card className="border-border/80 bg-card/40 shadow-none">
           <CardContent className="px-5 py-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -103,14 +107,20 @@ export default function Nutricao() {
 
       {!showOnboarding && (
         <>
-          <div className="flex gap-1 rounded-full bg-secondary/40 p-1 overflow-x-auto">
+          <div
+            className="flex gap-1 rounded-full bg-secondary/40 p-1 overflow-x-auto"
+            role="tablist"
+            aria-label="Seções de nutrição"
+          >
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
+                role="tab"
+                aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'flex-1 min-w-[4.2rem] rounded-full px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap',
+                  'flex-1 min-w-[3.8rem] rounded-full px-2 py-2 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap',
                   tab === t.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -130,6 +140,8 @@ export default function Nutricao() {
                 setTab('diario');
               }}
             />
+          ) : tab === 'peso' ? (
+            <WeightTracker />
           ) : tab === 'alimentos' ? (
             <FoodCatalog />
           ) : tab === 'refeicoes' ? (

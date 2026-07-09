@@ -78,9 +78,13 @@ C=$(code -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$BASE/api/ops/backup-meta")
 [[ "$C" == "200" ]] || fail "GET /api/ops/backup-meta → $C"
 ok "GET /api/ops/backup-meta → 200"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export BASE COOKIE_JAR
+if [[ -f "$SCRIPT_DIR/smoke-praxis-nutrition.sh" ]]; then
+  bash "$SCRIPT_DIR/smoke-praxis-nutrition.sh" || fail "smoke nutrition"
+fi
+
 if [[ "${PRAXIS_SMOKE_E2E:-1}" == "1" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  export BASE COOKIE_JAR
   bash "$SCRIPT_DIR/smoke-praxis-e2e.sh"
 fi
 

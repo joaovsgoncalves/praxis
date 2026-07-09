@@ -230,6 +230,25 @@ export const forjaApi = {
       const qs = query.toString();
       return request(`/api/nutrition/summary${qs ? `?${qs}` : ''}`);
     },
+    weight: {
+      list: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.from) query.set('from', params.from);
+        if (params.to) query.set('to', params.to);
+        if (params.limit) query.set('limit', String(params.limit));
+        const qs = query.toString();
+        return request(`/api/nutrition/weight${qs ? `?${qs}` : ''}`);
+      },
+      trend: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.days) query.set('days', String(params.days));
+        const qs = query.toString();
+        return request(`/api/nutrition/weight/trend${qs ? `?${qs}` : ''}`);
+      },
+      upsert: (data) =>
+        request('/api/nutrition/weight', { method: 'POST', body: JSON.stringify(data) }),
+      delete: (id) => request(`/api/nutrition/weight/${id}`, { method: 'DELETE' }),
+    },
     copyDay: (data = {}) =>
       request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
     seed: () => request('/api/nutrition/seed', { method: 'POST', body: '{}' }),

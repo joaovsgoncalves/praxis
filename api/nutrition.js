@@ -106,10 +106,20 @@ export function initNutritionSchema(db) {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS body_weight_logs (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      weight_kg REAL NOT NULL,
+      note TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(date)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_food_logs_date ON food_logs(date);
     CREATE INDEX IF NOT EXISTS idx_food_items_name ON food_items(name);
     CREATE INDEX IF NOT EXISTS idx_food_items_favorite ON food_items(is_favorite);
     CREATE INDEX IF NOT EXISTS idx_food_meals_status ON food_meals(status);
+    CREATE INDEX IF NOT EXISTS idx_body_weight_date ON body_weight_logs(date);
   `);
 
   const row = db.prepare('SELECT id FROM nutrition_profile WHERE id = ?').get('default');
@@ -1508,5 +1518,120 @@ export function buildNutritionSummary(db, { from, to } = {}) {
     days_hit_protein,
     top_foods,
     days,
+  };
+}
+
+// ==================== body weight (fase 10) ====================
+
+export function listWeightLogs(db, { from, to, limit = 90 } = {}) {
+  let sql = 'SELECT * FROM body_weight_logs WHERE 1=1';
+  const params = [];
+  if (from && isValidDateString(from)) {
+    sql += ' AND date >= ?';
+    params.push(from);
+  }
+  if (to && isValidDateString(to)) {
+    sql += ' AND date <= ?';
+    params.push(to);
+  }
+  sql += ' ORDER BY date DESC LIMIT ?';
+  params.push(Math.min(365, Math.max(1, Number(limit) || 90)));
+  return db.prepare(sql).all(...params);
+}
+
+export function getWeightLog(db, id) {
+  return db.prepare('SELECT * FROM body_weight_logs WHERE id = ?').get(id) || null;
+}
+
+/**
+ * Upsert by date: one weight per day.
+ * Optionally sync nutrition_profile.weight_kg to latest.
+ */
+export function upsertWeightLog(db, body = {}, { today } = {}) {
+  const date = String(body.date || today || '').slice(0, 10);
+  if (!isValidDateString(date)) {
+    const err = new Error('data inválida (use YYYY-MM-DD)');
+    err.status = 400;
+    throw err;
+  }
+  const weight = Number(body.weight_kg);
+  if (!Number.isFinite(weight) || weight < 30 || weight > 300) {
+    const err = new Error('peso deve ser entre 30 e 300 kg');
+    err.status = 400;
+    throw err;
+  }
+  const note = String(body.note || '');
+  const existing = db.prepare('SELECT id FROM body_weight_logs WHERE date = ?').get(date);
+  let id;
+  if (existing) {
+    id = existing.id;
+    db.prepare(
+      'UPDATE body_weight_logs SET weight_kg = ?, note = ? WHERE id = ?',
+    ).run(Math.round(weight * 10) / 10, note, id);
+  } else {
+    id = body.id || randomUUID();
+    db.prepare(
+      'INSERT INTO body_weight_logs (id, date, weight_kg, note) VALUES (?, ?, ?, ?)',
+    ).run(id, date, Math.round(weight * 10) / 10, note);
+  }
+  // keep profile in sync with latest log by date
+  const latest = db
+    .prepare('SELECT weight_kg FROM body_weight_logs ORDER BY date DESC LIMIT 1')
+    .get();
+  if (latest) {
+    db.prepare(
+      "UPDATE nutrition_profile SET weight_kg = ?, updated_at = datetime('now') WHERE id = 'default'",
+    ).run(latest.weight_kg);
+  }
+  return getWeightLog(db, id);
+}
+
+export function deleteWeightLog(db, id) {
+  const r = db.prepare('DELETE FROM body_weight_logs WHERE id = ?').run(id);
+  if (r.changes > 0) {
+    const latest = db
+      .prepare('SELECT weight_kg FROM body_weight_logs ORDER BY date DESC LIMIT 1')
+      .get();
+    if (latest) {
+      db.prepare(
+        "UPDATE nutrition_profile SET weight_kg = ?, updated_at = datetime('now') WHERE id = 'default'",
+      ).run(latest.weight_kg);
+    }
+  }
+  return r.changes > 0;
+}
+
+/** Compact series for sparkline + delta */
+export function buildWeightTrend(db, { days = 30 } = {}) {
+  const lim = Math.min(180, Math.max(7, Number(days) || 30));
+  const rows = db
+    .prepare(
+      'SELECT date, weight_kg FROM body_weight_logs ORDER BY date DESC LIMIT ?',
+    )
+    .all(lim)
+    .reverse();
+  if (!rows.length) {
+    return {
+      points: [],
+      latest: null,
+      previous: null,
+      delta_kg: null,
+      min_kg: null,
+      max_kg: null,
+    };
+  }
+  const weights = rows.map((r) => Number(r.weight_kg));
+  const latest = rows[rows.length - 1];
+  const previous = rows.length > 1 ? rows[rows.length - 2] : null;
+  return {
+    points: rows,
+    latest,
+    previous,
+    delta_kg:
+      previous != null
+        ? Math.round((Number(latest.weight_kg) - Number(previous.weight_kg)) * 10) / 10
+        : null,
+    min_kg: Math.min(...weights),
+    max_kg: Math.max(...weights),
   };
 }

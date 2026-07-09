@@ -61,6 +61,10 @@ import {
   parseNutritionText,
   createLogsFromParsed,
   buildNutritionSummary,
+  listWeightLogs,
+  upsertWeightLog,
+  deleteWeightLog,
+  buildWeightTrend,
 } from './nutrition.js';
 
 // Category constants
@@ -609,6 +613,35 @@ app.get('/api/nutrition/summary', (req, res) => {
     const code = err?.status || 400;
     res.status(code).json({ error: err?.message || 'summary falhou' });
   }
+});
+
+
+// body weight (fase 10)
+app.get('/api/nutrition/weight', (req, res) => {
+  const { from, to, limit } = req.query;
+  res.json(listWeightLogs(db, { from, to, limit }));
+});
+
+app.get('/api/nutrition/weight/trend', (req, res) => {
+  const days = req.query.days;
+  res.json(buildWeightTrend(db, { days }));
+});
+
+app.post('/api/nutrition/weight', (req, res) => {
+  try {
+    const row = upsertWeightLog(db, req.body || {}, { today: getLocalDateString() });
+    res.status(201).json(row);
+  } catch (err) {
+    const code = err?.status || 400;
+    res.status(code).json({ error: err?.message || 'não deu pra salvar o peso' });
+  }
+});
+
+app.delete('/api/nutrition/weight/:id', (req, res) => {
+  if (!deleteWeightLog(db, req.params.id)) {
+    return res.status(404).json({ error: 'registro de peso não encontrado' });
+  }
+  res.status(204).end();
 });
 
 // foods catalog (fase 2)
