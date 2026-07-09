@@ -499,9 +499,11 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                             >
                               <p className="text-sm font-medium truncate">{log.name_snapshot}</p>
                               <p className="text-xs text-muted-foreground tabular-nums">
-                                {log.servings != null && Number(log.servings) !== 1
-                                  ? `${Number(log.servings)}× · `
-                                  : ''}
+                                {log.grams != null && Number(log.grams) > 0
+                                  ? `${Number(log.grams)} g · `
+                                  : log.servings != null && Number(log.servings) !== 1
+                                    ? `${Number(log.servings)}× · `
+                                    : ''}
                                 {formatKcal(log.kcal)} · P {formatGrams(log.protein_g)} · C{' '}
                                 {formatGrams(log.carbs_g)} · G {formatGrams(log.fat_g)}
                               </p>
