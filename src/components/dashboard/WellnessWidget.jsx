@@ -67,38 +67,41 @@ export default function WellnessWidget({ todayCheck, onSave }) {
     }
   };
   if (!showForm && activeCheck) {
+    const wellnessStats = [
+      { label: 'Humor', value: moodEmojis[(activeCheck.mood || 3) - 1], detail: moodLabels[(activeCheck.mood || 3) - 1] },
+      { label: 'Sono', value: `${activeCheck.sleep_hours || 7}h`, detail: sleepQualityLabels[(activeCheck.sleep_quality || 3) - 1] },
+      { label: 'Qualidade', value: sleepQualityEmojis[(activeCheck.sleep_quality || 3) - 1], detail: sleepQualityLabels[(activeCheck.sleep_quality || 3) - 1] },
+      { label: 'Produtividade', value: `${activeCheck.productivity || 3}/5`, detail: productivityLabels[(activeCheck.productivity || 3) - 1] },
+    ];
+
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2.5">
-              <Heart className="w-5 h-5 text-domain-wellness" />
-              Bem-estar Hoje
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setShowForm(true)}>Editar</Button>
+      <Card className="praxis-dashboard-card praxis-context-card">
+        <CardContent className="p-5 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-domain-wellness/15 bg-domain-wellness/[0.07]">
+                <Heart className="h-4 w-4 text-domain-wellness" aria-hidden />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground">Corpo</p>
+                <h3 className="forja-title mt-0.5 text-base font-semibold tracking-[-0.025em]">Bem-estar hoje</h3>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground" onClick={() => setShowForm(true)}>
+              Editar
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-center p-3 rounded-lg bg-secondary/50">
-              <div className="text-2xl mb-1">{moodEmojis[(activeCheck.mood || 3) - 1]}</div>
-              <p className="text-xs text-muted-foreground">Humor</p>
-              <p className="text-xs font-medium">{moodLabels[(activeCheck.mood || 3) - 1]}</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-secondary/50">
-              <div className="text-lg font-bold text-chart-3 mb-1">{activeCheck.sleep_hours || 7}h</div>
-              <p className="text-xs text-muted-foreground">Sono</p>
-              <p className="text-xs font-medium">{sleepQualityLabels[(activeCheck.sleep_quality || 3) - 1]}</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-secondary/50">
-              <div className="text-2xl mb-1">{sleepQualityEmojis[(activeCheck.sleep_quality || 3) - 1]}</div>
-              <p className="text-xs text-muted-foreground">Qualidade</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-secondary/50">
-              <div className="text-lg font-bold text-primary mb-1">{activeCheck.productivity || 3}/5</div>
-              <p className="text-xs text-muted-foreground">Produtiv.</p>
-              <p className="text-xs font-medium">{productivityLabels[(activeCheck.productivity || 3) - 1]}</p>
-            </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {wellnessStats.map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-white/[0.05] bg-white/[0.022] px-3 py-3">
+                <p className="text-[10px] text-muted-foreground">{stat.label}</p>
+                <div className="mt-1.5 flex items-end justify-between gap-2">
+                  <p className="text-lg font-semibold tabular-nums leading-none">{stat.value}</p>
+                  <p className="truncate text-[10px] text-muted-foreground/75">{stat.detail}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -106,13 +109,13 @@ export default function WellnessWidget({ todayCheck, onSave }) {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <Card className="praxis-dashboard-card praxis-context-card">
+      <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
         <CardTitle>
           {todayCheck ? 'Editar Check-in' : 'Como está seu dia?'}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-5 px-5 pb-5 sm:px-5 sm:pb-5">
 
         {/* Humor */}
         <div>

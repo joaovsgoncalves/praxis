@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import PraxisBrand from '@/components/brand/PraxisBrand';
 
 const ROUTE_TITLES = [
   { prefix: '/habitos-tarefas', title: 'Tarefas' },
@@ -40,6 +41,7 @@ export default function MobileTopBar({ onOpenMenu }) {
       >
         <Menu className="h-5 w-5" />
       </button>
+      <PraxisBrand compact markClassName="h-8 w-8 rounded-lg" />
       <h1 className="forja-title truncate text-lg font-semibold">{title}</h1>
     </header>
   );

@@ -19,7 +19,7 @@ import OfflineBanner from '@/components/shared/OfflineBanner';
 import PwaInstallBanner from '@/components/shared/PwaInstallBanner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Gauge, ListChecks } from 'lucide-react';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from '@/lib/dates';
@@ -39,6 +39,21 @@ import OpeningRitualCollapsible from '@/components/dashboard/OpeningRitualCollap
 
 // Lote 7: widgets sem glow de domínio (app mais quieto)
 const Slot = ({ children }) => <div>{children}</div>;
+
+function DashboardGroupHeading({ icon: Icon, eyebrow, title, description, tone = 'text-domain-gold' }) {
+  return (
+    <div className="mb-3 flex items-start gap-3 px-1 sm:mb-4">
+      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
+        <Icon className={`h-4 w-4 ${tone}`} aria-hidden />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium text-muted-foreground">{eyebrow}</p>
+        <h2 className="forja-title mt-0.5 text-lg font-semibold tracking-[-0.035em] sm:text-xl">{title}</h2>
+        {description ? <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80 sm:text-sm">{description}</p> : null}
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -188,13 +203,23 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="praxis-page praxis-page--tight flex flex-col gap-3 sm:gap-4">
+    <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5">
       <div className="flex flex-col gap-2">
         <OfflineBanner />
         <PwaInstallBanner />
       </div>
 
-      <div className="order-1">
+      <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '20ms' }}>
+        <HeroDay
+          habitsDone={completedHabits}
+          habitsTotal={essentialHabits.length}
+          tasksDone={completedTasks}
+          tasksTotal={tasks.length}
+          userName={settings?.full_name}
+        />
+      </div>
+
+      <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '70ms' }}>
         <NowBlock
           task={nowTask}
           today={today}
@@ -207,63 +232,79 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="order-2 lg:order-3">
+      <div className="praxis-dashboard-reveal grid gap-2" style={{ '--praxis-reveal-delay': '110ms' }}>
         <OverdueTasksBanner count={overdueOpenCount} />
-      </div>
-
-      <div className="order-3 lg:order-4">
         <CapturePendingBanner />
       </div>
 
-      <div className="order-4">
-        <HeroDay
-          habitsDone={completedHabits}
-          habitsTotal={essentialHabits.length}
-          tasksDone={completedTasks}
-          tasksTotal={tasks.length}
-          userName={settings?.full_name}
-        />
+      <div
+        className="praxis-dashboard-reveal grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(350px,0.9fr)] xl:gap-6"
+        style={{ '--praxis-reveal-delay': '150ms' }}
+      >
+        <section className="min-w-0">
+          <DashboardGroupHeading
+            icon={ListChecks}
+            eyebrow="Execução"
+            title="O que precisa sair do papel"
+            description="Tarefas e hábitos que movem o dia."
+            tone="text-domain-gold"
+          />
+          <div className="space-y-4 lg:space-y-5">
+            <Slot domain="ember">
+              <TodayTasks
+                tasks={tasks}
+                today={today}
+                allTasksForRecurrence={allTasks}
+                onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
+                onEditTask={setEditingTask}
+                onReorderPending={handleReorderPending}
+                reorderBusy={reorderTasksMutation.isPending}
+              />
+            </Slot>
+            <Slot domain="wellness">
+              <TodayHabits
+                title="Hábitos essenciais"
+                today={today}
+                habits={essentialHabits}
+                habitLogs={habitLogs}
+                onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
+              />
+            </Slot>
+          </div>
+        </section>
+
+        <section className="praxis-dashboard-context min-w-0">
+          <DashboardGroupHeading
+            icon={Gauge}
+            eyebrow="Contexto"
+            title="Como seu dia está agora"
+            description="Corpo, agenda, alimentação e rituais no mesmo quadro."
+            tone="text-domain-wellness"
+          />
+          <div className="space-y-3 sm:space-y-4">
+            <NutritionTodayCard />
+            <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
+            <TodayCalendar />
+            <RitualWidget />
+          </div>
+        </section>
       </div>
 
-      <div className="order-5 lg:order-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)] gap-4 lg:gap-5 items-start">
-        <div className="space-y-4 lg:space-y-5">
-          <Slot domain="ember">
-            <TodayTasks
-              tasks={tasks}
-              today={today}
-              allTasksForRecurrence={allTasks}
-              onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
-              onEditTask={setEditingTask}
-              onReorderPending={handleReorderPending}
-              reorderBusy={reorderTasksMutation.isPending}
-            />
-          </Slot>
-          <Slot domain="wellness">
-            <TodayHabits
-              title="Hábitos essenciais"
-              today={today}
-              habits={essentialHabits}
-              habitLogs={habitLogs}
-              onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
-            />
-          </Slot>
-        </div>
-        <div className="space-y-3 sm:space-y-4">
-          <NutritionTodayCard />
-          <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
-          <TodayCalendar />
-          <RitualWidget />
-        </div>
-      </div>
-
-      <Collapsible defaultOpen={false} className="order-6 rounded-2xl border border-white/5 bg-black/20">
+      <Collapsible
+        defaultOpen={false}
+        className="praxis-dashboard-reveal rounded-2xl border border-white/[0.055] bg-white/[0.018]"
+        style={{ '--praxis-reveal-delay': '190ms' }}
+      >
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-5 h-auto">
-            <span className="text-sm font-medium text-left">Sugestões e reflexão</span>
-            <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+          <Button variant="ghost" className="h-auto w-full justify-between rounded-2xl px-4 py-4 hover:bg-white/[0.025] sm:px-5">
+            <span className="text-left">
+              <span className="block text-sm font-medium">Sugestões e reflexão</span>
+              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Abra quando quiser olhar além da execução imediata.</span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-55" />
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 px-2 pb-5 sm:px-3">
+        <CollapsibleContent className="space-y-4 px-3 pb-5 sm:px-4">
           <OpeningRitualCollapsible />
           <SuggestedGoalCard />
           <WeeklyReviewPrompt />
@@ -271,7 +312,7 @@ export default function Dashboard() {
         </CollapsibleContent>
       </Collapsible>
 
-      <XpProgressStrip className="order-7 mt-2" />
+      <XpProgressStrip className="praxis-dashboard-reveal mt-1" />
 
       <Dialog
         open={Boolean(editingTask)}

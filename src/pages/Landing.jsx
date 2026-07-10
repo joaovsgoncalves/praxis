@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PraxisLivePreview, PraxisVoiceFlowDemo } from '@/components/landing/PraxisLivePreview';
+import PraxisBrand from '@/components/brand/PraxisBrand';
 
 const flowSteps = [
   {
@@ -94,23 +95,6 @@ const featureCards = [
   },
 ];
 
-function BrandMark({ compact = false }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <span className="forja-title text-xl font-bold tracking-[-0.09em] text-domain-gold">π</span>
-        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-domain-gold shadow-[0_0_16px_hsl(var(--domain-gold)/0.8)]" />
-      </div>
-      {!compact ? (
-        <div>
-          <p className="forja-title text-lg font-bold leading-none tracking-[-0.055em]">Praxis</p>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Menos plano. Mais prática.</p>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function AppPreview() {
   return <PraxisLivePreview />;
 }
@@ -134,7 +118,7 @@ export default function Landing() {
       <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.055] bg-background/80 backdrop-blur-2xl supports-[backdrop-filter]:bg-background/65">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <a href="#topo" aria-label="Praxis — início">
-            <BrandMark />
+            <PraxisBrand />
           </a>
           <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex" aria-label="Navegação principal">
             <a className="transition-colors hover:text-foreground" href="#como-funciona">Como funciona</a>
@@ -391,7 +375,7 @@ export default function Landing() {
 
       <footer className="border-t border-white/[0.055] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
-          <BrandMark />
+          <PraxisBrand />
           <p className="text-xs text-muted-foreground">Fale. Organize. Execute. — Praxis {new Date().getFullYear()}</p>
         </div>
       </footer>

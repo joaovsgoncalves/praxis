@@ -22,9 +22,15 @@ import { sortPendingWithOverdueFirst } from '@/lib/taskListFilters';
 import { SectionHeading } from '@/components/layout/PraxisPage';
 
 const priorityStyles = {
-  high: 'bg-destructive/15 text-destructive border-destructive/20',
-  medium: 'bg-chart-4/15 text-chart-4 border-chart-4/20',
-  low: 'bg-muted text-muted-foreground border-border',
+  high: 'bg-destructive/10 text-destructive border-destructive/20',
+  medium: 'bg-domain-gold/[0.08] text-domain-gold border-domain-gold/15',
+  low: 'bg-white/[0.03] text-muted-foreground border-white/[0.06]',
+};
+
+const priorityLabels = {
+  high: 'Alta',
+  medium: 'Média',
+  low: 'Baixa',
 };
 
 export default function TodayTasks({
@@ -65,8 +71,8 @@ export default function TodayTasks({
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-4">
+    <Card className="praxis-dashboard-card">
+      <CardHeader className="p-5 pb-4 sm:p-5 sm:pb-4">
         <SectionHeading
           kicker="Hoje"
           title="Tarefas"
@@ -109,7 +115,7 @@ export default function TodayTasks({
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2.5 px-5 pb-5 sm:px-5 sm:pb-5">
         <AnimatePresence mode="popLayout" initial={false}>
           {pending.length === 0 && completed.length === 0 && (
             <motion.p
@@ -123,8 +129,8 @@ export default function TodayTasks({
           )}
           {pending.length > 0 && (
             <div className="flex items-center justify-between gap-2 px-1 pt-1">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Pendentes</div>
-              <p className="text-[10px] text-muted-foreground/80">Segure ⋮⋮ e arraste para ordenar</p>
+              <div className="text-xs font-medium text-muted-foreground">Pendentes</div>
+              <p className="text-[10px] text-muted-foreground/65">Arraste ⋮⋮ para ordenar</p>
             </div>
           )}
         </AnimatePresence>
@@ -155,10 +161,10 @@ export default function TodayTasks({
                           {...dragProvided.draggableProps}
                           style={dragProvided.draggableProps.style}
                           className={cn(
-                            'flex flex-col gap-3 p-4 rounded-2xl bg-secondary/45 border transition-colors sm:flex-row sm:items-start',
+                            'flex flex-col gap-3 rounded-xl border bg-white/[0.022] p-3.5 transition-[background-color,border-color,box-shadow] sm:flex-row sm:items-start',
                             snapshot.isDragging
-                              ? 'border-domain-ember/40 shadow-lg shadow-black/20 z-10'
-                              : 'border-transparent hover:bg-secondary/80 hover:border-domain-ember/20'
+                              ? 'z-10 border-domain-gold/30 bg-white/[0.045] shadow-lg shadow-black/20'
+                              : 'border-white/[0.055] hover:border-white/[0.09] hover:bg-white/[0.035]'
                           )}
                         >
                           <div className="flex items-start gap-2 flex-1 min-w-0 w-full">
@@ -173,27 +179,27 @@ export default function TodayTasks({
                             <Checkbox
                               checked={false}
                               onCheckedChange={() => handleComplete(task)}
-                              className="mt-1 h-6 w-6 shrink-0 border-muted-foreground/40 touch-manipulation"
+                              className="mt-1 h-5 w-5 shrink-0 border-muted-foreground/40 touch-manipulation"
                             />
                             <div className="flex-1 min-w-0 space-y-2">
-                              <p className="text-base font-semibold leading-snug break-words">{task.title}</p>
+                              <p className="text-sm font-semibold leading-snug break-words sm:text-[15px]">{task.title}</p>
                               <div className="flex flex-wrap items-center gap-2">
                                 <CategoryBadge category={task.category} />
                                 <Badge
                                   variant="outline"
                                   className={cn(
-                                    'text-xs border px-2.5 py-1',
+                                    'border px-2 py-0.5 text-[10px]',
                                     priorityStyles[task.priority || 'medium']
                                   )}
                                 >
-                                  {task.priority || 'medium'}
+                                  {priorityLabels[task.priority || 'medium']}
                                 </Badge>
                                 <TaskRecurrenceBadge task={task} allTasks={recurrencePool} />
                               </div>
                               {task.time && (
                                 <div className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                                  <span className="text-sm text-muted-foreground font-medium">{task.time}</span>
+                                  <span className="text-xs font-medium text-muted-foreground">{task.time}</span>
                                 </div>
                               )}
                               {task.date && today && task.date < today && (
@@ -209,7 +215,7 @@ export default function TodayTasks({
                               type="button"
                               size="default"
                               variant="secondary"
-                              className="gap-2 h-11 flex-1 touch-manipulation"
+                              className="h-9 flex-1 gap-1.5 rounded-lg px-3 text-xs touch-manipulation"
                               onClick={() => onEditTask?.(task)}
                             >
                               <Pencil className="w-4 h-4" />
@@ -220,7 +226,7 @@ export default function TodayTasks({
                                 type="button"
                                 size="default"
                                 variant="outline"
-                                className="gap-2 h-11 w-full sm:h-9 sm:w-auto touch-manipulation"
+                                className="h-9 w-full gap-1.5 rounded-lg px-3 text-xs touch-manipulation sm:w-auto"
                               >
                                 <Timer className="w-4 h-4" />
                                 Iniciar foco
@@ -240,7 +246,7 @@ export default function TodayTasks({
 
         <AnimatePresence mode="popLayout" initial={false}>
           {completed.length > 0 && (
-            <div className="text-xs uppercase tracking-[0.2em] text-green-400/80 px-1 pt-4">
+            <div className="px-1 pt-4 text-xs font-medium text-domain-wellness/80">
               Concluídas hoje
             </div>
           )}
@@ -251,15 +257,15 @@ export default function TodayTasks({
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-              className="flex items-center gap-4 p-4 rounded-2xl bg-domain-wellness/10 border border-domain-wellness/25"
+              className="flex items-center gap-3 rounded-xl border border-domain-wellness/15 bg-domain-wellness/[0.065] p-3"
             >
               <Checkbox
                 checked
                 onCheckedChange={() => onToggleComplete(task)}
-                className="h-6 w-6 border-domain-wellness data-[state=checked]:bg-domain-wellness touch-manipulation"
+                className="h-5 w-5 border-domain-wellness data-[state=checked]:bg-domain-wellness touch-manipulation"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-base text-domain-wellness line-through break-words">{task.title}</p>
+                <p className="text-sm text-domain-wellness/90 line-through break-words">{task.title}</p>
                 {task.date && today && task.date < today && (
                   <p className="text-[11px] text-green-400/80 mt-0.5">Limpa hoje · era de {task.date}</p>
                 )}

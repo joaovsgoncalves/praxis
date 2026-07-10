@@ -19,22 +19,10 @@ const timeOfDayConfig = {
 
 function ConfettiOverlay() {
   return (
-    <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-lg">
-      {Array.from({ length: 20 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute animate-confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: '-10px',
-            animationDelay: `${Math.random() * 1.5}s`,
-            animationDuration: `${1.5 + Math.random() * 1.5}s`,
-          }}
-        >
-          {['🎉', '✨', '⭐', '🎊', '💪'][Math.floor(Math.random() * 5)]}
-        </div>
-      ))}
-    </div>
+    <div
+      className="praxis-completion-glow pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-xl"
+      aria-hidden
+    />
   );
 }
 
@@ -58,7 +46,7 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
   useEffect(() => {
     if (prevDoneRef.current === false && isComplete) {
       setShowConfetti(true);
-      const timer = setTimeout(() => setShowConfetti(false), 3000);
+      const timer = setTimeout(() => setShowConfetti(false), 1200);
       return () => clearTimeout(timer);
     }
     prevDoneRef.current = isComplete;
@@ -66,12 +54,12 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
 
   return (
     <div className={cn(
-      'relative p-3 rounded-lg border transition-colors',
+      'relative rounded-xl border p-3.5 transition-[background-color,border-color,box-shadow]',
       isComplete
-        ? 'bg-green-500/10 border-green-500/30'
+        ? 'border-domain-wellness/18 bg-domain-wellness/[0.065]'
         : isMinimum
-          ? 'bg-gold/10 border-gold/30'
-          : 'bg-secondary/40 border-border hover:border-border/80'
+          ? 'border-domain-gold/18 bg-domain-gold/[0.055]'
+          : 'border-white/[0.05] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]'
     )}>
       {showConfetti && <ConfettiOverlay />}
 
@@ -80,12 +68,12 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
         <span className="text-lg">{ritual.emoji || '⚡'}</span>
         <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
         {isComplete ? (
-          <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30 text-xs shrink-0">
+          <Badge variant="outline" className="shrink-0 border-domain-wellness/20 bg-domain-wellness/[0.08] text-xs text-domain-wellness">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Completo
           </Badge>
         ) : isMinimum ? (
-          <Badge variant="outline" className="bg-gold/15 text-gold border-gold/30 text-xs shrink-0">
+          <Badge variant="outline" className="shrink-0 border-domain-gold/20 bg-domain-gold/[0.07] text-xs text-domain-gold">
             Parcial
           </Badge>
         ) : (
@@ -211,17 +199,19 @@ export default function RitualWidget() {
     .filter((k) => grouped[k]?.length > 0);
 
   return (
-    <Card>
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2.5 text-lg">
-          <Sparkles className="w-5 h-5 text-gold" />
-          Rituais do dia
-        </CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">
-          Hábitos agrupados por manhã, tarde e noite.
-        </p>
+    <Card className="praxis-dashboard-card praxis-context-card">
+      <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-domain-gold/15 bg-domain-gold/[0.07]">
+            <Sparkles className="h-4 w-4 text-domain-gold" aria-hidden />
+          </div>
+          <div>
+            <p className="text-[11px] font-medium text-muted-foreground">Ritmos do dia</p>
+            <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rituais</CardTitle>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-5 pb-5 sm:px-5 sm:pb-5">
         {isLoading && (
           <div className="space-y-3">
             <Skeleton className="h-20 w-full rounded-xl" />
@@ -280,15 +270,6 @@ export default function RitualWidget() {
         )}
       </CardContent>
 
-      <style>{`
-        @keyframes confetti-fall {
-          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(120px) rotate(720deg); opacity: 0; }
-        }
-        .animate-confetti {
-          animation: confetti-fall 2s ease-out forwards;
-        }
-      `}</style>
     </Card>
   );
 }

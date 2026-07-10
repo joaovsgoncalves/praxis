@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from '@/lib/categories';
 import { formatTaskTimeLabel, isTaskOverdue } from '@/lib/nowTask';
-import { Timer, CheckCircle2, Clock, AlertTriangle, Mic, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Timer, CheckCircle2, Clock, AlertTriangle, Mic, Plus, Flame } from 'lucide-react';
 
 export default function NowBlock({
   task,
@@ -20,31 +19,46 @@ export default function NowBlock({
 }) {
   if (!task) {
     return (
-      <Card className="border-primary/25 bg-card/50">
-        <CardContent className="p-4 sm:p-5 space-y-3">
-          <p className="forja-kicker text-primary text-xs">Agora</p>
-          <h2 className="forja-title text-lg sm:text-xl font-semibold leading-snug">
-            Nada urgente na fila — bom momento para capturar ou planejar.
+      <Card className="praxis-now-card relative overflow-hidden border-domain-gold/15 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.07),hsl(var(--card)/0.82)_52%,hsl(var(--primary)/0.045))]">
+        <div className="pointer-events-none absolute right-0 top-0 h-56 w-56 bg-[radial-gradient(circle,hsl(var(--domain-gold)/0.10),transparent_68%)]" aria-hidden />
+        <CardContent className="relative p-5 sm:p-6">
+          <div className="flex items-center gap-2 text-xs font-medium text-domain-gold">
+            <span className="h-2 w-2 rounded-full bg-domain-gold shadow-[0_0_14px_hsl(var(--domain-gold)/0.5)]" aria-hidden />
+            Agora
+          </div>
+          <h2 className="forja-title mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.045em] sm:text-3xl">
+            Nada urgente na fila.
           </h2>
-          <p className="text-sm text-muted-foreground max-w-xl">
-            Use a voz ou crie uma tarefa com horário para o Praxis destacar o próximo passo aqui.
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Bom momento para capturar o que está na cabeça ou criar o próximo passo de forma consciente.
           </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Button type="button" variant="default" className="praxis-touch-target w-full gap-2 sm:w-auto" onClick={onVoiceCapture}>
-              <Mic className="h-4 w-4" /> Captura por voz
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
+              type="button"
+              className="praxis-touch-target w-full gap-2 rounded-full bg-domain-gold text-black hover:bg-domain-gold/90 sm:w-auto"
+              onClick={onVoiceCapture}
+            >
+              <Mic className="h-4 w-4" /> Falar meu dia
             </Button>
-            <Button type="button" variant="outline" className="praxis-touch-target w-full gap-2 sm:w-auto" onClick={onAddTask}>
+            <Button
+              type="button"
+              variant="outline"
+              className="praxis-touch-target w-full gap-2 rounded-full border-white/[0.08] bg-white/[0.025] sm:w-auto"
+              onClick={onAddTask}
+            >
               <Plus className="h-4 w-4" /> Nova tarefa
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Também dá pra ir em{' '}
-            <Link to="/foco" className="text-primary underline-offset-2 hover:underline">
+
+          <p className="mt-4 text-xs text-muted-foreground/80">
+            Também dá para abrir o{' '}
+            <Link to="/foco" className="text-foreground/80 underline-offset-4 hover:text-foreground hover:underline">
               Modo foco
-            </Link>
-            {' '}ou{' '}
-            <Link to="/ideias?new=1" className="text-primary underline-offset-2 hover:underline">
-              Ideias
+            </Link>{' '}
+            ou registrar uma{' '}
+            <Link to="/ideias?new=1" className="text-foreground/80 underline-offset-4 hover:text-foreground hover:underline">
+              ideia
             </Link>
             .
           </p>
@@ -57,75 +71,87 @@ export default function NowBlock({
   const timeLabel = formatTaskTimeLabel(task);
 
   return (
-    <Card className="border-primary/30 bg-card/50">
-      <CardContent className="p-4 sm:p-5 space-y-4">
-        <div className="space-y-2">
-          <p className="praxis-kicker-row text-primary">
-            <span>Agora</span>
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Uma coisa de cada vez.
-          </p>
-        </div>
+    <Card className="praxis-now-card group relative overflow-hidden border-domain-gold/18 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.08),hsl(var(--card)/0.84)_50%,hsl(var(--primary)/0.05))]">
+      <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 bg-[radial-gradient(circle,hsl(var(--domain-gold)/0.11),transparent_65%)] opacity-80 transition-opacity duration-500 group-hover:opacity-100" aria-hidden />
+      <CardContent className="relative p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 max-w-3xl flex-1">
+            <div className="flex items-center gap-2 text-xs font-medium text-domain-gold">
+              <span className="praxis-now-pulse relative flex h-2.5 w-2.5 items-center justify-center" aria-hidden>
+                <span className="absolute inline-flex h-full w-full rounded-full bg-domain-gold/35" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-domain-gold" />
+              </span>
+              Agora
+            </div>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {overdue && (
-              <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
-                <AlertTriangle className="h-3 w-3" /> Atrasada
-              </Badge>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {overdue ? (
+                <Badge variant="outline" className="gap-1 border-destructive/30 bg-destructive/[0.08] text-destructive">
+                  <AlertTriangle className="h-3 w-3" /> Atrasada
+                </Badge>
+              ) : null}
+              {timeLabel ? (
+                <Badge variant="outline" className="gap-1 border-white/[0.07] bg-white/[0.03] text-foreground/75">
+                  <Clock className="h-3 w-3" /> {timeLabel}
+                </Badge>
+              ) : null}
+              {task.priority === 'high' ? (
+                <Badge className="border border-destructive/15 bg-destructive/10 text-xs text-destructive shadow-none">Prioridade alta</Badge>
+              ) : null}
+              <CategoryBadge category={task.category} />
+            </div>
+
+            <h2 className="forja-title mt-4 text-3xl font-semibold leading-[1.05] tracking-[-0.055em] sm:text-4xl">
+              {task.title}
+            </h2>
+            {task.description ? (
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">{task.description}</p>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">Uma coisa de cada vez.</p>
             )}
-            {timeLabel && (
-              <Badge variant="secondary" className="gap-1">
-                <Clock className="h-3 w-3" /> {timeLabel}
-              </Badge>
-            )}
-            {task.priority === 'high' && (
-              <Badge className={cn('text-xs', 'bg-destructive/15 text-destructive')}>Alta</Badge>
-            )}
-            <CategoryBadge category={task.category} />
           </div>
-          <h2 className="forja-title text-2xl sm:text-3xl font-semibold leading-snug">
-            {task.title}
-          </h2>
-          {task.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
-          )}
+
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap lg:max-w-[360px] lg:justify-end">
+            <Button asChild className="praxis-touch-target w-full gap-2 rounded-full bg-domain-gold px-5 text-black hover:bg-domain-gold/90 sm:w-auto">
+              <Link to={`/foco?taskId=${encodeURIComponent(task.id)}`}>
+                <Timer className="h-4 w-4" /> Começar foco
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="praxis-touch-target w-full gap-2 rounded-full border border-domain-wellness/15 bg-domain-wellness/[0.08] text-domain-wellness hover:bg-domain-wellness/[0.13] sm:w-auto"
+              disabled={busy}
+              onClick={() => onComplete?.(task)}
+            >
+              <CheckCircle2 className="h-4 w-4" /> Concluir
+            </Button>
+            <div className="flex gap-2 sm:basis-full sm:justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                className="praxis-touch-target flex-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground sm:flex-none"
+                disabled={busy}
+                onClick={() => onSnooze15?.(task)}
+              >
+                +15 min
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="praxis-touch-target flex-1 rounded-full px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground sm:flex-none"
+                disabled={busy}
+                onClick={() => onSnoozeTomorrow?.(task)}
+              >
+                Amanhã
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 lg:flex lg:flex-wrap">
-          <Button asChild className="praxis-touch-target w-full gap-2 sm:col-span-2 lg:col-span-1 lg:w-auto">
-            <Link to={`/foco?taskId=${encodeURIComponent(task.id)}`}>
-              <Timer className="h-4 w-4" /> Começar foco
-            </Link>
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="praxis-touch-target w-full gap-2 sm:w-auto"
-            disabled={busy}
-            onClick={() => onComplete?.(task)}
-          >
-            <CheckCircle2 className="h-4 w-4" /> Concluir
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="praxis-touch-target w-full sm:w-auto"
-            disabled={busy}
-            onClick={() => onSnooze15?.(task)}
-          >
-            Adiar +15 min
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="praxis-touch-target w-full sm:w-auto"
-            disabled={busy}
-            onClick={() => onSnoozeTomorrow?.(task)}
-          >
-            Amanhã
-          </Button>
+        <div className="mt-5 flex items-center gap-2 border-t border-white/[0.055] pt-4 text-[11px] text-muted-foreground/70">
+          <Flame className="h-3.5 w-3.5 text-domain-gold/80" aria-hidden />
+          O próximo passo fica visível até sair do caminho.
         </div>
       </CardContent>
     </Card>

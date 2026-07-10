@@ -5,54 +5,69 @@ export default function ParticleBackground() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return undefined;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+
     let animId;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.round(window.innerWidth * ratio);
+      canvas.height = Math.round(window.innerHeight * ratio);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     };
+
     resize();
     window.addEventListener('resize', resize);
 
-    const particles = Array.from({ length: 55 }, () => ({
+    const particles = Array.from({ length: 34 }, () => ({
       x: Math.random() * window.innerWidth,
       y: Math.random() * window.innerHeight,
-      r: Math.random() * 1.5 + 0.4,
-      dx: (Math.random() - 0.5) * 0.25,
-      dy: (Math.random() - 0.5) * 0.25,
-      alpha: Math.random() * 0.5 + 0.1,
-      dAlpha: (Math.random() - 0.5) * 0.003,
-      // golden or purple tint randomly
-      gold: Math.random() > 0.5,
+      r: Math.random() * 1 + 0.35,
+      dx: (Math.random() - 0.5) * 0.12,
+      dy: (Math.random() - 0.5) * 0.12,
+      alpha: Math.random() * 0.28 + 0.06,
+      dAlpha: (Math.random() - 0.5) * 0.0015,
+      gold: Math.random() > 0.42,
     }));
 
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      particles.forEach(p => {
-        p.x += p.dx;
-        p.y += p.dy;
-        p.alpha += p.dAlpha;
-        if (p.alpha <= 0.05 || p.alpha >= 0.65) p.dAlpha *= -1;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
+    const drawFrame = (animate = true) => {
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      particles.forEach((particle) => {
+        if (animate) {
+          particle.x += particle.dx;
+          particle.y += particle.dy;
+          particle.alpha += particle.dAlpha;
+          if (particle.alpha <= 0.04 || particle.alpha >= 0.36) particle.dAlpha *= -1;
+          if (particle.x < 0) particle.x = window.innerWidth;
+          if (particle.x > window.innerWidth) particle.x = 0;
+          if (particle.y < 0) particle.y = window.innerHeight;
+          if (particle.y > window.innerHeight) particle.y = 0;
+        }
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = p.gold
-          ? `rgba(251, 191, 36, ${p.alpha})`   // amber
-          : `rgba(168, 130, 255, ${p.alpha})`; // purple
+        ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
+        ctx.fillStyle = particle.gold
+          ? `rgba(224, 169, 42, ${particle.alpha})`
+          : `rgba(148, 116, 205, ${particle.alpha * 0.72})`;
         ctx.fill();
       });
+    };
+
+    const draw = () => {
+      drawFrame(true);
       animId = requestAnimationFrame(draw);
     };
 
-    draw();
+    if (reducedMotion) drawFrame(false);
+    else draw();
+
     return () => {
-      cancelAnimationFrame(animId);
+      if (animId) cancelAnimationFrame(animId);
       window.removeEventListener('resize', resize);
     };
   }, []);
@@ -60,8 +75,8 @@ export default function ParticleBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0"
-      style={{ opacity: 0.7 }}
+      className="pointer-events-none fixed inset-0 z-0 opacity-30"
+      aria-hidden
     />
   );
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, ExternalLink, CalendarDays } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { cn } from '@/lib/utils';
@@ -18,75 +18,82 @@ export default function TodayCalendar() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['todayCalendar'],
     queryFn: () => forjaApi.getTodayCalendar(),
-    refetchInterval: 300000, // 5 minutes
+    refetchInterval: 300000,
   });
 
   const events = Array.isArray(data) ? data : (data?.events ?? []);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4" />
-          Agenda de hoje
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading && (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 rounded-lg bg-secondary/40 animate-pulse" />
-            ))}
+    <Card className="praxis-dashboard-card praxis-context-card">
+      <CardContent className="p-5 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-domain-sky/15 bg-domain-sky/[0.07]">
+            <CalendarDays className="h-4 w-4 text-domain-sky" aria-hidden />
           </div>
-        )}
-
-        {isError && (
-          <p className="text-sm text-destructive py-4 text-center">
-            Erro ao carregar eventos
-          </p>
-        )}
-
-        {!isLoading && !isError && events.length === 0 && (
-          <div className="flex flex-col items-start py-3 gap-1">
-            <p className="text-sm text-muted-foreground">Nenhum evento no Google Agenda hoje.</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium text-muted-foreground">Agenda</p>
+            <div className="mt-0.5 flex items-center justify-between gap-3">
+              <h3 className="forja-title text-base font-semibold tracking-[-0.025em]">Hoje</h3>
+              {!isLoading && !isError && events.length > 0 ? (
+                <span className="text-[11px] tabular-nums text-muted-foreground">{events.length} evento{events.length === 1 ? '' : 's'}</span>
+              ) : null}
+            </div>
           </div>
-        )}
+        </div>
 
-        {!isLoading && !isError && events.length > 0 && (
-          <ul className="space-y-2">
-            {events.slice(0, 5).map((event, idx) => (
-              <li key={idx}>
-                <a
-                  href={event.htmlLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    'flex items-start gap-3 p-3 rounded-lg transition-colors',
-                    'bg-secondary/50 hover:bg-secondary group'
-                  )}
-                >
-                  <span className="text-xs tabular-nums text-muted-foreground pt-0.5 min-w-[3.2rem]">
-                    {formatTime(event.start)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                      {event.title}
-                    </p>
-                    {event.location && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground truncate">
-                          {event.location}
-                        </span>
-                      </div>
+        <div className="mt-4">
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="h-12 animate-pulse rounded-xl bg-white/[0.035]" />
+              ))}
+            </div>
+          ) : null}
+
+          {isError ? (
+            <p className="py-3 text-sm text-destructive">Não foi possível carregar a agenda.</p>
+          ) : null}
+
+          {!isLoading && !isError && events.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/[0.06] bg-white/[0.018] px-4 py-4">
+              <p className="text-sm text-muted-foreground">Nenhum evento no Google Agenda hoje.</p>
+            </div>
+          ) : null}
+
+          {!isLoading && !isError && events.length > 0 ? (
+            <ul className="space-y-2">
+              {events.slice(0, 5).map((event, index) => (
+                <li key={event.id || `${event.start}-${index}`}>
+                  <a
+                    href={event.htmlLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      'group flex items-start gap-3 rounded-xl border border-white/[0.05] bg-white/[0.022] px-3 py-3',
+                      'transition-[background-color,border-color] hover:border-white/[0.09] hover:bg-white/[0.035]',
                     )}
-                  </div>
-                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-primary shrink-0 mt-0.5" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+                  >
+                    <span className="min-w-[3rem] pt-0.5 text-[11px] tabular-nums text-muted-foreground">
+                      {formatTime(event.start)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground/90 transition-colors group-hover:text-foreground">
+                        {event.title}
+                      </p>
+                      {event.location ? (
+                        <div className="mt-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-muted-foreground" aria-hidden />
+                          <span className="truncate text-[11px] text-muted-foreground">{event.location}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                    <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/35 transition-colors group-hover:text-domain-sky" aria-hidden />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

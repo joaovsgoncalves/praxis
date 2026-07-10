@@ -264,6 +264,148 @@
   }
 }
 
+/* Praxis premium pass — interior do produto alinhado à landing. */
+.praxis-sidebar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.praxis-sidebar-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.praxis-brand-mark {
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+a:hover .praxis-brand-mark,
+a:focus-visible .praxis-brand-mark {
+  border-color: hsl(var(--domain-gold) / 0.22);
+  background-color: hsl(var(--domain-gold) / 0.055);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.06),
+    0 0 30px hsl(var(--domain-gold) / 0.08);
+  transform: translateY(-1px);
+}
+
+.praxis-dashboard {
+  width: 100%;
+  max-width: 80rem;
+}
+
+.praxis-dashboard .forja-panel {
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.82), hsl(var(--card) / 0.68));
+  border-color: hsl(0 0% 100% / 0.06);
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.025),
+    0 14px 45px hsl(0 0% 0% / 0.10);
+}
+
+.praxis-dashboard .praxis-dashboard-card {
+  transition:
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.praxis-dashboard .praxis-dashboard-card:hover {
+  border-color: hsl(0 0% 100% / 0.085);
+}
+
+.praxis-dashboard-context .praxis-context-card {
+  background:
+    linear-gradient(180deg, hsl(var(--card) / 0.76), hsl(var(--card) / 0.63));
+}
+
+.praxis-dashboard-summary,
+.praxis-now-card {
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.03),
+    0 18px 55px hsl(0 0% 0% / 0.13);
+}
+
+.praxis-progress-fill {
+  transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes praxis-dashboard-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.praxis-dashboard-reveal {
+  animation: praxis-dashboard-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--praxis-reveal-delay, 0ms);
+}
+
+@keyframes praxis-soft-ping {
+  0%, 100% {
+    opacity: 0.28;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+.praxis-now-pulse > span:first-child {
+  animation: praxis-soft-ping 2.4s ease-in-out infinite;
+}
+
+@keyframes praxis-completion-glow {
+  0% {
+    opacity: 0;
+    box-shadow: inset 0 0 0 1px hsl(var(--domain-wellness) / 0);
+  }
+  35% {
+    opacity: 1;
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--domain-wellness) / 0.35),
+      inset 0 0 34px hsl(var(--domain-wellness) / 0.10);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: inset 0 0 0 1px hsl(var(--domain-wellness) / 0);
+  }
+}
+
+.praxis-completion-glow {
+  animation: praxis-completion-glow 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .praxis-dashboard-reveal {
+    animation: none !important;
+  }
+
+  .praxis-progress-fill {
+    transition: none !important;
+  }
+
+  .praxis-now-pulse > span:first-child,
+  .praxis-completion-glow {
+    animation: none !important;
+  }
+
+  .praxis-brand-mark {
+    transition: none !important;
+  }
+}
+
 /* Landing — public face of Praxis. Kept outside Tailwind layers for predictable visual effects. */
 .landing-page {
   --landing-grid-line: hsl(0 0% 100% / 0.035);
