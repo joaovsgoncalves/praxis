@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -9,20 +10,17 @@ import {
   ChevronDown,
   CircleDot,
   Dumbbell,
-  Flame,
-  Focus,
   Leaf,
   Mic,
   MoonStar,
   MoveRight,
-  Play,
-  Sparkles,
   Target,
   Utensils,
   WandSparkles,
   Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PraxisLivePreview, PraxisVoiceFlowDemo } from '@/components/landing/PraxisLivePreview';
 
 const flowSteps = [
   {
@@ -113,181 +111,8 @@ function BrandMark({ compact = false }) {
   );
 }
 
-function VoiceOrb() {
-  const bars = [18, 29, 22, 38, 48, 31, 54, 42, 26, 35, 20, 44, 56, 33, 24, 39, 28, 18];
-  return (
-    <div className="relative mx-auto flex h-32 w-32 items-center justify-center sm:h-36 sm:w-36">
-      <div className="absolute inset-0 rounded-full border border-domain-gold/15 bg-domain-gold/[0.05] landing-orbit" />
-      <div className="absolute inset-3 rounded-full border border-primary/15 bg-primary/[0.05] landing-orbit landing-orbit--reverse" />
-      <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-background/90 shadow-[0_0_70px_hsl(var(--domain-gold)/0.12)] backdrop-blur-xl">
-        <Mic className="h-8 w-8 text-domain-gold" aria-hidden />
-      </div>
-      <div className="absolute -bottom-7 left-1/2 flex h-8 -translate-x-1/2 items-center gap-[3px] rounded-full border border-white/8 bg-background/80 px-3 backdrop-blur-xl">
-        {bars.map((height, index) => (
-          <span
-            key={`${height}-${index}`}
-            className="landing-wave-bar w-[2px] rounded-full bg-domain-gold/80"
-            style={{ '--bar-height': `${Math.max(6, height / 3)}px`, '--bar-delay': `${index * 45}ms` }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AppPreview() {
-  return (
-    <div className="relative mx-auto w-full max-w-[720px] lg:mr-0">
-      <div className="pointer-events-none absolute -inset-10 rounded-[3rem] bg-[radial-gradient(circle_at_50%_50%,hsl(var(--domain-gold)/0.12),transparent_58%)] blur-2xl" />
-
-      <div className="landing-app-frame relative overflow-hidden rounded-[1.9rem] border border-white/[0.09] bg-[#111114]/95 shadow-[0_35px_120px_rgba(0,0,0,0.58)]">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-            <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-            <span className="h-2.5 w-2.5 rounded-full bg-white/10" />
-          </div>
-          <div className="flex items-center gap-2 text-[10px] font-medium text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-domain-wellness" />
-            Sexta, 10 de julho
-          </div>
-        </div>
-
-        <div className="grid min-h-[470px] grid-cols-[76px_1fr] sm:grid-cols-[154px_1fr]">
-          <aside className="border-r border-white/[0.055] p-3 sm:p-4">
-            <div className="mb-7 flex items-center gap-2">
-              <BrandMark compact />
-              <span className="forja-title hidden text-sm font-bold sm:inline">Praxis</span>
-            </div>
-            <div className="space-y-1.5">
-              {[
-                ['Hoje', CircleDot, true],
-                ['Tarefas', Check, false],
-                ['Falar', Mic, false],
-                ['Revisar', MoonStar, false],
-              ].map(([label, Icon, active]) => (
-                <div
-                  key={label}
-                  className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs ${active ? 'bg-domain-gold/10 text-domain-gold' : 'text-muted-foreground'}`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="hidden sm:inline">{label}</span>
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          <main className="min-w-0 p-4 sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-medium text-muted-foreground">Boa tarde, Jota</p>
-                <h3 className="forja-title mt-1 text-xl font-bold sm:text-2xl">O que importa agora?</h3>
-              </div>
-              <div className="hidden rounded-full border border-domain-gold/15 bg-domain-gold/[0.07] px-3 py-1.5 text-[10px] font-medium text-domain-gold sm:block">
-                68% do dia concluído
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-domain-gold/15 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.11),transparent_70%)] p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[10px] font-medium text-domain-gold">
-                    <Flame className="h-3.5 w-3.5" aria-hidden />
-                    Agora
-                  </div>
-                  <p className="mt-2 text-sm font-semibold leading-snug sm:text-base">Finalizar a landing da Praxis</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">90 min de foco · prioridade alta</p>
-                </div>
-                <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-domain-gold text-black shadow-[0_0_30px_hsl(var(--domain-gold)/0.22)]" aria-label="Iniciar foco">
-                  <Play className="ml-0.5 h-4 w-4 fill-current" aria-hidden />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3.5">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-muted-foreground">Hoje</span>
-                  <span className="text-[10px] tabular-nums text-domain-wellness">3/5</span>
-                </div>
-                <div className="space-y-2.5">
-                  {['Ligar para clientes prioritários', 'Treinar planche + front lever', 'Revisar o dia às 21h'].map((task, index) => (
-                    <div key={task} className="flex items-center gap-2.5 text-[10px] leading-snug sm:text-[11px]">
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${index < 2 ? 'border-domain-wellness/40 bg-domain-wellness/15 text-domain-wellness' : 'border-white/15 text-transparent'}`}>
-                        <Check className="h-2.5 w-2.5" aria-hidden />
-                      </span>
-                      <span className={index < 2 ? 'text-muted-foreground line-through decoration-white/20' : 'text-foreground/85'}>{task}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3.5">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-muted-foreground">Macros</span>
-                  <Utensils className="h-3.5 w-3.5 text-domain-wellness" aria-hidden />
-                </div>
-                <p className="forja-title text-2xl font-bold tabular-nums">1.548 <span className="text-[10px] font-medium text-muted-foreground">/ 2.000 kcal</span></p>
-                <div className="mt-4 space-y-2.5">
-                  {[
-                    ['Proteína', 78, '132g / 170g', 'bg-domain-wellness'],
-                    ['Carbo', 62, '184g / 295g', 'bg-domain-sky'],
-                    ['Gordura', 48, '42g / 88g', 'bg-domain-gold'],
-                  ].map(([label, value, detail, fill]) => (
-                    <div key={label}>
-                      <div className="mb-1 flex justify-between text-[9px] text-muted-foreground">
-                        <span>{label}</span>
-                        <span className="tabular-nums">{detail}</span>
-                      </div>
-                      <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
-                        <div className={`h-full rounded-full ${fill}`} style={{ width: `${value}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
-
-      <div className="landing-float-card absolute -left-2 top-[36%] hidden w-[250px] rounded-2xl border border-white/[0.09] bg-background/90 p-4 shadow-2xl shadow-black/40 backdrop-blur-2xl md:block lg:-left-12">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-domain-gold/20 bg-domain-gold/10">
-            <Mic className="h-5 w-5 text-domain-gold" aria-hidden />
-          </div>
-          <div>
-            <p className="text-[10px] font-medium text-domain-gold">PraxIA ouvindo</p>
-            <p className="mt-0.5 text-xs font-medium">“Hoje eu preciso...”</p>
-          </div>
-        </div>
-        <div className="mt-3 flex h-7 items-end gap-[3px]">
-          {[9, 14, 8, 20, 16, 24, 12, 18, 11, 22, 15, 9, 17, 12, 20, 8].map((height, index) => (
-            <span key={`${height}-${index}`} className="w-full rounded-full bg-domain-gold/70" style={{ height: `${height}px`, opacity: 0.35 + ((index % 4) * 0.16) }} />
-          ))}
-        </div>
-      </div>
-
-      <div className="landing-float-card landing-float-card--delay absolute -bottom-7 right-3 hidden w-[245px] rounded-2xl border border-white/[0.09] bg-background/90 p-4 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:block lg:-right-8">
-        <div className="flex items-center gap-2 text-[10px] font-medium text-domain-wellness">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          Organizado pela PraxIA
-        </div>
-        <div className="mt-3 space-y-2">
-          {[
-            ['3 tarefas', Check],
-            ['2 hábitos', Flame],
-            ['1 bloco de foco', Focus],
-          ].map(([label, Icon]) => (
-            <div key={label} className="flex items-center gap-2 rounded-lg bg-white/[0.035] px-2.5 py-2 text-[10px] text-foreground/80">
-              <Icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-              {label}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  return <PraxisLivePreview />;
 }
 
 function SectionLabel({ children }) {
@@ -329,7 +154,12 @@ export default function Landing() {
           <div className="pointer-events-none absolute -right-[15%] top-[20%] -z-10 h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.09),transparent_66%)] blur-3xl" />
 
           <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[0.86fr_1.14fr] lg:gap-12 xl:gap-20">
-            <div className="relative z-10 max-w-2xl">
+            <motion.div
+              className="relative z-10 max-w-2xl"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+            >
               <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-domain-gold/15 bg-domain-gold/[0.065] px-3.5 py-2 text-xs font-medium text-domain-gold">
                 <WandSparkles className="h-3.5 w-3.5" aria-hidden />
                 Seu dia sai da cabeça e entra em movimento
@@ -367,11 +197,16 @@ export default function Landing() {
                   </span>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="relative lg:pl-2">
+            <motion.div
+              className="relative lg:pl-2"
+              initial={{ opacity: 0, y: 30, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.9, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            >
               <AppPreview />
-            </div>
+            </motion.div>
           </div>
         </section>
 
@@ -400,10 +235,18 @@ export default function Landing() {
 
             <div className="relative mt-16 grid gap-4 lg:grid-cols-3 lg:gap-5">
               <div className="absolute left-[16.66%] right-[16.66%] top-11 hidden h-px bg-gradient-to-r from-domain-gold/30 via-primary/30 to-domain-wellness/30 lg:block" />
-              {flowSteps.map((step) => {
+              {flowSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <article key={step.number} className="group relative rounded-3xl border border-white/[0.065] bg-white/[0.022] p-6 transition-colors hover:border-white/[0.1] hover:bg-white/[0.032] sm:p-7">
+                  <motion.article
+                    key={step.number}
+                    className="group relative rounded-3xl border border-white/[0.065] bg-white/[0.022] p-6 transition-colors hover:border-white/[0.1] hover:bg-white/[0.032] sm:p-7"
+                    initial={{ opacity: 0, y: 24 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.28 }}
+                    transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ y: -4 }}
+                  >
                     <div className="mb-8 flex items-center justify-between">
                       <div className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border ${step.shell}`}>
                         <Icon className={`h-5 w-5 ${step.accent}`} aria-hidden />
@@ -412,7 +255,7 @@ export default function Landing() {
                     </div>
                     <h3 className="forja-title text-2xl font-semibold tracking-[-0.04em]">{step.title}</h3>
                     <p className="mt-3 text-sm leading-7 text-muted-foreground">{step.description}</p>
-                  </article>
+                  </motion.article>
                 );
               })}
             </div>
@@ -427,15 +270,7 @@ export default function Landing() {
                     “Hoje eu preciso treinar, responder o Breno, estudar 40 minutos e resolver o EncarteZap.” O Praxis entende a bagunça e devolve clareza.
                   </p>
                 </div>
-                <div className="relative min-h-[240px] rounded-3xl border border-white/[0.06] bg-black/20 p-8 sm:p-10">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--domain-gold)/0.08),transparent_55%)]" />
-                  <VoiceOrb />
-                  <div className="relative mt-12 grid grid-cols-3 gap-2 text-center text-[10px] text-muted-foreground sm:text-xs">
-                    <div className="rounded-xl border border-white/[0.055] bg-white/[0.025] p-2.5"><span className="block text-sm font-semibold text-foreground">3</span> tarefas</div>
-                    <div className="rounded-xl border border-white/[0.055] bg-white/[0.025] p-2.5"><span className="block text-sm font-semibold text-foreground">2</span> hábitos</div>
-                    <div className="rounded-xl border border-white/[0.055] bg-white/[0.025] p-2.5"><span className="block text-sm font-semibold text-foreground">1</span> foco</div>
-                  </div>
-                </div>
+                <PraxisVoiceFlowDemo />
               </div>
             </div>
           </div>
@@ -454,10 +289,18 @@ export default function Landing() {
             </div>
 
             <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {featureCards.map((feature) => {
+              {featureCards.map((feature, index) => {
                 const Icon = feature.icon;
                 return (
-                  <article key={feature.eyebrow} className={`card-domain ${feature.accent} group rounded-3xl border border-white/[0.06] bg-background/45 p-6 transition-colors hover:border-white/[0.11] hover:bg-white/[0.028] sm:p-7`}>
+                  <motion.article
+                    key={feature.eyebrow}
+                    className={`card-domain ${feature.accent} group rounded-3xl border border-white/[0.06] bg-background/45 p-6 transition-colors hover:border-white/[0.11] hover:bg-white/[0.028] sm:p-7`}
+                    initial={{ opacity: 0, y: 26 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 0.6, delay: (index % 3) * 0.07, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ y: -5 }}
+                  >
                     <div className="mb-10 flex items-center justify-between">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.065] bg-white/[0.035]">
                         <Icon className="h-5 w-5 text-domain" aria-hidden />
@@ -467,7 +310,7 @@ export default function Landing() {
                     <p className="text-xs font-medium text-domain">{feature.eyebrow}</p>
                     <h3 className="forja-title mt-3 text-2xl font-semibold leading-tight tracking-[-0.04em]">{feature.title}</h3>
                     <p className="mt-4 text-sm leading-7 text-muted-foreground">{feature.description}</p>
-                  </article>
+                  </motion.article>
                 );
               })}
             </div>
