@@ -51,7 +51,7 @@ test.describe('rotas autenticadas @390px', () => {
       process.env.FORJA_APP_PASSWORD;
     test.skip(!pass, 'Defina PRAXIS_E2E_PASSWORD para testes logados');
 
-    await page.goto('/');
+    await page.goto('/entrar');
     await page.getByLabel('Senha').waitFor({ timeout: 30_000 });
     await page.getByLabel('Senha').fill(pass);
     await page.getByRole('button', { name: /Entrar/i }).click();

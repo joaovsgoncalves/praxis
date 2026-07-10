@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -23,11 +23,13 @@ import Achievements from '@/pages/Achievements';
 import WeeklyReview from '@/pages/WeeklyReview';
 import ShareCapture from '@/pages/ShareCapture';
 import Login from '@/pages/Login';
+import Landing from '@/pages/Landing';
 import { PraxisLoadingSplash, PraxisCenteredShell } from '@/components/layout/PraxisPage';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 const AuthenticatedApp = () => {
+  const location = useLocation();
   const {
     isLoadingAuth,
     isLoadingPublicSettings,
@@ -37,8 +39,19 @@ const AuthenticatedApp = () => {
     webAuthEnabled,
   } = useAuth();
 
+  const isLandingPath = location.pathname === '/';
+  const isLoginPath = location.pathname === '/entrar';
+
   if (isLoadingPublicSettings || isLoadingAuth) {
     return <PraxisLoadingSplash message="Carregando o Praxis…" />;
+  }
+
+  if (isLandingPath && !isAuthenticated) {
+    return <Landing />;
+  }
+
+  if (isLoginPath && !isAuthenticated && webAuthEnabled) {
+    return <Login onSuccess={onLoginSuccess} />;
   }
 
   if (authError) {
@@ -66,6 +79,10 @@ const AuthenticatedApp = () => {
         </PraxisCenteredShell>
       );
     }
+  }
+
+  if (isLoginPath && isAuthenticated) {
+    return <Navigate to="/" replace />;
   }
 
   if (!isAuthenticated && webAuthEnabled) {
