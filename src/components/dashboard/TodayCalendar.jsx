@@ -47,9 +47,8 @@ export default function TodayCalendar() {
         )}
 
         {!isLoading && !isError && events.length === 0 && (
-          <div className="flex flex-col items-center py-6 gap-2">
-            <CalendarDays className="w-8 h-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Nenhum evento hoje</p>
+          <div className="flex flex-col items-start py-3 gap-1">
+            <p className="text-sm text-muted-foreground">Nenhum evento no Google Agenda hoje.</p>
           </div>
         )}
 

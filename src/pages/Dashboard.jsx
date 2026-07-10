@@ -8,7 +8,6 @@ import TodayTasks from '@/components/dashboard/TodayTasks';
 import TodayHabits from '@/components/dashboard/TodayHabits';
 import WellnessWidget from '@/components/dashboard/WellnessWidget';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
-import WaterTracker from '@/components/dashboard/WaterTracker';
 import NutritionTodayCard from '@/components/nutrition/NutritionTodayCard';
 import TodayCalendar from '@/components/dashboard/TodayCalendar';
 import RitualWidget from '@/components/dashboard/RitualWidget';
@@ -46,19 +45,6 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
-
-  const [waterMl, setWaterMl] = React.useState(() => {
-    const dateKey = fortalezaDateKey();
-    const savedMl = localStorage.getItem(`water_ml_${dateKey}`);
-    if (savedMl) return Number(savedMl);
-    const savedGlasses = localStorage.getItem(`water_${dateKey}`);
-    return savedGlasses ? Number(savedGlasses) * 250 : 0;
-  });
-
-  const handleWaterUpdate = (val) => {
-    setWaterMl(val);
-    localStorage.setItem(`water_ml_${today}`, String(val));
-  };
 
   useEffect(() => {
     if (searchParams.get('from') === 'capture') {
@@ -262,22 +248,11 @@ export default function Dashboard() {
             />
           </Slot>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <NutritionTodayCard />
-          <Collapsible defaultOpen={false} className="rounded-2xl border border-white/5 bg-black/20">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between rounded-2xl px-4 py-5 h-auto">
-                <span className="text-sm font-medium text-left">Corpo e agenda</span>
-                <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-5 px-2 pb-5 sm:px-3">
-              <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
-              <TodayCalendar />
-              <RitualWidget />
-              <WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} />
-            </CollapsibleContent>
-          </Collapsible>
+          <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
+          <TodayCalendar />
+          <RitualWidget />
         </div>
       </div>
 

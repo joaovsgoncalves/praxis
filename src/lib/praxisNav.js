@@ -13,6 +13,7 @@ import {
   Settings,
   Inbox,
   UtensilsCrossed,
+  Dumbbell,
 } from 'lucide-react';
 
 /** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
@@ -28,10 +29,11 @@ export const secondaryNavItems = [
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
   { path: '/compras', label: 'Compras', icon: ShoppingBag },
+  { path: '/treinos', label: 'Treinos', icon: Dumbbell },
   { path: '/nutricao', label: 'Nutrição', icon: UtensilsCrossed },
   { path: '/capturas', label: 'Fila de capturas', icon: Inbox },
   { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
-  { path: '/rituais', label: 'Rituais', icon: Link2, requiresActiveRituals: true },
+  { path: '/rituais', label: 'Rituais', icon: Link2 },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy, requiresUnlockedAchievements: true },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },

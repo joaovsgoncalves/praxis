@@ -8,6 +8,7 @@ import {
 } from '@/components/layout/PraxisPage';
 import NutritionMetaForm from '@/components/nutrition/NutritionMetaForm';
 import NutritionOnboarding from '@/components/nutrition/NutritionOnboarding';
+import WaterTracker from '@/components/dashboard/WaterTracker';
 import FoodCatalog from '@/components/nutrition/FoodCatalog';
 import MealsCatalog from '@/components/nutrition/MealsCatalog';
 import DayDiary from '@/components/nutrition/DayDiary';
@@ -15,6 +16,7 @@ import NutritionHistory from '@/components/nutrition/NutritionHistory';
 import WeightTracker from '@/components/nutrition/WeightTracker';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatKcal, GOAL_LABELS } from '@/lib/nutrition';
+import { fortalezaDateKey } from '@/lib/dates';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +45,18 @@ export default function Nutricao() {
   const [maisPanel, setMaisPanel] = useState('alimentos');
   const [diaryDate, setDiaryDate] = useState(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const today = fortalezaDateKey();
+  const [waterMl, setWaterMl] = useState(() => {
+    const dateKey = fortalezaDateKey();
+    const savedMl = localStorage.getItem(`water_ml_${dateKey}`);
+    if (savedMl) return Number(savedMl);
+    const savedGlasses = localStorage.getItem(`water_${dateKey}`);
+    return savedGlasses ? Number(savedGlasses) * 250 : 0;
+  });
+  const handleWaterUpdate = (val) => {
+    setWaterMl(val);
+    localStorage.setItem(`water_ml_${today}`, String(val));
+  };
 
   const {
     data: profile,
@@ -155,11 +169,14 @@ export default function Nutricao() {
             className="space-y-4"
           >
             {tab === 'diario' ? (
-              loadingDay && !day ? (
-                <PraxisListSkeleton rows={3} />
-              ) : (
-                <DayDiary date={diaryDate || undefined} onDateChange={setDiaryDate} />
-              )
+              <>
+                <WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} />
+                {loadingDay && !day ? (
+                  <PraxisListSkeleton rows={3} />
+                ) : (
+                  <DayDiary date={diaryDate || undefined} onDateChange={setDiaryDate} />
+                )}
+              </>
             ) : null}
 
             {tab === 'historico' ? (

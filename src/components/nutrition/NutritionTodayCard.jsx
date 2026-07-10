@@ -78,7 +78,7 @@ export default function NutritionTodayCard() {
             </Link>
           </Button>
           <Button asChild size="sm" variant="ghost" className="rounded-full h-9 text-muted-foreground">
-            <Link to="/nutricao">Ver diário</Link>
+            <Link to="/nutricao">Diário · água</Link>
           </Button>
         </div>
       </CardContent>
