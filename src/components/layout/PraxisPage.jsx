@@ -37,11 +37,38 @@ const STAT_TONES = {
   neutral: 'border-white/5 bg-black/20',
 };
 
-export function StatTile({ label, value, tone = 'neutral', valueClassName }) {
+/** KPI tile — align="start" (default, hero grids) ou "center" (blocos de métrica). */
+export function StatTile({ label, value, tone = 'neutral', valueClassName, align = 'start', icon: Icon }) {
+  const centered = align === 'center';
   return (
-    <div className={cn('praxis-stat-tile', STAT_TONES[tone] || STAT_TONES.neutral)}>
-      <p className="praxis-stat-label">{label}</p>
-      <p className={cn('praxis-stat-value', tone === 'cyan' && 'text-cyan-100', valueClassName)}>{value}</p>
+    <div
+      className={cn(
+        'praxis-stat-tile h-full',
+        STAT_TONES[tone] || STAT_TONES.neutral,
+        centered && 'flex flex-col items-center justify-center text-center min-h-[7.25rem] px-3 py-4',
+      )}
+    >
+      {Icon ? (
+        <Icon
+          className={cn('h-5 w-5 shrink-0 text-muted-foreground', centered ? 'mb-1.5' : 'mb-1')}
+          aria-hidden
+        />
+      ) : null}
+      {centered ? (
+        <>
+          <p className={cn('text-2xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl', tone === 'cyan' && 'text-cyan-100', valueClassName)}>
+            {value}
+          </p>
+          <p className="mt-1.5 min-h-[2rem] max-w-[11rem] text-xs font-medium leading-snug text-muted-foreground">
+            {label}
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="praxis-stat-label min-h-[1.1rem]">{label}</p>
+          <p className={cn('praxis-stat-value', tone === 'cyan' && 'text-cyan-100', valueClassName)}>{value}</p>
+        </>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Timer, Flame, Smile, Zap, BarChart3 } from 'lucide-react';
-import { PageHero } from '@/components/layout/PraxisPage';
+import { PageHero, StatGrid, StatTile } from '@/components/layout/PraxisPage';
 import HabitsHeatmap from '@/components/dashboard/HabitsHeatmap';
 import CorrelationWidget from '@/components/dashboard/CorrelationWidget';
 import UpcomingPosts from '@/components/dashboard/UpcomingPosts';
@@ -73,39 +73,29 @@ export default function History() {
         )}
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-        <Card className="h-full border-border bg-card">
-          <CardContent className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 px-4 py-5 text-center">
-            <Timer className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-            <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">
-              {Math.round(totalFocusMinutes)}min
-            </p>
-            <p className="min-h-[2rem] max-w-[11rem] text-xs leading-snug text-muted-foreground">
-              Tempo de foco total
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="h-full border-border bg-card">
-          <CardContent className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 px-4 py-5 text-center">
-            <Zap className="h-5 w-5 shrink-0 text-chart-4" aria-hidden />
-            <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">{totalCycles}</p>
-            <p className="min-h-[2rem] max-w-[11rem] text-xs leading-snug text-muted-foreground">
-              Ciclos Pomodoro
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="h-full border-border bg-card">
-          <CardContent className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 px-4 py-5 text-center">
-            <Flame className="h-5 w-5 shrink-0 text-accent" aria-hidden />
-            <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">
-              {habitLogs.filter((l) => l.completed).length}
-            </p>
-            <p className="min-h-[2rem] max-w-[11rem] text-xs leading-snug text-muted-foreground">
-              Hábitos concluídos
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <StatGrid className="mt-0 sm:grid-cols-3 lg:grid-cols-3">
+        <StatTile
+          align="center"
+          icon={Timer}
+          label="Tempo de foco total"
+          value={`${Math.round(totalFocusMinutes)}min`}
+          valueClassName="tabular-nums"
+        />
+        <StatTile
+          align="center"
+          icon={Zap}
+          label="Ciclos Pomodoro"
+          value={String(totalCycles)}
+          valueClassName="tabular-nums"
+        />
+        <StatTile
+          align="center"
+          icon={Flame}
+          label="Hábitos concluídos"
+          value={String(habitLogs.filter((l) => l.completed).length)}
+          valueClassName="tabular-nums"
+        />
+      </StatGrid>
 
       <Card className="bg-card border-border">
         <CardHeader className="pb-2">

@@ -4,7 +4,7 @@ import { forjaApi } from '@/api/forjaClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Calendar } from 'lucide-react';
-import { PageHero } from '@/components/layout/PraxisPage';
+import { PageHero, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -147,22 +147,23 @@ export default function Achievements() {
         </div>
       )}
 
-      {/* Error */}
       {isError && (
-        <div className="text-center py-12">
-          <Trophy className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-sm text-destructive">Erro ao carregar conquistas</p>
+        <div className="mx-auto w-full max-w-xl">
+          <PraxisEmptyState
+            icon={Trophy}
+            title="Erro ao carregar conquistas"
+            description="Tenta de novo em instantes. Se continuar, confere a conexão."
+          />
         </div>
       )}
 
-      {/* Empty */}
       {!isLoading && !isError && achievements.length === 0 && (
-        <div className="text-center py-12">
-          <Trophy className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-sm text-muted-foreground">Nenhuma conquista disponível ainda</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            Continue completando tarefas e hábitos para desbloquear conquistas!
-          </p>
+        <div className="mx-auto w-full max-w-xl">
+          <PraxisEmptyState
+            icon={Trophy}
+            title="Nenhuma conquista disponível ainda"
+            description="Continue completando tarefas e hábitos para desbloquear medalhas."
+          />
         </div>
       )}
 

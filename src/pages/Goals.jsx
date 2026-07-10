@@ -18,7 +18,7 @@ import {
   GOAL_STARTER_TEMPLATES,
   goalPayloadFromStarter,
 } from '@/lib/goalStarterTemplates';
-import { PageHero, StatGrid, StatTile } from '@/components/layout/PraxisPage';
+import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 
 const timeframeLabels = { short: 'Curto prazo', medium: 'Médio prazo', long: 'Longo prazo' };
 const categoryLabels = { personal: 'Pessoal', professional: 'Profissional', health: 'Saúde', finance: 'Financeiro', learning: 'Aprendizado', other: 'Outro' };
@@ -119,31 +119,33 @@ export default function Goals() {
       </section>
 
       {filtered.length === 0 ? (
-        <Card className="border-primary/15 bg-primary/5">
-          <CardContent className="flex flex-col items-center gap-3 px-5 py-12 text-center sm:py-16">
-            <Target className="h-10 w-10 text-primary" />
-            <p className="text-lg font-semibold">Primeira meta em 3 passos</p>
-            <p className="max-w-md text-sm text-muted-foreground">Meta → prazo → tarefa ou hábito. Ou use um modelo abaixo.</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {GOAL_STARTER_TEMPLATES.map((t) => (
-                <Button
-                  key={t.id}
-                  variant="outline"
-                  className="rounded-full"
-                  onClick={() => {
-                    setWizardPreset(goalPayloadFromStarter(t.id));
-                    setShowWizard(true);
-                  }}
-                >
-                  {t.emoji} {t.label}
+        <div className="mx-auto w-full max-w-xl">
+          <PraxisEmptyState
+            icon={Target}
+            title="Primeira meta em 3 passos"
+            description="Meta → prazo → tarefa ou hábito. Ou use um modelo abaixo."
+            action={(
+              <>
+                {GOAL_STARTER_TEMPLATES.map((t) => (
+                  <Button
+                    key={t.id}
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => {
+                      setWizardPreset(goalPayloadFromStarter(t.id));
+                      setShowWizard(true);
+                    }}
+                  >
+                    {t.emoji} {t.label}
+                  </Button>
+                ))}
+                <Button onClick={() => { setWizardPreset(null); setShowWizard(true); }} className="rounded-full">
+                  <Plus className="mr-1.5 h-4 w-4" /> Começar wizard
                 </Button>
-              ))}
-            </div>
-            <Button onClick={() => { setWizardPreset(null); setShowWizard(true); }} className="rounded-full">
-              <Plus className="mr-1.5 h-4 w-4" /> Começar wizard
-            </Button>
-          </CardContent>
-        </Card>
+              </>
+            )}
+          />
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filtered.map((goal) => {
@@ -152,22 +154,32 @@ export default function Goals() {
             return (
               <Card key={goal.id} className="border-border bg-card">
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-base">{goal.title}</CardTitle>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="text-base leading-snug">{goal.title}</CardTitle>
                       <div className="mt-1 flex flex-wrap gap-2">
                         <Badge variant="outline" className="text-[10px]">{timeframeLabels[goal.timeframe]}</Badge>
                         <Badge variant="outline" className="text-[10px]">{statusLabels[goal.status]}</Badge>
                       </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex shrink-0 items-center gap-1">
                       {goal.status === 'active' && (
-                        <button type="button" onClick={() => updateGoal.mutate({ id: goal.id, data: { status: 'completed' } })}>
-                          <CheckCircle2 className="h-4 w-4 text-muted-foreground hover:text-accent" />
+                        <button
+                          type="button"
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent/10 hover:text-accent"
+                          aria-label="Concluir meta"
+                          onClick={() => updateGoal.mutate({ id: goal.id, data: { status: 'completed' } })}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
                         </button>
                       )}
-                      <button type="button" onClick={() => deleteGoal.mutate(goal.id)}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      <button
+                        type="button"
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Excluir meta"
+                        onClick={() => deleteGoal.mutate(goal.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>

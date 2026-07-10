@@ -162,7 +162,7 @@ export default function Compras() {
                   <p className="praxis-kicker-row">{PURCHASE_HORIZON_LABELS[h]}</p>
                   <p className="text-xs text-muted-foreground">{PURCHASE_HORIZON_HINTS[h]}</p>
                   <Card className="border-dashed border-white/5 bg-card/30">
-                    <CardContent className="py-8 text-center text-xs text-muted-foreground leading-relaxed px-4">
+                    <CardContent className="px-4 py-5 text-left text-xs leading-relaxed text-muted-foreground">
                       Nenhum item aqui ainda.
                     </CardContent>
                   </Card>

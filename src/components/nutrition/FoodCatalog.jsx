@@ -139,10 +139,10 @@ export default function FoodCatalog() {
           {foods.map((food) => (
             <li key={food.id}>
               <Card className="border-border/80 bg-card/40 shadow-none">
-                <CardContent className="px-4 py-3 flex items-start gap-3">
+                <CardContent className="flex items-center gap-3 px-4 py-3">
                   <button
                     type="button"
-                    className="mt-0.5 p-1 rounded-md text-muted-foreground hover:text-amber-400"
+                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-amber-400"
                     aria-label={food.is_favorite ? 'Tirar dos favoritos' : 'Favoritar'}
                     onClick={() => toggleFav.mutate(food)}
                   >

@@ -540,7 +540,7 @@ export default function HabitsTasks() {
                     : 'Crie uma tarefa ou mude o filtro acima.'
                 }
                 action={(
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <>
                     {taskScope === 'today' && overdueOpenTotal > 0 && (
                       <Button
                         type="button"
@@ -554,7 +554,7 @@ export default function HabitsTasks() {
                     <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
                       <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
                     </Button>
-                  </div>
+                  </>
                 )}
               />
             ) : (
