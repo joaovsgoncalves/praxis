@@ -137,7 +137,7 @@ export default function Ideas() {
         </StatGrid>
       </PageHero>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+      {isLoading ? (
         <section className="space-y-3">
           <SectionHeading
             kicker="Fila"
@@ -155,39 +155,75 @@ export default function Ideas() {
               </Select>
             )}
           />
-
-          {isLoading ? (
-            <PraxisListSkeleton rows={5} />
-          ) : sortedIdeas.length === 0 ? (
-            <PraxisEmptyState
-              icon={Lightbulb}
-              title="Nenhuma ideia neste filtro"
-              description="Guarde um pensamento sem data — quando fizer sentido, vira tarefa."
-              action={(
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                  <Button type="button" className="rounded-full praxis-touch-target" onClick={() => setShowIdeaForm(true)}>
-                    <Plus className="mr-1.5 h-4 w-4" /> Nova ideia
-                  </Button>
-                  <Button asChild variant="outline" className="rounded-full">
-                    <Link to="/revisao-semanal">Revisão semanal</Link>
-                  </Button>
-                </div>
+          <PraxisListSkeleton rows={5} />
+        </section>
+      ) : sortedIdeas.length === 0 ? (
+        /* Empty full-width: evita centro “torto” na coluna esquerda do grid 2-col */
+        <section className="mx-auto w-full max-w-xl space-y-4">
+          <SectionHeading
+            kicker="Fila"
+            title="Suas ideias"
+            trailing={(
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusFilterOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <PraxisEmptyState
+            icon={Lightbulb}
+            title="Nenhuma ideia neste filtro"
+            description="Guarde um pensamento sem data — quando fizer sentido, vira tarefa."
+            action={(
+              <>
+                <Button type="button" className="rounded-full praxis-touch-target" onClick={() => setShowIdeaForm(true)}>
+                  <Plus className="mr-1.5 h-4 w-4" /> Nova ideia
+                </Button>
+                <Button asChild variant="outline" className="rounded-full">
+                  <Link to="/revisao-semanal">Revisão semanal</Link>
+                </Button>
+              </>
+            )}
+          />
+        </section>
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <section className="space-y-3">
+            <SectionHeading
+              kicker="Fila"
+              title="Suas ideias"
+              trailing={(
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusFilterOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             />
-          ) : (
-            sortedIdeas.map((idea) => {
+            {sortedIdeas.map((idea) => {
               const status = idea.idea_status || 'capturada';
               const canPromote = status !== 'virou_tarefa' && status !== 'arquivada';
               return (
                 <Card key={idea.id} className="border-border/80 bg-card/90 shadow-sm">
-                  <CardContent className="p-4 sm:p-5 space-y-3">
+                  <CardContent className="space-y-3 p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-2">
                         <p className="text-base font-medium leading-snug text-foreground">
                           {cleanIdeaTitle(idea.title)}
                         </p>
                         {idea.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-3 whitespace-pre-wrap">
+                          <p className="line-clamp-3 whitespace-pre-wrap text-sm text-muted-foreground">
                             {idea.description}
                           </p>
                         )}
@@ -200,10 +236,10 @@ export default function Ideas() {
                         onClick={() => {
                           if (window.confirm('Excluir esta ideia?')) deleteIdea.mutate(idea.id);
                         }}
-                        className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         aria-label="Excluir"
                       >
-                        <Trash2 className="mx-auto h-4 w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
 
@@ -246,46 +282,46 @@ export default function Ideas() {
                   </CardContent>
                 </Card>
               );
-            })
-          )}
-        </section>
+            })}
+          </section>
 
-        <aside className="space-y-4">
-          <Card className="border-cyan-400/15 bg-cyan-500/5">
-            <CardContent className="space-y-3 p-5">
-              <p className="praxis-kicker-row text-cyan-200/90">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                <span>Revisão desta semana</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Promissoras e capturas dos últimos 7 dias — o que merece virar execução?
-              </p>
-              {weeklyReview.length === 0 ? (
-                <p className="text-sm text-muted-foreground/80">Nada na fila de revisão agora.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {weeklyReview.slice(0, 8).map((idea) => (
-                    <li key={idea.id} className="text-sm leading-snug">
-                      <span className="font-medium text-foreground">{cleanIdeaTitle(idea.title)}</span>
-                      <span className="text-muted-foreground"> · {IDEA_STATUS_LABELS[idea.idea_status || 'capturada']}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <Button asChild variant="outline" size="sm" className="w-full rounded-full">
-                <Link to="/revisao-semanal">Abrir revisão semanal</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <aside className="space-y-4">
+            <Card className="border-cyan-400/15 bg-cyan-500/5">
+              <CardContent className="space-y-3 p-5">
+                <p className="praxis-kicker-row text-cyan-200/90">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                  <span>Revisão desta semana</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Promissoras e capturas dos últimos 7 dias — o que merece virar execução?
+                </p>
+                {weeklyReview.length === 0 ? (
+                  <p className="text-sm text-muted-foreground/80">Nada na fila de revisão agora.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {weeklyReview.slice(0, 8).map((idea) => (
+                      <li key={idea.id} className="text-sm leading-snug">
+                        <span className="font-medium text-foreground">{cleanIdeaTitle(idea.title)}</span>
+                        <span className="text-muted-foreground"> · {IDEA_STATUS_LABELS[idea.idea_status || 'capturada']}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button asChild variant="outline" size="sm" className="w-full rounded-full">
+                  <Link to="/revisao-semanal">Abrir revisão semanal</Link>
+                </Button>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="space-y-2 p-5 text-sm leading-relaxed text-muted-foreground">
-              <p className="praxis-kicker-row">Dica</p>
-              <p>Ideia não leva hora nem prioridade alta — isso fica na tarefa, quando você decidir.</p>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+            <Card>
+              <CardContent className="space-y-2 p-5 text-sm leading-relaxed text-muted-foreground">
+                <p className="praxis-kicker-row">Dica</p>
+                <p>Ideia não leva hora nem prioridade alta — isso fica na tarefa, quando você decidir.</p>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
+      )}
 
       <Dialog open={showIdeaForm} onOpenChange={setShowIdeaForm}>
         <DialogContent>

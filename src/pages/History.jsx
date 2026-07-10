@@ -73,26 +73,36 @@ export default function History() {
         )}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="py-4 text-center">
-            <Timer className="w-5 h-5 text-primary mx-auto mb-1" />
-            <p className="text-2xl font-bold tabular-nums">{Math.round(totalFocusMinutes)}min</p>
-            <p className="text-xs text-muted-foreground">Tempo de foco total</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+        <Card className="h-full border-border bg-card">
+          <CardContent className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 px-4 py-5 text-center">
+            <Timer className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">
+              {Math.round(totalFocusMinutes)}min
+            </p>
+            <p className="min-h-[2rem] max-w-[11rem] text-xs leading-snug text-muted-foreground">
+              Tempo de foco total
+            </p>
           </CardContent>
         </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="py-4 text-center">
-            <Zap className="w-5 h-5 text-chart-4 mx-auto mb-1" />
-            <p className="text-2xl font-bold tabular-nums">{totalCycles}</p>
-            <p className="text-xs text-muted-foreground">Ciclos Pomodoro</p>
+        <Card className="h-full border-border bg-card">
+          <CardContent className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 px-4 py-5 text-center">
+            <Zap className="h-5 w-5 shrink-0 text-chart-4" aria-hidden />
+            <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">{totalCycles}</p>
+            <p className="min-h-[2rem] max-w-[11rem] text-xs leading-snug text-muted-foreground">
+              Ciclos Pomodoro
+            </p>
           </CardContent>
         </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="py-4 text-center">
-            <Flame className="w-5 h-5 text-accent mx-auto mb-1" />
-            <p className="text-2xl font-bold tabular-nums">{habitLogs.filter(l => l.completed).length}</p>
-            <p className="text-xs text-muted-foreground">Hábitos concluídos</p>
+        <Card className="h-full border-border bg-card">
+          <CardContent className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 px-4 py-5 text-center">
+            <Flame className="h-5 w-5 shrink-0 text-accent" aria-hidden />
+            <p className="text-2xl font-bold tabular-nums leading-none tracking-tight">
+              {habitLogs.filter((l) => l.completed).length}
+            </p>
+            <p className="min-h-[2rem] max-w-[11rem] text-xs leading-snug text-muted-foreground">
+              Hábitos concluídos
+            </p>
           </CardContent>
         </Card>
       </div>

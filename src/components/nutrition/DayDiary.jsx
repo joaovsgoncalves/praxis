@@ -488,7 +488,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                     {items.map((log) => (
                       <li key={log.id}>
                         <Card className="border-border/80 bg-card/40 shadow-none">
-                          <CardContent className="px-3 py-2.5 flex items-start gap-2">
+                          <CardContent className="flex items-center gap-2 px-3 py-2.5">
                             <button
                               type="button"
                               className="min-w-0 flex-1 text-left"
@@ -497,22 +497,35 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                                 setEditServings(String(log.servings ?? 1));
                               }}
                             >
-                              <p className="text-sm font-medium truncate">{log.name_snapshot}</p>
-                              <p className="text-xs text-muted-foreground tabular-nums">
-                                {log.grams != null && Number(log.grams) > 0
-                                  ? `${Number(log.grams)} g · `
-                                  : log.servings != null && Number(log.servings) !== 1
-                                    ? `${Number(log.servings)}× · `
-                                    : ''}
-                                {formatKcal(log.kcal)} · P {formatGrams(log.protein_g)} · C{' '}
-                                {formatGrams(log.carbs_g)} · G {formatGrams(log.fat_g)}
+                              <p className="truncate text-sm font-medium leading-snug">
+                                {log.name_snapshot}
+                              </p>
+                              <p className="mt-0.5 text-xs leading-snug text-muted-foreground tabular-nums">
+                                <span className="text-muted-foreground/90">
+                                  {log.grams != null && Number(log.grams) > 0
+                                    ? `${Number(log.grams)} g`
+                                    : log.servings != null && Number(log.servings) !== 1
+                                      ? `${Number(log.servings)}×`
+                                      : null}
+                                  {(log.grams != null && Number(log.grams) > 0) ||
+                                  (log.servings != null && Number(log.servings) !== 1)
+                                    ? ' · '
+                                    : null}
+                                </span>
+                                {formatKcal(log.kcal)}
+                                <span className="text-muted-foreground/70"> · </span>
+                                P {formatGrams(log.protein_g)}
+                                <span className="text-muted-foreground/70"> · </span>
+                                C {formatGrams(log.carbs_g)}
+                                <span className="text-muted-foreground/70"> · </span>
+                                G {formatGrams(log.fat_g)}
                               </p>
                             </button>
                             <Button
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                              className="h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-destructive"
                               aria-label="Remover"
                               onClick={() => {
                                 if (window.confirm(`Remover “${log.name_snapshot}”?`)) {
