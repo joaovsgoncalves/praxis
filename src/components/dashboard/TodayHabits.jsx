@@ -58,9 +58,10 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
         {habits.map((habit) => {
           const done = isCompletedToday(habit.id);
           return (
-            <motion.button
-              type="button"
+            <motion.div
               key={habit.id}
+              role="button"
+              tabIndex={0}
               ref={(el) => {
                 if (el) rowRefs.current.set(habit.id, el);
                 else rowRefs.current.delete(habit.id);
@@ -73,6 +74,12 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
                   : 'border-white/[0.055] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]',
               )}
               onClick={(event) => handleToggle(habit, done, event)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleToggle(habit, done, event);
+                }
+              }}
             >
               <Checkbox
                 checked={done}
@@ -101,7 +108,7 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
                   {habit.current_streak}
                 </span>
               ) : null}
-            </motion.button>
+            </motion.div>
           );
         })}
       </CardContent>
