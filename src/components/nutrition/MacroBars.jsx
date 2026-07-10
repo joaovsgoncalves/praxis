@@ -40,6 +40,7 @@ function pct(used, target) {
 
 /**
  * Barras de kcal + P/C/G.
+ * Coluna de valores com largura mínima pra alinhar o eixo direito.
  * @param {'full'|'compact'} variant
  */
 export default function MacroBars({
@@ -70,15 +71,25 @@ export default function MacroBars({
 
         return (
           <div key={row.key} className="space-y-1">
-            <div className="flex items-baseline justify-between gap-2 text-xs">
+            <div className="grid grid-cols-[minmax(4.5rem,auto)_1fr] items-baseline gap-x-3 text-xs">
               <span
-                className={cn('text-muted-foreground shrink-0', compact && 'w-7')}
+                className={cn(
+                  'text-muted-foreground shrink-0',
+                  compact && 'w-7',
+                )}
                 id={`macro-label-${row.key}`}
               >
                 {compact ? row.short : row.label}
               </span>
-              <span className="tabular-nums text-right min-w-0 truncate">
-                <span className={cn(over && 'text-amber-400')}>{usedLabel}</span>
+              <span className="min-w-0 justify-self-end text-right tabular-nums">
+                <span
+                  className={cn(
+                    'font-medium',
+                    over ? 'text-amber-400' : 'text-foreground',
+                  )}
+                >
+                  {usedLabel}
+                </span>
                 {hasTarget ? (
                   <span className="text-muted-foreground"> / {targetLabel}</span>
                 ) : null}
@@ -86,8 +97,9 @@ export default function MacroBars({
             </div>
             <div
               className={cn(
-                'w-full rounded-full bg-secondary/60 overflow-hidden',
+                'relative w-full overflow-hidden rounded-full bg-secondary/60',
                 compact ? 'h-1.5' : 'h-2',
+                over && 'ring-1 ring-inset ring-amber-400/35',
               )}
               role="progressbar"
               aria-valuenow={Math.round(Number(used) || 0)}
@@ -101,7 +113,7 @@ export default function MacroBars({
                   'h-full rounded-full motion-safe:transition-[width] motion-safe:duration-200 motion-safe:ease-out',
                   'motion-reduce:transition-none',
                   row.barClass,
-                  over && 'opacity-90',
+                  over && 'opacity-95',
                   !hasTarget && Number(used) > 0 && 'w-full opacity-40',
                 )}
                 style={{

@@ -387,18 +387,29 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       ) : (
         <>
           <Card className="border-border/80 bg-card/40 shadow-none">
-            <CardContent className="px-4 py-3 space-y-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Total do dia</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  {formatKcal(totals?.kcal)}
-                  {targets?.kcal != null ? (
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {' '}
-                      / {formatKcal(targets.kcal)}
+            <CardContent className="space-y-3 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Total do dia</p>
+                  <p className="text-lg font-semibold tabular-nums leading-tight">
+                    <span
+                      className={
+                        targets?.kcal != null &&
+                        Number(totals?.kcal) > Number(targets.kcal) * 1.02
+                          ? 'text-amber-400'
+                          : undefined
+                      }
+                    >
+                      {formatKcal(totals?.kcal)}
                     </span>
-                  ) : null}
-                </p>
+                    {targets?.kcal != null ? (
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {' '}
+                        / {formatKcal(targets.kcal)}
+                      </span>
+                    ) : null}
+                  </p>
+                </div>
               </div>
               <MacroBars totals={totals || {}} targets={targets || {}} variant="full" />
             </CardContent>
@@ -407,12 +418,23 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               {remaining && remaining.kcal != null ? (
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  Faltam {formatKcal(Math.max(0, remaining.kcal))}
-                  {remaining.protein_g != null
-                    ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
-                    : ''}
-                </p>
+                Number(remaining.kcal) < 0 ||
+                (remaining.protein_g != null && Number(remaining.protein_g) < 0) ? (
+                  <p className="text-xs tabular-nums text-amber-400/95">
+                    Passou{' '}
+                    {formatKcal(Math.abs(Math.min(0, Number(remaining.kcal))))}
+                    {remaining.protein_g != null && Number(remaining.protein_g) < 0
+                      ? ` · P ${formatGrams(Math.abs(Number(remaining.protein_g)))}`
+                      : ''}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    Faltam {formatKcal(Math.max(0, remaining.kcal))}
+                    {remaining.protein_g != null
+                      ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
+                      : ''}
+                  </p>
+                )
               ) : (
                 <p className="text-xs text-muted-foreground">Diário do dia</p>
               )}
@@ -488,7 +510,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                     {items.map((log) => (
                       <li key={log.id}>
                         <Card className="border-border/80 bg-card/40 shadow-none">
-                          <CardContent className="flex items-center gap-2 px-3 py-2.5">
+                          <CardContent className="flex items-center gap-3 px-3 py-2.5">
                             <button
                               type="button"
                               className="min-w-0 flex-1 text-left"
@@ -497,27 +519,25 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                                 setEditServings(String(log.servings ?? 1));
                               }}
                             >
-                              <p className="truncate text-sm font-medium leading-snug">
-                                {log.name_snapshot}
-                              </p>
-                              <p className="mt-0.5 text-xs leading-snug text-muted-foreground tabular-nums">
-                                <span className="text-muted-foreground/90">
+                              <div className="flex min-w-0 items-baseline justify-between gap-2">
+                                <p className="min-w-0 truncate text-sm font-medium leading-snug">
+                                  {log.name_snapshot}
+                                </p>
+                                <p className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
                                   {log.grams != null && Number(log.grams) > 0
                                     ? `${Number(log.grams)} g`
                                     : log.servings != null && Number(log.servings) !== 1
                                       ? `${Number(log.servings)}×`
-                                      : null}
-                                  {(log.grams != null && Number(log.grams) > 0) ||
-                                  (log.servings != null && Number(log.servings) !== 1)
-                                    ? ' · '
-                                    : null}
-                                </span>
+                                      : formatKcal(log.kcal)}
+                                </p>
+                              </div>
+                              <p className="mt-0.5 text-xs leading-snug text-muted-foreground tabular-nums">
                                 {formatKcal(log.kcal)}
-                                <span className="text-muted-foreground/70"> · </span>
+                                <span className="text-muted-foreground/60"> · </span>
                                 P {formatGrams(log.protein_g)}
-                                <span className="text-muted-foreground/70"> · </span>
+                                <span className="text-muted-foreground/60"> · </span>
                                 C {formatGrams(log.carbs_g)}
-                                <span className="text-muted-foreground/70"> · </span>
+                                <span className="text-muted-foreground/60"> · </span>
                                 G {formatGrams(log.fat_g)}
                               </p>
                             </button>
@@ -525,7 +545,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-9 w-9 shrink-0 self-center text-muted-foreground hover:text-destructive"
+                              className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
                               aria-label="Remover"
                               onClick={() => {
                                 if (window.confirm(`Remover “${log.name_snapshot}”?`)) {
