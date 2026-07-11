@@ -2,6 +2,7 @@
 import { defineConfig } from '@playwright/test';
 
 const baseURL = process.env.PRAXIS_E2E_BASE || 'https://praxis-jota.vercel.app';
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '';
 
 export default defineConfig({
   testDir: 'e2e',
@@ -13,6 +14,7 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    launchOptions: chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined,
   },
   projects: [
     {

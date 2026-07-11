@@ -34,6 +34,7 @@ import {
   updatePurchase,
   deletePurchase,
 } from './purchaseList.js';
+import { initWorkoutSchema, registerWorkoutRoutes } from './workouts.js';
 import {
   initNutritionSchema,
   getNutritionProfile,
@@ -369,9 +370,11 @@ initAuthSchema(db);
 initCaptureQueueSchema(db);
 initPurchaseSchema(db);
 initNutritionSchema(db);
+initWorkoutSchema(db);
 ensureDefaultUser(db);
 registerAuthRoutes(app, db, { secureCookie: COOKIE_SECURE });
 app.use(createApiAuthMiddleware({ db, apiKey: FORJA_API_KEY }));
+registerWorkoutRoutes(app, db);
 
 function stripPriorityPrefix(title) {
   if (typeof title !== 'string') return title;

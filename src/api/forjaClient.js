@@ -22,6 +22,10 @@ const OFFLINE_CACHEABLE = [
   '/api/insights/correlation',
   '/api/insights/weekly',
   '/api/insights/avoidance',
+  '/api/workouts/summary',
+  '/api/workouts/programs',
+  '/api/workouts/exercises',
+  '/api/workouts/sessions',
   '/api/weekly-reviews',
 ];
 
@@ -76,8 +80,10 @@ async function request(path, options = {}) {
       credentials: 'include',
     });
     if (!res.ok) {
-      const err = new Error(`API error: ${res.status}`);
+      const body = await res.json().catch(() => ({}));
+      const err = new Error(body?.error || body?.detail || `API error: ${res.status}`);
       err.status = res.status;
+      err.body = body;
       throw err;
     }
     if (res.status === 204) return null;
@@ -268,6 +274,79 @@ export const forjaApi = {
     copyDay: (data = {}) =>
       request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
     seed: () => request('/api/nutrition/seed', { method: 'POST', body: '{}' }),
+  },
+
+  // Workouts
+  workouts: {
+    summary: () => request('/api/workouts/summary'),
+    programs: {
+      list: () => request('/api/workouts/programs'),
+      get: (id) => request(`/api/workouts/programs/${id}`),
+      create: (data) => request('/api/workouts/programs', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/api/workouts/programs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/api/workouts/programs/${id}`, { method: 'DELETE' }),
+      activate: (id) => request(`/api/workouts/programs/${id}/activate`, { method: 'POST', body: '{}' }),
+      advance: (id, data = {}) => request(`/api/workouts/programs/${id}/advance`, { method: 'POST', body: JSON.stringify(data) }),
+      reorderDays: (id, orderedIds) => request(`/api/workouts/programs/${id}/days/reorder`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ordered_ids: orderedIds }),
+      }),
+    },
+    days: {
+      create: (programId, data) => request(`/api/workouts/programs/${programId}/days`, { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/api/workouts/days/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/api/workouts/days/${id}`, { method: 'DELETE' }),
+      addExercise: (id, data) => request(`/api/workouts/days/${id}/exercises`, { method: 'POST', body: JSON.stringify(data) }),
+      reorderExercises: (id, orderedIds) => request(`/api/workouts/days/${id}/exercises/reorder`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ordered_ids: orderedIds }),
+      }),
+    },
+    exercises: {
+      list: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.q) query.set('q', params.q);
+        if (params.limit) query.set('limit', String(params.limit));
+        const qs = query.toString();
+        return request(`/api/workouts/exercises${qs ? `?${qs}` : ''}`);
+      },
+      create: (data) => request('/api/workouts/exercises', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) => request(`/api/workouts/exercises/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/api/workouts/exercises/${id}`, { method: 'DELETE' }),
+    },
+    dayExercises: {
+      update: (id, data) => request(`/api/workouts/day-exercises/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id) => request(`/api/workouts/day-exercises/${id}`, { method: 'DELETE' }),
+    },
+    sessions: {
+      list: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.status) query.set('status', params.status);
+        if (params.limit) query.set('limit', String(params.limit));
+        const qs = query.toString();
+        return request(`/api/workouts/sessions${qs ? `?${qs}` : ''}`);
+      },
+      active: () => request('/api/workouts/sessions/active'),
+      get: (id) => request(`/api/workouts/sessions/${id}`),
+      start: (workoutDayId) => request('/api/workouts/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ workout_day_id: workoutDayId }),
+      }),
+      addSet: (sessionId, data) => request(`/api/workouts/sessions/${sessionId}/sets`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+      updateSet: (setId, data) => request(`/api/workouts/sets/${setId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+      deleteSet: (setId) => request(`/api/workouts/sets/${setId}`, { method: 'DELETE' }),
+      finish: (sessionId, data = {}) => request(`/api/workouts/sessions/${sessionId}/finish`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+      abandon: (sessionId) => request(`/api/workouts/sessions/${sessionId}/abandon`, { method: 'POST', body: '{}' }),
+    },
   },
 
   // Habits
