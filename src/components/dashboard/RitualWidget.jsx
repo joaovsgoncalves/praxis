@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Flame, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Flame, Sparkles } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -26,8 +26,9 @@ function ConfettiOverlay() {
   );
 }
 
-function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
+function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsible = false }) {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isOpen, setIsOpen] = useState(!collapsible);
   const prevDoneRef = useRef(null);
 
   const habits = ritual.habits || [];
@@ -64,82 +65,100 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today }) {
       {showConfetti && <ConfettiOverlay />}
 
       {/* Ritual header */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{ritual.emoji || '⚡'}</span>
-        <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
-        {isComplete ? (
-          <Badge variant="outline" className="shrink-0 border-domain-wellness/20 bg-domain-wellness/[0.08] text-xs text-domain-wellness">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            Completo
-          </Badge>
-        ) : isMinimum ? (
-          <Badge variant="outline" className="shrink-0 border-domain-gold/20 bg-domain-gold/[0.07] text-xs text-domain-gold">
-            Parcial
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground shrink-0">
-            {completedCount}/{totalCount}
-          </span>
-        )}
-      </div>
+      {collapsible ? (
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 text-left"
+          onClick={() => setIsOpen((open) => !open)}
+          aria-expanded={isOpen}
+        >
+          <span className="text-lg">{ritual.emoji || '⚡'}</span>
+          <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{completedCount}/{totalCount}</span>
+          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">{ritual.emoji || '⚡'}</span>
+          <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
+          {isComplete ? (
+            <Badge variant="outline" className="shrink-0 border-domain-wellness/20 bg-domain-wellness/[0.08] text-xs text-domain-wellness">
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+              Completo
+            </Badge>
+          ) : isMinimum ? (
+            <Badge variant="outline" className="shrink-0 border-domain-gold/20 bg-domain-gold/[0.07] text-xs text-domain-gold">
+              Parcial
+            </Badge>
+          ) : (
+            <span className="text-xs text-muted-foreground shrink-0">
+              {completedCount}/{totalCount}
+            </span>
+          )}
+        </div>
+      )}
 
-      {/* Progress bar */}
-      <Progress
-        value={progressPercent}
-        className={cn('h-1.5 mb-2', isComplete ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
-      />
+      {(!collapsible || isOpen) && (
+        <div className={collapsible ? 'mt-3' : ''}>
+          {/* Progress bar */}
+          <Progress
+            value={progressPercent}
+            className={cn('h-1.5 mb-2', isComplete ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
+          />
 
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <p className="text-[11px] text-muted-foreground">{statusCopy}</p>
-        {!isComplete && nextHabit && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-[11px] text-gold hover:text-gold"
-            onClick={() => onCompleteMinimum(nextHabit.id)}
-          >
-            <Flame className="w-3 h-3" />
-            Mínimo
-          </Button>
-        )}
-      </div>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-[11px] text-muted-foreground">{statusCopy}</p>
+            {!isComplete && nextHabit && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[11px] text-gold hover:text-gold"
+                onClick={() => onCompleteMinimum(nextHabit.id)}
+              >
+                <Flame className="w-3 h-3" />
+                Mínimo
+              </Button>
+            )}
+          </div>
 
-      {/* Habit checklist */}
-      <ul className="space-y-1.5">
-        {habits.map((habit) => (
-          <li key={habit.id} className="flex items-center gap-2 group">
-            <Checkbox
-              id={`ritual-habit-${ritual.id}-${habit.id}`}
-              checked={habit.completed_today}
-              onCheckedChange={() => onToggleHabit(habit.id, habit.completed_today)}
-              className={cn(
-                'h-4 w-4 shrink-0',
-                habit.completed_today
-                  ? 'data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
-                  : 'border-muted-foreground/40'
-              )}
-            />
-            <label
-              htmlFor={`ritual-habit-${ritual.id}-${habit.id}`}
-              className={cn(
-                'text-xs cursor-pointer transition-colors select-none',
-                habit.completed_today
-                  ? 'line-through text-muted-foreground'
-                  : 'text-foreground/80 group-hover:text-foreground'
-              )}
-            >
-              {habit.emoji && <span className="mr-1">{habit.emoji}</span>}
-              {habit.title || habit.name}
-            </label>
-          </li>
-        ))}
-      </ul>
+          {/* Habit checklist */}
+          <ul className="space-y-1.5">
+            {habits.map((habit) => (
+              <li key={habit.id} className="flex items-center gap-2 group">
+                <Checkbox
+                  id={`ritual-habit-${ritual.id}-${habit.id}`}
+                  checked={habit.completed_today}
+                  onCheckedChange={() => onToggleHabit(habit.id, habit.completed_today)}
+                  className={cn(
+                    'h-4 w-4 shrink-0',
+                    habit.completed_today
+                      ? 'data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
+                      : 'border-muted-foreground/40'
+                  )}
+                />
+                <label
+                  htmlFor={`ritual-habit-${ritual.id}-${habit.id}`}
+                  className={cn(
+                    'text-xs cursor-pointer transition-colors select-none',
+                    habit.completed_today
+                      ? 'line-through text-muted-foreground'
+                      : 'text-foreground/80 group-hover:text-foreground'
+                  )}
+                >
+                  {habit.emoji && <span className="mr-1">{habit.emoji}</span>}
+                  {habit.title || habit.name}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function RitualWidget() {
+export default function RitualWidget({ collapsible = false }) {
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -254,6 +273,7 @@ export default function RitualWidget() {
                         key={ritual.id}
                         ritual={ritual}
                         today={today}
+                        collapsible={collapsible}
                         onToggleHabit={(habitId, isDone) =>
                           toggleHabitMutation.mutate({ habitId, isDone })
                         }

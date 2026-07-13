@@ -16,6 +16,7 @@ import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
 import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import HabitForm from '@/components/habits-tasks/HabitForm';
+import RitualWidget from '@/components/dashboard/RitualWidget';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
 import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
@@ -111,6 +112,10 @@ export default function HabitsTasks() {
   const { data: activeHabitsList = [] } = useQuery({
     queryKey: ['habits', 'active'],
     queryFn: () => forjaApi.habits.list({ status: 'active' }),
+  });
+  const { data: activeRituals = [] } = useQuery({
+    queryKey: ['rituals', today],
+    queryFn: () => forjaApi.rituals.list({ status: 'active', date: today }),
   });
   const { data: userSettings } = useQuery({
     queryKey: ['me'],
@@ -315,6 +320,13 @@ export default function HabitsTasks() {
     if (categoryFilter !== 'all' && h.category !== categoryFilter) return false;
     return true;
   });
+  const showRituals = habitStatusFilter === 'active' && categoryFilter === 'all' && activeRituals.length > 0;
+  const activeRitualHabitIds = new Set(
+    activeRituals.flatMap((ritual) => ritual.habits_order || ritual.habits?.map((habit) => habit.id) || []),
+  );
+  const flatHabits = showRituals
+    ? filteredHabits.filter((habit) => !activeRitualHabitIds.has(habit.id))
+    : filteredHabits;
 
   const activeHabitsDueToday = activeHabitsList.filter(
     (h) => isHabitDueOnDate(h, today)
@@ -334,7 +346,7 @@ export default function HabitsTasks() {
   };
 
   const moveHabit = (habitId, direction) => {
-    const orderedIds = buildMovedOrder(habits, filteredHabits, habitId, direction);
+    const orderedIds = buildMovedOrder(habits, flatHabits, habitId, direction);
     if (orderedIds) reorderHabits.mutate(orderedIds);
   };
 
@@ -683,23 +695,34 @@ export default function HabitsTasks() {
               </div>
             )}
 
-            {filteredHabits.length === 0 ? (
-              <PraxisEmptyState
-                icon={Flame}
-                title="Nenhum hábito ainda"
-                description="Cadastre hábitos essenciais — eles aparecem no Hoje e nos rituais."
-                action={(
-                  <Button
-                    onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
-                    className="rounded-full praxis-touch-target"
-                  >
-                    <Plus className="mr-1.5 h-4 w-4" /> Novo hábito
-                  </Button>
-                )}
-              />
+            {showRituals && (
+              <RitualWidget collapsible />
+            )}
+
+            {flatHabits.length === 0 ? (
+              !showRituals && (
+                <PraxisEmptyState
+                  icon={Flame}
+                  title="Nenhum hábito ainda"
+                  description="Cadastre hábitos essenciais — eles aparecem no Hoje e nos rituais."
+                  action={(
+                    <Button
+                      onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
+                      className="rounded-full praxis-touch-target"
+                    >
+                      <Plus className="mr-1.5 h-4 w-4" /> Novo hábito
+                    </Button>
+                  )}
+                />
+              )
             ) : (
               <div className="space-y-3">
-                {filteredHabits.map((habit, index) => {
+                {showRituals && (
+                  <p className="pt-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    Outros hábitos
+                  </p>
+                )}
+                {flatHabits.map((habit, index) => {
                   const done = isHabitCompletedToday(habit.id);
                   const dueToday = isHabitDueOnDate(habit, today);
                   const canCheckIn = habit.status === 'active' && dueToday;
@@ -783,7 +806,7 @@ export default function HabitsTasks() {
                           habit={habit}
                           busy={reorderHabits.isPending}
                           disableUp={index === 0}
-                          disableDown={index === filteredHabits.length - 1}
+                          disableDown={index === flatHabits.length - 1}
                           onMoveUp={() => moveHabit(habit.id, -1)}
                           onMoveDown={() => moveHabit(habit.id, 1)}
                           onEdit={() => { setShowHabitForm(false); setEditingHabit(habit); }}
