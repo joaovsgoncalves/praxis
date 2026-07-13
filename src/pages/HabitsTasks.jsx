@@ -114,7 +114,7 @@ export default function HabitsTasks() {
     queryFn: () => forjaApi.habits.list({ status: 'active' }),
   });
   const { data: activeRituals = [] } = useQuery({
-    queryKey: ['rituals', today],
+    queryKey: ['rituals', { date: today, status: 'active' }],
     queryFn: () => forjaApi.rituals.list({ status: 'active', date: today }),
   });
   const { data: userSettings } = useQuery({
@@ -696,7 +696,7 @@ export default function HabitsTasks() {
             )}
 
             {showRituals && (
-              <RitualWidget collapsible />
+              <RitualWidget collapsible today={today} status="active" />
             )}
 
             {flatHabits.length === 0 ? (

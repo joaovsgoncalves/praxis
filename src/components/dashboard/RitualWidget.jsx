@@ -158,13 +158,14 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
   );
 }
 
-export default function RitualWidget({ collapsible = false }) {
+export default function RitualWidget({ collapsible = false, today: todayProp, status }) {
   const queryClient = useQueryClient();
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = todayProp || format(new Date(), 'yyyy-MM-dd');
+  const ritualParams = { date: today, ...(status ? { status } : {}) };
 
   const { data: rituals = [], isLoading, isError } = useQuery({
-    queryKey: ['rituals', today],
-    queryFn: () => forjaApi.rituals.list({ date: today }),
+    queryKey: ['rituals', ritualParams],
+    queryFn: () => forjaApi.rituals.list(ritualParams),
     refetchInterval: 30000,
   });
 
