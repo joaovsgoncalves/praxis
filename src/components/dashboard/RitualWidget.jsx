@@ -162,9 +162,10 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
   const queryClient = useQueryClient();
   const today = todayProp || format(new Date(), 'yyyy-MM-dd');
   const ritualParams = { date: today, ...(status ? { status } : {}) };
+  const ritualQueryKey = ['rituals', ritualParams];
 
   const { data: rituals = [], isLoading, isError } = useQuery({
-    queryKey: ['rituals', ritualParams],
+    queryKey: ritualQueryKey,
     queryFn: () => forjaApi.rituals.list(ritualParams),
     refetchInterval: 30000,
   });
@@ -184,8 +185,8 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
     onMutate: async ({ habitId, isDone }) => {
       // Optimistic update
       await queryClient.cancelQueries({ queryKey: ['rituals'] });
-      const previous = queryClient.getQueryData(['rituals', today]);
-      queryClient.setQueryData(['rituals', today], (old) => {
+      const previous = queryClient.getQueryData(ritualQueryKey);
+      queryClient.setQueryData(ritualQueryKey, (old) => {
         if (!old) return old;
         return old.map((ritual) => ({
           ...ritual,
@@ -198,7 +199,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(['rituals', today], context.previous);
+        queryClient.setQueryData(ritualQueryKey, context.previous);
       }
     },
     onSettled: () => {
