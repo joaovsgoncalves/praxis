@@ -1,15 +1,16 @@
 # Backend Express roda na VPS (forja-api.service), não na Vercel.
-# Se api/*.js entrar no deploy, a Vercel vira cada arquivo em serverless e
+# Só a pasta RAIZ /api (server.js, workouts.js, nutrition.js…).
+# NÃO usar o padrão "api" sem barra — isso também esconde src/api (forjaClient)
+# e quebra o build do Vite no deploy.
+#
+# Se esses arquivos entrarem no deploy, a Vercel vira cada um em serverless e
 # intercepta /api/workouts, /api/nutrition etc. ANTES do rewrite do vercel.json
-# para o Express real → 500 FUNCTION_INVOCATION_FAILED no site público.
-# Frontend só precisa do build Vite + rewrite/proxy.
-api
-api/**
+# para o Express real → 500 no site público.
+/api
+/api/**
 
 # Ruído de dev / local (não vai pro edge)
-e2e
-test-results
-playwright-report
-docs
-*.md
-!README.md
+/e2e
+/test-results
+/playwright-report
+/docs
