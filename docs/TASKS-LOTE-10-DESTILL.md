@@ -1,6 +1,6 @@
 # Tasks — Lote 10 + nome honesto
 
-Branch: `main`  
+Branch: `main` @ `0859def`  
 Plano: `docs/PLANO-PRAXIS-LOTE-10-DESTILL-NOME-HONESTO.md`
 
 ## 0) Nome honesto
@@ -20,4 +20,4 @@ Plano: `docs/PLANO-PRAXIS-LOTE-10-DESTILL-NOME-HONESTO.md`
 - [x] TodayTasks: Não hoje + Editar; Foco link texto
 
 ## 4) Ship
-- [ ] prepush + push + deploy + alias + smoke
+- [x] prepush + push + deploy + alias + smoke note API
