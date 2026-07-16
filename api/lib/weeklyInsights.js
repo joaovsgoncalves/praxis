@@ -80,18 +80,36 @@ export function buildWeeklyInsights(db, weekStart) {
   const activeHabits = db.prepare("SELECT * FROM habits WHERE status = 'active'").all();
   let habitSlots = 0;
   let habitDone = 0;
+  let habitSkipped = 0;
+  let habitOpenSlots = 0;
   const missByHabit = {};
+  const skipByHabit = {};
+  const skipReasonByHabit = {};
 
   for (const day of days) {
     for (const h of activeHabits) {
       if (!isHabitDueOnDate(h, day)) continue;
       habitSlots += 1;
       const log = db.prepare(
-        'SELECT completed FROM habit_logs WHERE habit_id = ? AND date = ?',
+        'SELECT completed, outcome, skip_reason FROM habit_logs WHERE habit_id = ? AND date = ?',
       ).get(h.id, day);
-      const ok = log && (log.completed === 1 || log.completed === true);
-      if (ok) habitDone += 1;
-      else {
+      const isSkipped = log && log.outcome === 'skipped';
+      const isDone = log && !isSkipped && (
+        log.outcome === 'done' || log.completed === 1 || log.completed === true
+      );
+      if (isDone) {
+        habitDone += 1;
+      } else if (isSkipped) {
+        habitSkipped += 1;
+        const key = h.title || h.id;
+        skipByHabit[key] = (skipByHabit[key] || 0) + 1;
+        if (log.skip_reason) {
+          if (!skipReasonByHabit[key]) skipReasonByHabit[key] = {};
+          const r = log.skip_reason;
+          skipReasonByHabit[key][r] = (skipReasonByHabit[key][r] || 0) + 1;
+        }
+      } else {
+        habitOpenSlots += 1;
         const key = h.title || h.id;
         missByHabit[key] = (missByHabit[key] || 0) + 1;
       }
@@ -158,6 +176,15 @@ export function buildWeeklyInsights(db, weekStart) {
     .slice(0, 5)
     .map(([title, misses]) => ({ title: cleanTitle(title), misses }));
 
+  const topSkipped = Object.entries(skipByHabit)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([title, skips]) => {
+      const reasons = skipReasonByHabit[title] || {};
+      const topReason = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      return { title: cleanTitle(title), skips, top_reason: topReason };
+    });
+
   const victoryTitles = completedTasks
     .slice(0, 5)
     .map((t) => cleanTitle(t.title))
@@ -175,7 +202,21 @@ export function buildWeeklyInsights(db, weekStart) {
   }
 
   if (topMissed[0]) {
-    suggested_priorities.push(`Reforçar hábito: ${topMissed[0].title} (${topMissed[0].misses} falha(s) na semana)`);
+    suggested_priorities.push(
+      `Reforçar hábito em aberto: ${topMissed[0].title} (${topMissed[0].misses} slot(s) sem registro)`,
+    );
+  } else if (topSkipped[0]) {
+    const reasonLabel = {
+      time: 'tempo',
+      energy: 'energia',
+      context: 'contexto',
+      other: 'outro',
+    }[topSkipped[0].top_reason] || null;
+    suggested_priorities.push(
+      reasonLabel
+        ? `${topSkipped[0].title}: não rolou ${topSkipped[0].skips}× (${reasonLabel}) — encolher janela?`
+        : `${topSkipped[0].title}: não rolou ${topSkipped[0].skips}× — rever frequência?`,
+    );
   }
 
   if (promissoras[0]) {
@@ -224,7 +265,8 @@ export function buildWeeklyInsights(db, weekStart) {
 
   const draft_blockers = [
     overdueCount > 0 ? `${overdueCount} pendência(s) atrasada(s).` : null,
-    topMissed[0] ? `Hábito ${topMissed[0].title} falhou ${topMissed[0].misses}x.` : null,
+    topMissed[0] ? `Hábito ${topMissed[0].title} ficou em aberto ${topMissed[0].misses}x.` : null,
+    topSkipped[0] ? `${topSkipped[0].title}: não rolou ${topSkipped[0].skips}x.` : null,
     habitPct !== null && habitPct < 50 ? 'Consistência de hábitos abaixo de 50%.' : null,
   ].filter(Boolean).join('\n') || 'O que travou energia ou atenção?';
 
@@ -257,6 +299,8 @@ export function buildWeeklyInsights(db, weekStart) {
       tasks_completed_count: completedTasks.length,
       tasks_completed_samples: victoryTitles,
       habits_done: habitDone,
+      habits_skipped: habitSkipped,
+      habits_open_slots: habitOpenSlots,
       habits_target: habitSlots,
       habits_completion_pct: habitPct,
       focus_minutes: focusMinutes,
@@ -275,6 +319,8 @@ export function buildWeeklyInsights(db, weekStart) {
       overdue_tasks_count: overdueCount,
       overdue_samples: stalePending.map((t) => cleanTitle(t.title)).filter(Boolean),
       missed_habits: topMissed,
+      top_skipped: topSkipped,
+      habits_skipped: habitSkipped,
     },
     ideas: {
       new_captures: ideasNew,

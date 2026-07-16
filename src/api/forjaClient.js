@@ -131,6 +131,9 @@ export const forjaApi = {
     create: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     reorder: (orderedIds) => request('/api/tasks/reorder', { method: 'PATCH', body: JSON.stringify({ ordered_ids: orderedIds }) }),
+    /** Empurra data para amanhã; status permanece aberto. Body: { reason? } */
+    notToday: (id, body = {}) =>
+      request(`/api/tasks/${id}/not-today`, { method: 'POST', body: JSON.stringify(body) }),
     delete: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
   },
 
@@ -361,7 +364,7 @@ export const forjaApi = {
     delete: (id) => request(`/api/habits/${id}`, { method: 'DELETE' }),
   },
 
-  // Habit Logs
+  // Habit Logs — body: { habit_id, date, outcome?: 'done'|'skipped', skip_reason?, completed?, value? }
   habitLogs: {
     list: (params = {}) => {
       const query = new URLSearchParams(params).toString();

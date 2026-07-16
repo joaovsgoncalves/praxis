@@ -1,4 +1,5 @@
 import React from 'react';
+import { countHabitDayOutcomes } from '@/lib/habits';
 
 export default function DayProgressBar({ habits = [], habitLogs = [], tasks = [] }) {
   const todayParts = new Intl.DateTimeFormat('en-US', {
@@ -13,12 +14,15 @@ export default function DayProgressBar({ habits = [], habitLogs = [], tasks = []
   const today = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
   const isTaskDone = (task) => task.status === 'completed' || task.status === 'done';
 
-  const completedHabits = habits.filter(h =>
-    habitLogs.some(l => l.habit_id === h.id && l.date === today && l.completed)
-  ).length;
+  const { done: completedHabits, skipped: skippedHabits, open: openHabits } = countHabitDayOutcomes(
+    habits,
+    habitLogs,
+    today,
+  );
 
   const completedTasks = tasks.filter(t => isTaskDone(t)).length;
   const totalItems = habits.length + tasks.length;
+  // Only done habits count as completion (skip is closed but not victory)
   const completedItems = completedHabits + completedTasks;
   const pct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
@@ -29,6 +33,10 @@ export default function DayProgressBar({ habits = [], habitLogs = [], tasks = []
     if (pct < 90) return 'Quase lá! 🔥';
     return 'Dia incrível! 🏆';
   };
+
+  const habitLine = skippedHabits > 0
+    ? `${completedHabits} feitos · ${skippedHabits} não rolou · ${openHabits} abertos`
+    : `${completedHabits}/${habits.length} hábitos`;
 
   return (
     <div className="mb-6">
@@ -51,7 +59,7 @@ export default function DayProgressBar({ habits = [], habitLogs = [], tasks = []
         />
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-        <span>{completedHabits}/{habits.length} hábitos</span>
+        <span>{habitLine}</span>
         <span>{completedTasks}/{tasks.length} tarefas</span>
       </div>
     </div>

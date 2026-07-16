@@ -1,30 +1,124 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { motion } from 'framer-motion';
-import { Flame } from 'lucide-react';
+import { Flame, Minus, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
+import {
+  countHabitDayOutcomes,
+  getHabitDayOutcome,
+  SKIP_REASONS,
+  SKIP_REASON_LABELS,
+  todayLogForHabit,
+} from '@/lib/habits';
 
-export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 'Hábitos de Hoje', today: todayProp }) {
+const LONG_PRESS_MS = 480;
+
+export default function TodayHabits({
+  habits,
+  habitLogs,
+  onToggleHabit,
+  onSkipHabit,
+  title = 'Hábitos de Hoje',
+  today: todayProp,
+}) {
   const today = todayProp || new Date().toISOString().split('T')[0];
   const rowRefs = useRef(new Map());
+  const longPressTimer = useRef(null);
+  const longPressFired = useRef(false);
+  const [skipSheetHabit, setSkipSheetHabit] = useState(null);
 
-  const isCompletedToday = (habitId) =>
-    habitLogs.some((log) => log.habit_id === habitId && log.date === today && log.completed);
+  const { done: doneCount, skipped: skippedCount, open: openCount } = countHabitDayOutcomes(
+    habits,
+    habitLogs,
+    today,
+  );
+  const donePct = habits.length > 0 ? Math.round((doneCount / habits.length) * 100) : 0;
 
-  const completedCount = habits.filter((habit) => isCompletedToday(habit.id)).length;
-  const donePct = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
-
-  const handleToggle = (habit, done, evt) => {
-    if (!done) {
-      const target = rowRefs.current.get(habit.id);
-      const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
-      if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
-    onToggleHabit?.(habit.id, done);
   };
+
+  const openSkipSheet = (habit) => {
+    setSkipSheetHabit(habit);
+  };
+
+  const handlePrimaryTap = (habit, evt) => {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    const log = todayLogForHabit(habitLogs, habit.id, today);
+    const outcome = getHabitDayOutcome(log);
+
+    if (outcome === 'done') {
+      onToggleHabit?.(habit.id, true);
+      return;
+    }
+    if (outcome === 'skipped') {
+      // Undo skip → open
+      onToggleHabit?.(habit.id, true);
+      return;
+    }
+    // open → done
+    const target = rowRefs.current.get(habit.id);
+    const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
+    if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+    onToggleHabit?.(habit.id, false);
+  };
+
+  const handlePointerDown = (habit) => {
+    longPressFired.current = false;
+    clearLongPress();
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      openSkipSheet(habit);
+    }, LONG_PRESS_MS);
+  };
+
+  const handlePointerUp = () => {
+    clearLongPress();
+  };
+
+  const confirmSkip = (reason = null) => {
+    if (!skipSheetHabit) return;
+    onSkipHabit?.(skipSheetHabit.id, reason);
+    setSkipSheetHabit(null);
+  };
+
+  const undoFromSheet = () => {
+    if (!skipSheetHabit) return;
+    onToggleHabit?.(skipSheetHabit.id, true);
+    setSkipSheetHabit(null);
+  };
+
+  const markDoneFromSheet = () => {
+    if (!skipSheetHabit) return;
+    // Upsert done (works from open or skipped)
+    const target = rowRefs.current.get(skipSheetHabit.id);
+    const rect = target?.getBoundingClientRect?.();
+    if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+    onToggleHabit?.(skipSheetHabit.id, false);
+    setSkipSheetHabit(null);
+  };
+
+  const sheetLog = skipSheetHabit
+    ? todayLogForHabit(habitLogs, skipSheetHabit.id, today)
+    : null;
+  const sheetOutcome = getHabitDayOutcome(sheetLog);
 
   return (
     <Card className="praxis-dashboard-card">
@@ -34,8 +128,15 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
             <p className="text-[11px] font-medium text-muted-foreground">Consistência</p>
             <h3 className="forja-title mt-1 text-xl font-semibold tracking-[-0.035em]">{title}</h3>
           </div>
-          <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-            {completedCount}/{habits.length}
+          <span className="shrink-0 text-right text-sm tabular-nums text-muted-foreground">
+            {doneCount}/{habits.length}
+            {skippedCount > 0 || openCount > 0 ? (
+              <span className="mt-0.5 block text-[10px] font-normal normal-case tracking-normal">
+                {doneCount} feitos
+                {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
+                {openCount > 0 ? ` · ${openCount} abertos` : ''}
+              </span>
+            ) : null}
           </span>
         </div>
         {habits.length > 0 ? (
@@ -56,7 +157,10 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
         ) : null}
 
         {habits.map((habit) => {
-          const done = isCompletedToday(habit.id);
+          const log = todayLogForHabit(habitLogs, habit.id, today);
+          const outcome = getHabitDayOutcome(log);
+          const done = outcome === 'done';
+          const skipped = outcome === 'skipped';
           return (
             <motion.div
               key={habit.id}
@@ -69,36 +173,60 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
               whileTap={{ scale: 0.985 }}
               className={cn(
                 'flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-[background-color,border-color,box-shadow]',
-                done
-                  ? 'border-domain-wellness/15 bg-domain-wellness/[0.065]'
-                  : 'border-white/[0.055] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]',
+                done && 'border-domain-wellness/15 bg-domain-wellness/[0.065]',
+                skipped && 'border-amber-500/20 bg-amber-500/[0.07]',
+                !done && !skipped && 'border-white/[0.055] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]',
               )}
-              onClick={(event) => handleToggle(habit, done, event)}
+              onClick={(event) => handlePrimaryTap(habit, event)}
+              onPointerDown={() => handlePointerDown(habit)}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  handleToggle(habit, done, event);
+                  handlePrimaryTap(habit, event);
                 }
               }}
             >
-              <Checkbox
-                checked={done}
-                onClick={(event) => event.stopPropagation()}
-                onCheckedChange={() => handleToggle(habit, done)}
-                className={cn(
-                  'h-5 w-5 shrink-0',
-                  done
-                    ? 'border-domain-wellness data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness'
-                    : 'border-muted-foreground/40',
-                )}
-              />
+              {skipped ? (
+                <span
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400/90"
+                  aria-hidden
+                >
+                  <Minus className="h-3 w-3" />
+                </span>
+              ) : (
+                <Checkbox
+                  checked={done}
+                  onClick={(event) => event.stopPropagation()}
+                  onCheckedChange={() => handlePrimaryTap(habit)}
+                  className={cn(
+                    'h-5 w-5 shrink-0',
+                    done
+                      ? 'border-domain-wellness data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness'
+                      : 'border-muted-foreground/40',
+                  )}
+                />
+              )}
 
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <p className={cn('min-w-0 truncate text-sm font-semibold sm:text-[15px]', done && 'text-domain-wellness/90 line-through')}>
+                  <p
+                    className={cn(
+                      'min-w-0 truncate text-sm font-semibold sm:text-[15px]',
+                      done && 'text-domain-wellness/90 line-through',
+                      skipped && 'text-muted-foreground opacity-75',
+                    )}
+                  >
                     {habit.title}
                   </p>
                   <CategoryBadge category={habit.category} />
+                  {skipped && log?.skip_reason ? (
+                    <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200/80">
+                      {SKIP_REASON_LABELS[log.skip_reason] || log.skip_reason}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -108,10 +236,97 @@ export default function TodayHabits({ habits, habitLogs, onToggleHabit, title = 
                   {habit.current_streak}
                 </span>
               ) : null}
+
+              <button
+                type="button"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                aria-label={`Mais opções — ${habit.title}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openSkipSheet(habit);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
             </motion.div>
           );
         })}
       </CardContent>
+
+      <Sheet open={Boolean(skipSheetHabit)} onOpenChange={(open) => { if (!open) setSkipSheetHabit(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl border-white/10 bg-card">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-base">
+              {skipSheetHabit ? skipSheetHabit.title : 'Hábito'}
+            </SheetTitle>
+            <SheetDescription>
+              {sheetOutcome === 'skipped'
+                ? 'Já registrado como não rolou. Pode desfazer ou marcar feito.'
+                : 'Registre o dia com honestidade — sem drama.'}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-4 space-y-3 pb-4">
+            {sheetOutcome !== 'skipped' ? (
+              <>
+                <p className="text-xs font-medium text-muted-foreground">Não rolou</p>
+                <div className="flex flex-wrap gap-2">
+                  {SKIP_REASONS.map((r) => (
+                    <Button
+                      key={r.value}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
+                      onClick={() => confirmSkip(r.value)}
+                    >
+                      {r.label}
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => confirmSkip(null)}
+                  >
+                    Sem motivo
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-full"
+                onClick={undoFromSheet}
+              >
+                Desfazer
+              </Button>
+            )}
+
+            {sheetOutcome !== 'done' ? (
+              <Button
+                type="button"
+                className="w-full rounded-full"
+                onClick={markDoneFromSheet}
+              >
+                Feito
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-full"
+                onClick={undoFromSheet}
+              >
+                Desfazer feito
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }

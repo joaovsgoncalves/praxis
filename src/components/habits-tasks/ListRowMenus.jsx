@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, Pause, Play, Archive } from 'lucide-react';
+import { MoreHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, Pause, Play, Archive, CalendarClock, MinusCircle } from 'lucide-react';
 
 /** Menu ⋯ — reordenar, editar, excluir (hábitos: + ciclo de vida) */
 export function TaskRowMenu({
@@ -16,6 +16,8 @@ export function TaskRowMenu({
   onMoveDown,
   onEdit,
   onDelete,
+  onNotToday,
+  showNotToday = false,
   disableUp,
   disableDown,
   busy,
@@ -33,7 +35,7 @@ export function TaskRowMenu({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem disabled={busy || disableUp} onClick={onMoveUp}>
           <ArrowUp className="mr-2 h-4 w-4" /> Subir
         </DropdownMenuItem>
@@ -44,6 +46,11 @@ export function TaskRowMenu({
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>
+        {showNotToday && onNotToday ? (
+          <DropdownMenuItem onClick={onNotToday}>
+            <CalendarClock className="mr-2 h-4 w-4" /> Não hoje
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
           <Trash2 className="mr-2 h-4 w-4" /> Excluir
         </DropdownMenuItem>
@@ -60,6 +67,10 @@ export function HabitRowMenu({
   onEdit,
   onDelete,
   onSetStatus,
+  onNaoRolou,
+  onUndoDayOutcome,
+  dayOutcome,
+  canCheckIn = false,
   disableUp,
   disableDown,
   busy,
@@ -87,6 +98,16 @@ export function HabitRowMenu({
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>
+        {canCheckIn && dayOutcome !== 'skipped' && onNaoRolou ? (
+          <DropdownMenuItem onClick={onNaoRolou}>
+            <MinusCircle className="mr-2 h-4 w-4" /> Não rolou
+          </DropdownMenuItem>
+        ) : null}
+        {canCheckIn && (dayOutcome === 'done' || dayOutcome === 'skipped') && onUndoDayOutcome ? (
+          <DropdownMenuItem onClick={onUndoDayOutcome}>
+            Desfazer registro do dia
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         {habit.status === 'active' && (
           <DropdownMenuItem onClick={() => onSetStatus('paused')}>

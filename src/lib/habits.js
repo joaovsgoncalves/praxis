@@ -82,3 +82,65 @@ export function isQuantitativeHabit(habit) {
 export function todayLogForHabit(habitLogs, habitId, dateKey) {
   return habitLogs.find((log) => log.habit_id === habitId && log.date === dateKey);
 }
+
+/** Day outcome: open | done | skipped */
+export const DAY_OUTCOMES = {
+  open: 'open',
+  done: 'done',
+  skipped: 'skipped',
+};
+
+export const DAY_OUTCOME_LABELS = {
+  open: 'Aberto',
+  done: 'Feito',
+  skipped: 'Não rolou',
+};
+
+export const SKIP_REASONS = [
+  { value: 'time', label: 'Tempo' },
+  { value: 'energy', label: 'Energia' },
+  { value: 'context', label: 'Contexto' },
+  { value: 'other', label: 'Outro' },
+];
+
+export const SKIP_REASON_LABELS = Object.fromEntries(
+  SKIP_REASONS.map((r) => [r.value, r.label]),
+);
+
+export function isHabitLogDone(log) {
+  if (!log) return false;
+  if (log.outcome === 'skipped') return false;
+  if (log.outcome === 'done') return true;
+  return log.completed === 1 || log.completed === true;
+}
+
+export function isHabitLogSkipped(log) {
+  if (!log) return false;
+  return log.outcome === 'skipped';
+}
+
+/** open | done | skipped */
+export function getHabitDayOutcome(log) {
+  if (!log) return DAY_OUTCOMES.open;
+  if (isHabitLogSkipped(log)) return DAY_OUTCOMES.skipped;
+  if (isHabitLogDone(log)) return DAY_OUTCOMES.done;
+  return DAY_OUTCOMES.open;
+}
+
+export function habitDayOutcomeLabel(outcome) {
+  return DAY_OUTCOME_LABELS[outcome] || DAY_OUTCOME_LABELS.open;
+}
+
+export function countHabitDayOutcomes(habits, habitLogs, dateKey) {
+  let done = 0;
+  let skipped = 0;
+  let open = 0;
+  for (const h of habits) {
+    const log = todayLogForHabit(habitLogs, h.id, dateKey);
+    const o = getHabitDayOutcome(log);
+    if (o === DAY_OUTCOMES.done) done += 1;
+    else if (o === DAY_OUTCOMES.skipped) skipped += 1;
+    else open += 1;
+  }
+  return { done, skipped, open, total: habits.length };
+}

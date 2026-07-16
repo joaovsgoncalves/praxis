@@ -36,6 +36,7 @@ import {
 import OverdueTasksBanner from '@/components/dashboard/OverdueTasksBanner';
 import SuggestedGoalCard from '@/components/dashboard/SuggestedGoalCard';
 import OpeningRitualCollapsible from '@/components/dashboard/OpeningRitualCollapsible';
+import { toast } from 'sonner';
 
 // Lote 7: widgets sem glow de domínio (app mais quieto)
 const Slot = ({ children }) => <div>{children}</div>;
@@ -166,10 +167,34 @@ export default function Dashboard() {
       if (isDone && logs[0]) {
         await forjaApi.habitLogs.delete(logs[0].id);
       } else if (!isDone) {
-        await forjaApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
+        await forjaApi.habitLogs.create({
+          habit_id: habitId,
+          date: today,
+          outcome: 'done',
+          completed: true,
+        });
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['habitLogs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
+
+  const skipHabitMutation = useMutation({
+    mutationFn: async ({ habitId, skipReason }) => {
+      await forjaApi.habitLogs.create({
+        habit_id: habitId,
+        date: today,
+        outcome: 'skipped',
+        ...(skipReason ? { skip_reason: skipReason } : {}),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      toast('Não rolou — registrado.');
+    },
   });
   const saveWellnessMutation = useMutation({
     mutationFn: async (data) => forjaApi.wellness.create({ ...data, date: today }),
@@ -188,9 +213,11 @@ export default function Dashboard() {
 
   const completedTasks = tasks.filter(t => isTaskDone(t)).length;
   const todayLogs = habitLogs.filter(l => l.date === today);
-  const completedHabits = essentialHabits.filter(h =>
-    todayLogs.some(l => l.habit_id === h.id && l.completed)
-  ).length;
+  const completedHabits = essentialHabits.filter((h) => {
+    const log = todayLogs.find((l) => l.habit_id === h.id);
+    if (!log || log.outcome === 'skipped') return false;
+    return log.outcome === 'done' || log.completed === 1 || log.completed === true;
+  }).length;
 
   const handleSnooze15 = (task) => {
     const data = buildSnooze15Update(task, today);
@@ -268,6 +295,9 @@ export default function Dashboard() {
                 habits={essentialHabits}
                 habitLogs={habitLogs}
                 onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
+                onSkipHabit={(habitId, skipReason) =>
+                  skipHabitMutation.mutate({ habitId, skipReason })
+                }
               />
             </Slot>
           </div>

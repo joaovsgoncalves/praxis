@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive, ListTodo } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive, ListTodo, Minus } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
@@ -22,15 +22,28 @@ import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder } from '@/lib/taskReorder';
 import { isTaskOpen } from '@/lib/tasks';
+import { toast } from 'sonner';
 import {
   HABIT_STATUS_LABELS,
+  SKIP_REASONS,
+  SKIP_REASON_LABELS,
+  countHabitDayOutcomes,
   formatFrequencyLabel,
+  getHabitDayOutcome,
   isHabitDueOnDate,
+  isHabitLogDone,
   isQuantitativeHabit,
   todayLogForHabit,
 } from '@/lib/habits';
@@ -40,6 +53,7 @@ import {
   sortTasksForList,
   countOpenOverdue,
   isTaskOverdue,
+  addDaysToDateKey,
 } from '@/lib/taskListFilters';
 import {
   habitTasksTabFromSearchParams,
@@ -80,6 +94,7 @@ export default function HabitsTasks() {
   const [taskSelectionMode, setTaskSelectionMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(() => new Set());
   const [taskScope, setTaskScope] = useState(() => taskScopeFromSearchParams(searchParams));
+  const [skipSheetHabit, setSkipSheetHabit] = useState(null);
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
@@ -206,6 +221,7 @@ export default function HabitsTasks() {
         await forjaApi.habitLogs.create({
           habit_id: habitId,
           date: today,
+          outcome: 'done',
           completed: true,
           ...(value !== undefined ? { value } : {}),
         });
@@ -218,9 +234,42 @@ export default function HabitsTasks() {
     },
   });
 
+  const skipHabit = useMutation({
+    mutationFn: async ({ habitId, skipReason }) => {
+      await forjaApi.habitLogs.create({
+        habit_id: habitId,
+        date: today,
+        outcome: 'skipped',
+        ...(skipReason ? { skip_reason: skipReason } : {}),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      toast('Não rolou — registrado.');
+      setSkipSheetHabit(null);
+    },
+  });
+
+  const notTodayTask = useMutation({
+    mutationFn: (taskId) => forjaApi.tasks.notToday(taskId, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      toast('Beleza — fica pra amanhã.');
+    },
+  });
+
   const isHabitCompletedToday = (habitId) => {
     const log = todayLogForHabit(habitLogs, habitId, today);
-    return Boolean(log?.completed);
+    return isHabitLogDone(log);
+  };
+
+  const habitDayOutcome = (habitId) => {
+    const log = todayLogForHabit(habitLogs, habitId, today);
+    return getHabitDayOutcome(log);
   };
 
   const setHabitStatus = useMutation({
@@ -331,7 +380,9 @@ export default function HabitsTasks() {
   const activeHabitsDueToday = activeHabitsList.filter(
     (h) => isHabitDueOnDate(h, today)
   );
-  const completedHabits = activeHabitsDueToday.filter((h) => isHabitCompletedToday(h.id)).length;
+  const habitDayCounts = countHabitDayOutcomes(activeHabitsDueToday, habitLogs, today);
+  const completedHabits = habitDayCounts.done;
+  const skippedHabitsToday = habitDayCounts.skipped;
   const habitsDayPct = activeHabitsDueToday.length
     ? Math.round((completedHabits / activeHabitsDueToday.length) * 100)
     : 0;
@@ -630,6 +681,12 @@ export default function HabitsTasks() {
                         {!compact && task.date && (
                           <div className="mt-1.5 flex flex-wrap gap-2">
                             <Badge variant="outline" className="text-xs">{task.date}</Badge>
+                            {task.day_outcome === 'not_today'
+                              && task.day_outcome_date === addDaysToDateKey(today, -1) && (
+                              <Badge variant="outline" className="text-[10px] text-amber-200/90 border-amber-500/25">
+                                Empurrada de ontem
+                              </Badge>
+                            )}
                           </div>
                         )}
                         {!compact && !task.date && task.recurrence && task.recurrence !== 'none' && (
@@ -639,13 +696,15 @@ export default function HabitsTasks() {
 
                       <TaskRowMenu
                         label={cleanPriorityPrefix(task.title)}
-                        busy={reorderTasks.isPending}
+                        busy={reorderTasks.isPending || notTodayTask.isPending}
                         disableUp={index === 0}
                         disableDown={index === filteredTasks.length - 1}
                         onMoveUp={() => moveTask(task.id, -1)}
                         onMoveDown={() => moveTask(task.id, 1)}
                         onEdit={() => setEditingTask(task)}
                         onDelete={() => confirmDeleteTask(task)}
+                        showNotToday={isTaskOpen(task) && task.category !== 'ideias'}
+                        onNotToday={() => notTodayTask.mutate(task.id)}
                       />
                     </CardContent>
                   </Card>
@@ -680,7 +739,10 @@ export default function HabitsTasks() {
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Hábitos de hoje</span>
                   <span>
-                    {completedHabits}/{activeHabitsDueToday.length} · {habitsDayPct}%
+                    {completedHabits} feitos
+                    {skippedHabitsToday > 0 ? ` · ${skippedHabitsToday} não rolou` : ''}
+                    {habitDayCounts.open > 0 ? ` · ${habitDayCounts.open} abertos` : ''}
+                    {' · '}{habitsDayPct}%
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-secondary rail-inset">
@@ -723,7 +785,9 @@ export default function HabitsTasks() {
                   </p>
                 )}
                 {flatHabits.map((habit, index) => {
-                  const done = isHabitCompletedToday(habit.id);
+                  const outcome = habitDayOutcome(habit.id);
+                  const done = outcome === 'done';
+                  const skipped = outcome === 'skipped';
                   const dueToday = isHabitDueOnDate(habit, today);
                   const canCheckIn = habit.status === 'active' && dueToday;
                   const todayLog = todayLogForHabit(habitLogs, habit.id, today);
@@ -734,7 +798,8 @@ export default function HabitsTasks() {
                       ref={el => { if (el) habitRowRefs.current.set(habit.id, el); else habitRowRefs.current.delete(habit.id); }}
                       className={cn(
                         'card-domain domain-wellness overflow-hidden bg-card/75 transition-colors',
-                        done && 'border-domain-wellness/30 bg-domain-wellness/10'
+                        done && 'border-domain-wellness/30 bg-domain-wellness/10',
+                        skipped && 'border-amber-500/25 bg-amber-500/[0.08]',
                       )}
                     >
                       <CardContent
@@ -746,13 +811,30 @@ export default function HabitsTasks() {
                         {canCheckIn ? (
                           <button
                             type="button"
-                            onClick={(evt) => handleToggleHabit(habit, done, evt)}
-                            disabled={toggleHabit.isPending}
+                            onClick={(evt) => {
+                              if (skipped) {
+                                toggleHabit.mutate({ habitId: habit.id, isDone: true });
+                                return;
+                              }
+                              handleToggleHabit(habit, done, evt);
+                            }}
+                            disabled={toggleHabit.isPending || skipHabit.isPending}
                             className="shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                            aria-label={`${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`}
+                            aria-label={
+                              skipped
+                                ? `Desfazer não rolou — ${cleanPriorityPrefix(habit.title)}`
+                                : `${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`
+                            }
                           >
                             {done ? (
                               <CheckCircle2 className={cn(compact ? 'h-4 w-4' : 'h-5 w-5', 'text-domain-wellness')} />
+                            ) : skipped ? (
+                              <span className={cn(
+                                'flex items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400',
+                                compact ? 'h-4 w-4' : 'h-5 w-5',
+                              )}>
+                                <Minus className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+                              </span>
                             ) : (
                               <Circle className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
                             )}
@@ -761,7 +843,11 @@ export default function HabitsTasks() {
                           <div className={cn('shrink-0', compact ? 'h-4 w-4' : 'h-5 w-5')} aria-hidden />
                         )}
                         {!compact && (
-                          <Flame className={cn('shrink-0 h-5 w-5 text-primary', done && 'text-domain-wellness')} />
+                          <Flame className={cn(
+                            'shrink-0 h-5 w-5 text-primary',
+                            done && 'text-domain-wellness',
+                            skipped && 'text-amber-400/80',
+                          )} />
                         )}
                         <div className="min-w-0 flex-1">
                           <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', compact && 'gap-1')}>
@@ -770,11 +856,20 @@ export default function HabitsTasks() {
                                 'font-semibold leading-snug',
                                 compact ? 'text-sm truncate' : 'text-base',
                                 done && 'text-domain-wellness line-through opacity-80',
+                                skipped && 'text-muted-foreground opacity-75',
                               )}
                             >
                               {cleanPriorityPrefix(habit.title)}
                             </p>
                             <CategoryBadge category={habit.category} />
+                            {skipped && (
+                              <Badge variant="outline" className="border-amber-500/30 text-[10px] text-amber-200/90">
+                                Não rolou
+                                {todayLog?.skip_reason
+                                  ? ` · ${SKIP_REASON_LABELS[todayLog.skip_reason] || todayLog.skip_reason}`
+                                  : ''}
+                              </Badge>
+                            )}
                             {habit.current_streak > 0 && (
                               <span className="text-[10px] text-orange-400 shrink-0">🔥{habit.current_streak}</span>
                             )}
@@ -789,7 +884,7 @@ export default function HabitsTasks() {
                               <Badge variant="outline" className="mt-1.5 text-xs">
                                 {formatFrequencyLabel(habit)}
                               </Badge>
-                              {quant && todayLog?.value != null && (
+                              {quant && todayLog?.value != null && done && (
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   Hoje: {todayLog.value}
                                   {habit.unit ? ` ${habit.unit}` : ''}
@@ -804,7 +899,9 @@ export default function HabitsTasks() {
                         <HabitRowMenu
                           label={cleanPriorityPrefix(habit.title)}
                           habit={habit}
-                          busy={reorderHabits.isPending}
+                          busy={reorderHabits.isPending || skipHabit.isPending}
+                          canCheckIn={canCheckIn}
+                          dayOutcome={outcome}
                           disableUp={index === 0}
                           disableDown={index === flatHabits.length - 1}
                           onMoveUp={() => moveHabit(habit.id, -1)}
@@ -812,6 +909,8 @@ export default function HabitsTasks() {
                           onEdit={() => { setShowHabitForm(false); setEditingHabit(habit); }}
                           onDelete={() => confirmDeleteHabit(habit)}
                           onSetStatus={(status) => setHabitStatus.mutate({ id: habit.id, status })}
+                          onNaoRolou={() => setSkipSheetHabit(habit)}
+                          onUndoDayOutcome={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
                         />
                       </CardContent>
                     </Card>
@@ -883,6 +982,44 @@ export default function HabitsTasks() {
         busy={bulkCancelTasks.isPending}
         onConfirm={(ids) => bulkCancelTasks.mutate(ids)}
       />
+
+      <Sheet open={Boolean(skipSheetHabit)} onOpenChange={(open) => { if (!open) setSkipSheetHabit(null); }}>
+        <SheetContent side="bottom" className="rounded-t-2xl border-white/10 bg-card">
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-base">
+              {skipSheetHabit ? cleanPriorityPrefix(skipSheetHabit.title) : 'Hábito'}
+            </SheetTitle>
+            <SheetDescription>
+              Motivo opcional — um toque. Pode pular.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 flex flex-wrap gap-2 pb-4">
+            {SKIP_REASONS.map((r) => (
+              <Button
+                key={r.value}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
+                disabled={skipHabit.isPending}
+                onClick={() => skipHabit.mutate({ habitId: skipSheetHabit.id, skipReason: r.value })}
+              >
+                {r.label}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              disabled={skipHabit.isPending}
+              onClick={() => skipHabit.mutate({ habitId: skipSheetHabit.id, skipReason: null })}
+            >
+              Sem motivo
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <VoiceCaptureButton />
     </div>

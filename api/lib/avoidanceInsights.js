@@ -102,28 +102,88 @@ export function buildAvoidanceInsights(db, today) {
   }
 
   const activeHabits = db.prepare("SELECT * FROM habits WHERE status = 'active'").all();
-  const todayLogs = new Set(
-    db.prepare('SELECT habit_id FROM habit_logs WHERE date = ? AND completed = 1').all(today).map((r) => r.habit_id),
+
+  // Closed loop today = done OR conscious skip (outcome=skipped)
+  const todayClosed = new Set(
+    db.prepare(`
+      SELECT habit_id FROM habit_logs
+      WHERE date = ?
+        AND (completed = 1 OR outcome = 'skipped' OR outcome = 'done')
+    `).all(today).map((r) => r.habit_id),
   );
-  const yesterdayLogs = new Set(
-    db.prepare('SELECT habit_id FROM habit_logs WHERE date = ? AND completed = 1').all(yesterday).map((r) => r.habit_id),
+  const yesterdayClosed = new Set(
+    db.prepare(`
+      SELECT habit_id FROM habit_logs
+      WHERE date = ?
+        AND (completed = 1 OR outcome = 'skipped' OR outcome = 'done')
+    `).all(yesterday).map((r) => r.habit_id),
+  );
+  const yesterdaySkipped = new Set(
+    db.prepare(`
+      SELECT habit_id FROM habit_logs WHERE date = ? AND outcome = 'skipped'
+    `).all(yesterday).map((r) => r.habit_id),
   );
 
   for (const h of activeHabits) {
     const dueToday = isHabitDueOnDate(h, today);
     const dueYesterday = isHabitDueOnDate(h, yesterday);
-    if (dueToday && dueYesterday && !todayLogs.has(h.id) && !yesterdayLogs.has(h.id)) {
+
+    // Skip hoje = loop fechado — não entra como "ainda sem check"
+    if (dueToday && dueYesterday && !todayClosed.has(h.id) && !yesterdayClosed.has(h.id)) {
       items.push({
-        id: `habit-skip-${h.id}`,
+        id: `habit-open-${h.id}`,
         entity_id: h.id,
         type: 'habit',
         title: cleanTitle(h.title),
-        reason: 'Devia rodar ontem e hoje — ainda sem check',
+        reason: 'Devia rodar ontem e hoje — ainda em aberto',
         severity: 'medium',
+        action: { label: 'Marcar hábito', href: '/habitos-tarefas?tab=habits' },
+      });
+    } else if (
+      dueToday
+      && dueYesterday
+      && yesterdaySkipped.has(h.id)
+      && !todayClosed.has(h.id)
+    ) {
+      items.push({
+        id: `habit-skip-open-${h.id}`,
+        entity_id: h.id,
+        type: 'habit',
+        title: cleanTitle(h.title),
+        reason: 'Ontem não rolou · hoje em aberto',
+        severity: 'low',
         action: { label: 'Marcar hábito', href: '/habitos-tarefas?tab=habits' },
       });
     }
   }
+
+  // Padrão: 3+ skips conscientes no mesmo hábito em 7 dias
+  const weekStart = weekAgo;
+  const skipCounts = db.prepare(`
+    SELECT habit_id, COUNT(*) AS skips
+    FROM habit_logs
+    WHERE outcome = 'skipped' AND date > ? AND date <= ?
+    GROUP BY habit_id
+    HAVING skips >= 3
+  `).all(weekStart, today);
+
+  for (const row of skipCounts) {
+    const h = activeHabits.find((x) => x.id === row.habit_id);
+    if (!h) continue;
+    // Evita duplicar se já há item open para o mesmo hábito
+    if (items.some((i) => i.entity_id === h.id && i.type === 'habit')) continue;
+    items.push({
+      id: `habit-pattern-skip-${h.id}`,
+      entity_id: h.id,
+      type: 'habit',
+      title: cleanTitle(h.title),
+      reason: `Não rolou ${row.skips}× na semana — rever frequência ou pausar?`,
+      severity: 'low',
+      action: { label: 'Editar hábito', href: '/habitos-tarefas?tab=habits' },
+    });
+  }
+
+
 
   const staleIdeas = db.prepare(`
     SELECT id, title, idea_status, updated_date

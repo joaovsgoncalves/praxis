@@ -157,6 +157,15 @@ function getLocalDateString(date = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+function addDaysLocal(dateString, days) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
+  return getLocalDateString(date);
+}
+
+const HABIT_OUTCOMES = new Set(['done', 'skipped']);
+const SKIP_REASONS = new Set(['time', 'energy', 'context', 'other']);
+
 // Middleware — credentials so session cookies work (Vercel same-origin + local dev)
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -460,6 +469,60 @@ const habitLogsCols = db.prepare("PRAGMA table_info(habit_logs)").all().map(c =>
 if (!habitLogsCols.includes('value')) {
   db.exec('ALTER TABLE habit_logs ADD COLUMN value REAL');
 }
+if (!habitLogsCols.includes('outcome')) {
+  db.exec("ALTER TABLE habit_logs ADD COLUMN outcome TEXT DEFAULT 'done'");
+}
+if (!habitLogsCols.includes('skip_reason')) {
+  db.exec('ALTER TABLE habit_logs ADD COLUMN skip_reason TEXT');
+}
+// Backfill: completed logs without explicit skip are "done"
+db.prepare(`
+  UPDATE habit_logs
+  SET outcome = 'done'
+  WHERE completed = 1 AND (outcome IS NULL OR outcome = '')
+`).run();
+// Incomplete rows that already exist without outcome stay open-like; only normalize known skips
+db.prepare(`
+  UPDATE habit_logs
+  SET completed = 0
+  WHERE outcome = 'skipped' AND completed != 0
+`).run();
+db.prepare(`
+  UPDATE habit_logs
+  SET completed = 1
+  WHERE outcome = 'done' AND completed != 1
+`).run();
+// Dedupe (habit_id, date) keeping most recent created_date / highest completed priority
+try {
+  db.exec(`
+    DELETE FROM habit_logs
+    WHERE id NOT IN (
+      SELECT id FROM (
+        SELECT id,
+          ROW_NUMBER() OVER (
+            PARTITION BY habit_id, date
+            ORDER BY
+              CASE WHEN completed = 1 THEN 0 ELSE 1 END,
+              created_date DESC,
+              id DESC
+          ) AS rn
+        FROM habit_logs
+      ) ranked
+      WHERE rn = 1
+    )
+  `);
+} catch {
+  // Fallback without window functions: keep first id per pair
+  const dupes = db.prepare(`
+    SELECT habit_id, date, MIN(id) as keep_id, COUNT(*) as c
+    FROM habit_logs GROUP BY habit_id, date HAVING c > 1
+  `).all();
+  for (const d of dupes) {
+    db.prepare('DELETE FROM habit_logs WHERE habit_id = ? AND date = ? AND id != ?')
+      .run(d.habit_id, d.date, d.keep_id);
+  }
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_logs_habit_date ON habit_logs(habit_id, date)');
 const settingsCols = db.prepare("PRAGMA table_info(user_settings)").all().map((c) => c.name);
 if (!settingsCols.includes('list_density')) {
   db.exec("ALTER TABLE user_settings ADD COLUMN list_density TEXT DEFAULT 'comfortable'");
@@ -504,6 +567,15 @@ if (!tasksCols2.includes('idea_status')) {
 }
 if (!tasksCols2.includes('source_idea_id')) {
   db.exec("ALTER TABLE tasks ADD COLUMN source_idea_id TEXT");
+}
+if (!tasksCols2.includes('day_outcome')) {
+  db.exec('ALTER TABLE tasks ADD COLUMN day_outcome TEXT');
+}
+if (!tasksCols2.includes('day_outcome_date')) {
+  db.exec('ALTER TABLE tasks ADD COLUMN day_outcome_date TEXT');
+}
+if (!tasksCols2.includes('day_outcome_reason')) {
+  db.exec('ALTER TABLE tasks ADD COLUMN day_outcome_reason TEXT');
 }
 db.prepare(`
   UPDATE tasks SET idea_status = 'capturada'
@@ -1630,53 +1702,124 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.json({ success: true, calendar_sync: calendarSync });
 });
 
+/** Empurra tarefa para amanhã (local), mantém status aberto, registra day_outcome. */
+app.post('/api/tasks/:id/not-today', (req, res) => {
+  const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Task not found' });
+
+  if (existing.status === 'completed' || existing.status === 'done' || existing.status === 'cancelled') {
+    return res.status(400).json({ error: 'Only open tasks can be marked not-today' });
+  }
+  if (existing.category === 'ideias') {
+    return res.status(400).json({ error: 'Ideas cannot use not-today' });
+  }
+
+  const today = getLocalDateString();
+  const tomorrow = addDaysLocal(today, 1);
+  let reason = null;
+  if (req.body?.reason != null && req.body.reason !== '') {
+    const r = String(req.body.reason).toLowerCase().trim();
+    if (!SKIP_REASONS.has(r)) {
+      return res.status(400).json({ error: 'reason must be time|energy|context|other' });
+    }
+    reason = r;
+  }
+
+  // Keep open status (pending / in_progress); only move date forward
+  const status = existing.status === 'in_progress' ? 'in_progress' : 'pending';
+
+  db.prepare(`
+    UPDATE tasks SET
+      date = ?,
+      status = ?,
+      day_outcome = 'not_today',
+      day_outcome_date = ?,
+      day_outcome_reason = ?,
+      updated_date = datetime('now')
+    WHERE id = ?
+  `).run(tomorrow, status, today, reason, req.params.id);
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  const calendarSync = syncTaskToCalendar(task);
+  const syncedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+  res.json({
+    ...syncedTask,
+    calendar_sync: calendarSync,
+  });
+});
+
 // ==================== HABITS (streak helper) ====================
+// Day outcome: done lengthens streak; skipped freezes (bridge); open/missing breaks.
+function isHabitLogDone(log) {
+  if (!log) return false;
+  if (log.outcome === 'skipped') return false;
+  if (log.outcome === 'done') return true;
+  return log.completed === 1 || log.completed === true;
+}
+
+function isHabitLogSkipped(log) {
+  if (!log) return false;
+  return log.outcome === 'skipped';
+}
+
 function getStreaks(habitId) {
-  // Get all completed log dates for this habit, sorted descending
   const logs = db.prepare(
-    `SELECT date FROM habit_logs WHERE habit_id = ? AND completed = 1 ORDER BY date DESC`
+    `SELECT date, completed, outcome FROM habit_logs WHERE habit_id = ? ORDER BY date DESC`
   ).all(habitId);
 
   if (logs.length === 0) return { current_streak: 0, best_streak: 0 };
 
-  const today = new Date().toISOString().split('T')[0];
-  const completedDates = new Set(logs.map(l => l.date));
+  const byDate = new Map();
+  for (const log of logs) {
+    if (!byDate.has(log.date)) byDate.set(log.date, log);
+  }
 
-  // current_streak: count consecutive days going backwards from today
+  const today = getLocalDateString();
+
+  // current_streak: walk backwards from today
+  // done → +1; skipped → freeze (continue); open → break
   let currentStreak = 0;
-  let checkDate = new Date(today + 'T00:00:00');
-  while (true) {
+  let checkDate = new Date(`${today}T12:00:00`);
+  // Safety cap: don't walk forever
+  for (let i = 0; i < 4000; i++) {
     const ds = checkDate.toISOString().split('T')[0];
-    if (completedDates.has(ds)) {
-      currentStreak++;
+    const log = byDate.get(ds);
+    if (isHabitLogDone(log)) {
+      currentStreak += 1;
       checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
+      continue;
     }
+    if (isHabitLogSkipped(log)) {
+      checkDate.setDate(checkDate.getDate() - 1);
+      continue;
+    }
+    break;
   }
 
-  // best_streak: longest consecutive streak ever
-  // Get all completed dates sorted ascending
-  const sortedAsc = db.prepare(
-    `SELECT DISTINCT date FROM habit_logs WHERE habit_id = ? AND completed = 1 ORDER BY date ASC`
-  ).all(habitId).map(r => r.date);
+  // best_streak: walk calendar from first log day → last, freezing across skips
+  const allDates = [...byDate.keys()].sort();
+  if (allDates.length === 0) return { current_streak: currentStreak, best_streak: 0 };
 
+  const start = new Date(`${allDates[0]}T12:00:00`);
+  const end = new Date(`${allDates[allDates.length - 1]}T12:00:00`);
   let bestStreak = 0;
-  let streak = 1;
-  for (let i = 1; i < sortedAsc.length; i++) {
-    const prev = new Date(sortedAsc[i - 1] + 'T00:00:00');
-    const curr = new Date(sortedAsc[i] + 'T00:00:00');
-    const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
-    if (diffDays === 1) {
-      streak++;
-    } else {
+  let streak = 0;
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const ds = cursor.toISOString().split('T')[0];
+    const log = byDate.get(ds);
+    if (isHabitLogDone(log)) {
+      streak += 1;
       bestStreak = Math.max(bestStreak, streak);
-      streak = 1;
+    } else if (isHabitLogSkipped(log)) {
+      // freeze — keep streak
+    } else {
+      streak = 0;
     }
+    cursor.setDate(cursor.getDate() + 1);
   }
-  bestStreak = Math.max(bestStreak, streak);
 
-  return { current_streak: currentStreak, best_streak: bestStreak };
+  return { current_streak: currentStreak, best_streak: Math.max(bestStreak, currentStreak) };
 }
 
 // ==================== HABITS ====================
@@ -1859,35 +2002,92 @@ app.get('/api/habit-logs', (req, res) => {
   res.json(logs);
 });
 
+function normalizeHabitOutcome(body = {}) {
+  const rawOutcome = body.outcome != null ? String(body.outcome).toLowerCase().trim() : null;
+  let outcome = rawOutcome && HABIT_OUTCOMES.has(rawOutcome) ? rawOutcome : null;
+  if (!outcome) {
+    // Compat: completed:true → done; completed:false alone is invalid without outcome
+    if (body.completed === false || body.completed === 0 || body.completed === '0') {
+      outcome = null;
+    } else {
+      outcome = 'done';
+    }
+  }
+  if (!outcome) {
+    return { error: 'outcome required (done|skipped), or completed:true for done' };
+  }
+
+  let skip_reason = null;
+  if (body.skip_reason != null && body.skip_reason !== '') {
+    const r = String(body.skip_reason).toLowerCase().trim();
+    if (!SKIP_REASONS.has(r)) {
+      return { error: 'skip_reason must be time|energy|context|other' };
+    }
+    skip_reason = r;
+  }
+
+  if (outcome === 'skipped') {
+    return { outcome: 'skipped', completed: 0, skip_reason, value: null };
+  }
+
+  return {
+    outcome: 'done',
+    completed: 1,
+    skip_reason: null,
+    value: body.value,
+  };
+}
+
 app.post('/api/habit-logs', (req, res) => {
-  const { habit_id, date, completed = true, value } = req.body;
+  const { habit_id, date } = req.body || {};
 
   if (!habit_id || !date) return res.status(400).json({ error: 'habit_id and date required' });
 
   const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(habit_id);
   if (!habit) return res.status(404).json({ error: 'Habit not found' });
 
-  let completedFlag = completed ? 1 : 0;
-  let logValue = value === undefined || value === null || value === '' ? null : Number(value);
-  if (habit.target_value != null && Number(habit.target_value) > 0) {
+  const normalized = normalizeHabitOutcome(req.body || {});
+  if (normalized.error) return res.status(400).json({ error: normalized.error });
+
+  let completedFlag = normalized.completed;
+  let logValue = normalized.value === undefined || normalized.value === null || normalized.value === ''
+    ? null
+    : Number(normalized.value);
+  let outcome = normalized.outcome;
+  let skipReason = normalized.skip_reason;
+
+  if (outcome === 'done' && habit.target_value != null && Number(habit.target_value) > 0) {
     if (logValue == null || Number.isNaN(logValue)) {
       logValue = Number(habit.target_value);
     }
-    if (logValue >= Number(habit.target_value)) completedFlag = 1;
+    if (logValue >= Number(habit.target_value)) {
+      completedFlag = 1;
+      outcome = 'done';
+    }
+  }
+
+  if (outcome === 'skipped') {
+    completedFlag = 0;
+    logValue = null;
+  } else {
+    completedFlag = 1;
+    skipReason = null;
   }
 
   const existing = db.prepare('SELECT id FROM habit_logs WHERE habit_id = ? AND date = ?').get(habit_id, date);
   if (existing) {
-    db.prepare('UPDATE habit_logs SET completed = ?, value = ? WHERE id = ?').run(completedFlag, logValue, existing.id);
+    db.prepare(
+      'UPDATE habit_logs SET completed = ?, value = ?, outcome = ?, skip_reason = ? WHERE id = ?',
+    ).run(completedFlag, logValue, outcome, skipReason, existing.id);
     const row = db.prepare('SELECT * FROM habit_logs WHERE id = ?').get(existing.id);
     return res.json(row);
   }
 
   const id = randomUUID();
   db.prepare(`
-    INSERT INTO habit_logs (id, habit_id, date, completed, value)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, habit_id, date, completedFlag, logValue);
+    INSERT INTO habit_logs (id, habit_id, date, completed, value, outcome, skip_reason)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, habit_id, date, completedFlag, logValue, outcome, skipReason);
 
   const row = db.prepare('SELECT * FROM habit_logs WHERE id = ?').get(id);
   res.status(201).json(row);
@@ -2163,12 +2363,6 @@ app.put('/api/user/settings', (req, res) => {
 const VALID_VOICE_CATEGORIES = new Set(['farmacia', 'treino', 'estudo', 'jotav_fit', 'ideias', 'pessoal', 'rotina']);
 const VALID_PRIORITIES = new Set(['high', 'medium', 'low']);
 const VALID_FREQUENCIES = new Set(['daily', 'weekdays', 'weekly']);
-
-function addDaysLocal(dateString, days) {
-  const [year, month, day] = dateString.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
-  return getLocalDateString(date);
-}
 
 function normalizeVoiceCategory(category, title = '') {
   const raw = String(category || '').toLowerCase().trim();
