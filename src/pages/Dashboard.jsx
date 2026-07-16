@@ -35,7 +35,6 @@ import {
 } from '@/lib/taskListFilters';
 import OverdueTasksBanner from '@/components/dashboard/OverdueTasksBanner';
 import SuggestedGoalCard from '@/components/dashboard/SuggestedGoalCard';
-import OpeningRitualCollapsible from '@/components/dashboard/OpeningRitualCollapsible';
 import { toast } from 'sonner';
 
 // Lote 7: widgets sem glow de domínio (app mais quieto)
@@ -215,11 +214,11 @@ export default function Dashboard() {
 
   const nowTask = React.useMemo(() => pickNowTask(allTasks, today), [allTasks, today]);
 
+  // Todos os hábitos devidos hoje — sem slice (Hero e lista contam a verdade)
   const essentialHabits = React.useMemo(
     () => habits
       .filter((h) => isHabitDueOnDate(h, today))
-      .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
-      .slice(0, 5),
+      .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
     [habits, today],
   );
 
@@ -248,17 +247,8 @@ export default function Dashboard() {
         <PwaInstallBanner />
       </div>
 
+      {/* Agora first — decisão do dia antes do resumo (lote 10a) */}
       <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '20ms' }}>
-        <HeroDay
-          habitsDone={completedHabits}
-          habitsTotal={essentialHabits.length}
-          tasksDone={completedTasks}
-          tasksTotal={tasks.length}
-          userName={settings?.full_name}
-        />
-      </div>
-
-      <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '70ms' }}>
         <NowBlock
           task={nowTask}
           today={today}
@@ -268,6 +258,16 @@ export default function Dashboard() {
           onSnoozeTomorrow={handleSnoozeTomorrow}
           onVoiceCapture={() => navigate('/captura')}
           onAddTask={() => setShowNewTaskForm(true)}
+        />
+      </div>
+
+      <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '70ms' }}>
+        <HeroDay
+          habitsDone={completedHabits}
+          habitsTotal={essentialHabits.length}
+          tasksDone={completedTasks}
+          tasksTotal={tasks.length}
+          userName={settings?.full_name}
         />
       </div>
 
@@ -349,7 +349,7 @@ export default function Dashboard() {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4 px-3 pb-5 sm:px-4">
-          <OpeningRitualCollapsible />
+          {/* Opening ritual fica no RitualWidget (contexto) — sem double manhã (lote 10b) */}
           <SuggestedGoalCard />
           <WeeklyReviewPrompt />
           <AvoidanceCockpit />

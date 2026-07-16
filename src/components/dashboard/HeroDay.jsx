@@ -62,50 +62,48 @@ export default function HeroDay({
   ];
 
   return (
-    <section className="praxis-dashboard-summary relative overflow-hidden rounded-3xl border border-white/[0.065] bg-white/[0.025] p-5 sm:p-6">
-      <div className="pointer-events-none absolute right-0 top-0 h-52 w-52 bg-[radial-gradient(circle,hsl(var(--domain-gold)/0.08),transparent_68%)]" aria-hidden />
-
-      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+    <section className="praxis-dashboard-summary relative overflow-hidden rounded-2xl border border-white/[0.055] bg-card/40 p-4 sm:p-5">
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 max-w-2xl">
           <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">
             {emoji} Praxis · {dateStr}
           </p>
-          <h1 className="forja-title mt-2 text-2xl font-bold leading-tight tracking-[-0.045em] sm:text-3xl lg:text-[2rem]">
+          <h1 className="forja-title mt-1.5 text-xl font-bold leading-tight tracking-[-0.04em] sm:text-2xl">
             {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
           </h1>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">{tagline}</p>
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground sm:text-sm">{tagline}</p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3 sm:justify-end">
+        <div className="flex shrink-0 items-center gap-2.5 sm:justify-end">
           {bestStreak > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-domain-ember/20 bg-domain-ember/[0.08] px-3 py-1.5 text-xs font-medium text-domain-ember">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-domain-ember/20 bg-domain-ember/[0.08] px-2.5 py-1 text-[11px] font-medium text-domain-ember">
               <Flame className="h-3.5 w-3.5" aria-hidden />
               {bestStreak}d
             </span>
           ) : null}
-          <div className="rounded-2xl border border-domain-gold/15 bg-domain-gold/[0.055] px-4 py-3 text-right">
-            <p className="text-[10px] font-medium text-muted-foreground">Dia concluído</p>
-            <p className="forja-title mt-1 text-2xl font-bold tabular-nums text-domain-gold sm:text-3xl">{roundedDayPct}%</p>
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-right">
+            <p className="text-[10px] font-medium text-muted-foreground">Dia</p>
+            <p className="forja-title mt-0.5 text-xl font-bold tabular-nums sm:text-2xl">{roundedDayPct}%</p>
           </div>
         </div>
       </div>
 
-      <div className="relative mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.055]">
+      <div className="relative mt-4 h-1 overflow-hidden rounded-full bg-white/[0.055]">
         <div
-          className="praxis-progress-fill h-full rounded-full bg-gradient-to-r from-domain-gold via-domain-gold to-domain-wellness"
+          className="praxis-progress-fill h-full rounded-full bg-domain-wellness/80"
           style={{ width: `${Math.max(0, Math.min(100, roundedDayPct))}%` }}
         />
       </div>
 
-      <div className="relative mt-5 grid grid-cols-3 divide-x divide-white/[0.06] rounded-2xl border border-white/[0.055] bg-black/15">
+      <div className="relative mt-3 grid grid-cols-3 divide-x divide-white/[0.06] rounded-xl border border-white/[0.05] bg-white/[0.02]">
         {missionStats.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="flex min-w-0 items-center gap-2.5 px-3 py-3.5 sm:px-4 sm:py-4">
-            <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.05] bg-white/[0.025] sm:flex">
-              <Icon className={`h-4 w-4 ${tone}`} aria-hidden />
+          <div key={label} className="flex min-w-0 items-center gap-2 px-2.5 py-2.5 sm:px-3 sm:py-3">
+            <div className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/[0.05] bg-white/[0.02] sm:flex">
+              <Icon className={`h-3.5 w-3.5 ${tone}`} aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] text-muted-foreground sm:text-[11px]">{label}</p>
-              <p className="mt-0.5 truncate text-sm font-semibold tabular-nums sm:text-base">{value}</p>
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+              <p className="mt-0.5 truncate text-xs font-semibold tabular-nums sm:text-sm">{value}</p>
             </div>
           </div>
         ))}

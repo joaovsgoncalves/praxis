@@ -64,69 +64,52 @@ export default function SkipHabitSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-4 pb-5">
-          {outcome !== 'skipped' || true ? (
-            <>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Nome honesto (opcional, mas melhor)
-                </p>
-                <Textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value.slice(0, 280))}
-                  placeholder={placeholder}
-                  className="min-h-[88px] resize-none border-amber-500/20 bg-black/20 text-sm"
-                  disabled={busy}
-                />
-                <p className="text-[11px] text-muted-foreground/80">
-                  Ex.: “eu escolhi o fácil” · “tive medo de falhar” · “fui irresponsável com isso”
-                </p>
-              </div>
+        <div className="mt-4 space-y-3 pb-5">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Nome honesto (opcional, mas melhor)
+            </p>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value.slice(0, 280))}
+              placeholder={placeholder}
+              className="min-h-[80px] resize-none border-amber-500/20 bg-white/[0.03] text-sm"
+              disabled={busy}
+              autoFocus
+            />
+            <p className="text-[11px] text-muted-foreground/80">
+              Em vez de “falta disciplina” — fala o nome real.
+            </p>
+          </div>
 
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Atalho (opcional)</p>
-                <div className="flex flex-wrap gap-2">
-                  {SKIP_REASONS.map((r) => (
-                    <Button
-                      key={r.value}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={
-                        chip === r.value
-                          ? 'rounded-full border-amber-400/50 bg-amber-500/25 text-amber-50'
-                          : 'rounded-full border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20'
-                      }
-                      disabled={busy}
-                      onClick={() => setChip((c) => (c === r.value ? null : r.value))}
-                    >
-                      {r.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {SKIP_REASONS.map((r) => (
+              <Button
+                key={r.value}
+                type="button"
+                variant="outline"
+                size="sm"
+                className={
+                  chip === r.value
+                    ? 'shrink-0 rounded-full border-amber-400/50 bg-amber-500/25 text-amber-50'
+                    : 'shrink-0 rounded-full border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20'
+                }
+                disabled={busy}
+                onClick={() => setChip((c) => (c === r.value ? null : r.value))}
+              >
+                {r.label}
+              </Button>
+            ))}
+          </div>
 
-              {outcome !== 'skipped' ? (
-                <Button
-                  type="button"
-                  className="w-full rounded-full bg-amber-600 text-white hover:bg-amber-500"
-                  disabled={busy}
-                  onClick={() => submit(chip)}
-                >
-                  Registrar: não rolou
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="w-full rounded-full bg-amber-600 text-white hover:bg-amber-500"
-                  disabled={busy}
-                  onClick={() => submit(chip)}
-                >
-                  Atualizar nome da falha
-                </Button>
-              )}
-            </>
-          ) : null}
+          <Button
+            type="button"
+            className="w-full rounded-full bg-amber-600 text-white hover:bg-amber-500"
+            disabled={busy}
+            onClick={() => submit(chip)}
+          >
+            {outcome === 'skipped' ? 'Atualizar nome da falha' : 'Registrar: não rolou'}
+          </Button>
 
           {outcome === 'skipped' && onUndo ? (
             <Button
@@ -143,12 +126,12 @@ export default function SkipHabitSheet({
           {outcome !== 'done' && onMarkDone ? (
             <Button
               type="button"
-              variant={outcome === 'skipped' ? 'outline' : 'default'}
-              className="w-full rounded-full"
+              variant="ghost"
+              className="w-full rounded-full text-muted-foreground"
               disabled={busy}
               onClick={onMarkDone}
             >
-              Feito
+              Na verdade fiz — marcar feito
             </Button>
           ) : null}
 

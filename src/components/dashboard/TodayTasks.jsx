@@ -213,7 +213,7 @@ export default function TodayTasks({
                               )}
                             </div>
                           </div>
-                          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-col sm:items-stretch shrink-0">
+                          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-col sm:items-stretch shrink-0">
                             {onNotToday ? (
                               <Button
                                 type="button"
@@ -237,16 +237,14 @@ export default function TodayTasks({
                               <Pencil className="w-4 h-4" />
                               Editar
                             </Button>
-                            <Link to={`/foco?taskId=${task.id}`} className="flex-1 sm:flex-none">
-                              <Button
-                                type="button"
-                                size="default"
-                                variant="outline"
-                                className="h-9 w-full gap-1.5 rounded-lg px-3 text-xs touch-manipulation sm:w-auto"
-                              >
-                                <Timer className="w-4 h-4" />
+                            <Link
+                              to={`/foco?taskId=${task.id}`}
+                              className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline sm:text-left"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Timer className="h-3.5 w-3.5" />
                                 Iniciar foco
-                              </Button>
+                              </span>
                             </Link>
                           </div>
                         </div>
