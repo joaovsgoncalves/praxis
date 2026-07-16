@@ -475,13 +475,18 @@ if (!habitLogsCols.includes('outcome')) {
 if (!habitLogsCols.includes('skip_reason')) {
   db.exec('ALTER TABLE habit_logs ADD COLUMN skip_reason TEXT');
 }
-// Backfill: completed logs without explicit skip are "done"
+// Backfill: only completed=1 logs are "done". DEFAULT 'done' on ADD COLUMN can
+// stamp incomplete rows — clear those so they don't become fake done.
 db.prepare(`
   UPDATE habit_logs
   SET outcome = 'done'
-  WHERE completed = 1 AND (outcome IS NULL OR outcome = '')
+  WHERE completed = 1 AND (outcome IS NULL OR outcome = '' OR outcome = 'done')
 `).run();
-// Incomplete rows that already exist without outcome stay open-like; only normalize known skips
+db.prepare(`
+  UPDATE habit_logs
+  SET outcome = NULL
+  WHERE completed = 0 AND (outcome IS NULL OR outcome = '' OR outcome = 'done')
+`).run();
 db.prepare(`
   UPDATE habit_logs
   SET completed = 0

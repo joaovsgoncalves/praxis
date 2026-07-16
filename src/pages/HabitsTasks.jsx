@@ -703,7 +703,11 @@ export default function HabitsTasks() {
                         onMoveDown={() => moveTask(task.id, 1)}
                         onEdit={() => setEditingTask(task)}
                         onDelete={() => confirmDeleteTask(task)}
-                        showNotToday={isTaskOpen(task) && task.category !== 'ideias'}
+                        showNotToday={
+                          isTaskOpen(task)
+                          && task.category !== 'ideias'
+                          && (!task.date || task.date <= today)
+                        }
                         onNotToday={() => notTodayTask.mutate(task.id)}
                       />
                     </CardContent>
