@@ -475,6 +475,9 @@ if (!habitLogsCols.includes('outcome')) {
 if (!habitLogsCols.includes('skip_reason')) {
   db.exec('ALTER TABLE habit_logs ADD COLUMN skip_reason TEXT');
 }
+if (!habitLogsCols.includes('note')) {
+  db.exec("ALTER TABLE habit_logs ADD COLUMN note TEXT DEFAULT ''");
+}
 // Backfill: only completed=1 logs are "done". DEFAULT 'done' on ADD COLUMN can
 // stamp incomplete rows — clear those so they don't become fake done.
 db.prepare(`
@@ -2031,14 +2034,22 @@ function normalizeHabitOutcome(body = {}) {
     skip_reason = r;
   }
 
+  // Free-text honest name of the miss ("eu escolhi o fácil")
+  let note = '';
+  const rawNote = body.note != null ? body.note : body.skip_note;
+  if (rawNote != null && String(rawNote).trim() !== '') {
+    note = String(rawNote).trim().slice(0, 280);
+  }
+
   if (outcome === 'skipped') {
-    return { outcome: 'skipped', completed: 0, skip_reason, value: null };
+    return { outcome: 'skipped', completed: 0, skip_reason, note, value: null };
   }
 
   return {
     outcome: 'done',
     completed: 1,
     skip_reason: null,
+    note: '',
     value: body.value,
   };
 }
@@ -2060,6 +2071,7 @@ app.post('/api/habit-logs', (req, res) => {
     : Number(normalized.value);
   let outcome = normalized.outcome;
   let skipReason = normalized.skip_reason;
+  let note = normalized.note || '';
 
   if (outcome === 'done' && habit.target_value != null && Number(habit.target_value) > 0) {
     if (logValue == null || Number.isNaN(logValue)) {
@@ -2077,22 +2089,23 @@ app.post('/api/habit-logs', (req, res) => {
   } else {
     completedFlag = 1;
     skipReason = null;
+    note = '';
   }
 
   const existing = db.prepare('SELECT id FROM habit_logs WHERE habit_id = ? AND date = ?').get(habit_id, date);
   if (existing) {
     db.prepare(
-      'UPDATE habit_logs SET completed = ?, value = ?, outcome = ?, skip_reason = ? WHERE id = ?',
-    ).run(completedFlag, logValue, outcome, skipReason, existing.id);
+      'UPDATE habit_logs SET completed = ?, value = ?, outcome = ?, skip_reason = ?, note = ? WHERE id = ?',
+    ).run(completedFlag, logValue, outcome, skipReason, note, existing.id);
     const row = db.prepare('SELECT * FROM habit_logs WHERE id = ?').get(existing.id);
     return res.json(row);
   }
 
   const id = randomUUID();
   db.prepare(`
-    INSERT INTO habit_logs (id, habit_id, date, completed, value, outcome, skip_reason)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, habit_id, date, completedFlag, logValue, outcome, skipReason);
+    INSERT INTO habit_logs (id, habit_id, date, completed, value, outcome, skip_reason, note)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, habit_id, date, completedFlag, logValue, outcome, skipReason, note);
 
   const row = db.prepare('SELECT * FROM habit_logs WHERE id = ?').get(id);
   res.status(201).json(row);
@@ -2639,7 +2652,7 @@ app.get('/api/rituals', (req, res) => {
       const habit = db.prepare('SELECT id, title FROM habits WHERE id = ?').get(hid);
       if (!habit) return null;
       const log = db.prepare(
-        'SELECT completed, outcome FROM habit_logs WHERE habit_id = ? AND date = ?'
+        'SELECT completed, outcome, skip_reason, note FROM habit_logs WHERE habit_id = ? AND date = ?'
       ).get(hid, today);
       const done = isHabitLogDone(log);
       const skipped = isHabitLogSkipped(log);
@@ -2649,6 +2662,8 @@ app.get('/api/rituals', (req, res) => {
         completed_today: done,
         skipped_today: skipped,
         day_outcome: skipped ? 'skipped' : done ? 'done' : 'open',
+        skip_reason: log?.skip_reason || null,
+        skip_note: (log?.note && String(log.note).trim()) || null,
       };
     }).filter(Boolean);
     return { ...ritual, habits_order: habitIds, habits };

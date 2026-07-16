@@ -22,13 +22,6 @@ import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
@@ -37,7 +30,6 @@ import { isTaskOpen } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
   HABIT_STATUS_LABELS,
-  SKIP_REASONS,
   SKIP_REASON_LABELS,
   countHabitDayOutcomes,
   formatFrequencyLabel,
@@ -47,6 +39,7 @@ import {
   isQuantitativeHabit,
   todayLogForHabit,
 } from '@/lib/habits';
+import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
 import {
   TASK_SCOPE_CHIPS,
   filterTasksByScope,
@@ -235,18 +228,20 @@ export default function HabitsTasks() {
   });
 
   const skipHabit = useMutation({
-    mutationFn: async ({ habitId, skipReason }) => {
+    mutationFn: async ({ habitId, skipReason, skipNote }) => {
       await forjaApi.habitLogs.create({
         habit_id: habitId,
         date: today,
         outcome: 'skipped',
         ...(skipReason ? { skip_reason: skipReason } : {}),
+        ...(skipNote ? { note: skipNote } : {}),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       toast('Não rolou — registrado.');
       setSkipSheetHabit(null);
     },
@@ -883,6 +878,11 @@ export default function HabitsTasks() {
                               </Badge>
                             )}
                           </div>
+                          {skipped && todayLog?.note ? (
+                            <p className="mt-1 text-[11px] leading-snug text-amber-100/75">
+                              “{todayLog.note}”
+                            </p>
+                          ) : null}
                           {!compact && (
                             <>
                               <Badge variant="outline" className="mt-1.5 text-xs">
@@ -1011,43 +1011,31 @@ export default function HabitsTasks() {
         onConfirm={(ids) => bulkCancelTasks.mutate(ids)}
       />
 
-      <Sheet open={Boolean(skipSheetHabit)} onOpenChange={(open) => { if (!open) setSkipSheetHabit(null); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl border-white/10 bg-card">
-          <SheetHeader className="text-left">
-            <SheetTitle className="text-base">
-              {skipSheetHabit ? cleanPriorityPrefix(skipSheetHabit.title) : 'Hábito'}
-            </SheetTitle>
-            <SheetDescription>
-              Motivo opcional — um toque. Pode pular.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="mt-4 flex flex-wrap gap-2 pb-4">
-            {SKIP_REASONS.map((r) => (
-              <Button
-                key={r.value}
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-full border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
-                disabled={skipHabit.isPending}
-                onClick={() => skipHabit.mutate({ habitId: skipSheetHabit.id, skipReason: r.value })}
-              >
-                {r.label}
-              </Button>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-full"
-              disabled={skipHabit.isPending}
-              onClick={() => skipHabit.mutate({ habitId: skipSheetHabit.id, skipReason: null })}
-            >
-              Sem motivo
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <SkipHabitSheet
+        open={Boolean(skipSheetHabit)}
+        onOpenChange={(open) => { if (!open) setSkipSheetHabit(null); }}
+        habitTitle={skipSheetHabit ? cleanPriorityPrefix(skipSheetHabit.title) : 'Hábito'}
+        outcome={skipSheetHabit ? habitDayOutcome(skipSheetHabit.id) : 'open'}
+        initialNote={
+          skipSheetHabit
+            ? (todayLogForHabit(habitLogs, skipSheetHabit.id, today)?.note || '')
+            : ''
+        }
+        busy={skipHabit.isPending}
+        onConfirm={({ skipReason, skipNote }) =>
+          skipHabit.mutate({ habitId: skipSheetHabit.id, skipReason, skipNote })
+        }
+        onUndo={() => {
+          if (!skipSheetHabit) return;
+          toggleHabit.mutate({ habitId: skipSheetHabit.id, isDone: true });
+          setSkipSheetHabit(null);
+        }}
+        onMarkDone={() => {
+          if (!skipSheetHabit) return;
+          toggleHabit.mutate({ habitId: skipSheetHabit.id, isDone: false });
+          setSkipSheetHabit(null);
+        }}
+      />
 
       <VoiceCaptureButton />
     </div>

@@ -182,17 +182,19 @@ export default function Dashboard() {
   });
 
   const skipHabitMutation = useMutation({
-    mutationFn: async ({ habitId, skipReason }) => {
+    mutationFn: async ({ habitId, skipReason, skipNote }) => {
       await forjaApi.habitLogs.create({
         habit_id: habitId,
         date: today,
         outcome: 'skipped',
         ...(skipReason ? { skip_reason: skipReason } : {}),
+        ...(skipNote ? { note: skipNote } : {}),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       toast('Não rolou — registrado.');
     },
   });
@@ -307,8 +309,8 @@ export default function Dashboard() {
                 habits={essentialHabits}
                 habitLogs={habitLogs}
                 onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
-                onSkipHabit={(habitId, skipReason) =>
-                  skipHabitMutation.mutate({ habitId, skipReason })
+                onSkipHabit={(habitId, skipReason, skipNote) =>
+                  skipHabitMutation.mutate({ habitId, skipReason, skipNote })
                 }
               />
             </Slot>

@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
 import { toast } from 'sonner';
+import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
 
 const timeOfDayConfig = {
   morning: { emoji: '🌅', label: 'Manhã', order: 0 },
@@ -33,7 +34,7 @@ function ConfettiOverlay() {
   );
 }
 
-function RitualItem({ ritual, onToggleHabit, onSkipHabit, onCompleteMinimum, collapsible = false }) {
+function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, collapsible = false }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isOpen, setIsOpen] = useState(!collapsible);
   const prevDoneRef = useRef(null);
@@ -183,6 +184,11 @@ function RitualItem({ ritual, onToggleHabit, onSkipHabit, onCompleteMinimum, col
                     {skipped ? (
                       <span className="ml-1.5 text-[10px] font-medium text-amber-200/80">Não rolou</span>
                     ) : null}
+                    {skipped && habit.skip_note ? (
+                      <span className="mt-0.5 block text-[10px] leading-snug text-amber-100/70">
+                        “{habit.skip_note}”
+                      </span>
+                    ) : null}
                   </label>
                   {skipped ? (
                     <Button
@@ -190,9 +196,9 @@ function RitualItem({ ritual, onToggleHabit, onSkipHabit, onCompleteMinimum, col
                       size="sm"
                       variant="ghost"
                       className="h-7 shrink-0 px-2 text-[11px] text-muted-foreground"
-                      onClick={() => onToggleHabit(habit.id, true)}
+                      onClick={() => onOpenSkip?.(habit)}
                     >
-                      Desfazer
+                      Nomear
                     </Button>
                   ) : !done ? (
                     <Button
@@ -200,7 +206,7 @@ function RitualItem({ ritual, onToggleHabit, onSkipHabit, onCompleteMinimum, col
                       size="sm"
                       variant="outline"
                       className="h-7 shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 px-2 text-[11px] text-amber-100 hover:bg-amber-500/20"
-                      onClick={() => onSkipHabit(habit.id)}
+                      onClick={() => onOpenSkip?.(habit)}
                     >
                       Não rolou
                     </Button>
@@ -220,6 +226,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
   const today = todayProp || fortalezaDateKey();
   const ritualParams = { date: today, ...(status ? { status } : {}) };
   const ritualQueryKey = ['rituals', ritualParams];
+  const [skipHabitTarget, setSkipHabitTarget] = useState(null);
 
   const { data: rituals = [], isLoading, isError } = useQuery({
     queryKey: ritualQueryKey,
@@ -284,14 +291,16 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
   });
 
   const skipHabitMutation = useMutation({
-    mutationFn: async (habitId) => {
+    mutationFn: async ({ habitId, skipReason, skipNote }) => {
       await forjaApi.habitLogs.create({
         habit_id: habitId,
         date: today,
         outcome: 'skipped',
+        ...(skipReason ? { skip_reason: skipReason } : {}),
+        ...(skipNote ? { note: skipNote } : {}),
       });
     },
-    onMutate: async (habitId) => {
+    onMutate: async ({ habitId, skipNote }) => {
       await queryClient.cancelQueries({ queryKey: ['rituals'] });
       const previous = queryClient.getQueryData(ritualQueryKey);
       queryClient.setQueryData(ritualQueryKey, (old) => {
@@ -305,6 +314,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
                   completed_today: false,
                   skipped_today: true,
                   day_outcome: 'skipped',
+                  skip_note: skipNote || h.skip_note || null,
                 }
               : h
           ),
@@ -319,6 +329,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
     },
     onSuccess: () => {
       toast('Não rolou — registrado.');
+      setSkipHabitTarget(null);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['rituals'] });
@@ -396,7 +407,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
                         onToggleHabit={(habitId, isDone) =>
                           toggleHabitMutation.mutate({ habitId, isDone })
                         }
-                        onSkipHabit={(habitId) => skipHabitMutation.mutate(habitId)}
+                        onOpenSkip={(habit) => setSkipHabitTarget(habit)}
                         onCompleteMinimum={(habitId) =>
                           toggleHabitMutation.mutate({ habitId, isDone: false })
                         }
@@ -410,6 +421,31 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
         )}
       </CardContent>
 
+      <SkipHabitSheet
+        open={Boolean(skipHabitTarget)}
+        onOpenChange={(open) => { if (!open) setSkipHabitTarget(null); }}
+        habitTitle={skipHabitTarget?.title || skipHabitTarget?.name || 'Hábito'}
+        outcome={skipHabitTarget ? habitDayState(skipHabitTarget) : 'open'}
+        initialNote={skipHabitTarget?.skip_note || ''}
+        busy={skipHabitMutation.isPending}
+        onConfirm={({ skipReason, skipNote }) =>
+          skipHabitMutation.mutate({
+            habitId: skipHabitTarget.id,
+            skipReason,
+            skipNote,
+          })
+        }
+        onUndo={() => {
+          if (!skipHabitTarget) return;
+          toggleHabitMutation.mutate({ habitId: skipHabitTarget.id, isDone: true });
+          setSkipHabitTarget(null);
+        }}
+        onMarkDone={() => {
+          if (!skipHabitTarget) return;
+          toggleHabitMutation.mutate({ habitId: skipHabitTarget.id, isDone: false });
+          setSkipHabitTarget(null);
+        }}
+      />
     </Card>
   );
 }

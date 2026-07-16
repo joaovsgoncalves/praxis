@@ -364,7 +364,7 @@ export const forjaApi = {
     delete: (id) => request(`/api/habits/${id}`, { method: 'DELETE' }),
   },
 
-  // Habit Logs — body: { habit_id, date, outcome?: 'done'|'skipped', skip_reason?, completed?, value? }
+  // Habit Logs — body: { habit_id, date, outcome?: 'done'|'skipped', skip_reason?, note?, completed?, value? }
   habitLogs: {
     list: (params = {}) => {
       const query = new URLSearchParams(params).toString();
