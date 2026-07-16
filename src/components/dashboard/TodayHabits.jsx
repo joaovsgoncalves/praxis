@@ -10,7 +10,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { motion } from 'framer-motion';
-import { Flame, Minus, MoreHorizontal } from 'lucide-react';
+import { Flame, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
@@ -237,18 +237,33 @@ export default function TodayHabits({
                 </span>
               ) : null}
 
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                aria-label={`Mais opções — ${habit.title}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openSkipSheet(habit);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
+              {skipped ? (
+                <button
+                  type="button"
+                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground"
+                  aria-label={`Desfazer não rolou — ${habit.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleHabit?.(habit.id, true);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  Desfazer
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-100/95 transition-colors hover:bg-amber-500/20"
+                  aria-label={`Não rolou — ${habit.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openSkipSheet(habit);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  Não rolou
+                </button>
+              )}
             </motion.div>
           );
         })}

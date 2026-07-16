@@ -196,6 +196,16 @@ export default function Dashboard() {
       toast('Não rolou — registrado.');
     },
   });
+
+  const notTodayTaskMutation = useMutation({
+    mutationFn: (taskId) => forjaApi.tasks.notToday(taskId, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      toast('Beleza — fica pra amanhã.');
+    },
+  });
   const saveWellnessMutation = useMutation({
     mutationFn: async (data) => forjaApi.wellness.create({ ...data, date: today }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wellness'] }),
@@ -284,6 +294,8 @@ export default function Dashboard() {
                 allTasksForRecurrence={allTasks}
                 onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
                 onEditTask={setEditingTask}
+                onNotToday={(t) => notTodayTaskMutation.mutate(t.id)}
+                notTodayBusy={notTodayTaskMutation.isPending}
                 onReorderPending={handleReorderPending}
                 reorderBusy={reorderTasksMutation.isPending}
               />

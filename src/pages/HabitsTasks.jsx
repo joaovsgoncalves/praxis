@@ -900,6 +900,30 @@ export default function HabitsTasks() {
                             </>
                           )}
                         </div>
+                        {canCheckIn && outcome !== 'skipped' ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 text-[11px] text-amber-100 hover:bg-amber-500/20"
+                            disabled={skipHabit.isPending}
+                            onClick={() => setSkipSheetHabit(habit)}
+                          >
+                            Não rolou
+                          </Button>
+                        ) : null}
+                        {canCheckIn && outcome === 'skipped' ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 rounded-full text-[11px]"
+                            disabled={toggleHabit.isPending}
+                            onClick={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
+                          >
+                            Desfazer
+                          </Button>
+                        ) : null}
                         <HabitRowMenu
                           label={cleanPriorityPrefix(habit.title)}
                           habit={habit}

@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   GripVertical,
   Pencil,
+  CalendarClock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,6 +40,8 @@ export default function TodayTasks({
   allTasksForRecurrence,
   onToggleComplete,
   onEditTask,
+  onNotToday,
+  notTodayBusy = false,
   onReorderPending,
   reorderBusy = false,
 }) {
@@ -210,7 +213,20 @@ export default function TodayTasks({
                               )}
                             </div>
                           </div>
-                          <div className="flex w-full gap-2 sm:w-auto sm:flex-col sm:items-stretch shrink-0">
+                          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-col sm:items-stretch shrink-0">
+                            {onNotToday ? (
+                              <Button
+                                type="button"
+                                size="default"
+                                variant="outline"
+                                disabled={notTodayBusy}
+                                className="h-9 flex-1 gap-1.5 rounded-lg border-amber-500/25 bg-amber-500/10 px-3 text-xs text-amber-100 touch-manipulation hover:bg-amber-500/20 sm:flex-none"
+                                onClick={() => onNotToday(task)}
+                              >
+                                <CalendarClock className="w-4 h-4" />
+                                Não hoje
+                              </Button>
+                            ) : null}
                             <Button
                               type="button"
                               size="default"
