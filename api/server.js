@@ -2631,7 +2631,7 @@ app.get('/api/rituals', (req, res) => {
   query += ' ORDER BY created_date DESC';
 
   const rituals = db.prepare(query).all(...params);
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
 
   const enriched = rituals.map(ritual => {
     const habitIds = JSON.parse(ritual.habits_order || '[]');
@@ -2639,9 +2639,17 @@ app.get('/api/rituals', (req, res) => {
       const habit = db.prepare('SELECT id, title FROM habits WHERE id = ?').get(hid);
       if (!habit) return null;
       const log = db.prepare(
-        'SELECT completed FROM habit_logs WHERE habit_id = ? AND date = ? AND completed = 1'
+        'SELECT completed, outcome FROM habit_logs WHERE habit_id = ? AND date = ?'
       ).get(hid, today);
-      return { id: habit.id, title: habit.title, completed_today: !!log };
+      const done = isHabitLogDone(log);
+      const skipped = isHabitLogSkipped(log);
+      return {
+        id: habit.id,
+        title: habit.title,
+        completed_today: done,
+        skipped_today: skipped,
+        day_outcome: skipped ? 'skipped' : done ? 'done' : 'open',
+      };
     }).filter(Boolean);
     return { ...ritual, habits_order: habitIds, habits };
   });

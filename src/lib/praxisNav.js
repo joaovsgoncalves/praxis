@@ -11,7 +11,6 @@ import {
   Trophy,
   BarChart3,
   Settings,
-  Inbox,
   UtensilsCrossed,
   Dumbbell,
 } from 'lucide-react';
@@ -31,7 +30,7 @@ export const secondaryNavItems = [
   { path: '/compras', label: 'Compras', icon: ShoppingBag },
   { path: '/treinos', label: 'Treinos', icon: Dumbbell },
   { path: '/nutricao', label: 'Nutrição', icon: UtensilsCrossed },
-  { path: '/capturas', label: 'Fila de capturas', icon: Inbox },
+  // /capturas fica acessível por banner/links do Falar — fora do menu (João 2026-07-16)
   { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
   { path: '/rituais', label: 'Rituais', icon: Link2 },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy, requiresUnlockedAchievements: true },

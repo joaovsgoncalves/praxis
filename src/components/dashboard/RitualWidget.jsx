@@ -5,17 +5,24 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, ChevronDown, Flame, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Flame, Minus, Sparkles } from 'lucide-react';
 import { forjaApi } from '@/api/forjaClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { fortalezaDateKey } from '@/lib/dates';
+import { toast } from 'sonner';
 
 const timeOfDayConfig = {
   morning: { emoji: '🌅', label: 'Manhã', order: 0 },
   afternoon: { emoji: '☀️', label: 'Tarde', order: 1 },
   evening: { emoji: '🌙', label: 'Noite', order: 2 },
 };
+
+function habitDayState(habit) {
+  if (habit?.day_outcome === 'skipped' || habit?.skipped_today) return 'skipped';
+  if (habit?.day_outcome === 'done' || habit?.completed_today) return 'done';
+  return 'open';
+}
 
 function ConfettiOverlay() {
   return (
@@ -26,23 +33,27 @@ function ConfettiOverlay() {
   );
 }
 
-function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsible = false }) {
+function RitualItem({ ritual, onToggleHabit, onSkipHabit, onCompleteMinimum, collapsible = false }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isOpen, setIsOpen] = useState(!collapsible);
   const prevDoneRef = useRef(null);
 
   const habits = ritual.habits || [];
-  const completedCount = habits.filter((h) => h.completed_today).length;
+  const completedCount = habits.filter((h) => habitDayState(h) === 'done').length;
+  const skippedCount = habits.filter((h) => habitDayState(h) === 'skipped').length;
+  const addressedCount = completedCount + skippedCount;
   const totalCount = habits.length;
   const isComplete = totalCount > 0 && completedCount === totalCount;
   const isMinimum = completedCount > 0 && !isComplete;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-  const nextHabit = habits.find((h) => !h.completed_today);
+  const nextHabit = habits.find((h) => habitDayState(h) === 'open');
   const statusCopy = isComplete
     ? 'Ritual completo. Dia registrado.'
     : isMinimum
       ? 'Ritual parcial também conta. Sem culpa.'
-      : 'Comece pelo mínimo: só o primeiro passo.';
+      : skippedCount > 0 && completedCount === 0
+        ? 'Tem passo em não rolou — dá pra desfazer ou seguir.'
+        : 'Comece pelo mínimo: só o primeiro passo.';
 
   useEffect(() => {
     if (prevDoneRef.current === false && isComplete) {
@@ -64,7 +75,6 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
     )}>
       {showConfetti && <ConfettiOverlay />}
 
-      {/* Ritual header */}
       {collapsible ? (
         <button
           type="button"
@@ -74,7 +84,10 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
         >
           <span className="text-lg">{ritual.emoji || '⚡'}</span>
           <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
-          <span className="text-xs text-muted-foreground shrink-0">{completedCount}/{totalCount}</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {completedCount}/{totalCount}
+            {skippedCount > 0 ? ` · ${skippedCount} nr` : ''}
+          </span>
           <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
         </button>
       ) : (
@@ -93,6 +106,7 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
           ) : (
             <span className="text-xs text-muted-foreground shrink-0">
               {completedCount}/{totalCount}
+              {addressedCount > completedCount ? ` · ${skippedCount} nr` : ''}
             </span>
           )}
         </div>
@@ -100,7 +114,6 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
 
       {(!collapsible || isOpen) && (
         <div className={collapsible ? 'mt-3' : ''}>
-          {/* Progress bar */}
           <Progress
             value={progressPercent}
             className={cn('h-1.5 mb-2', isComplete ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
@@ -122,35 +135,79 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
             )}
           </div>
 
-          {/* Habit checklist */}
           <ul className="space-y-1.5">
-            {habits.map((habit) => (
-              <li key={habit.id} className="flex items-center gap-2 group">
-                <Checkbox
-                  id={`ritual-habit-${ritual.id}-${habit.id}`}
-                  checked={habit.completed_today}
-                  onCheckedChange={() => onToggleHabit(habit.id, habit.completed_today)}
+            {habits.map((habit) => {
+              const state = habitDayState(habit);
+              const done = state === 'done';
+              const skipped = state === 'skipped';
+              return (
+                <li
+                  key={habit.id}
                   className={cn(
-                    'h-4 w-4 shrink-0',
-                    habit.completed_today
-                      ? 'data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
-                      : 'border-muted-foreground/40'
-                  )}
-                />
-                <label
-                  htmlFor={`ritual-habit-${ritual.id}-${habit.id}`}
-                  className={cn(
-                    'text-xs cursor-pointer transition-colors select-none',
-                    habit.completed_today
-                      ? 'line-through text-muted-foreground'
-                      : 'text-foreground/80 group-hover:text-foreground'
+                    'flex items-center gap-2 rounded-lg px-1 py-1 group',
+                    skipped && 'bg-amber-500/[0.06]',
                   )}
                 >
-                  {habit.emoji && <span className="mr-1">{habit.emoji}</span>}
-                  {habit.title || habit.name}
-                </label>
-              </li>
-            ))}
+                  {skipped ? (
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400"
+                      aria-hidden
+                    >
+                      <Minus className="h-2.5 w-2.5" />
+                    </span>
+                  ) : (
+                    <Checkbox
+                      id={`ritual-habit-${ritual.id}-${habit.id}`}
+                      checked={done}
+                      onCheckedChange={() => onToggleHabit(habit.id, done)}
+                      className={cn(
+                        'h-4 w-4 shrink-0',
+                        done
+                          ? 'data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
+                          : 'border-muted-foreground/40'
+                      )}
+                    />
+                  )}
+                  <label
+                    htmlFor={skipped ? undefined : `ritual-habit-${ritual.id}-${habit.id}`}
+                    className={cn(
+                      'min-w-0 flex-1 text-xs select-none',
+                      skipped ? 'text-muted-foreground opacity-80' : 'cursor-pointer',
+                      done
+                        ? 'line-through text-muted-foreground'
+                        : !skipped && 'text-foreground/80 group-hover:text-foreground',
+                    )}
+                  >
+                    {habit.emoji && <span className="mr-1">{habit.emoji}</span>}
+                    {habit.title || habit.name}
+                    {skipped ? (
+                      <span className="ml-1.5 text-[10px] font-medium text-amber-200/80">Não rolou</span>
+                    ) : null}
+                  </label>
+                  {skipped ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 shrink-0 px-2 text-[11px] text-muted-foreground"
+                      onClick={() => onToggleHabit(habit.id, true)}
+                    >
+                      Desfazer
+                    </Button>
+                  ) : !done ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 px-2 text-[11px] text-amber-100 hover:bg-amber-500/20"
+                      onClick={() => onSkipHabit(habit.id)}
+                    >
+                      Não rolou
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -160,7 +217,7 @@ function RitualItem({ ritual, onToggleHabit, onCompleteMinimum, today, collapsib
 
 export default function RitualWidget({ collapsible = false, today: todayProp, status }) {
   const queryClient = useQueryClient();
-  const today = todayProp || format(new Date(), 'yyyy-MM-dd');
+  const today = todayProp || fortalezaDateKey();
   const ritualParams = { date: today, ...(status ? { status } : {}) };
   const ritualQueryKey = ['rituals', ritualParams];
 
@@ -173,26 +230,43 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
       if (isDone) {
-        // Find and delete the log
         const logs = await forjaApi.habitLogs.list({ habit_id: habitId, date: today });
         if (logs.length > 0) {
           await forjaApi.habitLogs.delete(logs[0].id);
         }
       } else {
-        await forjaApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
+        await forjaApi.habitLogs.create({
+          habit_id: habitId,
+          date: today,
+          outcome: 'done',
+          completed: true,
+        });
       }
     },
     onMutate: async ({ habitId, isDone }) => {
-      // Optimistic update
       await queryClient.cancelQueries({ queryKey: ['rituals'] });
       const previous = queryClient.getQueryData(ritualQueryKey);
       queryClient.setQueryData(ritualQueryKey, (old) => {
         if (!old) return old;
         return old.map((ritual) => ({
           ...ritual,
-          habits: ritual.habits.map((h) =>
-            h.id === habitId ? { ...h, completed_today: !isDone } : h
-          ),
+          habits: ritual.habits.map((h) => {
+            if (h.id !== habitId) return h;
+            if (isDone) {
+              return {
+                ...h,
+                completed_today: false,
+                skipped_today: false,
+                day_outcome: 'open',
+              };
+            }
+            return {
+              ...h,
+              completed_today: true,
+              skipped_today: false,
+              day_outcome: 'done',
+            };
+          }),
         }));
       });
       return { previous };
@@ -205,10 +279,54 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['rituals'] });
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
     },
   });
 
-  // Group rituals by time_of_day
+  const skipHabitMutation = useMutation({
+    mutationFn: async (habitId) => {
+      await forjaApi.habitLogs.create({
+        habit_id: habitId,
+        date: today,
+        outcome: 'skipped',
+      });
+    },
+    onMutate: async (habitId) => {
+      await queryClient.cancelQueries({ queryKey: ['rituals'] });
+      const previous = queryClient.getQueryData(ritualQueryKey);
+      queryClient.setQueryData(ritualQueryKey, (old) => {
+        if (!old) return old;
+        return old.map((ritual) => ({
+          ...ritual,
+          habits: ritual.habits.map((h) =>
+            h.id === habitId
+              ? {
+                  ...h,
+                  completed_today: false,
+                  skipped_today: true,
+                  day_outcome: 'skipped',
+                }
+              : h
+          ),
+        }));
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(ritualQueryKey, context.previous);
+      }
+    },
+    onSuccess: () => {
+      toast('Não rolou — registrado.');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['rituals'] });
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
+
   const grouped = rituals.reduce((acc, ritual) => {
     const tod = ritual.time_of_day || 'morning';
     if (!acc[tod]) acc[tod] = [];
@@ -274,11 +392,11 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
                       <RitualItem
                         key={ritual.id}
                         ritual={ritual}
-                        today={today}
                         collapsible={collapsible}
                         onToggleHabit={(habitId, isDone) =>
                           toggleHabitMutation.mutate({ habitId, isDone })
                         }
+                        onSkipHabit={(habitId) => skipHabitMutation.mutate(habitId)}
                         onCompleteMinimum={(habitId) =>
                           toggleHabitMutation.mutate({ habitId, isDone: false })
                         }
