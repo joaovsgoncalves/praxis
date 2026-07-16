@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/sheet';
 import { SKIP_REASONS } from '@/lib/habits';
 
-const PLACEHOLDERS = [
+/** Frases honestas — toque preenche o nome (ainda dá pra editar / escrever do zero) */
+const HONEST_PHRASES = [
   'eu escolhi o fácil',
   'eu tive medo de tentar e falhar',
   'eu fui irresponsável com isso',
@@ -18,7 +19,7 @@ const PLACEHOLDERS = [
 ];
 
 /**
- * Sheet de “Não rolou” com nome honesto em texto livre (+ chips opcionais).
+ * Sheet de “Não rolou” com nome honesto em texto livre (+ atalhos opcionais).
  */
 export default function SkipHabitSheet({
   open,
@@ -33,9 +34,6 @@ export default function SkipHabitSheet({
 }) {
   const [note, setNote] = useState('');
   const [chip, setChip] = useState(null);
-  const [placeholder] = useState(
-    () => PLACEHOLDERS[Math.floor(Math.random() * PLACEHOLDERS.length)],
-  );
 
   useEffect(() => {
     if (open) {
@@ -60,26 +58,44 @@ export default function SkipHabitSheet({
           <SheetDescription>
             {outcome === 'skipped'
               ? 'Já registrado como não rolou. Pode desfazer, editar o nome ou marcar feito.'
-              : 'Quando falhar, nomeia sem romance — sem “falta disciplina”. O nome honesto.'}
+              : 'Quando falhar, nomeia sem romance — sem “falta disciplina” / “sou procrastinador”.'}
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-4 space-y-3 pb-5">
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
-              Nome honesto (opcional, mas melhor)
+              Nome honesto
             </p>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, 280))}
-              placeholder={placeholder}
-              className="min-h-[80px] resize-none border-amber-500/20 bg-white/[0.03] text-sm"
+              placeholder="escreve o teu — ou toca um abaixo"
+              className="min-h-[88px] resize-none border-amber-500/20 bg-white/[0.03] text-sm"
               disabled={busy}
               autoFocus
             />
-            <p className="text-[11px] text-muted-foreground/80">
-              Em vez de “falta disciplina” — fala o nome real.
-            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-muted-foreground">Toque pra preencher (edita depois se quiser)</p>
+            <div className="flex flex-col gap-1.5">
+              {HONEST_PHRASES.map((phrase) => (
+                <button
+                  key={phrase}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setNote(phrase)}
+                  className={
+                    note === phrase
+                      ? 'rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-2.5 text-left text-sm text-amber-50'
+                      : 'rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5 text-left text-sm text-foreground/90 hover:border-amber-500/25 hover:bg-amber-500/[0.08]'
+                  }
+                >
+                  “{phrase}”
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -92,7 +108,7 @@ export default function SkipHabitSheet({
                 className={
                   chip === r.value
                     ? 'shrink-0 rounded-full border-amber-400/50 bg-amber-500/25 text-amber-50'
-                    : 'shrink-0 rounded-full border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20'
+                    : 'shrink-0 rounded-full border-white/10 text-muted-foreground hover:bg-white/[0.04]'
                 }
                 disabled={busy}
                 onClick={() => setChip((c) => (c === r.value ? null : r.value))}
