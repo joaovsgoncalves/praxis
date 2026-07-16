@@ -183,11 +183,25 @@ O **kit visual ainda é sólido** (PageHero, quiet Lotes 7–9, nav 4+ferramenta
 
 ---
 
-## Veredito
+## Residual pós-lote 10 (subagentes 2026-07-16)
 
-| Pergunta | Resposta |
-|----------|----------|
-| Design “entregue” como sistema? | **Sim** — kit + quiet ainda valem. |
-| Design “calmo todo dia no celular”? | **Não ainda** — hierarquia Hoje + dual hábitos + densidade de ação. |
-| Tem muita coisa pra melhorar? | **Sim, mas em 3 lotes**, não rebrand. |
-| Próximo passo natural | **Arrocha 10a** (Agora first) → **10b** → **10c**; ou “deixa quieto” e só usa o app. |
+Lote 10 (`0859def`) fechou: Agora first · sem slice 5 · sem Opening duplicado · densidade task · skip note.
+
+### Ainda aberto (próximo: lote 11 se pedir)
+
+| Pri | Achado | Onde |
+|-----|--------|------|
+| **P0** | Row de hábito com long-press + checkbox + botão no mesmo `role=button` | `TodayHabits.jsx` |
+| **P1** | Loading vira empty falso (0/0, “nada urgente”) | Dashboard queries |
+| **P1** | Foco link < 44px touch | `TodayTasks.jsx` |
+| **P1** | Contexto ainda 4 cards pesados no mobile | Dashboard grid |
+| **P1** | Metas/Foco empty durante load | `Goals.jsx`, `Focus.jsx` |
+| **P1** | Compras KPIs zerados no filtro errado | `Compras.jsx` |
+| **P1** | WeeklyReview cards-dentro-de-cards | `WeeklyReview.jsx` |
+| **P1** | Treinos gradient “fitness” | `Treinos.jsx` |
+| **P2** | Nutri “Mais” = segunda nav + copy de fase | `Nutricao.jsx` |
+
+**Frente Tarefas/Hábitos (subagente 2):** timeout — não reabrir sem pedido; 10b/10c já cobriram o grosso.
+
+**Não implementar residual sem “arrocha lote 11”.**
+
