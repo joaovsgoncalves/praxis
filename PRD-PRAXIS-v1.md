@@ -140,7 +140,13 @@ Tela principal com:
 
 ## 9. Out of scope (v1)
 
-- Gamificação complexa (badges, níveis, XP)
+- Gamificação complexa (badges, níveis, XP) — **nota (jul/2026):** na prática o recurso
+  foi herdado do produto anterior (Forja do Jota, ver `PRD-PRAXIS-LEGADO-v0.md`) e segue
+  ativo: XP, 7 níveis, 7 conquistas, barra de progresso na sidebar e página `/conquistas`.
+  A Fase 11 de `docs/PLANO-IMPLEMENTACAO-PRAXIS.md` ("Gamificação discreta") já tratava a
+  feature como existente, reduzindo o tom em vez de removê-la. Decisão consciente do João:
+  **manter como está**. Este item do PRD documenta a intenção original do v1, não o estado
+  atual do produto — mantido aqui como histórico, não como pendência.
 - Integração com CRMs externos
 - Múltiplos perfis / times
 - PWA offline
