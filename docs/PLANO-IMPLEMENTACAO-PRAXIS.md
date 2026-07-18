@@ -61,7 +61,7 @@
 
 | ID | Task | Esforço | Aceite | Status |
 |----|------|---------|--------|--------|
-| P2-T01 | Grep UX: strings user-facing `Forja`, `A.N.A`, `forja` em `src/pages`, `src/components`, `index.html` | S | Lista de arquivos no PR/commit | **done** (`docs/P2-UX-STRINGS-AUDIT.md`) |
+| P2-T01 | Grep UX: strings user-facing `Forja`, `A.N.A`, `forja` em `src/pages`, `src/components`, `index.html` | S | Lista de arquivos no PR/commit | **done** (`docs/archive/P2-UX-STRINGS-AUDIT.md`) |
 | P2-T02 | Substituir copy (Ideas, Focus, VoiceCapture, empty states, tooltips) → Praxis / assistente de planejamento / captura por voz | S | Nenhuma string “Forja” em UI | **done** |
 | P2-T03 | Modo Foco: “Deep Work” → “Foco profundo”; botão “Iniciar foco de {n} min” | S | Focus.jsx atualizado | **done** |
 | P2-T04 | Gamificação: “5 pro próximo” → “Faltam 5 XP” (ou equivalente discreto) | S | Sidebar/Dashboard | **done** |
@@ -226,7 +226,7 @@
 | P13-T03 | Checklist métricas (acima) | **done** |
 | P13-T04 | Health watchdog | **done** |
 
-Ver `docs/ONDA-13-OPERACAO.md`.
+Ver `docs/archive/ONDA-13-OPERACAO.md`.
 
 ---
 
@@ -293,14 +293,14 @@ Ver `docs/ONDA-18-OPERACAO.md` e `docs/CHECKLIST-PRAXIS-10.md`.
 
 ## Pós-18 (evolução)
 
-Plano **ondas 19–24** + fase de uso: `docs/PLANO-PRAXIS-POS-18.md`  
-Auditoria base: `docs/AUDITORIA-PRAXIS-2026-07-02.md`  
+Plano **ondas 19–24** + fase de uso: `docs/archive/PLANO-PRAXIS-POS-18.md`  
+Auditoria base: `docs/archive/AUDITORIA-PRAXIS-2026-07-02.md`  
 **Onda 19:** `docs/ONDA-19-SMOKE.md`  
 **Onda 20:** `docs/ONDA-20-OPERACAO.md`  
 **Onda 21:** `docs/ONDA-21-VOZ-UX.md`  
 **Onda 22:** `docs/ONDA-22-LISTA.md`  
 **Onda 23:** `docs/ONDA-23-METAS-RITUAIS.md`  
-**Onda 24:** `docs/ONDA-24-ENTRADA-RAPIDA.md` · fechamento `docs/PRAXIS-FECHAMENTO-ONDAS-19-24.md`
+**Onda 24:** `docs/archive/ONDA-24-ENTRADA-RAPIDA.md` · fechamento `docs/archive/PRAXIS-FECHAMENTO-ONDAS-19-24.md`
 
 ---
 

@@ -177,7 +177,7 @@ O **kit visual ainda é sólido** (PageHero, quiet Lotes 7–9, nav 4+ferramenta
 ## Fontes
 
 - Código: `Dashboard.jsx`, `NowBlock.jsx`, `HeroDay.jsx`, `RitualWidget.jsx`, `HabitsTasks.jsx`, `TodayTasks.jsx`, `TodayHabits.jsx`, `SkipHabitSheet.jsx`, `Treinos.jsx`, `Nutricao.jsx`, `praxisNav.js`, `index.css`, `PraxisPage.jsx`  
-- Docs: `DESIGN.md`, `PRAXIS-DESIGN-AUDIT-2026-07-09.md`, Lotes 7–9, `PRAXIS-NOTA-ATUAL.md`  
+- Docs: `DESIGN.md`, `archive/PRAXIS-DESIGN-AUDIT-2026-07-09.md`, Lotes 7–9, `PRAXIS-NOTA-ATUAL.md`  
 - Tools: `npx impeccable@2.1.9 detect src/ --fast --json` (26) · UI Pro Max design-system/ux/style  
 - Contexto usuário: print rituais sem botão; pedido nota honesta; Fila removida  
 

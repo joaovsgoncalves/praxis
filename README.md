@@ -36,7 +36,7 @@ node server.js
 ## PRD e evolução
 
 - Conceito atual: [`PRD-PRAXIS-v1.md`](./PRD-PRAXIS-v1.md)
-- Histórico: [`PRD-PRAXIS-LEGADO-v0.md`](./PRD-PRAXIS-LEGADO-v0.md)
+- Histórico: [`PRD-PRAXIS-LEGADO-v0.md`](./docs/archive/PRD-PRAXIS-LEGADO-v0.md)
 
 ## Domínio
 

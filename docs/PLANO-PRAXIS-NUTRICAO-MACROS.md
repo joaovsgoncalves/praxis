@@ -297,7 +297,7 @@ Dashboard: card abaixo/acima da água (ordem a definir no design da fase 4 — d
 
 | # | Nome | Entrega | Done quando |
 |---|------|---------|-------------|
-| **0** | Fundação | Schema + módulo API vazio + flag + rota placeholder `/nutricao` “em breve” **ou** só backend migrations sem UI | `GET /api/nutrition/day` 401 anônimo; 200 auth com `{totals: zero, logs:[]}`; `prepush` + ship api. **Checklist código:** `docs/PRAXIS-NUTRICAO-FASE-0.md` (P0-T01…T09) |
+| **0** | Fundação | Schema + módulo API vazio + flag + rota placeholder `/nutricao` “em breve” **ou** só backend migrations sem UI | `GET /api/nutrition/day` 401 anônimo; 200 auth com `{totals: zero, logs:[]}`; `prepush` + ship api. **Checklist código:** `docs/archive/PRAXIS-NUTRICAO-FASE-0.md` (P0-T01…T09) |
 | **1** | Meta e perfil | PUT/GET profile + tela Meta (sem diário) + cálculo sugestão | João salva meta kcal/P/C/G; recarrega e persiste |
 | **2** | Catálogo de alimentos | CRUD foods + busca + favorito + form simples (100 g ou porção) | Criar “Ovo” e “Arroz”; listar/buscar |
 | **3** | Diário (core) | POST/PATCH/DELETE logs + GET day com totais + slots | Logar 2 itens no almoço; totais batem; apagar item atualiza |
@@ -308,7 +308,7 @@ Dashboard: card abaixo/acima da água (ordem a definir no design da fase 4 — d
 | **8** | Texto / parse | parse-text + UI Texto + from-text (base p/ A.N.A.) | **done** 2026-07-09 — STT in-app opcional depois |
 | **9** | Histórico e revisão | Calendário simples / lista dias; bloco macros em `/revisao-semanal` | **done** 2026-07-09 — summary API + aba Histórico + weekly insights |
 | **10** | Peso e tendência | Log de peso (`body_weight_logs`) + sparkline leve na Nutrição | **done** 2026-07-09 |
-| **11** | Polish produto | Copy, a11y barras, smoke nutrition, nota de produto | **done** — `PRAXIS-NUTRICAO-FECHAMENTO.md` + `smoke-praxis-nutrition.sh` |
+| **11** | Polish produto | Copy, a11y barras, smoke nutrition, nota de produto | **done** — `archive/PRAXIS-NUTRICAO-FECHAMENTO.md` + `smoke-praxis-nutrition.sh` |
 | **12** | Opcional barcode | Integração OFF **opt-in** (rede); cache local do produto | **done** 2026-07-09 — colar EAN; câmera nativa depois |
 
 ### Dependências entre fases
@@ -430,7 +430,7 @@ npm run deploy:prod
 |---|---|
 | **Fases totais** | **0–12 shipped** (barcode OFF) |
 | **MVP diário bom** | **0–12** |
-| **Fechamento** | `docs/PRAXIS-NUTRICAO-FECHAMENTO.md` |
+| **Fechamento** | `docs/archive/PRAXIS-NUTRICAO-FECHAMENTO.md` |
 | **Próximo passo** | usar · câmera nativa opcional se pedir |
 
 **Fases 0–12 implementadas (2026-07).**

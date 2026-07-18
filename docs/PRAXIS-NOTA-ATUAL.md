@@ -31,7 +31,7 @@
 
 ## Design (não misturar com nota de produto)
 
-Ver `docs/PRAXIS-DESIGN-AUDIT-2026-07-09.md` + `docs/PRAXIS-LOTE-9-DISTILL.md`.  
+Ver `docs/archive/PRAXIS-DESIGN-AUDIT-2026-07-09.md` + `docs/archive/PRAXIS-LOTE-9-DISTILL.md`.  
 Design **não** é 9,5+ até o Hoje respirar de forma estável no celular e a marca sair do padrão genérico dark/AI.
 
 ## Confiança 9,5+ (só uso)
