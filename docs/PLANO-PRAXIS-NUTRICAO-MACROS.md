@@ -397,7 +397,7 @@ Não são analytics SaaS — checklist do João:
 ## 15. Comandos de ship (por fase que toca API)
 
 ```bash
-cd apps/forja-do-jota
+cd apps/praxis
 npm run prepush:check
 git add -A && git commit -m "feat(praxis): nutrition fase N — …"
 git push origin main

@@ -2,8 +2,8 @@
 # Alerta se api/ do repo diverge do path que o systemd declara (sem sync automático).
 set -euo pipefail
 
-SRC="${PRAXIS_API_SRC:-/root/.hermes/workspaces/apps/forja-do-jota/api}"
-DST="${PRAXIS_API_DST:-/root/.hermes/workspaces/forja-do-jota/api}"
+SRC="${PRAXIS_API_SRC:-/root/.hermes/workspaces/apps/praxis/api}"
+DST="${PRAXIS_API_DST:-/root/.hermes/workspaces/praxis/api}"
 
 if [[ "$(realpath "$SRC" 2>/dev/null)" == "$(realpath "$DST" 2>/dev/null)" ]]; then
   echo "api-drift: OK (mesmo diretório)"

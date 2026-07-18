@@ -21,7 +21,7 @@ code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/api/health") || code=000
 [[ "$code" == "200" ]] && check "/api/health → 200" || bad "/api/health → $code"
 
 echo "[2] Backup local (VPS)"
-API_DIR="${PRAXIS_API_DIR:-/root/.hermes/workspaces/apps/forja-do-jota/api}"
+API_DIR="${PRAXIS_API_DIR:-/root/.hermes/workspaces/apps/praxis/api}"
 if [[ -f "$API_DIR/backups/last-backup.json" ]]; then
   check "last-backup.json presente"
   cat "$API_DIR/backups/last-backup.json"

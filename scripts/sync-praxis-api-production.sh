@@ -3,8 +3,8 @@
 # Uso na VPS: ./scripts/sync-forja-api-production.sh [--dry-run]
 set -euo pipefail
 
-SRC="${PRAXIS_API_SRC:-/root/.hermes/workspaces/apps/forja-do-jota/api}"
-DST="${PRAXIS_API_DST:-/root/.hermes/workspaces/forja-do-jota/api}"
+SRC="${PRAXIS_API_SRC:-/root/.hermes/workspaces/apps/praxis/api}"
+DST="${PRAXIS_API_DST:-/root/.hermes/workspaces/praxis/api}"
 DRY=0
 [[ "${1:-}" == "--dry-run" ]] && DRY=1
 

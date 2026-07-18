@@ -7,7 +7,7 @@
 #   FORJA_DB=/path/to/forja.db ./backup.sh # custom db path
 #
 # Schedule (suggested cron, runs daily at 03:15):
-#   15 3 * * * /home/user/forja-do-jota/api/scripts/backup.sh >> /var/log/forja-backup.log 2>&1
+#   15 3 * * * /home/user/praxis/api/scripts/backup.sh >> /var/log/forja-backup.log 2>&1
 #
 # Optional: push to cloud after backup
 #   RCLONE_REMOTE=gdrive:/forja-backups ./backup.sh

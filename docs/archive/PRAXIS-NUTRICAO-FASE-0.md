@@ -40,7 +40,7 @@ João **não** registra comida nesta fase — só infraestrutura testável.
 
 | | |
 |---|---|
-| **Arquivo** | `apps/forja-do-jota/api/nutrition.js` (novo) |
+| **Arquivo** | `apps/praxis/api/nutrition.js` (novo) |
 | **Fazer** | Espelhar estilo `purchaseList.js` |
 
 Exports mínimos:
@@ -260,7 +260,7 @@ Icon: preferir `UtensilsCrossed` ou `Apple` do lucide (já usado no projeto se e
 Ordem obrigatória:
 
 ```bash
-cd apps/forja-do-jota
+cd apps/praxis
 npm run prepush:check
 git status
 git add api/nutrition.js api/server.js src/api/forjaClient.js src/lib/nutrition.js \

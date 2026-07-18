@@ -117,7 +117,7 @@ Nada obrigatório do plano original ou do que você pediu (design geral + lista 
 ## Como saber se está no ar
 
 ```bash
-cd apps/forja-do-jota && npm run smoke:prod   # API + front
+cd apps/praxis && npm run smoke:prod   # API + front
 npm run deploy:prod                          # Vercel + alias praxis-jota
 ```
 

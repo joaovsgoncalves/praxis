@@ -33,7 +33,7 @@ A nota **10** no `PRAXIS-NOTA-ATUAL.md` era **otimista** — misturava “plano 
 | `npm run smoke:prod` (login + 8 rotas) | OK |
 | `npm run checklist:10` | OK |
 | `forja-api` systemd | active |
-| Processo API cwd | `apps/forja-do-jota/api` |
+| Processo API cwd | `apps/praxis/api` |
 | Cron backup 03:15 | instalado |
 | `last-backup.json` | presente (~30 KB snapshot) |
 | `GET /` e `/captura` e `manifest.webmanifest` | 200 |

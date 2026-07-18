@@ -26,7 +26,7 @@ Alerta Discord **só** se definir `PRAXIS_ALERT_WEBHOOK_URL` no cron ou no scrip
 
 | Path | Papel |
 |------|--------|
-| `apps/forja-do-jota/api` | Onde você edita (Git) |
+| `apps/praxis/api` | Onde você edita (Git) |
 | `forja-do-jota/api` | `WorkingDirectory` do systemd (pode divergir) |
 
 Depois de mudar `api/`:

@@ -97,7 +97,7 @@ Hoje mais legível: corpo (humor/sono) separado de agenda e de nutrição/água;
 ## Verificação
 
 ```bash
-cd apps/forja-do-jota && npm run prepush:check
+cd apps/praxis && npm run prepush:check
 # após ship front
 npm run deploy:prod && scripts/praxis-alias-canonical.sh
 # manual: Hoje expandir seções, /nutricao água, sidebar Rituais com 0 rituais, /treinos stub

@@ -10,7 +10,7 @@ Após `vercel --prod`, **sempre** atualizar aliases:
 
 ```bash
 export HOME=/root/.hermes/home
-cd /root/.hermes/workspaces/apps/forja-do-jota
+cd /root/.hermes/workspaces/apps/praxis
 DEP=$(vercel ls --yes 2>&1 | awk '/● Ready.*Production/ {print $3; exit}')
 vercel alias set "$DEP" dopraxis.vercel.app
 vercel alias set "$DEP" praxis-jota.vercel.app

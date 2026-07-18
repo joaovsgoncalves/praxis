@@ -6,11 +6,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 API_DIR="${PRAXIS_API_DIR:-$ROOT/api}"
 
 # Produção systemd costuma usar outro cwd
-if [[ -f /root/.hermes/workspaces/forja-do-jota/api/forja.db ]]; then
-  API_DIR="${PRAXIS_API_DIR:-/root/.hermes/workspaces/forja-do-jota/api}"
+if [[ -f /root/.hermes/workspaces/praxis/api/forja.db ]]; then
+  API_DIR="${PRAXIS_API_DIR:-/root/.hermes/workspaces/praxis/api}"
 fi
-if [[ -f "$ROOT/../forja-do-jota/api/forja.db" ]]; then
-  API_DIR="$(cd "$ROOT/../forja-do-jota/api" && pwd)"
+if [[ -f "$ROOT/../praxis/api/forja.db" ]]; then
+  API_DIR="$(cd "$ROOT/../praxis/api" && pwd)"
 fi
 
 export FORJA_DB="${FORJA_DB:-$API_DIR/forja.db}"

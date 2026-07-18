@@ -10,7 +10,7 @@ MARKER="# praxis-sqlite-backup"
 
 chmod +x "$BACKUP_SCRIPT" "$ROOT/api/scripts/backup.sh" 2>/dev/null || true
 
-LINE="15 3 * * * PRAXIS_API_DIR=\"${PRAXIS_API_DIR:-/root/.hermes/workspaces/apps/forja-do-jota/api}\" $BACKUP_SCRIPT >> $LOG 2>&1 $MARKER"
+LINE="15 3 * * * PRAXIS_API_DIR=\"${PRAXIS_API_DIR:-/root/.hermes/workspaces/apps/praxis/api}\" $BACKUP_SCRIPT >> $LOG 2>&1 $MARKER"
 
 if crontab -l 2>/dev/null | grep -qF "$MARKER"; then
   echo "Cron já instalado ($MARKER)."
