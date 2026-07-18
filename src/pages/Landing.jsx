@@ -217,25 +217,24 @@ export default function Landing() {
               </p>
             </div>
 
-            <div className="relative mt-16 grid gap-4 lg:grid-cols-3 lg:gap-5">
-              <div className="absolute left-[16.66%] right-[16.66%] top-11 hidden h-px bg-gradient-to-r from-domain-gold/30 via-primary/30 to-domain-wellness/30 lg:block" />
+            <div className="mt-16 grid gap-4 lg:grid-cols-3 lg:gap-5">
               {flowSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
                   <motion.article
                     key={step.number}
-                    className="group relative rounded-3xl border border-white/[0.065] bg-white/[0.022] p-6 transition-colors hover:border-white/[0.1] hover:bg-white/[0.032] sm:p-7"
+                    className="group relative overflow-hidden rounded-3xl border border-white/[0.065] bg-[#0d0d0f] p-6 transition-colors hover:border-white/[0.1] hover:bg-[#111114] sm:p-7"
                     initial={{ opacity: 0, y: 24 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.28 }}
                     transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
                     whileHover={{ y: -4 }}
                   >
-                    <div className="mb-8 flex items-center justify-between">
-                      <div className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border ${step.shell}`}>
+                    <div className="mb-8 flex items-center justify-between gap-4">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${step.shell}`}>
                         <Icon className={`h-5 w-5 ${step.accent}`} aria-hidden />
                       </div>
-                      <span className="font-mono text-[10px] tracking-[0.18em] text-muted-foreground/60">{step.number}</span>
+                      <span className="font-mono text-[10px] tracking-[0.18em] text-muted-foreground/55">{step.number}</span>
                     </div>
                     <h3 className="praxis-title text-2xl font-semibold tracking-[-0.04em]">{step.title}</h3>
                     <p className="mt-3 text-sm leading-7 text-muted-foreground">{step.description}</p>
