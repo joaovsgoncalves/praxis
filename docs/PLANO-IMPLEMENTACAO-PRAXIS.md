@@ -4,8 +4,8 @@
 **Dono:** João Victor  
 **Executor:** A.N.A. (implementação por ondas na `main`)  
 **Fonte:** Review Sêneca + alinhamento produto (subtração, cockpit “agora”, segurança)  
-**URL canônica:** https://praxis-jota.vercel.app  
-**Repo:** `forja-do-jota` → branch **`main`** (obrigatório push após cada onda entregável)
+**URL canônica:** https://dopraxis.vercel.app  
+**Repo:** `praxis` → branch **`main`** (obrigatório push após cada onda entregável)
 
 ---
 
@@ -47,7 +47,7 @@
 | P1-T03 | Endpoints `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | M | Login retorna cookie; logout invalida sessão | **done** |
 | P1-T04 | Middleware API: rotas `/api/*` (exceto health + login) exigem sessão válida **ou** `Authorization: Bearer` (FORJA_API_KEY para automação) | M | `curl` sem credencial → 401 em tasks/habits/wellness/calendar | **done** |
 | P1-T05 | Front: tela/login gate mínima (senha), `forjaClient` envia cookie/`credentials: include` | M | Vercel: usuário não logado não vê dados | **done** |
-| P1-T06 | Vercel: garantir que rewrite `/api` preserva cookies (same-site); testar login em produção | S | Login em `praxis-jota.vercel.app` OK | **done** |
+| P1-T06 | Vercel: garantir que rewrite `/api` preserva cookies (same-site); testar login em produção | S | Login em `dopraxis.vercel.app` OK | **done** |
 | P1-T07 | Rate limit básico em login (express-rate-limit) | S | Brute force mitigado | **done** |
 | P1-T08 | Checklist pós-deploy: endpoints sensíveis 401 anônimo; health 200; Hermes scripts com key ainda funcionam | S | Checklist marcado no doc auth | **done** |
 

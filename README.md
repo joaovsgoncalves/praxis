@@ -36,8 +36,16 @@ node server.js
 ## PRD e evolução
 
 - Conceito atual: [`PRD-PRAXIS-v1.md`](./PRD-PRAXIS-v1.md)
-- Histórico: [`PRD-PRAXIS-LEGADO-v0.md`](./docs/archive/PRD-PRAXIS-LEGADO-v0.md)
+- Histórico legado: `docs/archive/` (não usar como fonte de verdade)
 
-## Domínio
+## Domínio e repo
 
-`https://praxis-jota.vercel.app` (produção; API via proxy `/api` → VPS).
+| O quê | Valor |
+|-------|--------|
+| Repo | https://github.com/joaovsgoncalves1-jpg/praxis |
+| Projeto Vercel | `praxis` (team `jotaai`) |
+| Canônico (produto) | https://dopraxis.app *(DNS após compra)* |
+| Funciona agora | https://dopraxis.vercel.app |
+| Interim legado | https://praxis-jota.vercel.app |
+
+API em produção via proxy `/api` → VPS.

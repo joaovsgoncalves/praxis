@@ -1,6 +1,6 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-18 · **URL:** https://praxis-jota.vercel.app · **Nutrição 0–12 (barcode)**
+**Atualizado:** 2026-07-18 · **URL:** https://dopraxis.vercel.app · **Nutrição 0–12 (barcode)**
 
 ---
 

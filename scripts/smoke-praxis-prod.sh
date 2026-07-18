@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Smoke produção Praxis — front + API via praxis-jota (rewrites).
+# Smoke produção Praxis — front + API via dopraxis.vercel.app (rewrites).
 # Uso:
 #   ./scripts/smoke-praxis-prod.sh
-#   PRAXIS_BASE=https://praxis-jota.vercel.app PRAXIS_USER=jota PRAXIS_APP_PASSWORD='...' ./scripts/smoke-praxis-prod.sh
+#   PRAXIS_BASE=https://dopraxis.vercel.app PRAXIS_USER=jota PRAXIS_APP_PASSWORD='...' ./scripts/smoke-praxis-prod.sh
 set -euo pipefail
 
-BASE="${PRAXIS_BASE:-https://praxis-jota.vercel.app}"
+BASE="${PRAXIS_BASE:-https://dopraxis.vercel.app}"
 USER="${PRAXIS_USER:-jota}"
 PASS="${PRAXIS_APP_PASSWORD:-${FORJA_APP_PASSWORD:-}}"
 COOKIE_JAR="$(mktemp)"

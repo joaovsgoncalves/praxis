@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BASE="${PRAXIS_BASE:-https://praxis-jota.vercel.app}"
+BASE="${PRAXIS_BASE:-https://dopraxis.vercel.app}"
 PASS="${PRAXIS_APP_PASSWORD:-${FORJA_APP_PASSWORD:-}}"
 
 fail=0

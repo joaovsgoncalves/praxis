@@ -4,7 +4,7 @@ Atualizado: 2026-07-08 (simplificação menu 5 + Hoje enxuto)
 
 ## URL certa
 
-- **App:** https://praxis-jota.vercel.app  
+- **App:** https://dopraxis.vercel.app  
 - Se a tela parecer velha: **Ctrl+F5** (ou limpar cache do navegador).
 
 ## Os 3 comandos do dia
@@ -17,7 +17,7 @@ Atualizado: 2026-07-08 (simplificação menu 5 + Hoje enxuto)
 
 ## Se “sumiu” algo
 
-1. Confirma que está em **praxis-jota.vercel.app** (não outro alias antigo).  
+1. Confirma que está em **dopraxis.vercel.app** (não outro alias antigo).  
 2. **Ctrl+F5**  
 3. Se a API falhar: login de novo; em último caso avisa a A.N.A. com print.
 

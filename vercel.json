@@ -2,8 +2,8 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "forja-do-jota.vercel.app" }],
-      "destination": "https://praxis-jota.vercel.app/:path*",
+      "has": [{ "type": "host", "value": "www.dopraxis.app" }],
+      "destination": "https://dopraxis.app/:path*",
       "permanent": true
     }
   ],

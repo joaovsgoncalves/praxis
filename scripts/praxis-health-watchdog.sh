@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Watchdog: alerta se /api/health falhar N vezes seguidas.
 # Uso cron (ex. */5 * * * *):
-#   PRAXIS_BASE=https://praxis-jota.vercel.app ./scripts/praxis-health-watchdog.sh
+#   PRAXIS_BASE=https://dopraxis.vercel.app ./scripts/praxis-health-watchdog.sh
 # Opcional Discord webhook:
 #   PRAXIS_ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/...
 set -euo pipefail
 
-BASE="${PRAXIS_BASE:-https://praxis-jota.vercel.app}"
+BASE="${PRAXIS_BASE:-https://dopraxis.vercel.app}"
 STATE="${PRAXIS_HEALTH_STATE:-/tmp/praxis-health-failures.count}"
 MAX_FAILS="${PRAXIS_HEALTH_MAX_FAILS:-3}"
 

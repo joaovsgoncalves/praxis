@@ -156,7 +156,7 @@ Tela principal com:
 
 ## 10. Próximo passo
 
-1. **Decisão de domínio:** `praxis-do-jota.vercel.app` ou outro?
+1. **Domínio:** `dopraxis.app` (Vercel; DNS após compra). Interim: `dopraxis.vercel.app`. Repo: `joaovsgoncalves1-jpg/praxis`.
 2. **Definir stack final do rename** (Vercel domain, package name, variáveis de ambiente, Google Calendar account branding)
 3. **Wireframe de baixa fidelidade** das 5 telas do MVP
 4. **Implementação por fase:**
