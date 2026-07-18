@@ -173,7 +173,7 @@ export default function TodayTasks({
                           <div className="flex items-start gap-2 flex-1 min-w-0 w-full">
                             <button
                               type="button"
-                              className="mt-1.5 shrink-0 rounded-lg p-1 text-muted-foreground touch-manipulation hover:bg-black/20 hover:text-foreground"
+                              className="mt-1.5 shrink-0 rounded-lg p-1 text-muted-foreground touch-manipulation hover:bg-white/[0.03] hover:text-foreground"
                               aria-label="Arrastar para reordenar"
                               {...dragProvided.dragHandleProps}
                             >

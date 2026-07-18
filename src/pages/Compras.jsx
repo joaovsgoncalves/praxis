@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,14 +34,14 @@ export default function Compras() {
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['purchases', statusFilter],
     queryFn: () => {
-      if (statusFilter === 'ativas') return forjaApi.purchases.list({ status: 'want' });
-      if (statusFilter === 'all') return forjaApi.purchases.list({ status: 'all' });
-      return forjaApi.purchases.list({ status: statusFilter });
+      if (statusFilter === 'ativas') return praxisApi.purchases.list({ status: 'want' });
+      if (statusFilter === 'all') return praxisApi.purchases.list({ status: 'all' });
+      return praxisApi.purchases.list({ status: statusFilter });
     },
   });
 
   const createItem = useMutation({
-    mutationFn: (data) => forjaApi.purchases.create(data),
+    mutationFn: (data) => praxisApi.purchases.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       setShowForm(false);
@@ -49,19 +49,18 @@ export default function Compras() {
   });
 
   const updateItem = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.purchases.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.purchases.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchases'] }),
   });
 
   const deleteItem = useMutation({
-    mutationFn: (id) => forjaApi.purchases.delete(id),
+    mutationFn: (id) => praxisApi.purchases.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['purchases'] }),
   });
 
   const counts = useMemo(() => {
     const c = { short: 0, medium: 0, long: 0 };
     for (const it of items) {
-      if (it.status !== 'want') continue;
       if (c[it.horizon] !== undefined) c[it.horizon] += 1;
     }
     return c;
@@ -114,7 +113,7 @@ export default function Compras() {
         trailing={(
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-44">
+              <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -124,7 +123,7 @@ export default function Compras() {
               </SelectContent>
             </Select>
             <Select value={horizonView} onValueChange={setHorizonView}>
-              <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-44">
+              <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-44">
                 <SelectValue placeholder="Prazo" />
               </SelectTrigger>
               <SelectContent>

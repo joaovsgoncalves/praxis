@@ -11,7 +11,7 @@ import {
   Plus,
   RotateCcw,
 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import {
   PageHero,
   PraxisEmptyState,
@@ -43,20 +43,20 @@ export default function Treinos() {
 
   const { data: summary, isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'summary'],
-    queryFn: () => forjaApi.workouts.summary(),
+    queryFn: () => praxisApi.workouts.summary(),
     retry: 1,
   });
 
   const { data: programs = [] } = useQuery({
     queryKey: ['workouts', 'programs'],
-    queryFn: () => forjaApi.workouts.programs.list(),
+    queryFn: () => praxisApi.workouts.programs.list(),
     retry: 1,
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['workouts'] });
 
   const createProgram = useMutation({
-    mutationFn: (data) => forjaApi.workouts.programs.create(data),
+    mutationFn: (data) => praxisApi.workouts.programs.create(data),
     onSuccess: () => {
       setProgramDialogOpen(false);
       setTab('programa');
@@ -71,7 +71,7 @@ export default function Treinos() {
   });
 
   const startSession = useMutation({
-    mutationFn: (dayId) => forjaApi.workouts.sessions.start(dayId),
+    mutationFn: (dayId) => praxisApi.workouts.sessions.start(dayId),
     onSuccess: (session) => {
       setActiveSessionId(session.id);
       refresh();
@@ -90,7 +90,7 @@ export default function Treinos() {
   });
 
   const advanceRest = useMutation({
-    mutationFn: ({ programId, dayId }) => forjaApi.workouts.programs.advance(programId, { current_day_id: dayId }),
+    mutationFn: ({ programId, dayId }) => praxisApi.workouts.programs.advance(programId, { current_day_id: dayId }),
     onSuccess: () => {
       refresh();
       toast({ title: 'Descanso concluído', description: 'O próximo dia do ciclo já está pronto.' });
@@ -260,7 +260,7 @@ function TodayWorkout({
 
   return (
     <div className="space-y-5">
-      <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/14 via-card/85 to-card/50 shadow-none">
+      <Card className="overflow-hidden border-border/80 bg-card/35 shadow-none">
         <CardContent className="p-0">
           <div className="px-5 py-5">
             <div className="flex items-start justify-between gap-3">

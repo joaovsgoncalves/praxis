@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Link2, Sparkles, Flame, CheckCircle2, Trash2, Sun, Moon } from 'lucide-react';
 import { PageHero, SectionHeading, PraxisListSkeleton, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { RITUAL_TEMPLATES } from '@/lib/ritualTemplates';
@@ -58,16 +58,16 @@ export default function Rituais() {
 
   const { data: rituals = [], isLoading: loadingRituals } = useQuery({
     queryKey: ['rituals'],
-    queryFn: () => forjaApi.rituals.list({ status: 'active' }),
+    queryFn: () => praxisApi.rituals.list({ status: 'active' }),
   });
 
   const { data: habits = [], isLoading: loadingHabits } = useQuery({
     queryKey: ['habits'],
-    queryFn: () => forjaApi.habits.list({ status: 'active' }),
+    queryFn: () => praxisApi.habits.list({ status: 'active' }),
   });
 
   const createMutation = useMutation({
-    mutationFn: () => forjaApi.rituals.create({
+    mutationFn: () => praxisApi.rituals.create({
       name,
       emoji,
       time_of_day: timeOfDay,
@@ -83,12 +83,12 @@ export default function Rituais() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => forjaApi.rituals.delete(id),
+    mutationFn: (id) => praxisApi.rituals.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rituals'] }),
   });
 
   const templateMutation = useMutation({
-    mutationFn: (templateId) => forjaApi.rituals.fromTemplate(templateId),
+    mutationFn: (templateId) => praxisApi.rituals.fromTemplate(templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rituals'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });

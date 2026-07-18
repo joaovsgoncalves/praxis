@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,10 +16,10 @@ import WeeklyProgress from '@/components/dashboard/WeeklyProgress';
 export default function History() {
   const [range, setRange] = useState('30');
 
-  const { data: wellnessChecks = [] } = useQuery({ queryKey: ['wellnessAll'], queryFn: () => forjaApi.wellness.list() });
-  const { data: habits = [] } = useQuery({ queryKey: ['habitsAll'], queryFn: () => forjaApi.habits.list({ status: 'active' }) });
-  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogsAll'], queryFn: () => forjaApi.habitLogs.list() });
-  const { data: focusSessions = [] } = useQuery({ queryKey: ['focusAll'], queryFn: () => forjaApi.focus.list() });
+  const { data: wellnessChecks = [] } = useQuery({ queryKey: ['wellnessAll'], queryFn: () => praxisApi.wellness.list() });
+  const { data: habits = [] } = useQuery({ queryKey: ['habitsAll'], queryFn: () => praxisApi.habits.list({ status: 'active' }) });
+  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogsAll'], queryFn: () => praxisApi.habitLogs.list() });
+  const { data: focusSessions = [] } = useQuery({ queryKey: ['focusAll'], queryFn: () => praxisApi.focus.list() });
 
   const days = Number(range);
   const dateRange = Array.from({ length: days }, (_, i) => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CATEGORIES } from '@/lib/categories';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,7 +25,7 @@ const WEEKDAYS = [
 function BestTimeSuggestion({ onSelect, visible }) {
   const { data, isLoading } = useQuery({
     queryKey: ['bestHours'],
-    queryFn: () => forjaApi.insights.bestHours(),
+    queryFn: () => praxisApi.insights.bestHours(),
     enabled: visible,
     staleTime: 5 * 60 * 1000,
   });

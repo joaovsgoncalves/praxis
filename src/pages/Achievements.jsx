@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Calendar } from 'lucide-react';
@@ -91,7 +91,7 @@ function AchievementCard({ achievement, index }) {
 export default function Achievements() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['gamification'],
-    queryFn: () => forjaApi.gamification.get(),
+    queryFn: () => praxisApi.gamification.get(),
   });
 
   const achievements = data?.achievements || [];

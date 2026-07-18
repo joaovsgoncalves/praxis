@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,16 +32,16 @@ export default function Goals() {
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
 
-  const { data: goals = [] } = useQuery({ queryKey: ['allGoals'], queryFn: () => forjaApi.goals.list() });
-  const { data: tasks = [] } = useQuery({ queryKey: ['goalTasks'], queryFn: () => forjaApi.tasks.list() });
-  const { data: habits = [] } = useQuery({ queryKey: ['goalHabits'], queryFn: () => forjaApi.habits.list() });
+  const { data: goals = [] } = useQuery({ queryKey: ['allGoals'], queryFn: () => praxisApi.goals.list() });
+  const { data: tasks = [] } = useQuery({ queryKey: ['goalTasks'], queryFn: () => praxisApi.tasks.list() });
+  const { data: habits = [] } = useQuery({ queryKey: ['goalHabits'], queryFn: () => praxisApi.habits.list() });
   const { data: habitLogs = [] } = useQuery({
     queryKey: ['goalHabitLogs', today],
-    queryFn: () => forjaApi.habitLogs.list({ from: addDays(today, -6), to: today }),
+    queryFn: () => praxisApi.habitLogs.list({ from: addDays(today, -6), to: today }),
   });
 
   const createGoal = useMutation({
-    mutationFn: (data) => forjaApi.goals.create(data),
+    mutationFn: (data) => praxisApi.goals.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allGoals'] });
       queryClient.invalidateQueries({ queryKey: ['goalTasks'] });
@@ -52,12 +52,12 @@ export default function Goals() {
   });
 
   const updateGoal = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.goals.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.goals.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allGoals'] }),
   });
 
   const deleteGoal = useMutation({
-    mutationFn: (id) => forjaApi.goals.delete(id),
+    mutationFn: (id) => praxisApi.goals.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allGoals'] }),
   });
 
@@ -102,7 +102,7 @@ export default function Goals() {
         </StatGrid>
       </PageHero>
 
-      <section className="forja-panel rounded-3xl p-3 sm:p-4">
+      <section className="praxis-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-wrap gap-2">
           {['all', 'short', 'medium', 'long'].map((f) => (
             <Button

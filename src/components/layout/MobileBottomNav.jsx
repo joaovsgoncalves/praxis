@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { LayoutDashboard, ListTodo, Mic, BookOpen, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,7 @@ export default function MobileBottomNav({ onOpenMenu }) {
 
   const { data: pending } = useQuery({
     queryKey: ['captures', 'pending-count'],
-    queryFn: () => forjaApi.captures.pendingCount(),
+    queryFn: () => praxisApi.captures.pendingCount(),
     staleTime: 25_000,
     refetchInterval: 30_000,
   });

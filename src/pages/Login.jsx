@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { PraxisCenteredShell } from '@/components/layout/PraxisPage';
 
 export default function Login({ onSuccess }) {
@@ -20,7 +20,7 @@ export default function Login({ onSuccess }) {
     if (!pwd) return;
     setLoading(true);
     try {
-      const session = await forjaApi.auth.login(pwd);
+      const session = await praxisApi.auth.login(pwd);
       onSuccess?.(session);
     } catch (err) {
       const msg = err?.message || '';
@@ -47,8 +47,8 @@ export default function Login({ onSuccess }) {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-domain-gold/30 bg-domain-gold/10">
               <Hammer className="h-7 w-7 text-domain-gold" aria-hidden />
             </div>
-            <p className="forja-kicker text-primary">Praxis</p>
-            <h1 className="forja-title text-2xl font-bold">Entrar</h1>
+            <p className="praxis-kicker text-primary">Praxis</p>
+            <h1 className="praxis-title text-2xl font-bold">Entrar</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Uso pessoal — a senha fica só no servidor, não no navegador.
             </p>

@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { UtensilsCrossed, Plus, ArrowRight } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MacroBars from '@/components/nutrition/MacroBars';
@@ -12,7 +12,7 @@ import { formatKcal, isNutritionShowOnToday } from '@/lib/nutrition';
 export default function NutritionTodayCard() {
   const { data: settings } = useQuery({
     queryKey: ['me'],
-    queryFn: () => forjaApi.user.getSettings(),
+    queryFn: () => praxisApi.user.getSettings(),
     staleTime: 60_000,
   });
 
@@ -20,7 +20,7 @@ export default function NutritionTodayCard() {
 
   const { data: day, isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'day', 'today'],
-    queryFn: () => forjaApi.nutrition.day(),
+    queryFn: () => praxisApi.nutrition.day(),
     enabled: show,
     retry: 1,
     staleTime: 30_000,
@@ -50,7 +50,7 @@ export default function NutritionTodayCard() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-muted-foreground">Nutrição</p>
-              <h3 className="forja-title mt-0.5 text-base font-semibold tracking-[-0.025em]">Macros do dia</h3>
+              <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em]">Macros do dia</h3>
             </div>
           </div>
           <span className="shrink-0 pt-1 text-[11px] tabular-nums text-muted-foreground">{caloriesLabel}</span>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Scale, Trash2 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -87,13 +87,13 @@ export default function WeightTracker() {
 
   const { data: trend, isLoading } = useQuery({
     queryKey: ['nutrition', 'weight', 'trend'],
-    queryFn: () => forjaApi.nutrition.weight.trend({ days: 45 }),
+    queryFn: () => praxisApi.nutrition.weight.trend({ days: 45 }),
     retry: 1,
   });
 
   const { data: logs = [] } = useQuery({
     queryKey: ['nutrition', 'weight', 'list'],
-    queryFn: () => forjaApi.nutrition.weight.list({ limit: 14 }),
+    queryFn: () => praxisApi.nutrition.weight.list({ limit: 14 }),
     retry: 1,
   });
 
@@ -103,7 +103,7 @@ export default function WeightTracker() {
   };
 
   const saveMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.weight.upsert(data),
+    mutationFn: (data) => praxisApi.nutrition.weight.upsert(data),
     onSuccess: () => {
       invalidate();
       setWeight('');
@@ -113,7 +113,7 @@ export default function WeightTracker() {
   });
 
   const delMut = useMutation({
-    mutationFn: (id) => forjaApi.nutrition.weight.delete(id),
+    mutationFn: (id) => praxisApi.nutrition.weight.delete(id),
     onSuccess: () => {
       invalidate();
       toast.success('Peso removido');

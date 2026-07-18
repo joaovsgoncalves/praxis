@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, startOfDay, addDays, subDays, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -31,12 +31,12 @@ const BUCKET_BG = [
 export default function HabitsHeatmap() {
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],
-    queryFn: () => forjaApi.habits.list({ status: 'active' }),
+    queryFn: () => praxisApi.habits.list({ status: 'active' }),
     staleTime: 60_000,
   });
   const { data: logs = [] } = useQuery({
     queryKey: ['habitLogsAll'],
-    queryFn: () => forjaApi.habitLogs.list({}),
+    queryFn: () => praxisApi.habitLogs.list({}),
     staleTime: 60_000,
   });
 

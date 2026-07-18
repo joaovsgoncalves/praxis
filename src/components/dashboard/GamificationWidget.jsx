@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +55,7 @@ export default function GamificationWidget() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['gamification'],
-    queryFn: () => forjaApi.gamification.get(),
+    queryFn: () => praxisApi.gamification.get(),
     refetchInterval: 30_000,
   });
 
@@ -73,11 +73,11 @@ export default function GamificationWidget() {
           duration: 6000,
         });
         // Dispatch custom event so the widget can show confetti
-        window.dispatchEvent(new CustomEvent('forja-confetti'));
+        window.dispatchEvent(new CustomEvent('praxis-confetti'));
       }
     };
-    window.addEventListener('forja-level-up', handler);
-    return () => window.removeEventListener('forja-level-up', handler);
+    window.addEventListener('praxis-level-up', handler);
+    return () => window.removeEventListener('praxis-level-up', handler);
   }, []);
 
   const [showConfetti, setShowConfetti] = React.useState(false);
@@ -86,8 +86,8 @@ export default function GamificationWidget() {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 4000);
     };
-    window.addEventListener('forja-confetti', handler);
-    return () => window.removeEventListener('forja-confetti', handler);
+    window.addEventListener('praxis-confetti', handler);
+    return () => window.removeEventListener('praxis-confetti', handler);
   }, []);
 
   if (isLoading) {

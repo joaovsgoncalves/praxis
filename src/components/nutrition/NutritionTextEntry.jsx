@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Type } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -55,7 +55,7 @@ export default function NutritionTextEntry({
 
   const parseMut = useMutation({
     mutationFn: () =>
-      forjaApi.nutrition.parseText({
+      praxisApi.nutrition.parseText({
         text,
         meal_slot: slot === 'auto' ? undefined : slot,
       }),
@@ -75,7 +75,7 @@ export default function NutritionTextEntry({
 
   const confirmMut = useMutation({
     mutationFn: (items) =>
-      forjaApi.nutrition.logs.fromText({
+      praxisApi.nutrition.logs.fromText({
         date,
         meal_slot: parsed?.meal_slot || slot,
         items,

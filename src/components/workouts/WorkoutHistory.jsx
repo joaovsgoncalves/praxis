@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, ChevronRight, Clock3, Dumbbell, Layers3 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
@@ -12,13 +12,13 @@ export default function WorkoutHistory() {
 
   const { data: sessions = [], isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'history'],
-    queryFn: () => forjaApi.workouts.sessions.list({ status: 'completed', limit: 50 }),
+    queryFn: () => praxisApi.workouts.sessions.list({ status: 'completed', limit: 50 }),
     staleTime: 15_000,
   });
 
   const { data: detail, isLoading: loadingDetail } = useQuery({
     queryKey: ['workouts', 'history', selectedId],
-    queryFn: () => forjaApi.workouts.sessions.get(selectedId),
+    queryFn: () => praxisApi.workouts.sessions.get(selectedId),
     enabled: Boolean(selectedId),
   });
 

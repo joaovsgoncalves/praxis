@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { motion } from 'framer-motion';
 import { Flame, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
@@ -117,7 +116,7 @@ export default function TodayHabits({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-medium text-muted-foreground">Consistência</p>
-            <h3 className="forja-title mt-1 text-xl font-semibold tracking-[-0.035em]">{title}</h3>
+            <h3 className="praxis-title mt-1 text-xl font-semibold tracking-[-0.035em]">{title}</h3>
           </div>
           <span className="shrink-0 text-right text-sm tabular-nums text-muted-foreground">
             {doneCount}/{habits.length}
@@ -153,78 +152,75 @@ export default function TodayHabits({
           const done = outcome === 'done';
           const skipped = outcome === 'skipped';
           return (
-            <motion.div
+            <div
               key={habit.id}
-              role="button"
-              tabIndex={0}
               ref={(el) => {
                 if (el) rowRefs.current.set(habit.id, el);
                 else rowRefs.current.delete(habit.id);
               }}
-              whileTap={{ scale: 0.985 }}
               className={cn(
                 'flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-[background-color,border-color,box-shadow]',
                 done && 'border-domain-wellness/15 bg-domain-wellness/[0.065]',
                 skipped && 'border-amber-500/20 bg-amber-500/[0.07]',
                 !done && !skipped && 'border-white/[0.055] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]',
               )}
-              onClick={(event) => handlePrimaryTap(habit, event)}
-              onPointerDown={() => handlePointerDown(habit)}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  handlePrimaryTap(habit, event);
-                }
-              }}
             >
-              {skipped ? (
-                <span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400/90"
-                  aria-hidden
-                >
-                  <Minus className="h-3 w-3" />
-                </span>
-              ) : (
-                <Checkbox
-                  checked={done}
-                  onClick={(event) => event.stopPropagation()}
-                  onCheckedChange={() => handlePrimaryTap(habit)}
-                  className={cn(
-                    'h-5 w-5 shrink-0',
-                    done
-                      ? 'border-domain-wellness data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness'
-                      : 'border-muted-foreground/40',
-                  )}
-                />
-              )}
-
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <p
-                    className={cn(
-                      'min-w-0 truncate text-sm font-semibold sm:text-[15px]',
-                      done && 'text-domain-wellness/90 line-through',
-                      skipped && 'text-muted-foreground opacity-75',
-                    )}
+              {/* Área principal de toque para marcar como feito */}
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg"
+                onClick={(event) => handlePrimaryTap(habit, event)}
+                onPointerDown={() => handlePointerDown(habit)}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                aria-label={`Alternar conclusão do hábito: ${habit.title}`}
+              >
+                {skipped ? (
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400/90"
+                    aria-hidden
                   >
-                    {habit.title}
-                  </p>
-                  <CategoryBadge category={habit.category} />
-                  {skipped && log?.skip_reason ? (
-                    <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200/80">
-                      {SKIP_REASON_LABELS[log.skip_reason] || log.skip_reason}
-                    </span>
+                    <Minus className="h-3 w-3" />
+                  </span>
+                ) : (
+                  <Checkbox
+                    checked={done}
+                    tabIndex={-1}
+                    className={cn(
+                      'h-5 w-5 shrink-0 pointer-events-none',
+                      done
+                        ? 'border-domain-wellness data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness'
+                        : 'border-muted-foreground/40',
+                    )}
+                  />
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p
+                      className={cn(
+                        'min-w-0 truncate text-sm font-semibold sm:text-[15px]',
+                        done && 'text-domain-wellness/90 line-through',
+                        skipped && 'text-muted-foreground opacity-75',
+                      )}
+                    >
+                      {habit.title}
+                    </p>
+                    <CategoryBadge category={habit.category} />
+                    {skipped && log?.skip_reason ? (
+                      <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200/80">
+                        {SKIP_REASON_LABELS[log.skip_reason] || log.skip_reason}
+                      </span>
+                    ) : null}
+                  </div>
+                  {skipped && log?.note ? (
+                    <p className="mt-1 text-[11px] leading-snug text-amber-100/75">
+                      “{log.note}”
+                    </p>
                   ) : null}
                 </div>
-                {skipped && log?.note ? (
-                  <p className="mt-1 text-[11px] leading-snug text-amber-100/75">
-                    “{log.note}”
-                  </p>
-                ) : null}
-              </div>
+              </button>
 
               {habit.current_streak > 0 ? (
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-domain-ember/15 bg-domain-ember/[0.07] px-2 py-1 text-[11px] font-medium text-domain-ember">
@@ -242,7 +238,6 @@ export default function TodayHabits({
                     e.stopPropagation();
                     openSkipSheet(habit);
                   }}
-                  onPointerDown={(e) => e.stopPropagation()}
                 >
                   Nomear
                 </button>
@@ -255,12 +250,11 @@ export default function TodayHabits({
                     e.stopPropagation();
                     openSkipSheet(habit);
                   }}
-                  onPointerDown={(e) => e.stopPropagation()}
                 >
                   Não rolou
                 </button>
               )}
-            </motion.div>
+            </div>
           );
         })}
       </CardContent>

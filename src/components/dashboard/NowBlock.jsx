@@ -26,7 +26,7 @@ export default function NowBlock({
             <span className="h-2 w-2 rounded-full bg-domain-gold shadow-[0_0_14px_hsl(var(--domain-gold)/0.5)]" aria-hidden />
             Agora
           </div>
-          <h2 className="forja-title mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.045em] sm:text-3xl">
+          <h2 className="praxis-title mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.045em] sm:text-3xl">
             Nada urgente na fila.
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
@@ -101,7 +101,7 @@ export default function NowBlock({
               <CategoryBadge category={task.category} />
             </div>
 
-            <h2 className="forja-title mt-4 text-3xl font-semibold leading-[1.05] tracking-[-0.055em] sm:text-4xl">
+            <h2 className="praxis-title mt-4 text-3xl font-semibold leading-[1.05] tracking-[-0.055em] sm:text-4xl">
               {task.title}
             </h2>
             {task.description ? (

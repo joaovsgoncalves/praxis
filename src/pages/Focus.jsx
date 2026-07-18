@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -62,17 +62,17 @@ export default function Focus() {
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['pendingTasks'],
-    queryFn: () => forjaApi.tasks.list({ status: 'pending' }),
+    queryFn: () => praxisApi.tasks.list({ status: 'pending' }),
   });
 
   const { data: todaySessions = [] } = useQuery({
     queryKey: ['todayFocus', today],
-    queryFn: () => forjaApi.focus.list({ date: today }),
+    queryFn: () => praxisApi.focus.list({ date: today }),
   });
 
   const { data: focusStats = [] } = useQuery({
     queryKey: ['focusStats', 30],
-    queryFn: () => forjaApi.focus.stats(30),
+    queryFn: () => praxisApi.focus.stats(30),
     staleTime: 60_000,
   });
 
@@ -80,7 +80,7 @@ export default function Focus() {
   const activePreset = PRESETS[selectedPreset] || PRESETS[0];
 
   const saveSessionMutation = useMutation({
-    mutationFn: (data) => forjaApi.focus.create(data),
+    mutationFn: (data) => praxisApi.focus.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todayFocus'] });
       queryClient.invalidateQueries({ queryKey: ['focusStats'] });
@@ -88,7 +88,7 @@ export default function Focus() {
   });
 
   const completeTaskMutation = useMutation({
-    mutationFn: (taskId) => forjaApi.tasks.update(taskId, { status: 'completed' }),
+    mutationFn: (taskId) => praxisApi.tasks.update(taskId, { status: 'completed' }),
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -104,7 +104,7 @@ export default function Focus() {
   });
 
   const snoozeTaskMutation = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });

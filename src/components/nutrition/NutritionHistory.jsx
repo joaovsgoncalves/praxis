@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
@@ -63,7 +63,7 @@ export default function NutritionHistory({ onOpenDay }) {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'summary', from, to],
-    queryFn: () => forjaApi.nutrition.summary({ from, to }),
+    queryFn: () => praxisApi.nutrition.summary({ from, to }),
     retry: 1,
   });
 

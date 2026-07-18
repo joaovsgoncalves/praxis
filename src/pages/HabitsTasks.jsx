@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -110,40 +110,40 @@ export default function HabitsTasks() {
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
     queryKey: ['tasks', today],
-    queryFn: () => forjaApi.tasks.list({ limit: 50, include_overdue: '1', today }),
+    queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
   const { data: habits = [] } = useQuery({
     queryKey: ['allHabits', habitStatusFilter],
-    queryFn: () => forjaApi.habits.list({ status: habitStatusFilter }),
+    queryFn: () => praxisApi.habits.list({ status: habitStatusFilter }),
   });
-  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => forjaApi.habitLogs.list({ date: today }) });
+  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => praxisApi.habitLogs.list({ date: today }) });
   const { data: activeHabitsList = [] } = useQuery({
     queryKey: ['habits', 'active'],
-    queryFn: () => forjaApi.habits.list({ status: 'active' }),
+    queryFn: () => praxisApi.habits.list({ status: 'active' }),
   });
   const { data: activeRituals = [] } = useQuery({
     queryKey: ['rituals', { date: today, status: 'active' }],
-    queryFn: () => forjaApi.rituals.list({ status: 'active', date: today }),
+    queryFn: () => praxisApi.rituals.list({ status: 'active', date: today }),
   });
   const { data: userSettings } = useQuery({
     queryKey: ['me'],
-    queryFn: () => forjaApi.user.getSettings(),
+    queryFn: () => praxisApi.user.getSettings(),
     staleTime: 60_000,
   });
   const compact = userSettings?.list_density === 'compact';
 
   const updateListDensity = useMutation({
-    mutationFn: (list_density) => forjaApi.user.updateSettings({ list_density }),
+    mutationFn: (list_density) => praxisApi.user.updateSettings({ list_density }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
   });
 
   const createTask = useMutation({
-    mutationFn: (data) => forjaApi.tasks.create(data),
+    mutationFn: (data) => praxisApi.tasks.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allTasks'] }); queryClient.invalidateQueries({ queryKey: ['tasks'] }); setShowTaskForm(false); },
   });
 
   const updateTask = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -153,12 +153,12 @@ export default function HabitsTasks() {
   });
 
   const createHabit = useMutation({
-    mutationFn: (data) => forjaApi.habits.create(data),
+    mutationFn: (data) => praxisApi.habits.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allHabits'] }); queryClient.invalidateQueries({ queryKey: ['habits'] }); setShowHabitForm(false); },
   });
 
   const updateHabit = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.habits.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.habits.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -168,17 +168,17 @@ export default function HabitsTasks() {
   });
 
   const deleteTask = useMutation({
-    mutationFn: (id) => forjaApi.tasks.delete(id),
+    mutationFn: (id) => praxisApi.tasks.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
   });
 
   const deleteHabit = useMutation({
-    mutationFn: (id) => forjaApi.habits.delete(id),
+    mutationFn: (id) => praxisApi.habits.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allHabits'] }),
   });
 
   const reorderTasks = useMutation({
-    mutationFn: (orderedIds) => forjaApi.tasks.reorder(orderedIds),
+    mutationFn: (orderedIds) => praxisApi.tasks.reorder(orderedIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -186,7 +186,7 @@ export default function HabitsTasks() {
   });
 
   const reorderHabits = useMutation({
-    mutationFn: (orderedIds) => forjaApi.habits.reorder(orderedIds),
+    mutationFn: (orderedIds) => praxisApi.habits.reorder(orderedIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -194,7 +194,7 @@ export default function HabitsTasks() {
   });
 
   const toggleTask = useMutation({
-    mutationFn: (task) => forjaApi.tasks.update(task.id, {
+    mutationFn: (task) => praxisApi.tasks.update(task.id, {
       status: task.status === 'completed' ? 'pending' : 'completed',
     }),
     onSuccess: (data) => {
@@ -209,9 +209,9 @@ export default function HabitsTasks() {
     mutationFn: async ({ habitId, isDone, value }) => {
       const logs = habitLogs.filter(log => log.habit_id === habitId && log.date === today);
       if (isDone && logs[0]) {
-        await forjaApi.habitLogs.delete(logs[0].id);
+        await praxisApi.habitLogs.delete(logs[0].id);
       } else if (!isDone) {
-        await forjaApi.habitLogs.create({
+        await praxisApi.habitLogs.create({
           habit_id: habitId,
           date: today,
           outcome: 'done',
@@ -229,7 +229,7 @@ export default function HabitsTasks() {
 
   const skipHabit = useMutation({
     mutationFn: async ({ habitId, skipReason, skipNote }) => {
-      await forjaApi.habitLogs.create({
+      await praxisApi.habitLogs.create({
         habit_id: habitId,
         date: today,
         outcome: 'skipped',
@@ -248,7 +248,7 @@ export default function HabitsTasks() {
   });
 
   const notTodayTask = useMutation({
-    mutationFn: (taskId) => forjaApi.tasks.notToday(taskId, {}),
+    mutationFn: (taskId) => praxisApi.tasks.notToday(taskId, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -268,7 +268,7 @@ export default function HabitsTasks() {
   };
 
   const setHabitStatus = useMutation({
-    mutationFn: ({ id, status }) => forjaApi.habits.update(id, { status }),
+    mutationFn: ({ id, status }) => praxisApi.habits.update(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -278,7 +278,7 @@ export default function HabitsTasks() {
   const bulkArchiveTasks = useMutation({
     mutationFn: async (ids) => {
       for (const id of ids) {
-        await forjaApi.tasks.update(id, { status: 'cancelled' });
+        await praxisApi.tasks.update(id, { status: 'cancelled' });
       }
     },
     onSuccess: () => {
@@ -294,7 +294,7 @@ export default function HabitsTasks() {
   const bulkCancelTasks = useMutation({
     mutationFn: async (ids) => {
       for (const id of ids) {
-        await forjaApi.tasks.update(id, { status: 'cancelled' });
+        await praxisApi.tasks.update(id, { status: 'cancelled' });
       }
     },
     onSuccess: () => {
@@ -452,10 +452,10 @@ export default function HabitsTasks() {
         </StatGrid>
       </PageHero>
 
-      <section className="forja-panel rounded-3xl p-3 sm:p-4">
+      <section className="praxis-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <Tabs value={view} onValueChange={handleViewChange}>
-            <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-black/20 p-1 flex-nowrap">
+            <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-white/[0.03] p-1 flex-nowrap">
               <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="all">Todos</TabsTrigger>
               <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="tasks">Tarefas ({filteredTasks.length})</TabsTrigger>
               <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="habits">Hábitos ({habits.length})</TabsTrigger>
@@ -555,7 +555,7 @@ export default function HabitsTasks() {
                   Arquivar
                 </Button>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-40"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="pending">Pendentes</SelectItem>
@@ -717,11 +717,11 @@ export default function HabitsTasks() {
           <section className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="forja-kicker">Consistência</p>
-                <h2 className="forja-title text-2xl font-semibold">Hábitos</h2>
+                <p className="praxis-kicker">Consistência</p>
+                <h2 className="praxis-title text-2xl font-semibold">Hábitos</h2>
               </div>
               <Select value={habitStatusFilter} onValueChange={setHabitStatusFilter}>
-                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-48">
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -734,7 +734,7 @@ export default function HabitsTasks() {
             </div>
 
             {habitStatusFilter === 'active' && activeHabitsDueToday.length > 0 && (
-              <div className="space-y-1.5 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+              <div className="space-y-1.5 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Hábitos de hoje</span>
                   <span>

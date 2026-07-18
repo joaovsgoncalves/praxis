@@ -42,7 +42,7 @@ export default function MobileTopBar({ onOpenMenu }) {
         <Menu className="h-5 w-5" />
       </button>
       <PraxisBrand compact markClassName="h-8 w-8 rounded-lg" />
-      <h1 className="forja-title truncate text-lg font-semibold">{title}</h1>
+      <h1 className="praxis-title truncate text-lg font-semibold">{title}</h1>
     </header>
   );
 }

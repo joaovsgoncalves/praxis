@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Camera, Calendar, Loader2 } from 'lucide-react';
@@ -23,7 +23,7 @@ const priorityLabels = {
 export default function UpcomingPosts() {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['upcomingPosts'],
-    queryFn: () => forjaApi.tasks.list({ category: 'jotav_fit', status: 'pending' }),
+    queryFn: () => praxisApi.tasks.list({ category: 'jotav_fit', status: 'pending' }),
   });
 
   const upcoming = tasks

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Progress } from '@/components/ui/progress';
 import { ChevronRight, Sparkles } from 'lucide-react';
 
@@ -8,7 +8,7 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 export default function XpProgressStrip({ className = '' }) {
   const { data, isLoading } = useQuery({
     queryKey: ['gamification'],
-    queryFn: () => forjaApi.gamification.get(),
+    queryFn: () => praxisApi.gamification.get(),
     staleTime: 45_000,
   });
 

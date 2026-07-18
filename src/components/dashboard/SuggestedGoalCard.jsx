@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Target, X } from 'lucide-react';
 import { PraxisInlinePromo } from '@/components/layout/PraxisPage';
@@ -17,7 +17,7 @@ export default function SuggestedGoalCard() {
 
   const { data: goals = [] } = useQuery({
     queryKey: ['allGoals'],
-    queryFn: () => forjaApi.goals.list(),
+    queryFn: () => praxisApi.goals.list(),
     staleTime: 120_000,
   });
 

@@ -14,7 +14,7 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,9 +71,9 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   );
 
   const createProgram = useMutation({
-    mutationFn: (data) => forjaApi.workouts.programs.create(data),
+    mutationFn: (data) => praxisApi.workouts.programs.create(data),
     onSuccess: async (created) => {
-      if (!created.is_active) await forjaApi.workouts.programs.activate(created.id);
+      if (!created.is_active) await praxisApi.workouts.programs.activate(created.id);
       setProgramDialog({ open: false, initial: null });
       refresh();
       toast({ title: 'Programa criado', description: 'Agora monta os dias do teu ciclo.' });
@@ -82,7 +82,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const updateProgram = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.workouts.programs.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.workouts.programs.update(id, data),
     onSuccess: () => {
       setProgramDialog({ open: false, initial: null });
       refresh();
@@ -92,7 +92,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const activateProgram = useMutation({
-    mutationFn: (id) => forjaApi.workouts.programs.activate(id),
+    mutationFn: (id) => praxisApi.workouts.programs.activate(id),
     onSuccess: () => {
       refresh();
       toast({ title: 'Programa ativado' });
@@ -101,7 +101,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const deleteProgram = useMutation({
-    mutationFn: (id) => forjaApi.workouts.programs.delete(id),
+    mutationFn: (id) => praxisApi.workouts.programs.delete(id),
     onSuccess: () => {
       setSelectedDayId(null);
       refresh();
@@ -111,7 +111,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const createDay = useMutation({
-    mutationFn: (data) => forjaApi.workouts.days.create(program.id, data),
+    mutationFn: (data) => praxisApi.workouts.days.create(program.id, data),
     onSuccess: (updated) => {
       const newest = updated.days?.[updated.days.length - 1];
       if (newest) setSelectedDayId(newest.id);
@@ -123,7 +123,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const updateDay = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.workouts.days.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.workouts.days.update(id, data),
     onSuccess: () => {
       setDayDialog({ open: false, initial: null });
       refresh();
@@ -133,7 +133,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const deleteDay = useMutation({
-    mutationFn: (id) => forjaApi.workouts.days.delete(id),
+    mutationFn: (id) => praxisApi.workouts.days.delete(id),
     onSuccess: () => {
       refresh();
       toast({ title: 'Dia removido' });
@@ -142,13 +142,13 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const reorderDays = useMutation({
-    mutationFn: (orderedIds) => forjaApi.workouts.programs.reorderDays(program.id, orderedIds),
+    mutationFn: (orderedIds) => praxisApi.workouts.programs.reorderDays(program.id, orderedIds),
     onSuccess: refresh,
     onError: fail('Não deu pra reorganizar os dias'),
   });
 
   const setCurrentDay = useMutation({
-    mutationFn: (dayId) => forjaApi.workouts.programs.update(program.id, { current_day_id: dayId }),
+    mutationFn: (dayId) => praxisApi.workouts.programs.update(program.id, { current_day_id: dayId }),
     onSuccess: () => {
       refresh();
       toast({ title: 'Próximo treino atualizado' });
@@ -157,7 +157,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const addExercise = useMutation({
-    mutationFn: ({ dayId, exerciseId, config }) => forjaApi.workouts.days.addExercise(dayId, {
+    mutationFn: ({ dayId, exerciseId, config }) => praxisApi.workouts.days.addExercise(dayId, {
       exercise_id: exerciseId,
       ...config,
     }),
@@ -170,7 +170,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const updateExercise = useMutation({
-    mutationFn: ({ id, config }) => forjaApi.workouts.dayExercises.update(id, config),
+    mutationFn: ({ id, config }) => praxisApi.workouts.dayExercises.update(id, config),
     onSuccess: () => {
       setExerciseConfig({ open: false, day: null, exercise: null, initial: null });
       refresh();
@@ -180,7 +180,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const deleteExercise = useMutation({
-    mutationFn: (id) => forjaApi.workouts.dayExercises.delete(id),
+    mutationFn: (id) => praxisApi.workouts.dayExercises.delete(id),
     onSuccess: () => {
       refresh();
       toast({ title: 'Exercício removido do treino' });
@@ -189,7 +189,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   });
 
   const reorderExercises = useMutation({
-    mutationFn: ({ dayId, orderedIds }) => forjaApi.workouts.days.reorderExercises(dayId, orderedIds),
+    mutationFn: ({ dayId, orderedIds }) => praxisApi.workouts.days.reorderExercises(dayId, orderedIds),
     onSuccess: refresh,
     onError: fail('Não deu pra reorganizar os exercícios'),
   });

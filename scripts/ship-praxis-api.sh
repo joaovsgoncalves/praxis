@@ -3,5 +3,5 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-bash "$ROOT/scripts/sync-forja-api-production.sh"
+bash "$ROOT/scripts/sync-praxis-api-production.sh"
 echo "ship:api OK"

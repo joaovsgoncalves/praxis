@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { WifiOff } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // We piggy-back on the health endpoint. If it fails, the offline cache in
-// forjaClient is already serving stale data — we just surface that to the user.
+// praxisClient is already serving stale data — we just surface that to the user.
 export default function OfflineBanner() {
   const [navigatorOnline, setNavigatorOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -24,7 +24,7 @@ export default function OfflineBanner() {
 
   const { isError, dataUpdatedAt } = useQuery({
     queryKey: ['health'],
-    queryFn: () => forjaApi.health(),
+    queryFn: () => praxisApi.health(),
     refetchInterval: 60_000,
     retry: 0,
     staleTime: 30_000,

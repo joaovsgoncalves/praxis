@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import HeroDay from '@/components/dashboard/HeroDay';
 import NowBlock from '@/components/dashboard/NowBlock';
@@ -48,7 +48,7 @@ function DashboardGroupHeading({ icon: Icon, eyebrow, title, description, tone =
       </div>
       <div className="min-w-0">
         <p className="text-[11px] font-medium text-muted-foreground">{eyebrow}</p>
-        <h2 className="forja-title mt-0.5 text-lg font-semibold tracking-[-0.035em] sm:text-xl">{title}</h2>
+        <h2 className="praxis-title mt-0.5 text-lg font-semibold tracking-[-0.035em] sm:text-xl">{title}</h2>
         {description ? <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80 sm:text-sm">{description}</p> : null}
       </div>
     </div>
@@ -67,9 +67,9 @@ export default function Dashboard() {
     }
   }, [searchParams, navigate]);
 
-  const { data: allTasks = [] } = useQuery({
+  const { data: allTasks = [], isLoading: isLoadingTasks } = useQuery({
     queryKey: ['dashboardTasks', today],
-    queryFn: () => forjaApi.tasks.list({ limit: 50, include_overdue: '1', today }),
+    queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
 
   const overdueOpenCount = React.useMemo(
@@ -90,21 +90,25 @@ export default function Dashboard() {
       })
       .sort((a, b) => sortTasksForList(a, b, today));
   }, [allTasks, today]);
-  const { data: habits = [] } = useQuery({
+
+  const { data: habits = [], isLoading: isLoadingHabits } = useQuery({
     queryKey: ['habits'],
-    queryFn: () => forjaApi.habits.list({ status: 'active' }),
+    queryFn: () => praxisApi.habits.list({ status: 'active' }),
   });
-  const { data: habitLogs = [] } = useQuery({
+
+  const { data: habitLogs = [], isLoading: isLoadingLogs } = useQuery({
     queryKey: ['habitLogs', today],
-    queryFn: () => forjaApi.habitLogs.list({ date: today }),
+    queryFn: () => praxisApi.habitLogs.list({ date: today }),
   });
-  const { data: wellnessChecks = [] } = useQuery({
+
+  const { data: wellnessChecks = [], isLoading: isLoadingWellness } = useQuery({
     queryKey: ['wellness', today],
-    queryFn: () => forjaApi.wellness.list({ date: today }),
+    queryFn: () => praxisApi.wellness.list({ date: today }),
   });
-  const { data: settings } = useQuery({
+
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ['userSettings'],
-    queryFn: () => forjaApi.user.getSettings(),
+    queryFn: () => praxisApi.user.getSettings(),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -123,7 +127,7 @@ export default function Dashboard() {
   const toggleTaskMutation = useMutation({
     mutationFn: (task) => {
       const newStatus = isTaskDone(task) ? 'pending' : 'completed';
-      return forjaApi.tasks.update(task.id, { status: newStatus });
+      return praxisApi.tasks.update(task.id, { status: newStatus });
     },
     onSuccess: (updated) => {
       invalidateTaskQueries();
@@ -133,21 +137,21 @@ export default function Dashboard() {
     },
   });
   const updateTaskMutation = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
     onSuccess: () => {
       invalidateTaskQueries();
       setEditingTask(null);
     },
   });
   const createTaskMutation = useMutation({
-    mutationFn: (data) => forjaApi.tasks.create({ ...data, date: data.date || today }),
+    mutationFn: (data) => praxisApi.tasks.create({ ...data, date: data.date || today }),
     onSuccess: () => {
       invalidateTaskQueries();
       setShowNewTaskForm(false);
     },
   });
   const reorderTasksMutation = useMutation({
-    mutationFn: (orderedIds) => forjaApi.tasks.reorder(orderedIds),
+    mutationFn: (orderedIds) => praxisApi.tasks.reorder(orderedIds),
     onSuccess: invalidateTaskQueries,
   });
 
@@ -164,9 +168,9 @@ export default function Dashboard() {
     mutationFn: async ({ habitId, isDone }) => {
       const logs = habitLogs.filter(l => l.habit_id === habitId && l.date === today);
       if (isDone && logs[0]) {
-        await forjaApi.habitLogs.delete(logs[0].id);
+        await praxisApi.habitLogs.delete(logs[0].id);
       } else if (!isDone) {
-        await forjaApi.habitLogs.create({
+        await praxisApi.habitLogs.create({
           habit_id: habitId,
           date: today,
           outcome: 'done',
@@ -182,7 +186,7 @@ export default function Dashboard() {
 
   const skipHabitMutation = useMutation({
     mutationFn: async ({ habitId, skipReason, skipNote }) => {
-      await forjaApi.habitLogs.create({
+      await praxisApi.habitLogs.create({
         habit_id: habitId,
         date: today,
         outcome: 'skipped',
@@ -199,7 +203,7 @@ export default function Dashboard() {
   });
 
   const notTodayTaskMutation = useMutation({
-    mutationFn: (taskId) => forjaApi.tasks.notToday(taskId, {}),
+    mutationFn: (taskId) => praxisApi.tasks.notToday(taskId, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
@@ -208,7 +212,7 @@ export default function Dashboard() {
     },
   });
   const saveWellnessMutation = useMutation({
-    mutationFn: async (data) => forjaApi.wellness.create({ ...data, date: today }),
+    mutationFn: async (data) => praxisApi.wellness.create({ ...data, date: today }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wellness'] }),
   });
 
@@ -239,6 +243,27 @@ export default function Dashboard() {
     const data = buildSnoozeTomorrowUpdate(task, today);
     updateTaskMutation.mutate({ id: task.id, data });
   };
+
+  const isLoading = isLoadingTasks || isLoadingHabits || isLoadingLogs || isLoadingWellness || isLoadingSettings;
+
+  if (isLoading) {
+    return (
+      <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5 animate-pulse">
+        <div className="h-44 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+        <div className="h-28 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(350px,0.9fr)] xl:gap-6">
+          <div className="space-y-5">
+            <div className="h-64 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+            <div className="h-64 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+          </div>
+          <div className="space-y-5">
+            <div className="h-48 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+            <div className="h-48 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5">

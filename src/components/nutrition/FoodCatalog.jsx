@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Star, Pencil, Trash2 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,14 +30,14 @@ export default function FoodCatalog() {
 
   const { data: foods = [], isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'foods', listParams],
-    queryFn: () => forjaApi.nutrition.foods.list(listParams),
+    queryFn: () => praxisApi.nutrition.foods.list(listParams),
     retry: 1,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
 
   const createMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.foods.create(data),
+    mutationFn: (data) => praxisApi.nutrition.foods.create(data),
     onSuccess: () => {
       invalidate();
       setShowForm(false);
@@ -47,7 +47,7 @@ export default function FoodCatalog() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.nutrition.foods.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.nutrition.foods.update(id, data),
     onSuccess: () => {
       invalidate();
       setEditing(null);
@@ -58,7 +58,7 @@ export default function FoodCatalog() {
 
   const toggleFav = useMutation({
     mutationFn: (food) =>
-      forjaApi.nutrition.foods.update(food.id, {
+      praxisApi.nutrition.foods.update(food.id, {
         is_favorite: food.is_favorite ? 0 : 1,
       }),
     onSuccess: invalidate,
@@ -66,7 +66,7 @@ export default function FoodCatalog() {
   });
 
   const archiveMut = useMutation({
-    mutationFn: (id) => forjaApi.nutrition.foods.delete(id),
+    mutationFn: (id) => praxisApi.nutrition.foods.delete(id),
     onSuccess: () => {
       invalidate();
       toast.success('Alimento arquivado');

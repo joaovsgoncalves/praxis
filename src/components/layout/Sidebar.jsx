@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { cn } from '@/lib/utils';
 import { primaryNavItems, secondaryNavItems, filterSecondaryNav } from '@/lib/praxisNav';
 import PraxisBrand from '@/components/brand/PraxisBrand';
@@ -41,7 +41,7 @@ function AvatarRing({ progress, level }) {
 function SidebarGamificationBar() {
   const { data } = useQuery({
     queryKey: ['gamification'],
-    queryFn: () => forjaApi.gamification.get(),
+    queryFn: () => praxisApi.gamification.get(),
     staleTime: 30_000,
   });
 
@@ -115,17 +115,17 @@ export default function Sidebar({ open, onClose }) {
 
   const { data: goals = [] } = useQuery({
     queryKey: ['allGoals'],
-    queryFn: () => forjaApi.goals.list(),
+    queryFn: () => praxisApi.goals.list(),
     staleTime: 60_000,
   });
   const { data: rituals = [] } = useQuery({
     queryKey: ['rituals', 'nav'],
-    queryFn: () => forjaApi.rituals.list({ status: 'active' }),
+    queryFn: () => praxisApi.rituals.list({ status: 'active' }),
     staleTime: 60_000,
   });
   const { data: gamificationNav } = useQuery({
     queryKey: ['gamification'],
-    queryFn: () => forjaApi.gamification.get(),
+    queryFn: () => praxisApi.gamification.get(),
     staleTime: 120_000,
   });
 

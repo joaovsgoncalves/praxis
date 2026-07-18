@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { fortalezaDateKey } from '@/lib/dates';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,12 +20,12 @@ export default function AvoidanceCockpit() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['avoidance', today],
-    queryFn: () => forjaApi.insights.avoidance({ date: today }),
+    queryFn: () => praxisApi.insights.avoidance({ date: today }),
     staleTime: 60_000,
   });
 
   const praxiaMutation = useMutation({
-    mutationFn: () => forjaApi.praxia.confront({ date: today }),
+    mutationFn: () => praxisApi.praxia.confront({ date: today }),
   });
 
   const items = data?.items ?? [];

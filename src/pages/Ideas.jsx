@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lightbulb, Plus, Trash2, Sparkles, Archive, ArrowRightCircle, Star } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,7 +46,7 @@ export default function Ideas() {
 
   const { data: ideas = [], isLoading } = useQuery({
     queryKey: ['ideas'],
-    queryFn: () => forjaApi.ideas.list(),
+    queryFn: () => praxisApi.ideas.list(),
   });
 
   const filteredIdeas = useMemo(() => {
@@ -75,7 +75,7 @@ export default function Ideas() {
   };
 
   const createIdea = useMutation({
-    mutationFn: (data) => forjaApi.tasks.create(data),
+    mutationFn: (data) => praxisApi.tasks.create(data),
     onSuccess: () => {
       invalidateIdeas();
       setShowIdeaForm(false);
@@ -83,17 +83,17 @@ export default function Ideas() {
   });
 
   const updateIdea = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.tasks.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
     onSuccess: invalidateIdeas,
   });
 
   const deleteIdea = useMutation({
-    mutationFn: (id) => forjaApi.tasks.delete(id),
+    mutationFn: (id) => praxisApi.tasks.delete(id),
     onSuccess: invalidateIdeas,
   });
 
   const promoteIdea = useMutation({
-    mutationFn: (id) => forjaApi.ideas.promoteToTask(id, { date: fortalezaDateKey(), priority: 'medium' }),
+    mutationFn: (id) => praxisApi.ideas.promoteToTask(id, { date: fortalezaDateKey(), priority: 'medium' }),
     onSuccess: (res) => {
       invalidateIdeas();
       toast({
@@ -144,7 +144,7 @@ export default function Ideas() {
             title="Suas ideias"
             trailing={(
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,7 +165,7 @@ export default function Ideas() {
             title="Suas ideias"
             trailing={(
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
+                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,7 +200,7 @@ export default function Ideas() {
               title="Suas ideias"
               trailing={(
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-black/20 sm:w-56">
+                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-56">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

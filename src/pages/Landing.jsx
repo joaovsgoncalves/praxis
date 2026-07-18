@@ -149,7 +149,7 @@ export default function Landing() {
                 Seu dia sai da cabeça e entra em movimento
               </div>
 
-              <h1 className="forja-title text-[clamp(3.15rem,8vw,6.6rem)] font-bold leading-[0.92] tracking-[-0.075em]">
+              <h1 className="praxis-title text-[clamp(3.15rem,8vw,6.6rem)] font-bold leading-[0.92] tracking-[-0.075em]">
                 Pare de planejar a vida.
                 <span className="mt-2 block bg-[linear-gradient(100deg,hsl(var(--domain-gold)),hsl(42_92%_72%),hsl(var(--domain-gold)))] bg-clip-text text-transparent">Comece a executá-la.</span>
               </h1>
@@ -211,7 +211,7 @@ export default function Landing() {
           <div className="mx-auto max-w-7xl">
             <div className="mx-auto max-w-3xl text-center">
               <SectionLabel>Como funciona</SectionLabel>
-              <h2 className="forja-title text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Menos interface. Mais movimento.</h2>
+              <h2 className="praxis-title text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Menos interface. Mais movimento.</h2>
               <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
                 O Praxis encurta a distância entre pensar em fazer e realmente começar.
               </p>
@@ -237,7 +237,7 @@ export default function Landing() {
                       </div>
                       <span className="font-mono text-[10px] tracking-[0.18em] text-muted-foreground/60">{step.number}</span>
                     </div>
-                    <h3 className="forja-title text-2xl font-semibold tracking-[-0.04em]">{step.title}</h3>
+                    <h3 className="praxis-title text-2xl font-semibold tracking-[-0.04em]">{step.title}</h3>
                     <p className="mt-3 text-sm leading-7 text-muted-foreground">{step.description}</p>
                   </motion.article>
                 );
@@ -249,7 +249,7 @@ export default function Landing() {
               <div className="relative grid items-center gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
                 <div className="text-center lg:text-left">
                   <p className="text-xs font-medium uppercase tracking-[0.16em] text-domain-gold">Input primário: você</p>
-                  <h3 className="forja-title mt-4 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Fale como quem manda um áudio para um amigo.</h3>
+                  <h3 className="praxis-title mt-4 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Fale como quem manda um áudio para um amigo.</h3>
                   <p className="mt-5 text-sm leading-7 text-muted-foreground sm:text-base">
                     “Hoje eu preciso treinar, responder o Breno, estudar 40 minutos e resolver o EncarteZap.” O Praxis entende a bagunça e devolve clareza.
                   </p>
@@ -265,7 +265,7 @@ export default function Landing() {
             <div className="grid items-end gap-8 lg:grid-cols-[0.9fr_1.1fr]">
               <div>
                 <SectionLabel>Um sistema só</SectionLabel>
-                <h2 className="forja-title max-w-2xl text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Sua vida inteira não precisa morar em seis aplicativos.</h2>
+                <h2 className="praxis-title max-w-2xl text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Sua vida inteira não precisa morar em seis aplicativos.</h2>
               </div>
               <p className="max-w-2xl text-base leading-8 text-muted-foreground lg:justify-self-end lg:text-lg">
                 Tarefas, foco, hábitos, treino, nutrição, metas, rituais e revisão compartilham o mesmo contexto. Menos troca de ferramenta. Menos recomeço. Mais continuidade.
@@ -292,7 +292,7 @@ export default function Landing() {
                       <ArrowRight className="h-4 w-4 -translate-x-1 text-muted-foreground/30 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
                     </div>
                     <p className="text-xs font-medium text-domain">{feature.eyebrow}</p>
-                    <h3 className="forja-title mt-3 text-2xl font-semibold leading-tight tracking-[-0.04em]">{feature.title}</h3>
+                    <h3 className="praxis-title mt-3 text-2xl font-semibold leading-tight tracking-[-0.04em]">{feature.title}</h3>
                     <p className="mt-4 text-sm leading-7 text-muted-foreground">{feature.description}</p>
                   </motion.article>
                 );
@@ -306,7 +306,7 @@ export default function Landing() {
             <div className="grid items-center gap-14 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
               <div>
                 <SectionLabel>Por que Praxis</SectionLabel>
-                <h2 className="forja-title text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Porque saber o que fazer não é o mesmo que fazer.</h2>
+                <h2 className="praxis-title text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Porque saber o que fazer não é o mesmo que fazer.</h2>
                 <p className="mt-6 max-w-xl text-base leading-8 text-muted-foreground sm:text-lg">
                   Praxis é ação consciente. O produto existe para uma coisa simples: reduzir o espaço entre a intenção e a prática.
                 </p>
@@ -324,7 +324,7 @@ export default function Landing() {
                       <CalendarDays className="h-5 w-5 text-muted-foreground" aria-hidden />
                     </div>
                     <p className="text-xs font-medium text-muted-foreground">Antes</p>
-                    <p className="forja-title mt-2 text-xl font-semibold">Planejar para sentir que avançou.</p>
+                    <p className="praxis-title mt-2 text-xl font-semibold">Planejar para sentir que avançou.</p>
                     <ul className="mt-5 space-y-3 text-sm text-muted-foreground">
                       <li className="flex gap-2.5"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-white/20" /> Anotações espalhadas</li>
                       <li className="flex gap-2.5"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-white/20" /> Decidir a mesma coisa todo dia</li>
@@ -337,7 +337,7 @@ export default function Landing() {
                       <Zap className="h-5 w-5 text-domain-gold" aria-hidden />
                     </div>
                     <p className="text-xs font-medium text-domain-gold">Com Praxis</p>
-                    <p className="forja-title mt-2 text-xl font-semibold">Organizar para começar a executar.</p>
+                    <p className="praxis-title mt-2 text-xl font-semibold">Organizar para começar a executar.</p>
                     <ul className="mt-5 space-y-3 text-sm text-foreground/75">
                       <li className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-domain-wellness" /> Um lugar para o dia inteiro</li>
                       <li className="flex gap-2.5"><Check className="mt-0.5 h-4 w-4 shrink-0 text-domain-wellness" /> Clareza do próximo passo</li>
@@ -358,7 +358,7 @@ export default function Landing() {
               <div className="mx-auto mb-7 flex h-14 w-14 items-center justify-center rounded-2xl border border-domain-gold/20 bg-domain-gold/10">
                 <Leaf className="h-6 w-6 text-domain-gold" aria-hidden />
               </div>
-              <h2 className="forja-title text-4xl font-bold tracking-[-0.06em] sm:text-5xl lg:text-6xl">Menos plano. Mais prática.</h2>
+              <h2 className="praxis-title text-4xl font-bold tracking-[-0.06em] sm:text-5xl lg:text-6xl">Menos plano. Mais prática.</h2>
               <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-muted-foreground sm:text-lg">
                 Abra o Praxis, fale o que está na cabeça e comece pelo próximo passo que realmente importa.
               </p>

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Star, Search } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -237,13 +237,13 @@ export default function MealsCatalog() {
 
   const { data: meals = [], isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'meals'],
-    queryFn: () => forjaApi.nutrition.meals.list({ limit: 50 }),
+    queryFn: () => praxisApi.nutrition.meals.list({ limit: 50 }),
     retry: 1,
   });
 
   const { data: foods = [] } = useQuery({
     queryKey: ['nutrition', 'foods', { forMeals: true }],
-    queryFn: () => forjaApi.nutrition.foods.list({ limit: 100 }),
+    queryFn: () => praxisApi.nutrition.foods.list({ limit: 100 }),
     retry: 1,
   });
 
@@ -252,7 +252,7 @@ export default function MealsCatalog() {
   };
 
   const createMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.meals.create(data),
+    mutationFn: (data) => praxisApi.nutrition.meals.create(data),
     onSuccess: () => {
       invalidate();
       setShowForm(false);
@@ -262,7 +262,7 @@ export default function MealsCatalog() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.nutrition.meals.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.nutrition.meals.update(id, data),
     onSuccess: () => {
       invalidate();
       setEditing(null);
@@ -273,14 +273,14 @@ export default function MealsCatalog() {
 
   const toggleFav = useMutation({
     mutationFn: (meal) =>
-      forjaApi.nutrition.meals.update(meal.id, {
+      praxisApi.nutrition.meals.update(meal.id, {
         is_favorite: meal.is_favorite ? 0 : 1,
       }),
     onSuccess: invalidate,
   });
 
   const archiveMut = useMutation({
-    mutationFn: (id) => forjaApi.nutrition.meals.delete(id),
+    mutationFn: (id) => praxisApi.nutrition.meals.delete(id),
     onSuccess: () => {
       invalidate();
       toast.success('Refeição arquivada');

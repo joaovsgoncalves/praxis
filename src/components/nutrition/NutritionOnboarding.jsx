@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -56,7 +56,7 @@ export default function NutritionOnboarding({ profile, onDone }) {
   });
 
   const suggestMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.suggestProfile(data),
+    mutationFn: (data) => praxisApi.nutrition.suggestProfile(data),
     onSuccess: (sug) => {
       setSuggestion(sug);
       setStep(2);
@@ -67,7 +67,7 @@ export default function NutritionOnboarding({ profile, onDone }) {
   });
 
   const saveMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.updateProfile(data),
+    mutationFn: (data) => praxisApi.nutrition.updateProfile(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nutrition'] });
       toast.success('Meta pronta — bora pro diário');
@@ -78,7 +78,7 @@ export default function NutritionOnboarding({ profile, onDone }) {
 
   const skipMut = useMutation({
     mutationFn: () =>
-      forjaApi.nutrition.updateProfile({ onboarding_done: 1 }),
+      praxisApi.nutrition.updateProfile({ onboarding_done: 1 }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nutrition', 'profile'] });
       onDone?.();

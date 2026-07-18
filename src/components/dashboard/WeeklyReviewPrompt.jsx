@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { BookOpen, ArrowRight } from 'lucide-react';
 import { PraxisInlinePromo } from '@/components/layout/PraxisPage';
@@ -23,7 +23,7 @@ function shouldShowPrompt(today, lastReviewWeekStart) {
 export default function WeeklyReviewPrompt() {
   const { data, isLoading } = useQuery({
     queryKey: ['weeklyReviewHistory', 1],
-    queryFn: () => forjaApi.weeklyReviews.list(1),
+    queryFn: () => praxisApi.weeklyReviews.list(1),
     staleTime: 5 * 60 * 1000,
   });
 

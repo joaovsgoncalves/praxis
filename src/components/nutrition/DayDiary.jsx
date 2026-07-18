@@ -14,7 +14,7 @@ import {
   Type,
   ScanBarcode,
 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -154,27 +154,27 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
 
   const { data: day, isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'day', date],
-    queryFn: () => forjaApi.nutrition.day(date),
+    queryFn: () => praxisApi.nutrition.day(date),
     retry: 1,
   });
 
   const { data: recentFoods = [] } = useQuery({
     queryKey: ['nutrition', 'foods', 'recent'],
-    queryFn: () => forjaApi.nutrition.foods.recent({ limit: 12 }),
+    queryFn: () => praxisApi.nutrition.foods.recent({ limit: 12 }),
     enabled: addOpen,
     retry: 1,
   });
 
   const { data: favFoods = [] } = useQuery({
     queryKey: ['nutrition', 'foods', { favorites: true }],
-    queryFn: () => forjaApi.nutrition.foods.list({ favorites: true, limit: 30 }),
+    queryFn: () => praxisApi.nutrition.foods.list({ favorites: true, limit: 30 }),
     enabled: addOpen,
     retry: 1,
   });
 
   const { data: savedMeals = [] } = useQuery({
     queryKey: ['nutrition', 'meals', { forAdd: true }],
-    queryFn: () => forjaApi.nutrition.meals.list({ limit: 30 }),
+    queryFn: () => praxisApi.nutrition.meals.list({ limit: 30 }),
     enabled: addOpen,
     retry: 1,
   });
@@ -182,7 +182,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   const { data: searchFoods = [] } = useQuery({
     queryKey: ['nutrition', 'foods', { q: foodQ, forAdd: true }],
     queryFn: () =>
-      forjaApi.nutrition.foods.list({
+      praxisApi.nutrition.foods.list({
         q: foodQ.trim() || undefined,
         limit: 30,
       }),
@@ -196,7 +196,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   };
 
   const createMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.logs.create(data),
+    mutationFn: (data) => praxisApi.nutrition.logs.create(data),
     onSuccess: () => {
       invalidateDay();
       setAddOpen(false);
@@ -209,7 +209,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   });
 
   const fromMealMut = useMutation({
-    mutationFn: (data) => forjaApi.nutrition.logs.fromMeal(data),
+    mutationFn: (data) => praxisApi.nutrition.logs.fromMeal(data),
     onSuccess: (res) => {
       invalidateDay();
       setAddOpen(false);
@@ -224,7 +224,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => forjaApi.nutrition.logs.update(id, data),
+    mutationFn: ({ id, data }) => praxisApi.nutrition.logs.update(id, data),
     onSuccess: () => {
       invalidateDay();
       setEditLog(null);
@@ -234,7 +234,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id) => forjaApi.nutrition.logs.delete(id),
+    mutationFn: (id) => praxisApi.nutrition.logs.delete(id),
     onSuccess: () => {
       invalidateDay();
       toast.success('Removido');
@@ -244,7 +244,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
 
   const copyYesterdayMut = useMutation({
     mutationFn: () =>
-      forjaApi.nutrition.copyDay({
+      praxisApi.nutrition.copyDay({
         to_date: date,
         from_date: shiftDate(date, -1),
       }),

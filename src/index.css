@@ -123,13 +123,13 @@
     box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03);
   }
 
-  .forja-panel {
+  .praxis-panel {
     background: hsl(var(--card) / 0.94);
     border: 1px solid hsl(0 0% 100% / 0.06);
     box-shadow: none;
   }
 
-  .forja-kicker {
+  .praxis-kicker {
     @apply font-sans text-xs font-medium tracking-wide text-muted-foreground normal-case;
   }
 
@@ -162,7 +162,7 @@
     @apply mt-1.5 text-xl font-semibold tabular-nums leading-none tracking-tight sm:text-2xl;
   }
 
-  .forja-title {
+  .praxis-title {
     @apply font-display tracking-[-0.045em];
   }
 
@@ -299,7 +299,7 @@ a:focus-visible .praxis-brand-mark {
   max-width: 80rem;
 }
 
-.praxis-dashboard .forja-panel {
+.praxis-dashboard .praxis-panel {
   background:
     linear-gradient(180deg, hsl(var(--card) / 0.82), hsl(var(--card) / 0.68));
   border-color: hsl(0 0% 100% / 0.06);

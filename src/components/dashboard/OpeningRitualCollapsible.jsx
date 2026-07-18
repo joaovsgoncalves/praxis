@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,7 +29,7 @@ export default function OpeningRitualCollapsible() {
 
   const { data: rituals = [], isLoading } = useQuery({
     queryKey: ['rituals', today],
-    queryFn: () => forjaApi.rituals.list({ date: today }),
+    queryFn: () => praxisApi.rituals.list({ date: today }),
     staleTime: 30_000,
   });
 
@@ -39,7 +39,7 @@ export default function OpeningRitualCollapsible() {
   );
 
   const createFromTemplate = useMutation({
-    mutationFn: () => forjaApi.rituals.fromTemplate('day_open'),
+    mutationFn: () => praxisApi.rituals.fromTemplate('day_open'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rituals'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
@@ -49,10 +49,10 @@ export default function OpeningRitualCollapsible() {
   const toggleHabit = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
       if (isDone) {
-        const logs = await forjaApi.habitLogs.list({ habit_id: habitId, date: today });
-        if (logs.length > 0) await forjaApi.habitLogs.delete(logs[0].id);
+        const logs = await praxisApi.habitLogs.list({ habit_id: habitId, date: today });
+        if (logs.length > 0) await praxisApi.habitLogs.delete(logs[0].id);
       } else {
-        await forjaApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
+        await praxisApi.habitLogs.create({ habit_id: habitId, date: today, completed: true });
       }
     },
     onSettled: () => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ScanBarcode } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +53,7 @@ export default function NutritionBarcodeEntry({
   };
 
   const lookupMut = useMutation({
-    mutationFn: (raw) => forjaApi.nutrition.barcode.lookup(raw),
+    mutationFn: (raw) => praxisApi.nutrition.barcode.lookup(raw),
     onSuccess: (data) => {
       setResult(data);
       toast.success(
@@ -75,7 +75,7 @@ export default function NutritionBarcodeEntry({
 
   const logMut = useMutation({
     mutationFn: ({ foodId, meal_slot, servings: s }) =>
-      forjaApi.nutrition.logs.create({
+      praxisApi.nutrition.logs.create({
         date,
         food_item_id: foodId,
         meal_slot,

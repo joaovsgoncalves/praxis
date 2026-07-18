@@ -53,7 +53,7 @@ export default function TaskBulkArchiveDialog({
             tasks.map((task) => (
               <label
                 key={task.id}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/5 bg-black/20 p-3"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-3"
               >
                 <Checkbox
                   checked={selected.has(task.id)}

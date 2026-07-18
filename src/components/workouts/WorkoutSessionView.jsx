@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -81,7 +81,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
 
   const { data: session, isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'session', sessionId],
-    queryFn: () => forjaApi.workouts.sessions.get(sessionId),
+    queryFn: () => praxisApi.workouts.sessions.get(sessionId),
     enabled: Boolean(sessionId),
     refetchOnWindowFocus: true,
   });
@@ -165,7 +165,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   };
 
   const addSet = useMutation({
-    mutationFn: (payload) => forjaApi.workouts.sessions.addSet(sessionId, payload),
+    mutationFn: (payload) => praxisApi.workouts.sessions.addSet(sessionId, payload),
     onSuccess: (updated) => {
       updateSessionCache(updated);
       startRest(currentExercise?.rest_seconds, currentExercise?.id);
@@ -180,7 +180,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   });
 
   const deleteSet = useMutation({
-    mutationFn: (setId) => forjaApi.workouts.sessions.deleteSet(setId),
+    mutationFn: (setId) => praxisApi.workouts.sessions.deleteSet(setId),
     onSuccess: (updated) => {
       updateSessionCache(updated);
       toast({ title: 'Série removida' });
@@ -189,7 +189,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   });
 
   const finishSession = useMutation({
-    mutationFn: () => forjaApi.workouts.sessions.finish(sessionId),
+    mutationFn: () => praxisApi.workouts.sessions.finish(sessionId),
     onSuccess: (updated) => {
       localStorage.removeItem(localRestKey(sessionId));
       queryClient.setQueryData(['workouts', 'session', sessionId], updated);
@@ -208,7 +208,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   });
 
   const abandonSession = useMutation({
-    mutationFn: () => forjaApi.workouts.sessions.abandon(sessionId),
+    mutationFn: () => praxisApi.workouts.sessions.abandon(sessionId),
     onSuccess: (updated) => {
       localStorage.removeItem(localRestKey(sessionId));
       queryClient.invalidateQueries({ queryKey: ['workouts'] });

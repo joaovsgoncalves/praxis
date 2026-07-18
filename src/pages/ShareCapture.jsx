@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -40,7 +40,7 @@ export default function ShareCapture() {
     started.current = true;
     (async () => {
       try {
-        const res = await forjaApi.captures.createText(payload, 'share');
+        const res = await praxisApi.captures.createText(payload, 'share');
         navigate(`/captura?capture=${res.capture_id}`, { replace: true });
       } catch (e) {
         setError(e?.message || 'Falha ao enfileirar. Tente de novo.');
@@ -80,7 +80,7 @@ export default function ShareCapture() {
             </>
           ) : (
             <>
-              <p className="forja-title text-lg font-semibold">Enviando para o Praxis…</p>
+              <p className="praxis-title text-lg font-semibold">Enviando para o Praxis…</p>
               <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
                 Organizando a partir do que você compartilhou.

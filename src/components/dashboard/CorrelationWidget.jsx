@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 
@@ -24,7 +24,7 @@ function Delta({ value, label, unit = '' }) {
 export default function CorrelationWidget() {
   const { data, isLoading } = useQuery({
     queryKey: ['correlation', 60],
-    queryFn: () => forjaApi.insights.correlation(60),
+    queryFn: () => praxisApi.insights.correlation(60),
     staleTime: 10 * 60 * 1000,
   });
 

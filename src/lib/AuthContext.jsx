@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 
 const AuthContext = createContext();
 
@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     setAuthError(null);
     try {
-      const config = await forjaApi.auth.config();
+      const config = await praxisApi.auth.config();
       setWebAuthEnabled(Boolean(config.webAuthEnabled));
       if (!config.webAuthEnabled) {
         setUser({ username: 'local', display_name: 'Local dev' });
@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
         setAuthChecked(true);
         return;
       }
-      const me = await forjaApi.auth.me();
+      const me = await praxisApi.auth.me();
       setUser(me.user);
       setIsAuthenticated(true);
       setAuthChecked(true);
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await forjaApi.auth.logout();
+      await praxisApi.auth.logout();
     } catch {}
     setUser(null);
     setIsAuthenticated(false);

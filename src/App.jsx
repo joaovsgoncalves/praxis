@@ -68,8 +68,8 @@ const AuthenticatedApp = () => {
         <PraxisCenteredShell>
           <Card className="glass-surface border-white/10">
             <CardContent className="p-8 text-center space-y-4">
-              <p className="forja-kicker text-destructive">Sem conexão</p>
-              <h1 className="forja-title text-xl font-semibold">API fora do ar</h1>
+              <p className="praxis-kicker text-destructive">Sem conexão</p>
+              <h1 className="praxis-title text-xl font-semibold">API fora do ar</h1>
               <p className="text-sm text-muted-foreground">{authError.message}</p>
               <Button type="button" variant="outline" className="rounded-full" onClick={() => window.location.reload()}>
                 Tentar de novo

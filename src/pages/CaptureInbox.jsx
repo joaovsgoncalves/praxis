@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,12 +44,12 @@ export default function CaptureInbox() {
 
   const { data: captures = [], isLoading } = useQuery({
     queryKey: ['captures', 'inbox'],
-    queryFn: () => forjaApi.captures.list({ status: 'failed,transcribed,parsed', limit: 40 }),
+    queryFn: () => praxisApi.captures.list({ status: 'failed,transcribed,parsed', limit: 40 }),
     refetchInterval: 20_000,
   });
 
   const retryMutation = useMutation({
-    mutationFn: (id) => forjaApi.captures.retry(id),
+    mutationFn: (id) => praxisApi.captures.retry(id),
     onSuccess: (data, id) => {
       queryClient.invalidateQueries({ queryKey: ['captures'] });
       toast({ title: 'Transcrição OK', description: 'Abrindo revisão dos itens.' });

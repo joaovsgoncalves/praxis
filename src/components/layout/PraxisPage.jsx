@@ -15,7 +15,7 @@ export function PageHero({ kicker, kickerIcon: Icon, kickerClassName, title, des
               <span>{kicker}</span>
             </p>
           ) : null}
-          <h1 className="forja-title text-3xl font-bold leading-[1.15] sm:text-4xl">{title}</h1>
+          <h1 className="praxis-title text-3xl font-bold leading-[1.15] sm:text-4xl">{title}</h1>
           {description ? (
             <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">{description}</p>
           ) : null}
@@ -34,7 +34,7 @@ export function StatGrid({ children, className }) {
 const STAT_TONES = {
   cyan: 'border-cyan-400/20 bg-cyan-500/10',
   amber: 'border-amber-400/20 bg-amber-500/10',
-  neutral: 'border-white/5 bg-black/20',
+  neutral: 'border-white/5 bg-white/[0.03]',
 };
 
 /** KPI tile — align="start" (default, hero grids) ou "center" (blocos de métrica). */
@@ -78,7 +78,7 @@ export function SectionHeading({ kicker, title, trailing }) {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0 space-y-1">
         {kicker ? <p className="praxis-kicker-row text-muted-foreground">{kicker}</p> : null}
-        <h2 className="forja-title text-xl font-semibold leading-tight sm:text-2xl">{title}</h2>
+        <h2 className="praxis-title text-xl font-semibold leading-tight sm:text-2xl">{title}</h2>
       </div>
       {trailing ? <div className="w-full shrink-0 sm:w-auto">{trailing}</div> : null}
     </div>
@@ -99,7 +99,7 @@ export function PraxisLoadingSplash({ message = 'Carregando o Praxis…' }) {
   return (
     <PraxisCenteredShell maxWidth="max-w-sm">
       <div className="glass-surface rounded-2xl border border-white/10 p-8 text-center space-y-5">
-        <p className="forja-kicker text-primary">Praxis</p>
+        <p className="praxis-kicker text-primary">Praxis</p>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10">
           <div className="h-6 w-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" aria-hidden />
         </div>

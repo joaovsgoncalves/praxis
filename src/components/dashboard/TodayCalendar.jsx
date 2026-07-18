@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, ExternalLink, CalendarDays } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { cn } from '@/lib/utils';
 
 function formatTime(isoString) {
@@ -17,7 +17,7 @@ function formatTime(isoString) {
 export default function TodayCalendar() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['todayCalendar'],
-    queryFn: () => forjaApi.getTodayCalendar(),
+    queryFn: () => praxisApi.getTodayCalendar(),
     refetchInterval: 300000,
   });
 
@@ -33,7 +33,7 @@ export default function TodayCalendar() {
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium text-muted-foreground">Agenda</p>
             <div className="mt-0.5 flex items-center justify-between gap-3">
-              <h3 className="forja-title text-base font-semibold tracking-[-0.025em]">Hoje</h3>
+              <h3 className="praxis-title text-base font-semibold tracking-[-0.025em]">Hoje</h3>
               {!isLoading && !isError && events.length > 0 ? (
                 <span className="text-[11px] tabular-nums text-muted-foreground">{events.length} evento{events.length === 1 ? '' : 's'}</span>
               ) : null}

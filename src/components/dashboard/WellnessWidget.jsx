@@ -84,7 +84,7 @@ export default function WellnessWidget({ todayCheck, onSave }) {
               </div>
               <div>
                 <p className="text-[11px] font-medium text-muted-foreground">Corpo</p>
-                <h3 className="forja-title mt-0.5 text-base font-semibold tracking-[-0.025em]">Bem-estar hoje</h3>
+                <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em]">Bem-estar hoje</h3>
               </div>
             </div>
             <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground" onClick={() => setShowForm(true)}>

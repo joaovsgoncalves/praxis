@@ -1,7 +1,7 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Sparkles } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,13 +36,13 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
 
   const { data: exercises = [], isLoading } = useQuery({
     queryKey: ['workouts', 'exercise-library', deferredQuery],
-    queryFn: () => forjaApi.workouts.exercises.list({ q: deferredQuery || undefined, limit: 80 }),
+    queryFn: () => praxisApi.workouts.exercises.list({ q: deferredQuery || undefined, limit: 80 }),
     enabled: open && !creating,
     staleTime: 20_000,
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload) => forjaApi.workouts.exercises.create(payload),
+    mutationFn: (payload) => praxisApi.workouts.exercises.create(payload),
     onSuccess: (exercise) => {
       queryClient.invalidateQueries({ queryKey: ['workouts', 'exercise-library'] });
       toast({ title: 'Exercício criado', description: `${exercise.name} já entrou na tua biblioteca.` });

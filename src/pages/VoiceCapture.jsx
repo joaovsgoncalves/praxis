@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ export default function VoiceCapture() {
 
   const { data: pending } = useQuery({
     queryKey: ['captures', 'pending-count'],
-    queryFn: () => forjaApi.captures.pendingCount(),
+    queryFn: () => praxisApi.captures.pendingCount(),
     staleTime: 20_000,
   });
   const inboxCount = pending?.count ?? 0;
@@ -81,11 +81,11 @@ export default function VoiceCapture() {
   }, []);
 
   const runParse = useCallback(async (text, captureId) => {
-    const parseRes = await forjaApi.parseVoice(text);
+    const parseRes = await praxisApi.parseVoice(text);
     applyParsedItems(parseRes);
     if (captureId) {
       try {
-        await forjaApi.captures.saveParsed(captureId, parseRes.items || []);
+        await praxisApi.captures.saveParsed(captureId, parseRes.items || []);
       } catch {
         /* non-blocking */
       }
@@ -99,7 +99,7 @@ export default function VoiceCapture() {
       setCapturePhase('loading_capture');
       clearError();
       try {
-        const cap = await forjaApi.captures.get(captureParam);
+        const cap = await praxisApi.captures.get(captureParam);
         if (cancelled) return;
         setActiveCaptureId(cap.id);
         if (cap.parsed_items?.length) {
@@ -192,7 +192,7 @@ export default function VoiceCapture() {
 
     try {
       setCapturePhase('transcribing');
-      const captureRes = await forjaApi.captures.submitAudio(blob);
+      const captureRes = await praxisApi.captures.submitAudio(blob);
       const captureId = captureRes.capture_id || null;
       setActiveCaptureId(captureId);
       const text = captureRes.text || '';
@@ -219,14 +219,14 @@ export default function VoiceCapture() {
   const confirmItem = async (item) => {
     try {
       if (item.type === 'habit') {
-        await forjaApi.habits.create({
+        await praxisApi.habits.create({
           title: item.title,
           frequency: item.frequency || 'daily',
           category: item.category || 'pessoal',
           source: 'voice',
         });
       } else {
-        await forjaApi.tasks.create({
+        await praxisApi.tasks.create({
           title: item.title,
           date: item.date || null,
           time: item.time || null,
@@ -249,7 +249,7 @@ export default function VoiceCapture() {
     }
     if (activeCaptureId) {
       try {
-        await forjaApi.captures.archive(activeCaptureId);
+        await praxisApi.captures.archive(activeCaptureId);
         queryClient.invalidateQueries({ queryKey: ['captures'] });
       } catch {
         /* non-blocking */

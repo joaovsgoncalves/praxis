@@ -12,12 +12,12 @@ export default function PageNotFound() {
     <PraxisCenteredShell maxWidth="max-w-lg">
       <Card className="glass-surface border-white/10">
         <CardContent className="p-8 sm:p-10 text-center space-y-6">
-          <p className="forja-kicker text-muted-foreground">Praxis</p>
+          <p className="praxis-kicker text-muted-foreground">Praxis</p>
           <p className="text-6xl font-light tabular-nums text-muted-foreground/40" aria-hidden>
             404
           </p>
           <div className="space-y-2">
-            <h1 className="forja-title text-2xl font-bold">Página não encontrada</h1>
+            <h1 className="praxis-title text-2xl font-bold">Página não encontrada</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Não existe rota para{' '}
               <span className="font-mono text-xs text-foreground/90 break-all">{path}</span>

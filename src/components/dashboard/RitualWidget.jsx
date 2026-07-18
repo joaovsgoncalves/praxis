@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, ChevronDown, Flame, Minus, Sparkles } from 'lucide-react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
@@ -230,19 +230,19 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
 
   const { data: rituals = [], isLoading, isError } = useQuery({
     queryKey: ritualQueryKey,
-    queryFn: () => forjaApi.rituals.list(ritualParams),
+    queryFn: () => praxisApi.rituals.list(ritualParams),
     refetchInterval: 30000,
   });
 
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
       if (isDone) {
-        const logs = await forjaApi.habitLogs.list({ habit_id: habitId, date: today });
+        const logs = await praxisApi.habitLogs.list({ habit_id: habitId, date: today });
         if (logs.length > 0) {
-          await forjaApi.habitLogs.delete(logs[0].id);
+          await praxisApi.habitLogs.delete(logs[0].id);
         }
       } else {
-        await forjaApi.habitLogs.create({
+        await praxisApi.habitLogs.create({
           habit_id: habitId,
           date: today,
           outcome: 'done',
@@ -292,7 +292,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
 
   const skipHabitMutation = useMutation({
     mutationFn: async ({ habitId, skipReason, skipNote }) => {
-      await forjaApi.habitLogs.create({
+      await praxisApi.habitLogs.create({
         habit_id: habitId,
         date: today,
         outcome: 'skipped',

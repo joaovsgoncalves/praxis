@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import {
   PageHero,
   PraxisEmptyState,
@@ -64,14 +64,14 @@ export default function Nutricao() {
     isError: profileError,
   } = useQuery({
     queryKey: ['nutrition', 'profile'],
-    queryFn: () => forjaApi.nutrition.profile(),
+    queryFn: () => praxisApi.nutrition.profile(),
     retry: 1,
   });
 
   const dayKey = diaryDate || undefined;
   const { data: day, isLoading: loadingDay } = useQuery({
     queryKey: ['nutrition', 'day', dayKey || 'today'],
-    queryFn: () => forjaApi.nutrition.day(dayKey),
+    queryFn: () => praxisApi.nutrition.day(dayKey),
     retry: 1,
   });
 

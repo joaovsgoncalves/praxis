@@ -23,13 +23,13 @@ export default function PraxisBrand({
         )}
         aria-hidden
       >
-        <span className="forja-title text-xl font-bold tracking-[-0.09em] text-domain-gold">π</span>
+        <span className="praxis-title text-xl font-bold tracking-[-0.09em] text-domain-gold">π</span>
         <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-domain-gold shadow-[0_0_16px_hsl(var(--domain-gold)/0.8)]" />
       </div>
 
       {!compact ? (
         <div className="min-w-0">
-          <p className={cn('forja-title text-lg font-bold leading-none tracking-[-0.055em]', nameClassName)}>
+          <p className={cn('praxis-title text-lg font-bold leading-none tracking-[-0.055em]', nameClassName)}>
             Praxis
           </p>
           {tagline ? (

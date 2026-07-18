@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,10 +58,10 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const { logout } = useAuth();
 
-  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => forjaApi.user.getSettings() });
+  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => praxisApi.user.getSettings() });
   const { data: backupMeta } = useQuery({
     queryKey: ['ops', 'backup-meta'],
-    queryFn: () => forjaApi.ops.backupMeta(),
+    queryFn: () => praxisApi.ops.backupMeta(),
     staleTime: 120_000,
   });
 
@@ -92,7 +92,7 @@ export default function Settings() {
     try {
       const nextAvatarUrl = await compressAvatar(file);
       setAvatarUrl(nextAvatarUrl);
-      await forjaApi.user.updateSettings({ avatar_url: nextAvatarUrl });
+      await praxisApi.user.updateSettings({ avatar_url: nextAvatarUrl });
       queryClient.invalidateQueries({ queryKey: ['me'] });
       toast.success('Foto de perfil atualizada!');
     } catch (err) {
@@ -104,7 +104,7 @@ export default function Settings() {
   };
 
   const saveSettings = async () => {
-    await forjaApi.user.updateSettings({
+    await praxisApi.user.updateSettings({
       pomodoro_focus: Number(pomodoroFocus),
       pomodoro_break: Number(pomodoroBreak),
     });
@@ -196,7 +196,7 @@ export default function Settings() {
           <Select
             value={user?.list_density === 'compact' ? 'compact' : 'comfortable'}
             onValueChange={async (v) => {
-              await forjaApi.user.updateSettings({ list_density: v });
+              await praxisApi.user.updateSettings({ list_density: v });
               queryClient.invalidateQueries({ queryKey: ['me'] });
               toast.success('Densidade atualizada');
             }}

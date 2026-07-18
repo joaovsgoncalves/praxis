@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { useTimeOfDay } from '@/hooks/useTimeOfDay';
 import { Flame, Target, Timer } from 'lucide-react';
 import { fortalezaDateKey, fortalezaDisplayDate } from '@/lib/dates';
@@ -21,17 +21,17 @@ export default function HeroDay({
 
   const { data: focusToday = [] } = useQuery({
     queryKey: ['focusToday', today],
-    queryFn: () => forjaApi.focus.list({ date: today }),
+    queryFn: () => praxisApi.focus.list({ date: today }),
     staleTime: 30_000,
   });
   const { data: settings } = useQuery({
     queryKey: ['userSettings'],
-    queryFn: () => forjaApi.user.getSettings(),
+    queryFn: () => praxisApi.user.getSettings(),
     staleTime: 5 * 60 * 1000,
   });
   const { data: habits = [] } = useQuery({
     queryKey: ['habits'],
-    queryFn: () => forjaApi.habits.list({ status: 'active' }),
+    queryFn: () => praxisApi.habits.list({ status: 'active' }),
     staleTime: 60_000,
   });
 
@@ -68,7 +68,7 @@ export default function HeroDay({
           <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">
             {emoji} Praxis · {dateStr}
           </p>
-          <h1 className="forja-title mt-1.5 text-xl font-bold leading-tight tracking-[-0.04em] sm:text-2xl">
+          <h1 className="praxis-title mt-1.5 text-xl font-bold leading-tight tracking-[-0.04em] sm:text-2xl">
             {greeting}{userName ? `, ${userName.split(' ')[0]}` : ''}
           </h1>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground sm:text-sm">{tagline}</p>
@@ -83,7 +83,7 @@ export default function HeroDay({
           ) : null}
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-right">
             <p className="text-[10px] font-medium text-muted-foreground">Dia</p>
-            <p className="forja-title mt-0.5 text-xl font-bold tabular-nums sm:text-2xl">{roundedDayPct}%</p>
+            <p className="praxis-title mt-0.5 text-xl font-bold tabular-nums sm:text-2xl">{roundedDayPct}%</p>
           </div>
         </div>
       </div>

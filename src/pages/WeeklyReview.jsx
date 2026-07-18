@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,18 +46,18 @@ export default function WeeklyReview() {
 
   const { data: current } = useQuery({
     queryKey: ['weeklyReviewCurrent', weekStart],
-    queryFn: () => forjaApi.weeklyReviews.current(weekStart),
+    queryFn: () => praxisApi.weeklyReviews.current(weekStart),
   });
 
   const { data: auto, isLoading: autoLoading } = useQuery({
     queryKey: ['weeklyInsights', weekStart],
-    queryFn: () => forjaApi.insights.weekly(weekStart),
+    queryFn: () => praxisApi.insights.weekly(weekStart),
   });
 
   // fallback se insights antigo não trouxer nutrition (API desatualizada)
   const { data: nutritionSummary } = useQuery({
     queryKey: ['nutrition', 'summary', weekStart, weekEnd],
-    queryFn: () => forjaApi.nutrition.summary({ from: weekStart, to: weekEnd }),
+    queryFn: () => praxisApi.nutrition.summary({ from: weekStart, to: weekEnd }),
     enabled: !autoLoading && !!weekStart && !auto?.nutrition,
     retry: 1,
   });
@@ -74,7 +74,7 @@ export default function WeeklyReview() {
 
   const { data: history = [] } = useQuery({
     queryKey: ['weeklyReviewHistory'],
-    queryFn: () => forjaApi.weeklyReviews.list(8),
+    queryFn: () => praxisApi.weeklyReviews.list(8),
   });
 
   const [form, setForm] = useState(empty);
@@ -94,7 +94,7 @@ export default function WeeklyReview() {
   }, [current]);
 
   const saveMutation = useMutation({
-    mutationFn: () => forjaApi.weeklyReviews.save({ ...form, week_start: weekStart }),
+    mutationFn: () => praxisApi.weeklyReviews.save({ ...form, week_start: weekStart }),
     onSuccess: () => {
       toast.success('Revisão salva');
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewCurrent'] });
@@ -104,7 +104,7 @@ export default function WeeklyReview() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => forjaApi.weeklyReviews.delete(id),
+    mutationFn: (id) => praxisApi.weeklyReviews.delete(id),
     onSuccess: () => {
       toast.success('Revisão removida');
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewCurrent'] });
@@ -123,7 +123,7 @@ export default function WeeklyReview() {
       const dates = taskDatesForNextWeek(weekStart);
       const created = [];
       for (let i = 0; i < titles.length; i++) {
-        const t = await forjaApi.tasks.create({
+        const t = await praxisApi.tasks.create({
           title: titles[i],
           date: dates[i],
           status: 'pending',
@@ -402,7 +402,7 @@ export default function WeeklyReview() {
 
 function InsightBlock({ title, children }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-black/20 p-3">
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
       <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
       {children}
     </div>

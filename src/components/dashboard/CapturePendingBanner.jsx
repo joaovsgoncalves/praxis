@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { forjaApi } from '@/api/forjaClient';
+import { praxisApi } from '@/api/praxisClient';
 import { toast } from '@/components/ui/use-toast';
 import { Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ export default function CapturePendingBanner() {
 
   const { data } = useQuery({
     queryKey: ['captures', 'pending-count'],
-    queryFn: () => forjaApi.captures.pendingCount(),
+    queryFn: () => praxisApi.captures.pendingCount(),
     refetchInterval: 15_000,
     staleTime: 10_000,
   });

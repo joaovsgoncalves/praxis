@@ -45,10 +45,10 @@ function PreviewBrand() {
   return (
     <div className="flex items-center gap-2">
       <div className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.045]">
-        <span className="forja-title text-lg font-bold tracking-[-0.09em] text-domain-gold">π</span>
+        <span className="praxis-title text-lg font-bold tracking-[-0.09em] text-domain-gold">π</span>
         <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-domain-gold shadow-[0_0_14px_hsl(var(--domain-gold)/0.8)]" />
       </div>
-      <span className="forja-title hidden text-sm font-bold sm:inline">Praxis</span>
+      <span className="praxis-title hidden text-sm font-bold sm:inline">Praxis</span>
     </div>
   );
 }
@@ -197,7 +197,7 @@ export function PraxisLivePreview() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-medium text-muted-foreground">Boa tarde, Jota</p>
-                <h3 className="forja-title mt-1 text-xl font-bold sm:text-2xl">O que importa agora?</h3>
+                <h3 className="praxis-title mt-1 text-xl font-bold sm:text-2xl">O que importa agora?</h3>
               </div>
               <motion.div
                 key={phase.progress}
@@ -266,7 +266,7 @@ export function PraxisLivePreview() {
                   <span className="text-[10px] font-medium text-muted-foreground">Macros</span>
                   <Utensils className="h-3.5 w-3.5 text-domain-wellness" aria-hidden />
                 </div>
-                <p className="forja-title text-2xl font-bold tabular-nums">1.548 <span className="text-[10px] font-medium text-muted-foreground">/ 2.000 kcal</span></p>
+                <p className="praxis-title text-2xl font-bold tabular-nums">1.548 <span className="text-[10px] font-medium text-muted-foreground">/ 2.000 kcal</span></p>
                 <div className="mt-4 space-y-2.5">
                   {[
                     ['Proteína', 78, '132g / 170g', 'bg-domain-wellness'],
@@ -388,7 +388,7 @@ export function PraxisVoiceFlowDemo() {
   ];
 
   return (
-    <div className="relative min-h-[300px] overflow-hidden rounded-3xl border border-white/[0.06] bg-black/20 p-6 sm:p-8">
+    <div className="relative min-h-[300px] overflow-hidden rounded-3xl border border-white/[0.06] bg-white/[0.03] p-6 sm:p-8">
       <motion.div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,hsl(var(--domain-gold)/0.12),transparent_56%)]"
         animate={reduceMotion ? undefined : { opacity: [0.45, 0.85, 0.45], scale: [0.98, 1.04, 0.98] }}
