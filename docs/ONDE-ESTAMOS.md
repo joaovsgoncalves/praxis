@@ -51,11 +51,13 @@ resolver o que dá pra fazer via repo (testes, CI, docs, nota no PRD):
   `docs/jota-fit/`.
 - [x] **Nota no PRD sobre gamificação** — `PRD-PRAXIS-v1.md` §9 documentado: XP/níveis/
   badges foram mantidos por escolha consciente, não esquecimento.
-- [ ] **Checklist manual do João (fora do repo, precisa da VPS):** confirmar versão do
-  Node em produção (ajustar pin da CI se divergir de 20.x); confirmar que os crons de
-  backup e health-check estão instalados (`crontab -l`, ou `npm run checklist:10`);
-  tornar os checks `frontend`/`backend` obrigatórios em GitHub → Settings → Branches
-  depois que a CI rodar pelo menos uma vez; avaliar `RCLONE_REMOTE` pra backup fora da VPS.
+- [x] **CI pin = Node da VPS** — workflow em Node **22** (prod `forja-api` = v22.x; era 20).
+- [x] **Crons na VPS** — backup SQLite `15 3 * * *` + health watchdog `*/5`; backup de
+  2026-07-18 ok. RCLONE offsite ainda opcional.
+- [ ] **Branch protection** — repo privado sem GitHub Pro não deixa exigir checks via API;
+  CI já roda e fica verde, mas merge não trava sozinho. Avaliar Pro / repo público / regra
+  manual se um dia doer.
+- [ ] **RCLONE_REMOTE** (opcional) — cópia do backup pra fora da VPS.
 
 ---
 
