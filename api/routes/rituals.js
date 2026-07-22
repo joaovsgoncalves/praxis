@@ -46,7 +46,11 @@ export function createRitualsRouter({ db, getLocalDateString, nextSortOrder }) {
     const enriched = rituals.map(ritual => {
       const habitIds = JSON.parse(ritual.habits_order || '[]');
       const habits = habitIds.map(hid => {
-        const habit = db.prepare('SELECT id, title FROM habits WHERE id = ?').get(hid);
+        const habit = db.prepare(`
+          SELECT id, title, description, frequency, category, streak_target, goal_id, source,
+                 status, sort_order, recurrence_days, target_value, unit, preferred_time
+          FROM habits WHERE id = ?
+        `).get(hid);
         if (!habit) return null;
         const log = db.prepare(
           'SELECT completed, outcome, skip_reason, note FROM habit_logs WHERE habit_id = ? AND date = ?',
@@ -54,8 +58,7 @@ export function createRitualsRouter({ db, getLocalDateString, nextSortOrder }) {
         const done = isHabitLogDone(log);
         const skipped = isHabitLogSkipped(log);
         return {
-          id: habit.id,
-          title: habit.title,
+          ...habit,
           completed_today: done,
           skipped_today: skipped,
           day_outcome: skipped ? 'skipped' : done ? 'done' : 'open',
@@ -63,6 +66,13 @@ export function createRitualsRouter({ db, getLocalDateString, nextSortOrder }) {
           skip_note: (log?.note && String(log.note).trim()) || null,
         };
       }).filter(Boolean);
+      // Timed habits first within the ritual (empty time last)
+      habits.sort((a, b) => {
+        const ta = a.preferred_time || '99:99';
+        const tb = b.preferred_time || '99:99';
+        if (ta !== tb) return ta.localeCompare(tb);
+        return 0;
+      });
       return { ...ritual, habits_order: habitIds, habits };
     });
 

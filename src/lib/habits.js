@@ -79,6 +79,30 @@ export function isQuantitativeHabit(habit) {
   return habit?.target_value != null && Number(habit.target_value) > 0;
 }
 
+/** Normalize / display preferred clock time (HH:MM). */
+export function normalizePreferredTime(value) {
+  if (value == null || value === '') return '';
+  const m = String(value).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return '';
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return '';
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+export function formatPreferredTime(value) {
+  const t = normalizePreferredTime(value);
+  return t || '';
+}
+
+/** Sort habits: with clock first (ascending), then untitled times, keep stable. */
+export function compareHabitsByPreferredTime(a, b) {
+  const ta = normalizePreferredTime(a?.preferred_time) || '99:99';
+  const tb = normalizePreferredTime(b?.preferred_time) || '99:99';
+  if (ta !== tb) return ta.localeCompare(tb);
+  return 0;
+}
+
 export function todayLogForHabit(habitLogs, habitId, dateKey) {
   return habitLogs.find((log) => log.habit_id === habitId && log.date === dateKey);
 }

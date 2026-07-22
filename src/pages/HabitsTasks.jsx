@@ -34,6 +34,7 @@ import {
   SKIP_REASON_LABELS,
   countHabitDayOutcomes,
   formatFrequencyLabel,
+  formatPreferredTime,
   getHabitDayOutcome,
   isHabitDueOnDate,
   isHabitLogDone,
@@ -164,6 +165,7 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       queryClient.invalidateQueries({ queryKey: ['goalHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       setEditingHabit(null);
     },
   });
@@ -760,7 +762,12 @@ export default function HabitsTasks() {
             )}
 
             {showRituals && (
-              <RitualWidget collapsible today={today} status="active" />
+              <div className="space-y-2">
+                <RitualWidget collapsible today={today} status="active" />
+                <p className="px-1 text-[11px] text-muted-foreground">
+                  Hábitos do ritual se editam pelo lápis em cada passo (e dá pra marcar horário preferido).
+                </p>
+              </div>
             )}
 
             {flatHabits.length === 0 ? (
@@ -864,6 +871,12 @@ export default function HabitsTasks() {
                               {cleanPriorityPrefix(habit.title)}
                             </p>
                             <CategoryBadge category={habit.category} />
+                            {formatPreferredTime(habit.preferred_time) ? (
+                              <Badge variant="outline" className="gap-1 border-domain-gold/30 bg-domain-gold/10 text-[10px] text-domain-gold">
+                                <Clock className="h-3 w-3" aria-hidden />
+                                {formatPreferredTime(habit.preferred_time)}
+                              </Badge>
+                            ) : null}
                             {skipped && (
                               <Badge variant="outline" className="border-amber-500/30 text-[10px] text-amber-200/90">
                                 Não rolou

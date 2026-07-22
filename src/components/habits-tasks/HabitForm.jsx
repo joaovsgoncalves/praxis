@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CATEGORIES } from '@/lib/categories';
-import { parseRecurrenceDays } from '@/lib/habits';
+import { parseRecurrenceDays, normalizePreferredTime } from '@/lib/habits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +31,7 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
     recurrence_days: parseRecurrenceDays(initial),
     target_value: initial.target_value ?? '',
     unit: initial.unit || '',
+    preferred_time: normalizePreferredTime(initial.preferred_time) || '',
   });
 
   const toggleWeekDay = (day) => {
@@ -54,6 +55,7 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
         ? null
         : Number(form.target_value),
       unit: form.unit?.trim() || '',
+      preferred_time: normalizePreferredTime(form.preferred_time) || '',
     };
     onSubmit(payload);
   };
@@ -114,6 +116,22 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
           </div>
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <label htmlFor="habit-preferred-time" className="text-xs font-medium text-muted-foreground">
+          Horário preferido (opcional)
+        </label>
+        <Input
+          id="habit-preferred-time"
+          type="time"
+          value={form.preferred_time}
+          onChange={(e) => setForm((f) => ({ ...f, preferred_time: e.target.value }))}
+          className="bg-secondary/50"
+        />
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Se o hábito roda em um horário fixo (ex.: 22h), marca aqui. Ele aparece com o relógio e sobe na ordem do ritual.
+        </p>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Input

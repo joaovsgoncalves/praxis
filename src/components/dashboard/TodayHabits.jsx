@@ -7,6 +7,7 @@ import { CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import {
   countHabitDayOutcomes,
+  formatPreferredTime,
   getHabitDayOutcome,
   SKIP_REASON_LABELS,
   todayLogForHabit,
@@ -208,6 +209,11 @@ export default function TodayHabits({
                       {habit.title}
                     </p>
                     <CategoryBadge category={habit.category} />
+                    {formatPreferredTime(habit.preferred_time) ? (
+                      <span className="inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-domain-gold">
+                        {formatPreferredTime(habit.preferred_time)}
+                      </span>
+                    ) : null}
                     {skipped && log?.skip_reason ? (
                       <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-200/80">
                         {SKIP_REASON_LABELS[log.skip_reason] || log.skip_reason}

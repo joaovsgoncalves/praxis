@@ -5,13 +5,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, ChevronDown, Flame, Minus, Sparkles } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle2, ChevronDown, Clock, Flame, Minus, Pencil, Sparkles } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
+import { formatPreferredTime } from '@/lib/habits';
 import { toast } from 'sonner';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
+import HabitForm from '@/components/habits-tasks/HabitForm';
 
 const timeOfDayConfig = {
   morning: { emoji: '🌅', label: 'Manhã', order: 0 },
@@ -34,7 +37,7 @@ function ConfettiOverlay() {
   );
 }
 
-function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, collapsible = false }) {
+function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEditHabit, collapsible = false }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isOpen, setIsOpen] = useState(!collapsible);
   const prevDoneRef = useRef(null);
@@ -141,12 +144,14 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, coll
               const state = habitDayState(habit);
               const done = state === 'done';
               const skipped = state === 'skipped';
+              const timeLabel = formatPreferredTime(habit.preferred_time);
               return (
                 <li
                   key={habit.id}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg px-1 py-1 group',
+                    'flex items-center gap-2 rounded-lg px-1 py-1.5 group',
                     skipped && 'bg-amber-500/[0.06]',
+                    timeLabel && !done && !skipped && 'bg-domain-gold/[0.04]',
                   )}
                 >
                   {skipped ? (
@@ -179,17 +184,35 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, coll
                         : !skipped && 'text-foreground/80 group-hover:text-foreground',
                     )}
                   >
-                    {habit.emoji && <span className="mr-1">{habit.emoji}</span>}
-                    {habit.title || habit.name}
-                    {skipped ? (
-                      <span className="ml-1.5 text-[10px] font-medium text-amber-200/80">Não rolou</span>
-                    ) : null}
+                    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      {habit.emoji ? <span>{habit.emoji}</span> : null}
+                      <span>{habit.title || habit.name}</span>
+                      {timeLabel ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-domain-gold">
+                          <Clock className="h-2.5 w-2.5" aria-hidden />
+                          {timeLabel}
+                        </span>
+                      ) : null}
+                      {skipped ? (
+                        <span className="text-[10px] font-medium text-amber-200/80">Não rolou</span>
+                      ) : null}
+                    </span>
                     {skipped && habit.skip_note ? (
                       <span className="mt-0.5 block text-[10px] leading-snug text-amber-100/70">
                         “{habit.skip_note}”
                       </span>
                     ) : null}
                   </label>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    aria-label={`Editar ${habit.title || habit.name || 'hábito'}`}
+                    onClick={() => onEditHabit?.(habit)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                   {skipped ? (
                     <Button
                       type="button"
@@ -227,6 +250,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
   const ritualParams = { date: today, ...(status ? { status } : {}) };
   const ritualQueryKey = ['rituals', ritualParams];
   const [skipHabitTarget, setSkipHabitTarget] = useState(null);
+  const [editingHabit, setEditingHabit] = useState(null);
 
   const { data: rituals = [], isLoading, isError } = useQuery({
     queryKey: ritualQueryKey,
@@ -338,6 +362,20 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
     },
   });
 
+  const updateHabitMutation = useMutation({
+    mutationFn: ({ id, data }) => praxisApi.habits.update(id, data),
+    onSuccess: () => {
+      toast('Hábito atualizado.');
+      setEditingHabit(null);
+      queryClient.invalidateQueries({ queryKey: ['rituals'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+    },
+    onError: () => {
+      toast.error('Não deu pra salvar o hábito.');
+    },
+  });
+
   const grouped = rituals.reduce((acc, ritual) => {
     const tod = ritual.time_of_day || 'morning';
     if (!acc[tod]) acc[tod] = [];
@@ -358,6 +396,9 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
           <div>
             <p className="text-[11px] font-medium text-muted-foreground">Ritmos do dia</p>
             <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rituais</CardTitle>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Toque no lápis pra editar qualquer passo — horário incluso.
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -408,6 +449,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
                           toggleHabitMutation.mutate({ habitId, isDone })
                         }
                         onOpenSkip={(habit) => setSkipHabitTarget(habit)}
+                        onEditHabit={(habit) => setEditingHabit(habit)}
                         onCompleteMinimum={(habitId) =>
                           toggleHabitMutation.mutate({ habitId, isDone: false })
                         }
@@ -446,6 +488,22 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
           setSkipHabitTarget(null);
         }}
       />
+
+      <Dialog open={Boolean(editingHabit)} onOpenChange={(open) => { if (!open) setEditingHabit(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar hábito</DialogTitle>
+          </DialogHeader>
+          {editingHabit ? (
+            <HabitForm
+              key={editingHabit.id}
+              initial={editingHabit}
+              onSubmit={(data) => updateHabitMutation.mutate({ id: editingHabit.id, data })}
+              onCancel={() => setEditingHabit(null)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -265,6 +265,9 @@ if (!habitsCols2.includes('target_value')) {
 if (!habitsCols2.includes('unit')) {
   db.exec("ALTER TABLE habits ADD COLUMN unit TEXT DEFAULT ''");
 }
+if (!habitsCols2.includes('preferred_time')) {
+  db.exec("ALTER TABLE habits ADD COLUMN preferred_time TEXT DEFAULT ''");
+}
 
 const habitLogsCols = db.prepare("PRAGMA table_info(habit_logs)").all().map(c => c.name);
 if (!habitLogsCols.includes('value')) {

@@ -69,6 +69,18 @@ export function createHabitsRouter(ctx) {
     res.json({ success: true, updated, habits: enriched });
   });
 
+  function normalizePreferredTime(input) {
+    if (input === undefined) return undefined;
+    if (input === null || input === '') return '';
+    const raw = String(input).trim();
+    const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!m) return null;
+    const h = Number(m[1]);
+    const min = Number(m[2]);
+    if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  }
+
   router.post('/', (req, res) => {
     const id = randomUUID();
     const {
@@ -83,10 +95,15 @@ export function createHabitsRouter(ctx) {
       recurrence_days,
       target_value,
       unit = '',
+      preferred_time = '',
     } = req.body;
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
     const freq = HABIT_FREQUENCIES.has(frequency) ? frequency : 'daily';
+    const prefTime = normalizePreferredTime(preferred_time);
+    if (prefTime === null) {
+      return res.status(400).json({ error: 'preferred_time must be HH:MM or empty' });
+    }
 
     const habitTitle = stripPriorityPrefix(title);
     const habitSortOrder = sort_order !== undefined ? Number(sort_order) : nextSortOrder('habits');
@@ -96,11 +113,11 @@ export function createHabitsRouter(ctx) {
       : Number(target_value);
 
     db.prepare(`
-      INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source, sort_order, recurrence_days, target_value, unit)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO habits (id, title, description, frequency, category, streak_target, goal_id, source, sort_order, recurrence_days, target_value, unit, preferred_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, habitTitle, description, freq, category, Number(streak_target) || 30,
-      goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || ''
+      goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || '', prefTime || ''
     );
 
     const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(id);
@@ -111,7 +128,10 @@ export function createHabitsRouter(ctx) {
     const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Habit not found' });
 
-    const { title, description, frequency, category, streak_target, goal_id, source, status, sort_order, recurrence_days, target_value, unit } = req.body;
+    const {
+      title, description, frequency, category, streak_target, goal_id, source, status,
+      sort_order, recurrence_days, target_value, unit, preferred_time,
+    } = req.body;
 
     if (status !== undefined && status !== null && !HABIT_STATUSES.has(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -124,6 +144,13 @@ export function createHabitsRouter(ctx) {
     const tgt = target_value !== undefined
       ? (target_value === null || target_value === '' ? null : Number(target_value))
       : undefined;
+    let prefTime;
+    if (preferred_time !== undefined) {
+      prefTime = normalizePreferredTime(preferred_time);
+      if (prefTime === null) {
+        return res.status(400).json({ error: 'preferred_time must be HH:MM or empty' });
+      }
+    }
 
     db.prepare(`
       UPDATE habits SET 
@@ -138,7 +165,8 @@ export function createHabitsRouter(ctx) {
         sort_order = COALESCE(?, sort_order),
         recurrence_days = COALESCE(?, recurrence_days),
         target_value = COALESCE(?, target_value),
-        unit = COALESCE(?, unit)
+        unit = COALESCE(?, unit),
+        preferred_time = COALESCE(?, preferred_time)
       WHERE id = ?
     `).run(
       title !== undefined ? stripPriorityPrefix(title) : null,
@@ -153,6 +181,7 @@ export function createHabitsRouter(ctx) {
       recDays,
       tgt !== undefined ? tgt : null,
       unit,
+      prefTime !== undefined ? prefTime : null,
       req.params.id
     );
 
