@@ -1,5 +1,4 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 
 export default function TaskGroupSection({ title, count, badge, children }) {
   if (!children || (Array.isArray(children) && children.length === 0)) return null;

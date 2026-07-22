@@ -36,5 +36,11 @@ playwright/.cache/
 api/forja.db-shm
 api/forja.db-wal
 api/forja.db
+api/praxis.db-shm
+api/praxis.db-wal
+api/praxis.db
+api/*.db
+api/*.db-shm
+api/*.db-wal
 api/backups/
 api/uploads/
