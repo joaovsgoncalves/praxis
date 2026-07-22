@@ -45,17 +45,16 @@ export function createTasksRouter(ctx) {
       return res.json(recent.map(enrichCategory));
     }
 
-    // The frontend uses this mode for the operational day. Prefer open work through
-    // today + completions closed today, instead of a generic "recent 50" dump that
-    // can hide today's pending behind old history and confuse the UI.
+    // The frontend uses this mode for the operational payload. Include all open
+    // non-ideia tasks (overdue, today, and upcoming) + completions closed today,
+    // so upcoming pending tasks are never drowned out by old completed history.
     const operationalRows = db.prepare(`
       SELECT * FROM tasks
       WHERE status NOT IN ('completed', 'done', 'cancelled')
         AND category != 'ideias'
-        AND date IS NOT NULL AND date <= ?
-      ORDER BY date ASC, priority DESC
-      LIMIT 120
-    `).all(today);
+      ORDER BY (date IS NULL) ASC, date ASC, priority DESC, sort_order IS NULL, sort_order ASC
+      LIMIT 150
+    `).all();
 
     const completedTodayRows = db.prepare(`
       SELECT * FROM tasks
@@ -76,12 +75,20 @@ export function createTasksRouter(ctx) {
     for (const t of operationalRows) byId.set(t.id, t);
     for (const t of completedTodayRows) byId.set(t.id, t);
     // Keep any explicit filters from the base query (status/date/category) if set.
-    for (const t of recent) byId.set(t.id, t);
+    for (const t of recent) {
+      if (!category && t.category === 'ideias') continue;
+      byId.set(t.id, t);
+    }
 
     const merged = [...byId.values()].sort((a, b) => {
-      const aOver = a.date && a.date < today && !['completed', 'done', 'cancelled'].includes(a.status);
-      const bOver = b.date && b.date < today && !['completed', 'done', 'cancelled'].includes(b.status);
+      const aOpen = !['completed', 'done', 'cancelled'].includes(a.status);
+      const bOpen = !['completed', 'done', 'cancelled'].includes(b.status);
+      const aOver = aOpen && a.date && a.date < today;
+      const bOver = bOpen && b.date && b.date < today;
+
       if (aOver !== bOver) return aOver ? -1 : 1;
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+
       const so = (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9);
       if (so !== 0) return so;
       return String(b.created_date || '').localeCompare(String(a.created_date || ''));

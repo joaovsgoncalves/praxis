@@ -44,3 +44,4 @@ api/*.db-shm
 api/*.db-wal
 api/backups/
 api/uploads/
+.agent-context/

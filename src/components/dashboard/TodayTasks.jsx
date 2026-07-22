@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkFromElement } from '@/lib/celebration';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
-import { sortPendingWithOverdueFirst } from '@/lib/taskListFilters';
+import { sortPendingWithOverdueFirst, addDaysToDateKey } from '@/lib/taskListFilters';
 import { SectionHeading } from '@/components/layout/PraxisPage';
 
 const priorityStyles = {
@@ -62,6 +62,16 @@ export default function TodayTasks({
     (t) => t.date && today && t.date < today && completedOn(t) === today
   ).length;
   const donePct = tasks.length > 0 ? Math.round((completed.length / tasks.length) * 100) : 0;
+
+  const upcomingOpenCount = React.useMemo(() => {
+    if (!allTasksForRecurrence || !today) return 0;
+    const endOfWeek = addDaysToDateKey(today, 7);
+    return allTasksForRecurrence.filter((t) => {
+      if (t.status === 'cancelled' || isDone(t)) return false;
+      const d = (t.date || '').slice(0, 10);
+      return Boolean(d && d > today && d <= endOfWeek);
+    }).length;
+  }, [allTasksForRecurrence, today]);
 
   const handleComplete = (task) => {
     if (!isDone(task)) {
@@ -123,15 +133,27 @@ export default function TodayTasks({
       <CardContent className="space-y-2.5 px-5 pb-5 sm:px-5 sm:pb-5">
         <AnimatePresence mode="popLayout" initial={false}>
           {pending.length === 0 && completed.length === 0 && (
-                      <motion.p
-                        key="empty"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-sm text-muted-foreground py-4 text-center"
-                      >
-                        Nenhuma tarefa para hoje. Que tal capturar uma por voz?
-                      </motion.p>
-                    )}
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-4 text-center space-y-1.5"
+            >
+              <p className="text-sm text-muted-foreground">
+                {upcomingOpenCount > 0
+                  ? `Nenhuma tarefa para hoje · ${upcomingOpenCount} na semana`
+                  : 'Nenhuma tarefa para hoje. Que tal capturar uma por voz?'}
+              </p>
+              {upcomingOpenCount > 0 && (
+                <Link
+                  to="/habitos-tarefas?tab=tasks&scope=week"
+                  className="inline-block text-xs font-medium text-primary hover:underline"
+                >
+                  Ver tarefas da semana →
+                </Link>
+              )}
+            </motion.div>
+          )}
                     {overduePending.length > 0 && (
                                           <div className="flex items-center justify-between gap-2 px-1 pt-1">
                                             <div className="text-xs font-semibold text-destructive">
