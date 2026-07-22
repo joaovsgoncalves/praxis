@@ -16,22 +16,22 @@ export default function PraxisBrand({
   return (
     <div className={cn('flex items-center gap-3', className)}>
       <div
-        className={cn(
-          'praxis-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl',
-          'border border-white/10 bg-[#0c0c10] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
-          markClassName,
-        )}
-        aria-hidden
-      >
-        <img
-          src="/praxis-logo.png"
-          alt=""
-          width={40}
-          height={40}
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-      </div>
+              className={cn(
+                'praxis-brand-mark relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl',
+                'border border-white/10 bg-[#0c0c10] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
+                markClassName,
+              )}
+              aria-hidden
+            >
+              <img
+                src="/praxis-logo.png?v=8"
+                alt=""
+                width={40}
+                height={40}
+                decoding="async"
+                className="h-[86%] w-[86%] object-contain"
+              />
+            </div>
 
       {!compact ? (
         <div className="min-w-0">

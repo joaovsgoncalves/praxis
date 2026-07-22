@@ -45,7 +45,7 @@ function PreviewBrand() {
   return (
     <div className="flex items-center gap-2">
       <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#0c0c10]">
-        <img src="/praxis-logo.png" alt="" width={36} height={36} className="h-full w-full object-cover" />
+        <img src="/praxis-logo.png?v=8" alt="" width={36} height={36} className="h-[86%] w-[86%] object-contain" />
       </div>
       <span className="praxis-title hidden text-sm font-bold sm:inline">Praxis</span>
     </div>

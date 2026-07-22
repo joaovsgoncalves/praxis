@@ -1,13 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Praxis">
-  <!-- Crisp tab favicon: thick gold P + arrow, no blur -->
   <rect width="32" height="32" rx="7" fill="#0c0c10"/>
-  <!-- stem -->
-  <rect x="9" y="7" width="3.4" height="18.2" rx="0.4" fill="#f6b428"/>
-  <!-- P bowl -->
-  <path fill="#f6b428" d="M9.2 7h11.2c3.1 0 5.5 1.85 5.5 4.85S23.4 16.6 20.4 16.6H12.4V7z"/>
-  <path fill="#0c0c10" d="M12.6 9.9h6.3c1.55 0 2.55.85 2.55 2.05s-1 2.05-2.55 2.05h-6.3V9.9z"/>
-  <!-- stem over left of bowl hole -->
-  <rect x="9" y="7" width="3.6" height="9.8" fill="#f6b428"/>
-  <!-- arrow up -->
-  <path fill="#ffc84a" d="M18.6 19.2l3.4-4.1 3.4 4.1h-2.05v5.4h-2.7v-5.4z"/>
+  <defs>
+    <linearGradient id="g" x1="8" y1="6" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd278"/><stop offset=".55" stop-color="#f5a820"/><stop offset="1" stop-color="#c87808"/>
+    </linearGradient>
+  </defs>
+  <!-- stylized P/D with upward arrow (matches praxis-logo) -->
+  <path fill="url(#g)" d="M8.2 8.2 L18.6 8.2 Q24.8 8.2 24.8 14.2 Q24.8 19.4 19.4 20.2 L14.2 20.2 L14.2 24.2 L11 24.2 L11 8.2 Z M14.2 11 L14.2 17.4 L18.4 17.4 Q21.4 17.4 21.4 14.2 Q21.4 11 18.4 11 Z"/>
+  <path fill="url(#g)" d="M16.2 15.2 L21.6 9.6 L23.2 11.2 L20.4 14 L24.2 14 L24.2 16.4 L16.2 16.4 Z"/>
 </svg>

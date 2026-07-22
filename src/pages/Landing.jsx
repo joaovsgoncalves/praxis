@@ -311,7 +311,7 @@ export default function Landing() {
                 </p>
                 <div className="mt-8 flex items-center gap-3 text-sm font-medium text-foreground/85">
                   <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-domain-gold/20 bg-[#0c0c10]">
-                    <img src="/praxis-logo.png" alt="" width={36} height={36} className="h-full w-full object-cover" />
+                    <img src="/praxis-logo.png?v=8" alt="" width={36} height={36} className="h-[86%] w-[86%] object-contain" />
                   </span>
                   <span>Fale. Organize. Execute.</span>
                 </div>
