@@ -367,10 +367,10 @@ export default function VoiceCapture() {
   return (
     <div className="praxis-page max-w-2xl">
       <PageHero
-        kicker="Voz"
+        kicker="Voz & PraxIA"
         kickerIcon={Mic}
-        title="Captura por voz"
-        description="Fale; o Praxis separa tarefas e hábitos. Áudio fica salvo se a transcrição falhar."
+        title="Descarregar meu dia em áudio"
+        description="Fale sem se preocupar em organizar. A PraxIA estrutura suas tarefas, hábitos e blocos de foco automaticamente."
         action={(
           <Button asChild variant="outline" size="sm" className="relative praxis-touch-target shrink-0 rounded-full">
             <Link to="/capturas">

@@ -38,15 +38,13 @@ export default function AvoidanceCockpit() {
     <Card className="border-border/80 bg-card/40">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-500/90" />
-              O que estou evitando?
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              Gargalos de Evasão
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {isLoading ? 'Lendo seus padrões…' : data?.headline}
+              {isLoading ? 'Lendo seus padrões com PraxIA…' : (data?.headline || 'Gargalo detectado: resolver estes itens elimina a pressão acumulada da sua cabeça.')}
             </p>
-          </div>
           {data?.total_count > 0 && (
             <Badge variant="outline" className="shrink-0 tabular-nums font-normal">
               {items.length}

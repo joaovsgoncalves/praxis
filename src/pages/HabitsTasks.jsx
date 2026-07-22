@@ -245,7 +245,7 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       queryClient.invalidateQueries({ queryKey: ['rituals'] });
-      toast('Não rolou — registrado.');
+      toast('Registrado. O importante é não quebrar a corrente dois dias seguidos.');
       setSkipSheetHabit(null);
     },
   });
@@ -256,7 +256,7 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      toast('Beleza — fica pra amanhã.');
+      toast('Adiado. Empurrado pra amanhã sem culpa, mas com compromisso.');
     },
   });
 

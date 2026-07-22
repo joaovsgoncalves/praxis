@@ -74,16 +74,35 @@ export default function HeroDay({
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground sm:text-sm">{tagline}</p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2.5 sm:justify-end">
+        <div className="flex shrink-0 items-center gap-3 sm:justify-end">
           {bestStreak > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-domain-ember/20 bg-domain-ember/[0.08] px-2.5 py-1 text-[11px] font-medium text-domain-ember">
-              <Flame className="h-3.5 w-3.5" aria-hidden />
-              {bestStreak}d
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-500 shadow-sm">
+              <Flame className="h-4 w-4 animate-pulse" aria-hidden />
+              {bestStreak}d streak
             </span>
           ) : null}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-right">
-            <p className="text-[10px] font-medium text-muted-foreground">Dia</p>
-            <p className="praxis-title mt-0.5 text-xl font-bold tabular-nums sm:text-2xl">{roundedDayPct}%</p>
+          <div className="relative flex items-center justify-center">
+            <svg className="w-14 h-14 -rotate-90 transform" viewBox="0 0 36 36">
+              <path
+                className="text-muted/30"
+                strokeWidth="3"
+                stroke="currentColor"
+                fill="none"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path
+                className="text-amber-500 transition-all duration-500 ease-out"
+                strokeDasharray={`${roundedDayPct}, 100`}
+                strokeWidth="3.2"
+                strokeLinecap="round"
+                stroke="currentColor"
+                fill="none"
+                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+            </svg>
+            <span className="absolute text-xs font-extrabold tabular-nums text-foreground">
+              {roundedDayPct}%
+            </span>
           </div>
         </div>
       </div>
