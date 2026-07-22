@@ -51,11 +51,13 @@ export default function TodayTasks({
   const completedOn = (task) =>
     task.completed_date || String(task.completed_at || task.updated_date || '').slice(0, 10);
   const pending = sortPendingWithOverdueFirst(
-    tasks.filter((t) => !isDone(t)),
-    today,
-  );
-  const completed = tasks.filter((t) => isDone(t));
-  const overdueCount = pending.filter((t) => t.date && today && t.date < today).length;
+      tasks.filter((t) => !isDone(t)),
+      today,
+    );
+    const overduePending = pending.filter((t) => t.date && today && t.date < today);
+    const todayPending = pending.filter((t) => !t.date || !today || t.date >= today);
+    const completed = tasks.filter((t) => isDone(t));
+    const overdueCount = overduePending.length;
   const cleanedOverdueCount = completed.filter(
     (t) => t.date && today && t.date < today && completedOn(t) === today
   ).length;
@@ -121,55 +123,81 @@ export default function TodayTasks({
       <CardContent className="space-y-2.5 px-5 pb-5 sm:px-5 sm:pb-5">
         <AnimatePresence mode="popLayout" initial={false}>
           {pending.length === 0 && completed.length === 0 && (
-            <motion.p
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-sm text-muted-foreground py-4 text-center"
-            >
-              Nenhuma tarefa para hoje. Que tal capturar uma por voz?
-            </motion.p>
-          )}
-          {pending.length > 0 && (
-            <div className="flex items-center justify-between gap-2 px-1 pt-1">
-              <div className="text-xs font-medium text-muted-foreground">Pendentes</div>
-              <p className="text-[10px] text-muted-foreground/65">Arraste ⋮⋮ para ordenar</p>
-            </div>
-          )}
-        </AnimatePresence>
+                      <motion.p
+                        key="empty"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-sm text-muted-foreground py-4 text-center"
+                      >
+                        Nenhuma tarefa para hoje. Que tal capturar uma por voz?
+                      </motion.p>
+                    )}
+                    {overduePending.length > 0 && (
+                                          <div className="flex items-center justify-between gap-2 px-1 pt-1">
+                                            <div className="text-xs font-semibold text-destructive">
+                                              Atrasadas · {overduePending.length}
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground/65">Vêm de dias anteriores</p>
+                                          </div>
+                                        )}
+                                        {todayPending.length > 0 && overduePending.length === 0 && (
+                                          <div className="flex items-center justify-between gap-2 px-1 pt-1">
+                                            <div className="text-xs font-medium text-muted-foreground">
+                                              Pendentes de hoje
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground/65">Arraste ⋮⋮ para ordenar</p>
+                                          </div>
+                                        )}
+                                      </AnimatePresence>
 
-        {pending.length > 0 && (
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="dashboard-today-pending">
-              {(dropProvided) => (
-                <div
-                  ref={dropProvided.innerRef}
-                  {...dropProvided.droppableProps}
-                  className="space-y-3"
-                >
-                  {pending.map((task, index) => (
-                    <Draggable
-                      key={task.id}
-                      draggableId={String(task.id)}
-                      index={index}
-                      isDragDisabled={reorderBusy}
-                    >
-                      {(dragProvided, snapshot) => (
-                        <div
-                          ref={(el) => {
-                            dragProvided.innerRef(el);
-                            if (el) rowRefs.current.set(task.id, el);
-                            else rowRefs.current.delete(task.id);
-                          }}
-                          {...dragProvided.draggableProps}
-                          style={dragProvided.draggableProps.style}
-                          className={cn(
-                            'flex flex-col gap-3 rounded-xl border bg-white/[0.022] p-3.5 transition-[background-color,border-color,box-shadow] sm:flex-row sm:items-start',
-                            snapshot.isDragging
-                              ? 'z-10 border-domain-gold/30 bg-white/[0.045] shadow-lg shadow-black/20'
-                              : 'border-white/[0.055] hover:border-white/[0.09] hover:bg-white/[0.035]'
-                          )}
-                        >
+                  {pending.length > 0 && (
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                      <Droppable droppableId="dashboard-today-pending">
+                        {(dropProvided) => (
+                          <div
+                            ref={dropProvided.innerRef}
+                            {...dropProvided.droppableProps}
+                            className="space-y-3"
+                          >
+                            {pending.map((task, index) => {
+                              const isOverdue = Boolean(task.date && today && task.date < today);
+                              const showOverdueDivider =
+                                overduePending.length > 0
+                                && todayPending.length > 0
+                                && index === overduePending.length;
+                              return (
+                              <React.Fragment key={task.id}>
+                                {showOverdueDivider ? (
+                                  <div className="flex items-center justify-between gap-2 px-1 pt-2">
+                                    <div className="text-xs font-medium text-muted-foreground">
+                                      Hoje · {todayPending.length}
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground/65">Arraste ⋮⋮ para ordenar</p>
+                                  </div>
+                                ) : null}
+                              <Draggable
+                                draggableId={String(task.id)}
+                                index={index}
+                                isDragDisabled={reorderBusy}
+                              >
+                                {(dragProvided, snapshot) => (
+                                  <div
+                                    ref={(el) => {
+                                      dragProvided.innerRef(el);
+                                      if (el) rowRefs.current.set(task.id, el);
+                                      else rowRefs.current.delete(task.id);
+                                    }}
+                                    {...dragProvided.draggableProps}
+                                    style={dragProvided.draggableProps.style}
+                                    className={cn(
+                                      'flex flex-col gap-3 rounded-xl border bg-white/[0.022] p-3.5 transition-[background-color,border-color,box-shadow] sm:flex-row sm:items-start',
+                                      snapshot.isDragging
+                                        ? 'z-10 border-domain-gold/30 bg-white/[0.045] shadow-lg shadow-black/20'
+                                        : isOverdue
+                                          ? 'border-destructive/25 bg-destructive/[0.04] hover:border-destructive/35'
+                                          : 'border-white/[0.055] hover:border-white/[0.09] hover:bg-white/[0.035]'
+                                    )}
+                                  >
                           <div className="flex items-start gap-2 flex-1 min-w-0 w-full">
                             <button
                               type="button"
@@ -248,15 +276,17 @@ export default function TodayTasks({
                             </Link>
                           </div>
                         </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {dropProvided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-        )}
+                                              )}
+                                            </Draggable>
+                                            </React.Fragment>
+                                            );
+                                          })}
+                                          {dropProvided.placeholder}
+                                        </div>
+                                      )}
+                                    </Droppable>
+                                  </DragDropContext>
+                                )}
 
         <AnimatePresence mode="popLayout" initial={false}>
           {completed.length > 0 && (

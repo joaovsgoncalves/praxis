@@ -164,7 +164,7 @@ function reorderItems(table, orderedIds) {
 
 const {
   syncTaskToCalendar,
-  purgeOverdueTasksFromGoogleCalendar,
+  runCalendarMaintenance,
   createCalendarRouter,
 } = createCalendarServices({ db, getLocalDateString });
 
@@ -213,5 +213,5 @@ app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ db }));
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔥 Praxis API running on port ${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
-  setImmediate(() => purgeOverdueTasksFromGoogleCalendar());
+  setImmediate(() => runCalendarMaintenance());
 });

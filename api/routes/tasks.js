@@ -45,9 +45,9 @@ export function createTasksRouter(ctx) {
       return res.json(recent.map(enrichCategory));
     }
 
-    // The frontend uses this mode for the operational day. The base query can be
-    // filled by older completed rows before a task due today is reached, so merge
-    // every still-open task through today instead of only strictly overdue rows.
+    // The frontend uses this mode for the operational day. Prefer open work through
+    // today + completions closed today, instead of a generic "recent 50" dump that
+    // can hide today's pending behind old history and confuse the UI.
     const operationalRows = db.prepare(`
       SELECT * FROM tasks
       WHERE status NOT IN ('completed', 'done', 'cancelled')
@@ -57,8 +57,25 @@ export function createTasksRouter(ctx) {
       LIMIT 120
     `).all(today);
 
+    const completedTodayRows = db.prepare(`
+      SELECT * FROM tasks
+      WHERE status IN ('completed', 'done')
+        AND category != 'ideias'
+        AND (
+          completed_date = ?
+          OR (
+            (completed_date IS NULL OR completed_date = '')
+            AND substr(COALESCE(completed_at, updated_date, ''), 1, 10) = ?
+          )
+        )
+      ORDER BY updated_date DESC
+      LIMIT 80
+    `).all(today, today);
+
     const byId = new Map();
     for (const t of operationalRows) byId.set(t.id, t);
+    for (const t of completedTodayRows) byId.set(t.id, t);
+    // Keep any explicit filters from the base query (status/date/category) if set.
     for (const t of recent) byId.set(t.id, t);
 
     const merged = [...byId.values()].sort((a, b) => {

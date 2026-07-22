@@ -73,7 +73,9 @@ export function createCalendarServices({ db, getLocalDateString }) {
     if (!task?.date || !task?.time) return false;
     if (['completed', 'done', 'cancelled'].includes(String(task.status || '').toLowerCase())) return false;
     const today = getLocalDateString();
-    if (String(task.date) < today) return false;
+    // Só o dia de HOJE vira notificação no Google.
+    // Atrasada, "Não hoje", amanhã e futuros ficam só no Praxis até o dia real.
+    if (String(task.date) !== today) return false;
     return true;
   }
 
@@ -157,24 +159,66 @@ export function createCalendarServices({ db, getLocalDateString }) {
     }
   }
 
-  function purgeOverdueTasksFromGoogleCalendar() {
+  function purgeNonTodayTasksFromGoogleCalendar() {
     if (!FORJA_CALENDAR_SYNC_ENABLED) return;
     const today = getLocalDateString();
+    // Qualquer evento linkado que NÃO seja do dia operacional sai do Google
+    // (atrasadas, adiadas com "Não hoje", e blocos futuros ainda não vigentes).
     const rows = db
       .prepare(
         `SELECT * FROM tasks
-         WHERE date < ? AND calendar_event_id IS NOT NULL
-         AND status NOT IN ('completed', 'done', 'cancelled')`,
+         WHERE calendar_event_id IS NOT NULL
+         AND (
+           date IS NULL OR date != ?
+           OR status IN ('completed', 'done', 'cancelled')
+         )`,
       )
       .all(today);
     for (const task of rows) {
       try {
         syncTaskToCalendar(task);
       } catch (err) {
-        console.error('purgeOverdueCalendar', task.id, err.message);
+        console.error('purgeNonTodayCalendar', task.id, err.message);
       }
     }
-    if (rows.length) console.log(`Calendar: removed ${rows.length} overdue task event(s) from Google`);
+    if (rows.length) console.log(`Calendar: removed ${rows.length} non-today task event(s) from Google`);
+  }
+
+  /** Mantém nome antigo como alias — boot e scripts legados. */
+  function purgeOverdueTasksFromGoogleCalendar() {
+    return purgeNonTodayTasksFromGoogleCalendar();
+  }
+
+  /** Garante que pendentes COM horário de HOJE tenham evento (após meia-noite / restart). */
+  function ensureTodayTasksOnCalendar() {
+    if (!FORJA_CALENDAR_SYNC_ENABLED) return;
+    const today = getLocalDateString();
+    const rows = db
+      .prepare(
+        `SELECT * FROM tasks
+         WHERE date = ?
+         AND time IS NOT NULL AND trim(time) != ''
+         AND status NOT IN ('completed', 'done', 'cancelled')
+         AND category != 'ideias'`,
+      )
+      .all(today);
+    let synced = 0;
+    for (const task of rows) {
+      try {
+        const result = syncTaskToCalendar(task);
+        if (result && (result.action === 'created' || result.action === 'updated' || result.action === 'recreated')) {
+          synced += 1;
+        }
+      } catch (err) {
+        console.error('ensureTodayCalendar', task.id, err.message);
+      }
+    }
+    if (synced) console.log(`Calendar: synced ${synced} today task event(s) to Google`);
+  }
+
+  function runCalendarMaintenance() {
+    purgeNonTodayTasksFromGoogleCalendar();
+    ensureTodayTasksOnCalendar();
   }
 
   /** Router mounted at /api/calendar */
@@ -231,6 +275,10 @@ export function createCalendarServices({ db, getLocalDateString }) {
   return {
     syncTaskToCalendar,
     purgeOverdueTasksFromGoogleCalendar,
+    purgeNonTodayTasksFromGoogleCalendar,
+    ensureTodayTasksOnCalendar,
+    runCalendarMaintenance,
+    shouldSyncTaskToCalendar,
     createCalendarRouter,
   };
 }
