@@ -1,29 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Praxis">
-  <defs>
-    <linearGradient id="praxis-g" x1="8" y1="6" x2="24" y2="26" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#f6c453"/>
-      <stop offset="55%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#d97706"/>
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="0.55" result="b"/>
-      <feMerge>
-        <feMergeNode in="b"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-  <rect width="32" height="32" rx="8" fill="#0c0c10"/>
-  <rect x="1.5" y="1.5" width="29" height="29" rx="6.5" fill="#12121a" stroke="#2a2418" stroke-width="1"/>
-  <!-- P monogram + upward execution stem (matches praxis-logo.png) -->
-  <path
-    fill="url(#praxis-g)"
-    filter="url(#glow)"
-    d="M10.2 8.2h7.1c3.55 0 5.85 1.85 5.85 4.85 0 2.55-1.55 4.25-4.05 4.75l.35.55c.55.9 1.15 1.85 1.8 2.85.25.4.1.95-.35 1.1-.35.12-.75-.05-.95-.4-.7-1.15-1.4-2.25-2.05-3.25H13.4v6.05c0 .45-.35.8-.8.8s-.8-.35-.8-.8V9c0-.45.35-.8.8-.8zm3.2 3.05v3.85h2.95c1.7 0 2.7-.9 2.7-2 0-1.15-1-1.85-2.75-1.85H13.4z"
-  />
-  <path
-    d="M21.6 22.2l1.85-3.4c.2-.35.7-.4.95-.1.2.25.15.65-.1.85l-1.55 1.45 2.15.15c.4.03.7.4.65.8-.05.4-.4.68-.8.65l-3.35-.25c-.45-.03-.75-.5-.55-.9z"
-    fill="#fbbf24"
-    opacity="0.95"
-  />
+  <!-- Crisp tab favicon: thick gold P + arrow, no blur -->
+  <rect width="32" height="32" rx="7" fill="#0c0c10"/>
+  <!-- stem -->
+  <rect x="9" y="7" width="3.4" height="18.2" rx="0.4" fill="#f6b428"/>
+  <!-- P bowl -->
+  <path fill="#f6b428" d="M9.2 7h11.2c3.1 0 5.5 1.85 5.5 4.85S23.4 16.6 20.4 16.6H12.4V7z"/>
+  <path fill="#0c0c10" d="M12.6 9.9h6.3c1.55 0 2.55.85 2.55 2.05s-1 2.05-2.55 2.05h-6.3V9.9z"/>
+  <!-- stem over left of bowl hole -->
+  <rect x="9" y="7" width="3.6" height="9.8" fill="#f6b428"/>
+  <!-- arrow up -->
+  <path fill="#ffc84a" d="M18.6 19.2l3.4-4.1 3.4 4.1h-2.05v5.4h-2.7v-5.4z"/>
 </svg>
