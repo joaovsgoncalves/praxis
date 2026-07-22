@@ -19,51 +19,51 @@ export default function NowBlock({
 }) {
   if (!task) {
     return (
-      <Card className="praxis-now-card relative overflow-hidden border-domain-gold/15 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.07),hsl(var(--card)/0.82)_52%,hsl(var(--primary)/0.045))]">
-        <div className="pointer-events-none absolute right-0 top-0 h-56 w-56 bg-[radial-gradient(circle,hsl(var(--domain-gold)/0.10),transparent_68%)]" aria-hidden />
-        <CardContent className="relative p-5 sm:p-6">
-          <div className="flex items-center gap-2 text-xs font-medium text-domain-gold">
-            <span className="h-2 w-2 rounded-full bg-domain-gold shadow-[0_0_14px_hsl(var(--domain-gold)/0.5)]" aria-hidden />
-            Agora
-          </div>
-          <h2 className="praxis-title mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.045em] sm:text-3xl">
-            Nada urgente na fila.
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Bom momento para capturar o que está na cabeça ou criar o próximo passo de forma consciente.
-          </p>
+      <Card className="praxis-now-card praxis-tactile-card relative overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.12),hsl(var(--card)/0.9)_48%,rgba(245,158,11,0.05))]">
+              <div className="pointer-events-none absolute right-0 top-0 h-56 w-56 bg-[radial-gradient(circle,rgba(245,158,11,0.18),transparent_68%)]" aria-hidden />
+              <CardContent className="relative p-5 sm:p-6">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-400">
+                  <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.7)]" aria-hidden />
+                  Agora
+                </div>
+                <h2 className="praxis-title mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.045em] text-foreground sm:text-3xl">
+                  Nada urgente na fila.
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  Bom momento para capturar o que está na cabeça ou criar o próximo passo de forma consciente.
+                </p>
 
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Button
-              type="button"
-              className="praxis-touch-target w-full gap-2 rounded-full bg-domain-gold text-black hover:bg-domain-gold/90 sm:w-auto"
-              onClick={onVoiceCapture}
-            >
-              <Mic className="h-4 w-4" /> Falar meu dia
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="praxis-touch-target w-full gap-2 rounded-full border-white/[0.08] bg-white/[0.025] sm:w-auto"
-              onClick={onAddTask}
-            >
-              <Plus className="h-4 w-4" /> Nova tarefa
-            </Button>
-          </div>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <Button
+                    type="button"
+                    className="praxis-touch-target praxis-glow-ember w-full gap-2 rounded-full bg-amber-500 text-slate-950 hover:bg-amber-400 sm:w-auto"
+                    onClick={onVoiceCapture}
+                  >
+                    <Mic className="h-4 w-4" /> Falar meu dia
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="praxis-touch-target w-full gap-2 rounded-full border-amber-500/25 bg-white/[0.03] hover:border-amber-500/40 hover:bg-amber-500/10 sm:w-auto"
+                    onClick={onAddTask}
+                  >
+                    <Plus className="h-4 w-4" /> Nova tarefa
+                  </Button>
+                </div>
 
-          <p className="mt-4 text-xs text-muted-foreground/80">
-            Também dá para abrir o{' '}
-            <Link to="/foco" className="text-foreground/80 underline-offset-4 hover:text-foreground hover:underline">
-              Modo foco
-            </Link>{' '}
-            ou registrar uma{' '}
-            <Link to="/ideias?new=1" className="text-foreground/80 underline-offset-4 hover:text-foreground hover:underline">
-              ideia
-            </Link>
-            .
-          </p>
-        </CardContent>
-      </Card>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Também dá para abrir o{' '}
+                  <Link to="/foco" className="font-medium text-amber-200/90 underline-offset-4 hover:text-amber-100 hover:underline">
+                    Modo foco
+                  </Link>{' '}
+                  ou registrar uma{' '}
+                  <Link to="/ideias?new=1" className="font-medium text-amber-200/90 underline-offset-4 hover:text-amber-100 hover:underline">
+                    ideia
+                  </Link>
+                  .
+                </p>
+              </CardContent>
+            </Card>
     );
   }
 

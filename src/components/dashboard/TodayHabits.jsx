@@ -159,11 +159,11 @@ export default function TodayHabits({
                 else rowRefs.current.delete(habit.id);
               }}
               className={cn(
-                'flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-[background-color,border-color,box-shadow]',
-                done && 'border-domain-wellness/15 bg-domain-wellness/[0.065]',
-                skipped && 'border-amber-500/20 bg-amber-500/[0.07]',
-                !done && !skipped && 'border-white/[0.055] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]',
-              )}
+                              'praxis-tactile-card flex w-full items-center gap-3 rounded-xl border p-3.5 text-left',
+                              done && 'border-amber-500/25 bg-amber-500/[0.08]',
+                              skipped && 'border-amber-500/20 bg-amber-500/[0.07]',
+                              !done && !skipped && 'border-border/70 bg-card/60 hover:border-amber-500/35',
+                            )}
             >
               {/* Área principal de toque para marcar como feito */}
               <button
@@ -190,8 +190,8 @@ export default function TodayHabits({
                     className={cn(
                       'h-5 w-5 shrink-0 pointer-events-none',
                       done
-                        ? 'border-domain-wellness data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness'
-                        : 'border-muted-foreground/40',
+                                              ? 'border-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:text-slate-950'
+                                              : 'border-muted-foreground/50 hover:border-amber-500/60',
                     )}
                   />
                 )}
@@ -201,8 +201,8 @@ export default function TodayHabits({
                     <p
                       className={cn(
                         'min-w-0 truncate text-sm font-semibold sm:text-[15px]',
-                        done && 'text-domain-wellness/90 line-through',
-                        skipped && 'text-muted-foreground opacity-75',
+                        done && 'text-muted-foreground/80 line-through decoration-amber-500/50',
+                                                skipped && 'text-muted-foreground opacity-75',
                       )}
                     >
                       {habit.title}
@@ -223,11 +223,11 @@ export default function TodayHabits({
               </button>
 
               {habit.current_streak > 0 ? (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-domain-ember/15 bg-domain-ember/[0.07] px-2 py-1 text-[11px] font-medium text-domain-ember">
-                  <Flame className="h-3 w-3" aria-hidden />
-                  {habit.current_streak}
-                </span>
-              ) : null}
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-500">
+                                <Flame className="h-3 w-3 fill-amber-500/20" aria-hidden />
+                                {habit.current_streak}d
+                              </span>
+                            ) : null}
 
               {skipped ? (
                 <button
