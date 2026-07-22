@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 
 /**
- * Fundo de partículas ouro/ember — visível e em movimento calmo.
- * Pontos sobem com drift; halo contido. Sem roxo.
- * Respeita prefers-reduced-motion (campo estático nesses casos).
+ * Atmosfera ouro da Praxis — pontos que sobem de verdade.
+ *
+ * - Sempre anima (reduced-motion só deixa mais calmo, não congela).
+ * - Canvas full-viewport, atrás do conteúdo (z-0).
+ * - Partículas grandes o bastante pra ler no celular com cards por cima.
  */
 export default function ParticleBackground() {
   const canvasRef = useRef(null);
@@ -11,167 +13,150 @@ export default function ParticleBackground() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
-    const ctx = canvas.getContext('2d', { alpha: true });
+
+    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
     if (!ctx) return undefined;
 
-    let animId = 0;
-    let running = true;
-    let reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-    const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let raf = 0;
+    let alive = true;
+    let last = performance.now();
+    let calm =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 
-    const targetCount = () => {
-      const area = window.innerWidth * window.innerHeight;
-      // denser field so movement reads even on large screens
-      return Math.max(36, Math.min(64, Math.round(area / 16000)));
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const onMq = (e) => {
+      calm = e.matches === true;
     };
+    mq?.addEventListener?.('change', onMq);
 
-    const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
-      const w = Math.max(1, window.innerWidth);
-      const h = Math.max(1, window.innerHeight);
-      canvas.width = Math.round(w * ratio);
-      canvas.height = Math.round(h * ratio);
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-
-    const W = () => window.innerWidth;
-    const H = () => window.innerHeight;
-
-    const spawn = (fromBottom = true) => ({
-      x: Math.random() * W(),
-      y: fromBottom ? H() + Math.random() * 40 : Math.random() * H(),
-      // larger core so the rise is readable at a glance
-      r: 1.1 + Math.random() * 1.8,
-      // px/sec — calm but clearly alive (~0.8–2.2px/frame @60fps)
-      vx: (Math.random() - 0.5) * 22,
-      vy: -(42 + Math.random() * 56),
-      life: 0,
-      maxLife: 6 + Math.random() * 7,
-      hue: 34 + Math.random() * 14,
-      twinkle: Math.random() * Math.PI * 2,
+    const cssSize = () => ({
+      w: Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1),
+      h: Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1),
     });
 
-    const particles = Array.from({ length: targetCount() }, () => spawn(false));
+    const resize = () => {
+      const { w, h } = cssSize();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.max(1, Math.round(h * dpr));
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      // reset transform every resize — draw in CSS pixels
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
 
-    const drawFrame = (dtSec, animate) => {
-      const width = W();
-      const height = H();
-      if (width < 1 || height < 1) return;
+    const countFor = () => {
+      const { w, h } = cssSize();
+      const area = w * h;
+      // denser on phone so gaps between cards still show motion
+      const base = Math.round(area / 12000);
+      const n = Math.max(48, Math.min(90, base));
+      return calm ? Math.max(28, Math.round(n * 0.55)) : n;
+    };
 
-      ctx.clearRect(0, 0, width, height);
+    const spawn = (fromBottom) => {
+      const { w, h } = cssSize();
+      // speed in px/sec — clearly rising even at a glance
+      const speedScale = calm ? 0.45 : 1;
+      return {
+        x: Math.random() * w,
+        y: fromBottom ? h + Math.random() * 60 : Math.random() * h,
+        r: calm ? 1.6 + Math.random() * 2.2 : 2.2 + Math.random() * 3.4,
+        vx: (Math.random() - 0.5) * 28 * speedScale,
+        vy: -(55 + Math.random() * 85) * speedScale,
+        life: fromBottom ? 0 : Math.random() * 0.55,
+        maxLife: (calm ? 8 : 5.5) + Math.random() * (calm ? 6 : 5),
+        hue: 34 + Math.random() * 16,
+        phase: Math.random() * Math.PI * 2,
+        spin: (0.9 + Math.random() * 1.8) * (Math.random() < 0.5 ? -1 : 1),
+      };
+    };
 
-      const want = targetCount();
+    const particles = Array.from({ length: countFor() }, () => spawn(false));
+
+    const draw = (dt) => {
+      const { w, h } = cssSize();
+      ctx.clearRect(0, 0, w, h);
+
+      const want = countFor();
       while (particles.length < want) particles.push(spawn(true));
+      if (particles.length > want + 12) particles.length = want;
 
       for (let i = particles.length - 1; i >= 0; i -= 1) {
         const p = particles[i];
-        if (animate) {
-          p.life += dtSec;
-          p.x += p.vx * dtSec;
-          p.y += p.vy * dtSec;
-          p.twinkle += dtSec * 2.6;
-          p.vx += Math.sin(p.twinkle) * 4.5 * dtSec;
-        }
+        p.life += dt;
+        p.phase += dt * p.spin;
+        p.x += p.vx * dt + Math.sin(p.phase) * 10 * dt;
+        p.y += p.vy * dt;
 
         const t = p.life / p.maxLife;
-        if (animate && (t >= 1 || p.y < -30 || p.x < -50 || p.x > width + 50)) {
-          particles.splice(i, 1);
+        if (t >= 1 || p.y < -40 || p.x < -60 || p.x > w + 60) {
+          particles[i] = spawn(true);
           continue;
         }
 
-        const envelope = t < 0.1 ? t / 0.1 : t > 0.72 ? (1 - t) / 0.28 : 1;
-        const twinkle = 0.78 + Math.sin(p.twinkle) * 0.22;
-        // stronger alpha so motion is obvious under card washes
-        const alpha = Math.max(0.12, envelope * twinkle * 0.62);
-        const radius = p.r * (1 - t * 0.22);
-        const halo = radius * 4.2;
+        // fade in / out
+        const env = t < 0.12 ? t / 0.12 : t > 0.7 ? (1 - t) / 0.3 : 1;
+        const tw = 0.75 + Math.sin(p.phase * 1.7) * 0.25;
+        const alpha = Math.min(0.95, Math.max(0.2, env * tw * (calm ? 0.55 : 0.82)));
+        const radius = p.r * (1 - t * 0.2);
+        const halo = radius * (calm ? 3.8 : 5.2);
 
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, halo);
-        glow.addColorStop(0, `hsla(${p.hue}, 94%, 66%, ${alpha})`);
-        glow.addColorStop(0.5, `hsla(${p.hue}, 90%, 54%, ${alpha * 0.34})`);
-        glow.addColorStop(1, `hsla(${p.hue}, 82%, 46%, 0)`);
-        ctx.fillStyle = glow;
+        // soft glow
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, halo);
+        g.addColorStop(0, `hsla(${p.hue}, 96%, 68%, ${alpha})`);
+        g.addColorStop(0.4, `hsla(${p.hue}, 92%, 56%, ${alpha * 0.4})`);
+        g.addColorStop(1, `hsla(${p.hue}, 85%, 48%, 0)`);
         ctx.beginPath();
+        ctx.fillStyle = g;
         ctx.arc(p.x, p.y, halo, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = `hsla(${p.hue}, 98%, 78%, ${Math.min(0.95, alpha * 1.05)})`;
+        // bright core
         ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(0.7, radius * 0.75), 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue}, 100%, 82%, ${Math.min(1, alpha * 1.15)})`;
+        ctx.arc(p.x, p.y, Math.max(1.1, radius * 0.78), 0, Math.PI * 2);
         ctx.fill();
       }
     };
 
-    const stopLoop = () => {
-      if (animId) {
-        cancelAnimationFrame(animId);
-        animId = 0;
-      }
-    };
-
-    let prev = performance.now();
     const tick = (now) => {
-      if (!running) return;
-      if (reducedMotion) {
-        animId = 0;
+      if (!alive) return;
+      // Never hard-stop on hidden tab forever: if visible, keep going.
+      if (typeof document !== 'undefined' && document.hidden) {
+        last = now;
+        raf = requestAnimationFrame(tick);
         return;
       }
-      const dtSec = Math.min(0.05, (now - prev) / 1000);
-      prev = now;
-      drawFrame(dtSec, true);
-      animId = requestAnimationFrame(tick);
-    };
-
-    const startLoop = () => {
-      stopLoop();
-      if (reducedMotion) {
-        for (const p of particles) {
-          if (p.life === 0) p.life = p.maxLife * (0.15 + Math.random() * 0.45);
-        }
-        drawFrame(0, false);
-        return;
+      const dt = Math.min(0.048, Math.max(0.001, (now - last) / 1000));
+      last = now;
+      try {
+        draw(dt);
+      } catch {
+        // keep loop alive even if a frame fails
       }
-      prev = performance.now();
-      animId = requestAnimationFrame(tick);
+      raf = requestAnimationFrame(tick);
     };
 
-    const onMotionChange = (event) => {
-      reducedMotion = event.matches === true;
-      startLoop();
-    };
-
-    // pause when tab hidden — saves battery and avoids huge dt jumps
-    const onVisibility = () => {
-      if (document.hidden) {
-        stopLoop();
-        return;
-      }
-      prev = performance.now();
-      startLoop();
-    };
-
-    motionQuery?.addEventListener?.('change', onMotionChange);
-    document.addEventListener('visibilitychange', onVisibility);
-    startLoop();
+    // mark state for quick debug in DevTools
+    canvas.dataset.praxisParticles = calm ? 'calm' : 'live';
+    last = performance.now();
+    raf = requestAnimationFrame(tick);
 
     return () => {
-      running = false;
-      stopLoop();
+      alive = false;
+      cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
-      document.removeEventListener('visibilitychange', onVisibility);
-      motionQuery?.removeEventListener?.('change', onMotionChange);
+      mq?.removeEventListener?.('change', onMq);
     };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-0 opacity-[0.72]"
+      className="pointer-events-none fixed inset-0 z-0 opacity-90"
       aria-hidden
     />
   );
