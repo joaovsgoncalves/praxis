@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { praxisApi } from '@/api/praxisClient';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -37,30 +37,110 @@ const PRESETS = [
   { label: 'Maratona', shortLabel: 'Maratona', focus: 90, brk: 20, Icon: Hourglass },
 ];
 
+const STORAGE_KEY = 'praxis:focus:active-v1';
+const MAX_SESSION_AGE_MS = 12 * 60 * 60 * 1000;
+
+function readStoredSession() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.v !== 1 || !data.inSession || !data.sessionStart) return null;
+    if (Date.now() - Number(data.sessionStart) > MAX_SESSION_AGE_MS) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSession(payload) {
+  try {
+    if (!payload?.inSession) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function clearStoredSession() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function remainingFromEndsAt(endsAt) {
+  if (!endsAt) return 0;
+  return Math.max(0, Math.ceil((Number(endsAt) - Date.now()) / 1000));
+}
+
 export default function Focus() {
   const urlParams = new URLSearchParams(window.location.search);
   const initialTaskId = urlParams.get('taskId') || '';
+  const stored = useMemo(() => readStoredSession(), []);
 
-  const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId);
-  const [focusDuration, setFocusDuration] = useState(25);
-  const [breakDuration, setBreakDuration] = useState(5);
-  const [selectedPreset, setSelectedPreset] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isBreak, setIsBreak] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [cycles, setCycles] = useState(0);
-  const [sessionStart, setSessionStart] = useState(null);
-  const [inSession, setInSession] = useState(false);
-  const [totalFocusTime, setTotalFocusTime] = useState(0);
+  const [selectedTaskId, setSelectedTaskId] = useState(
+    () => (stored?.selectedTaskId != null ? stored.selectedTaskId : initialTaskId) || '',
+  );
+  const [focusDuration, setFocusDuration] = useState(() => stored?.focusDuration || 25);
+  const [breakDuration, setBreakDuration] = useState(() => stored?.breakDuration || 5);
+  const [selectedPreset, setSelectedPreset] = useState(() => stored?.selectedPreset ?? 0);
+  const [isRunning, setIsRunning] = useState(() => Boolean(stored?.isRunning && !stored?.isPaused));
+  const [isPaused, setIsPaused] = useState(() => Boolean(stored?.isPaused));
+  const [isBreak, setIsBreak] = useState(() => Boolean(stored?.isBreak));
+  const [timeLeft, setTimeLeft] = useState(() => {
+    if (!stored?.inSession) return 25 * 60;
+    if (stored.isRunning && !stored.isPaused && stored.endsAt) {
+      return remainingFromEndsAt(stored.endsAt) || stored.remainingSec || 0;
+    }
+    return stored.remainingSec ?? stored.focusDuration * 60 ?? 25 * 60;
+  });
+  const [cycles, setCycles] = useState(() => stored?.cycles || 0);
+  const [sessionStart, setSessionStart] = useState(() => stored?.sessionStart || null);
+  const [inSession, setInSession] = useState(() => Boolean(stored?.inSession));
+  const [totalFocusTime, setTotalFocusTime] = useState(() =>
+    Math.round((stored?.focusAccumMs || 0) / 1000),
+  );
   const [postSessionOpen, setPostSessionOpen] = useState(false);
   const [postSession, setPostSession] = useState(null);
-  const endsAtRef = useRef(null);
-  const focusAccumMsRef = useRef(0);
-  const focusSegmentStartRef = useRef(null);
-  const transitionedRef = useRef(false);
+  const [hydrated] = useState(true);
+
+  const endsAtRef = useRef(stored?.isRunning && !stored?.isPaused ? stored.endsAt || null : null);
+  const remainingSecRef = useRef(
+    stored?.inSession
+      ? (stored.isRunning && !stored.isPaused && stored.endsAt
+        ? remainingFromEndsAt(stored.endsAt)
+        : stored.remainingSec) ?? 0
+      : 25 * 60,
+  );
+  const focusAccumMsRef = useRef(stored?.focusAccumMs || 0);
+  const focusSegmentStartRef = useRef(
+    stored?.isRunning && !stored?.isPaused && !stored?.isBreak
+      ? stored.focusSegmentStart || Date.now()
+      : null,
+  );
+  const isBreakRef = useRef(Boolean(stored?.isBreak));
+  const focusDurationRef = useRef(stored?.focusDuration || 25);
+  const breakDurationRef = useRef(stored?.breakDuration || 5);
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
+
+  useEffect(() => {
+    isBreakRef.current = isBreak;
+  }, [isBreak]);
+  useEffect(() => {
+    focusDurationRef.current = focusDuration;
+  }, [focusDuration]);
+  useEffect(() => {
+    breakDurationRef.current = breakDuration;
+  }, [breakDuration]);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['pendingTasks'],
@@ -80,6 +160,47 @@ export default function Focus() {
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
   const activePreset = PRESETS[selectedPreset] || PRESETS[0];
+
+  const persist = useCallback(() => {
+    if (!inSession || !sessionStart) {
+      clearStoredSession();
+      return;
+    }
+    const running = isRunning && !isPaused;
+    writeStoredSession({
+      v: 1,
+      inSession: true,
+      selectedTaskId: selectedTaskId || '',
+      focusDuration,
+      breakDuration,
+      selectedPreset,
+      isRunning: Boolean(isRunning),
+      isPaused: Boolean(isPaused),
+      isBreak: Boolean(isBreak),
+      remainingSec: remainingSecRef.current,
+      endsAt: running ? endsAtRef.current : null,
+      cycles,
+      sessionStart,
+      focusAccumMs: focusAccumMsRef.current,
+      focusSegmentStart: running && !isBreak ? focusSegmentStartRef.current : null,
+    });
+  }, [
+    inSession,
+    sessionStart,
+    selectedTaskId,
+    focusDuration,
+    breakDuration,
+    selectedPreset,
+    isRunning,
+    isPaused,
+    isBreak,
+    cycles,
+  ]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    persist();
+  }, [persist, hydrated, timeLeft, totalFocusTime]);
 
   const saveSessionMutation = useMutation({
     mutationFn: (data) => praxisApi.focus.create(data),
@@ -120,35 +241,42 @@ export default function Focus() {
   });
 
   const applyPreset = (index) => {
+    if (inSession) return;
     setSelectedPreset(index);
     setFocusDuration(PRESETS[index].focus);
     setBreakDuration(PRESETS[index].brk);
     setTimeLeft(PRESETS[index].focus * 60);
+    remainingSecRef.current = PRESETS[index].focus * 60;
   };
 
   const startSession = () => {
+    const secs = focusDuration * 60;
     focusAccumMsRef.current = 0;
-    focusSegmentStartRef.current = null;
-    endsAtRef.current = null;
-    transitionedRef.current = false;
+    focusSegmentStartRef.current = Date.now();
+    endsAtRef.current = Date.now() + secs * 1000;
+    remainingSecRef.current = secs;
+    isBreakRef.current = false;
     setInSession(true);
     setSessionStart(Date.now());
     setTotalFocusTime(0);
     setCycles(0);
     setIsRunning(true);
+    setIsPaused(false);
     setIsBreak(false);
-    setTimeLeft(focusDuration * 60);
+    setTimeLeft(secs);
     setPostSessionOpen(false);
     setPostSession(null);
   };
 
-  const endSession = () => {
+  const endSession = useCallback(() => {
     let finalFocusMs = focusAccumMsRef.current;
-    if (!isBreak && isRunning && !isPaused && focusSegmentStartRef.current) {
+    if (!isBreakRef.current && isRunning && !isPaused && focusSegmentStartRef.current) {
       finalFocusMs += Date.now() - focusSegmentStartRef.current;
     }
     const totalSeconds = Math.max(0, Math.round(finalFocusMs / 1000));
-    const taskToFinish = selectedTaskId && selectedTaskId !== 'none' ? selectedTask : null;
+    const taskToFinish = selectedTaskId && selectedTaskId !== 'none'
+      ? tasks.find((t) => t.id === selectedTaskId) || selectedTask
+      : null;
 
     setIsRunning(false);
     setIsPaused(false);
@@ -157,6 +285,8 @@ export default function Focus() {
     focusAccumMsRef.current = 0;
     focusSegmentStartRef.current = null;
     endsAtRef.current = null;
+    remainingSecRef.current = focusDuration * 60;
+    clearStoredSession();
 
     if (sessionStart && totalSeconds > 0) {
       saveSessionMutation.mutate({
@@ -172,82 +302,158 @@ export default function Focus() {
         cycles,
       });
       setPostSessionOpen(true);
+    } else if (sessionStart && totalSeconds === 0) {
+      toast({
+        title: 'Sessão descartada',
+        description: 'Menos de 1 segundo de foco — nada foi salvo.',
+      });
     }
     setSessionStart(null);
-  };
+    setTimeLeft(focusDuration * 60);
+  }, [
+    isRunning,
+    isPaused,
+    selectedTaskId,
+    selectedTask,
+    tasks,
+    sessionStart,
+    cycles,
+    focusDuration,
+    saveSessionMutation,
+  ]);
 
-  useEffect(() => {
-    if (!isRunning || isPaused) {
-      endsAtRef.current = null;
-      if (focusSegmentStartRef.current !== null) {
-        focusAccumMsRef.current += Date.now() - focusSegmentStartRef.current;
-        focusSegmentStartRef.current = null;
-        setTotalFocusTime(Math.round(focusAccumMsRef.current / 1000));
+  const togglePause = () => {
+      if (!inSession) return;
+      if (!isPaused) {
+        // going to pause: freeze remaining from wall clock
+        if (endsAtRef.current) {
+          remainingSecRef.current = remainingFromEndsAt(endsAtRef.current);
+          setTimeLeft(remainingSecRef.current);
+        }
+        if (!isBreakRef.current && focusSegmentStartRef.current) {
+          focusAccumMsRef.current += Date.now() - focusSegmentStartRef.current;
+          focusSegmentStartRef.current = null;
+          setTotalFocusTime(Math.round(focusAccumMsRef.current / 1000));
+        }
+        endsAtRef.current = null;
+        setIsPaused(true);
+        setIsRunning(true);
+      } else {
+        // resume
+        const secs = Math.max(0, remainingSecRef.current);
+        endsAtRef.current = Date.now() + secs * 1000;
+        if (!isBreakRef.current) {
+          focusSegmentStartRef.current = Date.now();
+        }
+        setIsPaused(false);
+        setIsRunning(true);
+        setTimeLeft(secs);
       }
-      return undefined;
-    }
+    };
 
-    endsAtRef.current = Date.now() + timeLeft * 1000;
-    transitionedRef.current = false;
-    if (!isBreak && focusSegmentStartRef.current === null) {
+  // Wall-clock ticker + phase transitions (survives background tabs)
+  useEffect(() => {
+    if (!inSession || !isRunning || isPaused) return undefined;
+
+    if (!endsAtRef.current) {
+      const secs = Math.max(0, remainingSecRef.current || timeLeft);
+      endsAtRef.current = Date.now() + secs * 1000;
+    }
+    if (!isBreakRef.current && focusSegmentStartRef.current == null) {
       focusSegmentStartRef.current = Date.now();
     }
 
     const tick = () => {
-      const remainingMs = endsAtRef.current - Date.now();
-      setTimeLeft(Math.max(0, Math.ceil(remainingMs / 1000)));
+      let endsAt = endsAtRef.current;
+      if (!endsAt) return;
 
-      if (!isBreak) {
+      let remainingMs = endsAt - Date.now();
+
+      // Catch up multiple phase flips if tab was backgrounded a long time
+      let guard = 0;
+      while (remainingMs <= 0 && guard < 20) {
+        guard += 1;
+        if (!isBreakRef.current) {
+          if (focusSegmentStartRef.current) {
+            focusAccumMsRef.current += Math.max(
+              0,
+              (endsAtRef.current || Date.now()) - focusSegmentStartRef.current,
+            );
+            focusSegmentStartRef.current = null;
+          }
+          setTotalFocusTime(Math.round(focusAccumMsRef.current / 1000));
+          setCycles((c) => c + 1);
+          isBreakRef.current = true;
+          setIsBreak(true);
+          const brkSecs = breakDurationRef.current * 60;
+          remainingSecRef.current = brkSecs;
+          endsAt = Date.now() + brkSecs * 1000;
+          endsAtRef.current = endsAt;
+          remainingMs = endsAt - Date.now();
+        } else {
+          isBreakRef.current = false;
+          setIsBreak(false);
+          const focusSecs = focusDurationRef.current * 60;
+          remainingSecRef.current = focusSecs;
+          endsAt = Date.now() + focusSecs * 1000;
+          endsAtRef.current = endsAt;
+          focusSegmentStartRef.current = Date.now();
+          remainingMs = endsAt - Date.now();
+        }
+      }
+
+      const secs = Math.max(0, Math.ceil(remainingMs / 1000));
+      remainingSecRef.current = secs;
+      setTimeLeft(secs);
+
+      if (!isBreakRef.current) {
         const elapsedMs =
           focusAccumMsRef.current +
           (focusSegmentStartRef.current ? Date.now() - focusSegmentStartRef.current : 0);
         setTotalFocusTime(Math.round(elapsedMs / 1000));
       }
-
-      if (remainingMs <= 0 && !transitionedRef.current) {
-        transitionedRef.current = true;
-        if (!isBreak) {
-          if (focusSegmentStartRef.current) {
-            focusAccumMsRef.current += Date.now() - focusSegmentStartRef.current;
-            focusSegmentStartRef.current = null;
-          }
-          setTotalFocusTime(Math.round(focusAccumMsRef.current / 1000));
-          setCycles((c) => c + 1);
-          setIsBreak(true);
-          setTimeLeft(breakDuration * 60);
-        } else {
-          setIsBreak(false);
-          setTimeLeft(focusDuration * 60);
-        }
-      }
     };
 
     tick();
-    const interval = setInterval(tick, 1000);
-    const handleVisible = () => {
+    const interval = setInterval(tick, 250);
+    const onVisible = () => {
       if (document.visibilityState === 'visible') tick();
     };
-    document.addEventListener('visibilitychange', handleVisible);
+    document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', tick);
+    window.addEventListener('pageshow', tick);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisible);
+      document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', tick);
+      window.removeEventListener('pageshow', tick);
+      // freeze remaining into ref for pause/unmount persistence
+      if (endsAtRef.current) {
+        remainingSecRef.current = remainingFromEndsAt(endsAtRef.current);
+      }
     };
-  }, [isRunning, isPaused, isBreak, focusDuration, breakDuration]);
+  }, [inSession, isRunning, isPaused]);
+
+  // Keep storage fresh while running (endsAt moves only on phase change; remaining ticks)
+  useEffect(() => {
+    if (!inSession) return undefined;
+    const id = setInterval(() => persist(), 5000);
+    return () => clearInterval(id);
+  }, [inSession, persist]);
 
   const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const m = Math.floor(Math.max(0, seconds) / 60);
+    const s = Math.max(0, seconds) % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const formatMinutes = (seconds) => `${Math.max(1, Math.round(seconds / 60))} min`;
 
-  const progress = isBreak
-    ? ((breakDuration * 60 - timeLeft) / (breakDuration * 60)) * 100
-    : ((focusDuration * 60 - timeLeft) / (focusDuration * 60)) * 100;
+  const phaseTotal = (isBreak ? breakDuration : focusDuration) * 60;
+  const progress = phaseTotal > 0
+    ? Math.min(100, Math.max(0, ((phaseTotal - timeLeft) / phaseTotal) * 100))
+    : 0;
 
   const topFocusStats = focusStats.filter((s) => s.task_id).slice(0, 5);
 
@@ -446,6 +652,10 @@ export default function Focus() {
                   <>
                     <Coffee className="h-4 w-4" aria-hidden /> Pausa
                   </>
+                ) : isPaused ? (
+                  <>
+                    <Pause className="h-4 w-4" aria-hidden /> Pausado
+                  </>
                 ) : (
                   <>
                     <Brain className="h-4 w-4" aria-hidden /> Foco
@@ -453,9 +663,21 @@ export default function Focus() {
                 )}
               </Badge>
 
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56">
-                <svg viewBox="0 0 192 192" className="w-full h-full -rotate-90" aria-hidden>
-                  <circle cx="96" cy="96" r="90" fill="none" stroke="currentColor" className="text-border" strokeWidth="4" />
+              <div className="relative mx-auto aspect-square w-48 sm:w-56 shrink-0">
+                <svg
+                  viewBox="0 0 192 192"
+                  className="absolute inset-0 h-full w-full -rotate-90"
+                  aria-hidden
+                >
+                  <circle
+                    cx="96"
+                    cy="96"
+                    r="90"
+                    fill="none"
+                    stroke="currentColor"
+                    className="text-border"
+                    strokeWidth="4"
+                  />
                   <circle
                     cx="96"
                     cy="96"
@@ -469,8 +691,8 @@ export default function Focus() {
                     strokeLinecap="round"
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-5xl sm:text-6xl font-semibold tabular-nums tracking-tight">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="text-5xl sm:text-6xl font-semibold tabular-nums tracking-tight leading-none">
                     {formatTime(timeLeft)}
                   </span>
                 </div>
@@ -483,7 +705,7 @@ export default function Focus() {
               )}
 
               <div className="flex gap-3">
-                <Button onClick={() => setIsPaused(!isPaused)} variant="outline" size="lg">
+                <Button onClick={togglePause} variant="outline" size="lg">
                   {isPaused ? <Play className="w-5 h-5 mr-2" /> : <Pause className="w-5 h-5 mr-2" />}
                   {isPaused ? 'Continuar' : 'Pausar'}
                 </Button>
