@@ -1,5 +1,7 @@
 // Praxis API Client — unified client for the Praxis backend
-// Replaces Base44 SDK calls with direct API calls
+import { tasksApiModule } from './tasksApi';
+import { nutritionApiModule } from './nutritionApi';
+import { workoutsApiModule } from './workoutsApi';
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
 // Em dev local, .env define VITE_PRAXIS_API/VITE_FORJA_API para o backend da Praxis.
@@ -126,21 +128,10 @@ export const praxisApi = {
     logout: () => request('/api/auth/logout', { method: 'POST', body: '{}' }),
   },
 
-  // Tasks
-  tasks: {
-    list: (params = {}) => {
-      const query = new URLSearchParams(params).toString();
-      return request(`/api/tasks${query ? '?' + query : ''}`);
-    },
-    get: (id) => request(`/api/tasks/${id}`),
-    create: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id, data) => request(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    reorder: (orderedIds) => request('/api/tasks/reorder', { method: 'PATCH', body: JSON.stringify({ ordered_ids: orderedIds }) }),
-    /** Empurra data para amanhã; status permanece aberto. Body: { reason? } */
-    notToday: (id, body = {}) =>
-      request(`/api/tasks/${id}/not-today`, { method: 'POST', body: JSON.stringify(body) }),
-    delete: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
-  },
+  ...tasksApiModule(request),
+  ...nutritionApiModule(request),
+  ...workoutsApiModule(request),
+
 
   ideas: {
     list: (params = {}) => {
