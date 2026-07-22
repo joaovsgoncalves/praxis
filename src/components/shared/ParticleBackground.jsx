@@ -1,5 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 
+/**
+ * Fundo de partículas ouro/ember — legível no shell, sem roxo de template.
+ * Ember-like: sobem devagar + fade, ~28 sprites.
+ */
 export default function ParticleBackground() {
   const canvasRef = useRef(null);
 
@@ -24,47 +28,78 @@ export default function ParticleBackground() {
     resize();
     window.addEventListener('resize', resize);
 
-    const particles = Array.from({ length: 34 }, () => ({
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      r: Math.random() * 1 + 0.35,
-      dx: (Math.random() - 0.5) * 0.12,
-      dy: (Math.random() - 0.5) * 0.12,
-      alpha: Math.random() * 0.28 + 0.06,
-      dAlpha: (Math.random() - 0.5) * 0.0015,
-      gold: Math.random() > 0.42,
-    }));
+    const W = () => window.innerWidth;
+    const H = () => window.innerHeight;
 
-    const drawFrame = (animate = true) => {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      particles.forEach((particle) => {
+    const spawn = (fromBottom = true) => ({
+      x: Math.random() * W(),
+      y: fromBottom ? H() + Math.random() * 40 : Math.random() * H(),
+      r: 0.9 + Math.random() * 1.8,
+      vx: (Math.random() - 0.5) * 0.18,
+      vy: -0.18 - Math.random() * 0.42,
+      life: 0,
+      maxLife: 4200 + Math.random() * 5200,
+      // gold → warm ember, never purple
+      hue: 34 + Math.random() * 14,
+    });
+
+    const particles = Array.from({ length: 28 }, () => spawn(false));
+
+    const drawFrame = (dt, animate) => {
+      ctx.clearRect(0, 0, W(), H());
+
+      while (particles.length < 28) particles.push(spawn(true));
+
+      for (let i = particles.length - 1; i >= 0; i -= 1) {
+        const p = particles[i];
         if (animate) {
-          particle.x += particle.dx;
-          particle.y += particle.dy;
-          particle.alpha += particle.dAlpha;
-          if (particle.alpha <= 0.04 || particle.alpha >= 0.36) particle.dAlpha *= -1;
-          if (particle.x < 0) particle.x = window.innerWidth;
-          if (particle.x > window.innerWidth) particle.x = 0;
-          if (particle.y < 0) particle.y = window.innerHeight;
-          if (particle.y > window.innerHeight) particle.y = 0;
+          p.life += dt;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx += (Math.random() - 0.5) * 0.008;
         }
 
+        const t = p.life / p.maxLife;
+        if (animate && (t >= 1 || p.y < -12)) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        const fade = t < 0.12 ? t / 0.12 : 1 - (t - 0.12) / 0.88;
+        const alpha = Math.max(0.05, fade * 0.55);
+        const radius = p.r * (1 - t * 0.35);
+
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 5);
+        glow.addColorStop(0, `hsla(${p.hue}, 92%, 62%, ${alpha})`);
+        glow.addColorStop(0.55, `hsla(${p.hue}, 88%, 48%, ${alpha * 0.35})`);
+        glow.addColorStop(1, `hsla(${p.hue}, 80%, 40%, 0)`);
+        ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
-        ctx.fillStyle = particle.gold
-          ? `rgba(224, 169, 42, ${particle.alpha})`
-          : `rgba(148, 116, 205, ${particle.alpha * 0.72})`;
+        ctx.arc(p.x, p.y, radius * 5, 0, Math.PI * 2);
         ctx.fill();
-      });
+
+        ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, ${alpha * 0.95})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
     };
 
-    const draw = () => {
-      drawFrame(true);
+    if (reducedMotion) {
+      drawFrame(0, false);
+      return () => {
+        window.removeEventListener('resize', resize);
+      };
+    }
+
+    let prev = performance.now();
+    const draw = (now) => {
+      const dt = Math.min(48, now - prev);
+      prev = now;
+      drawFrame(dt, true);
       animId = requestAnimationFrame(draw);
     };
-
-    if (reducedMotion) drawFrame(false);
-    else draw();
+    animId = requestAnimationFrame(draw);
 
     return () => {
       if (animId) cancelAnimationFrame(animId);
@@ -75,7 +110,7 @@ export default function ParticleBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-0 opacity-30"
+      className="pointer-events-none fixed inset-0 z-0 opacity-[0.52]"
       aria-hidden
     />
   );

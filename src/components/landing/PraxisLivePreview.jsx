@@ -44,9 +44,8 @@ const WAVE = [9, 14, 8, 20, 16, 24, 12, 18, 11, 22, 15, 9, 17, 12, 20, 8];
 function PreviewBrand() {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.045]">
-        <span className="praxis-title text-lg font-bold tracking-[-0.09em] text-domain-gold">π</span>
-        <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-domain-gold shadow-[0_0_14px_hsl(var(--domain-gold)/0.8)]" />
+      <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#0c0c10]">
+        <img src="/praxis-logo.png" alt="" width={36} height={36} className="h-full w-full object-cover" />
       </div>
       <span className="praxis-title hidden text-sm font-bold sm:inline">Praxis</span>
     </div>

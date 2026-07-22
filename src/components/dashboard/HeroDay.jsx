@@ -63,8 +63,12 @@ export default function HeroDay({
 
   return (
     <section className="praxis-dashboard-summary praxis-tactile-card relative overflow-hidden rounded-2xl border border-amber-500/15 bg-card/70 p-4 sm:p-5">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.14),transparent_70%)]" aria-hidden />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              {/* Glow anchored behind the day ring — not a free-floating mid-card blob */}
+              <div
+                className="pointer-events-none absolute right-2 top-1 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.10),transparent_72%)] sm:right-3 sm:top-2 sm:h-32 sm:w-32"
+                aria-hidden
+              />
+              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 max-w-2xl">
               <p className="text-[11px] font-medium text-amber-500/90 sm:text-xs">
                 {emoji} Praxis · {dateStr}

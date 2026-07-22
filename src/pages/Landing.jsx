@@ -310,7 +310,9 @@ export default function Landing() {
                   Praxis é ação consciente. O produto existe para uma coisa simples: reduzir o espaço entre a intenção e a prática.
                 </p>
                 <div className="mt-8 flex items-center gap-3 text-sm font-medium text-foreground/85">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-domain-gold/20 bg-domain-gold/10 text-domain-gold">π</span>
+                  <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-domain-gold/20 bg-[#0c0c10]">
+                    <img src="/praxis-logo.png" alt="" width={36} height={36} className="h-full w-full object-cover" />
+                  </span>
                   <span>Fale. Organize. Execute.</span>
                 </div>
               </div>

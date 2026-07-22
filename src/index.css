@@ -103,15 +103,15 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply text-foreground font-sans;
-    font-size: 16px;
-    text-rendering: geometricPrecision;
-    background-color: hsl(var(--background));
-    background-image:
-      radial-gradient(circle at 50% -20%, hsl(38 75% 14% / 0.25), transparent 50%),
-      radial-gradient(circle at 100% 100%, hsl(240 8% 10% / 0.5), transparent 45%);
-    background-attachment: fixed;
-  }
+      @apply text-foreground font-sans;
+      font-size: 16px;
+      text-rendering: geometricPrecision;
+      background-color: hsl(var(--background));
+      /* One soft top wash — particles own the atmosphere; avoid competing orbs */
+      background-image:
+        radial-gradient(ellipse 90% 55% at 50% -18%, hsl(38 70% 16% / 0.18), transparent 58%);
+      background-attachment: fixed;
+    }
 }
 
 @layer components {

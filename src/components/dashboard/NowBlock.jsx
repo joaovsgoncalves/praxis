@@ -18,14 +18,18 @@ export default function NowBlock({
   onVoiceCapture,
 }) {
   if (!task) {
-    return (
-      <Card className="praxis-now-card praxis-tactile-card relative overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.12),hsl(var(--card)/0.9)_48%,rgba(245,158,11,0.05))]">
-              <div className="pointer-events-none absolute right-0 top-0 h-56 w-56 bg-[radial-gradient(circle,rgba(245,158,11,0.18),transparent_68%)]" aria-hidden />
-              <CardContent className="relative p-5 sm:p-6">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-400">
-                  <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.7)]" aria-hidden />
-                  Agora
-                </div>
+      return (
+        <Card className="praxis-now-card praxis-tactile-card relative overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.10),hsl(var(--card)/0.92)_52%,rgba(245,158,11,0.03))]">
+                {/* Empty state: soft edge wash only — no big mid-card orb */}
+                <div
+                  className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 bg-[radial-gradient(circle,rgba(245,158,11,0.08),transparent_70%)] opacity-70"
+                  aria-hidden
+                />
+                <CardContent className="relative p-5 sm:p-6">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-400">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.7)]" aria-hidden />
+                    Agora
+                  </div>
                 <h2 className="praxis-title mt-4 max-w-3xl text-2xl font-semibold leading-tight tracking-[-0.045em] text-foreground sm:text-3xl">
                   Nada urgente na fila.
                 </h2>
@@ -71,18 +75,22 @@ export default function NowBlock({
   const timeLabel = formatTaskTimeLabel(task);
 
   return (
-    <Card className="praxis-now-card group relative overflow-hidden border-domain-gold/18 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.08),hsl(var(--card)/0.84)_50%,hsl(var(--primary)/0.05))]">
-      <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 bg-[radial-gradient(circle,hsl(var(--domain-gold)/0.11),transparent_65%)] opacity-80 transition-opacity duration-500 group-hover:opacity-100" aria-hidden />
-      <CardContent className="relative p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 max-w-3xl flex-1">
-            <div className="flex items-center gap-2 text-xs font-medium text-domain-gold">
-              <span className="praxis-now-pulse relative flex h-2.5 w-2.5 items-center justify-center" aria-hidden>
-                <span className="absolute inline-flex h-full w-full rounded-full bg-domain-gold/35" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-domain-gold" />
-              </span>
-              Agora
-            </div>
+      <Card className="praxis-now-card group relative overflow-hidden border-domain-gold/18 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.08),hsl(var(--card)/0.84)_50%,hsl(var(--primary)/0.05))]">
+        {/* Anchored behind title block — supports hierarchy, not a random blob */}
+        <div
+          className="pointer-events-none absolute left-0 top-0 h-40 w-56 bg-[radial-gradient(circle_at_20%_30%,hsl(var(--domain-gold)/0.10),transparent_68%)] opacity-90 transition-opacity duration-500 group-hover:opacity-100 sm:h-48 sm:w-72"
+          aria-hidden
+        />
+        <CardContent className="relative p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-3xl flex-1">
+              <div className="flex items-center gap-2 text-xs font-medium text-domain-gold">
+                <span className="praxis-now-pulse relative flex h-2.5 w-2.5 items-center justify-center" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-domain-gold/35" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-domain-gold" />
+                </span>
+                Agora
+              </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {overdue ? (
