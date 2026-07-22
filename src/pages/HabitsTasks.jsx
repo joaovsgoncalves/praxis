@@ -8,6 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
 import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive, ListTodo, Minus } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
@@ -90,6 +101,8 @@ export default function HabitsTasks() {
   const [selectedTaskIds, setSelectedTaskIds] = useState(() => new Set());
   const [taskScope, setTaskScope] = useState(() => taskScopeFromSearchParams(searchParams));
   const [skipSheetHabit, setSkipSheetHabit] = useState(null);
+  const [taskPendingDelete, setTaskPendingDelete] = useState(null);
+  const [habitPendingDelete, setHabitPendingDelete] = useState(null);
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
@@ -402,21 +415,11 @@ export default function HabitsTasks() {
   };
 
   const confirmDeleteTask = (task) => {
-    const title = cleanPriorityPrefix(task.title);
-    const open = task.status === 'pending' || task.status === 'in_progress';
-    const message = open
-      ? `Excluir a tarefa aberta "${title}"? Isso não pode ser desfeito.`
-      : `Excluir a tarefa "${title}"? Isso não pode ser desfeito.`;
-    if (window.confirm(message)) deleteTask.mutate(task.id);
+    setTaskPendingDelete(task);
   };
 
   const confirmDeleteHabit = (habit) => {
-    const title = cleanPriorityPrefix(habit.title);
-    if (!window.confirm(`Excluir permanentemente o hábito "${title}"?`)) return;
-    if (!window.confirm(
-      'Última confirmação: todos os check-ins e o histórico de streak deste hábito serão apagados para sempre. Continuar?'
-    )) return;
-    deleteHabit.mutate(habit.id);
+    setHabitPendingDelete(habit);
   };
 
   const todayRadarCount = filterTasksByScope(tasks, 'today', today).length;
@@ -1010,6 +1013,71 @@ export default function HabitsTasks() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(taskPendingDelete)}
+        onOpenChange={(open) => { if (!open) setTaskPendingDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {taskPendingDelete && (
+                <>
+                  "{cleanPriorityPrefix(taskPendingDelete.title)}"
+                  {taskPendingDelete.status === 'pending' || taskPendingDelete.status === 'in_progress'
+                    ? ' está aberta e será excluída.'
+                    : ' será excluída.'}{' '}
+                  Isso não pode ser desfeito.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={() => {
+                if (taskPendingDelete) deleteTask.mutate(taskPendingDelete.id);
+                setTaskPendingDelete(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(habitPendingDelete)}
+        onOpenChange={(open) => { if (!open) setHabitPendingDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir hábito?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {habitPendingDelete && (
+                <>
+                  "{cleanPriorityPrefix(habitPendingDelete.title)}" será excluído permanentemente, junto com todos
+                  os check-ins e o histórico de streak. Isso não pode ser desfeito.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={() => {
+                if (habitPendingDelete) deleteHabit.mutate(habitPendingDelete.id);
+                setHabitPendingDelete(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <TaskBulkArchiveDialog
         open={bulkArchiveOpen}

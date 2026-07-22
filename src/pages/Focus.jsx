@@ -55,8 +55,10 @@ export default function Focus() {
   const [totalFocusTime, setTotalFocusTime] = useState(0);
   const [postSessionOpen, setPostSessionOpen] = useState(false);
   const [postSession, setPostSession] = useState(null);
-  const intervalRef = useRef(null);
-  const focusTickRef = useRef(null);
+  const endsAtRef = useRef(null);
+  const focusAccumMsRef = useRef(0);
+  const focusSegmentStartRef = useRef(null);
+  const transitionedRef = useRef(false);
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
 
@@ -125,6 +127,10 @@ export default function Focus() {
   };
 
   const startSession = () => {
+    focusAccumMsRef.current = 0;
+    focusSegmentStartRef.current = null;
+    endsAtRef.current = null;
+    transitionedRef.current = false;
     setInSession(true);
     setSessionStart(Date.now());
     setTotalFocusTime(0);
@@ -137,15 +143,20 @@ export default function Focus() {
   };
 
   const endSession = () => {
-    const totalSeconds = Math.max(0, Math.round(totalFocusTime));
+    let finalFocusMs = focusAccumMsRef.current;
+    if (!isBreak && isRunning && !isPaused && focusSegmentStartRef.current) {
+      finalFocusMs += Date.now() - focusSegmentStartRef.current;
+    }
+    const totalSeconds = Math.max(0, Math.round(finalFocusMs / 1000));
     const taskToFinish = selectedTaskId && selectedTaskId !== 'none' ? selectedTask : null;
 
     setIsRunning(false);
     setIsPaused(false);
     setInSession(false);
     setIsBreak(false);
-    clearInterval(intervalRef.current);
-    clearInterval(focusTickRef.current);
+    focusAccumMsRef.current = 0;
+    focusSegmentStartRef.current = null;
+    endsAtRef.current = null;
 
     if (sessionStart && totalSeconds > 0) {
       saveSessionMutation.mutate({
@@ -166,40 +177,63 @@ export default function Focus() {
   };
 
   useEffect(() => {
-    if (isRunning && !isPaused && !isBreak) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current);
-            setIsBreak(true);
-            setTimeLeft(breakDuration * 60);
-            setCycles((c) => c + 1);
-            return breakDuration * 60;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      focusTickRef.current = setInterval(() => {
-        setTotalFocusTime((t) => t + 1);
-      }, 1000);
-    } else if (isRunning && !isPaused && isBreak) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current);
-            setIsBreak(false);
-            setTimeLeft(focusDuration * 60);
-            return focusDuration * 60;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (!isRunning || isPaused) {
+      endsAtRef.current = null;
+      if (focusSegmentStartRef.current !== null) {
+        focusAccumMsRef.current += Date.now() - focusSegmentStartRef.current;
+        focusSegmentStartRef.current = null;
+        setTotalFocusTime(Math.round(focusAccumMsRef.current / 1000));
+      }
+      return undefined;
     }
 
+    endsAtRef.current = Date.now() + timeLeft * 1000;
+    transitionedRef.current = false;
+    if (!isBreak && focusSegmentStartRef.current === null) {
+      focusSegmentStartRef.current = Date.now();
+    }
+
+    const tick = () => {
+      const remainingMs = endsAtRef.current - Date.now();
+      setTimeLeft(Math.max(0, Math.ceil(remainingMs / 1000)));
+
+      if (!isBreak) {
+        const elapsedMs =
+          focusAccumMsRef.current +
+          (focusSegmentStartRef.current ? Date.now() - focusSegmentStartRef.current : 0);
+        setTotalFocusTime(Math.round(elapsedMs / 1000));
+      }
+
+      if (remainingMs <= 0 && !transitionedRef.current) {
+        transitionedRef.current = true;
+        if (!isBreak) {
+          if (focusSegmentStartRef.current) {
+            focusAccumMsRef.current += Date.now() - focusSegmentStartRef.current;
+            focusSegmentStartRef.current = null;
+          }
+          setTotalFocusTime(Math.round(focusAccumMsRef.current / 1000));
+          setCycles((c) => c + 1);
+          setIsBreak(true);
+          setTimeLeft(breakDuration * 60);
+        } else {
+          setIsBreak(false);
+          setTimeLeft(focusDuration * 60);
+        }
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('focus', tick);
+
     return () => {
-      clearInterval(intervalRef.current);
-      clearInterval(focusTickRef.current);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisible);
+      window.removeEventListener('focus', tick);
     };
   }, [isRunning, isPaused, isBreak, focusDuration, breakDuration]);
 
@@ -419,8 +453,8 @@ export default function Focus() {
                 )}
               </Badge>
 
-              <div className="relative">
-                <svg className="w-48 h-48 sm:w-56 sm:h-56 -rotate-90" aria-hidden>
+              <div className="relative w-48 h-48 sm:w-56 sm:h-56">
+                <svg viewBox="0 0 192 192" className="w-full h-full -rotate-90" aria-hidden>
                   <circle cx="96" cy="96" r="90" fill="none" stroke="currentColor" className="text-border" strokeWidth="4" />
                   <circle
                     cx="96"
