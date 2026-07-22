@@ -1,14 +1,16 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Check, X, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function HabitGridRow({ habit, isDone, onToggleDone, onSkipClick }) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <motion.div
-      whileHover={{ scale: 1.01, y: -1 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={reduceMotion ? undefined : { scale: 1.01, y: -1 }}
+      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 450, damping: 25 }}
       className="praxis-tactile-card flex items-center justify-between p-3.5 rounded-xl border border-border/70 bg-card/60"
     >
@@ -23,6 +25,7 @@ export default function HabitGridRow({ habit, isDone, onToggleDone, onSkipClick 
               : 'border-border/80 hover:border-amber-500/60 hover:bg-amber-500/10'
           )}
           onClick={() => onToggleDone(habit, isDone)}
+          aria-label={isDone ? `Desmarcar ${habit.title}` : `Concluir ${habit.title}`}
         >
           <Check className={cn('w-4 h-4 stroke-[3]', isDone ? 'opacity-100' : 'opacity-30')} />
         </Button>
@@ -44,7 +47,8 @@ export default function HabitGridRow({ habit, isDone, onToggleDone, onSkipClick 
           size="icon"
           className="h-8 w-8 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 rounded-lg"
           onClick={() => onSkipClick(habit)}
-          title="Empurrar ou pular hoje"
+          title="Não rolou hoje"
+          aria-label={`Marcar que ${habit.title} não rolou hoje`}
         >
           <X className="w-4 h-4" />
         </Button>

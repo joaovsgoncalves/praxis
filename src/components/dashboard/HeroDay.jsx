@@ -78,11 +78,16 @@ export default function HeroDay({
           {bestStreak > 0 ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-500 shadow-sm">
               <Flame className="h-4 w-4 animate-pulse" aria-hidden />
-              {bestStreak}d streak
+              {bestStreak} dias
             </span>
           ) : null}
           <div className="relative flex items-center justify-center">
-            <svg className="w-14 h-14 -rotate-90 transform" viewBox="0 0 36 36">
+            <svg
+              className="w-14 h-14 -rotate-90 transform"
+              viewBox="0 0 36 36"
+              role="img"
+              aria-label={`Progresso do dia: ${roundedDayPct}%`}
+            >
               <path
                 className="text-muted/30"
                 strokeWidth="3"

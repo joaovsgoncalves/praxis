@@ -370,7 +370,7 @@ export default function VoiceCapture() {
         kicker="Voz & PraxIA"
         kickerIcon={Mic}
         title="Descarregar meu dia em áudio"
-        description="Fale sem se preocupar em organizar. A PraxIA estrutura suas tarefas, hábitos e blocos de foco automaticamente."
+        description="Fale sem se preocupar em organizar. A PraxIA separa tarefas e hábitos para você revisar antes de salvar."
         action={(
           <Button asChild variant="outline" size="sm" className="relative praxis-touch-target shrink-0 rounded-full">
             <Link to="/capturas">
