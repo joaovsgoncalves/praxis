@@ -10,7 +10,7 @@ import {
   registerAuthRoutes,
   createApiAuthMiddleware,
 } from './praxisAuth.js';
-import { initializeDatabase } from './lib/dbInit.js';
+import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
 import { getLevel } from './lib/gamification.js';
 import { createCalendarServices } from './lib/calendarSync.js';
@@ -124,7 +124,7 @@ const COOKIE_SECURE = !['0', 'false', 'no'].includes(
   String(process.env.PRAXIS_COOKIE_SECURE ?? '1').toLowerCase(),
 );
 
-const db = new Database(path.join(__dirname, 'forja.db'));
+const db = new Database(resolveDbPath(__dirname));
 db.pragma('journal_mode = WAL');
 
 initializeDatabase(db);

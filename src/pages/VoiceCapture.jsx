@@ -44,6 +44,7 @@ export default function VoiceCapture() {
   const recordingTimeout = useRef(null);
   const recordingStartedAt = useRef(0);
   const recordingTick = useRef(null);
+  const browserRecognition = useRef(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -125,6 +126,94 @@ export default function VoiceCapture() {
     return () => { cancelled = true; };
   }, [captureParam, applyParsedItems, runParse]);
 
+  const browserSpeechSupported = typeof window !== 'undefined'
+    && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  // Fallback nativo: transcreve pelo próprio navegador (Web Speech API) sem
+  // depender do backend de STT. Usado quando o MediaRecorder não existe ou
+  // quando a conexão/servidor de transcrição está inacessível.
+  const startBrowserSpeech = useCallback(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      setErrorTitle('Sem reconhecimento no navegador');
+      setErrorMessage('Este navegador não faz transcrição local. Tente a gravação normal ou o app oficial.');
+      return;
+    }
+
+    clearError();
+    setTranscription('');
+    setItems([]);
+    setActiveCaptureId(null);
+    setSearchParams({});
+
+    const stopTick = () => {
+      if (recordingTick.current) {
+        clearInterval(recordingTick.current);
+        recordingTick.current = null;
+      }
+    };
+
+    const recognition = new SR();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+    browserRecognition.current = recognition;
+
+    recognition.onresult = async (event) => {
+      const text = Array.from(event.results)
+        .map((r) => r[0]?.transcript || '')
+        .join(' ')
+        .trim();
+      setTranscription(text);
+      if (!text) {
+        setErrorTitle('Nada capturado');
+        setErrorMessage('Não entendi o áudio pelo navegador. Fale de novo em frases curtas.');
+        setCapturePhase('idle');
+        return;
+      }
+      setCapturePhase('parsing');
+      try {
+        await runParse(text, null);
+      } catch (error) {
+        setCaptureError({ status: error.status, body: error.body || {}, message: error.message });
+      }
+      setCapturePhase('idle');
+    };
+
+    recognition.onerror = (event) => {
+      stopTick();
+      setErrorTitle('Reconhecimento do navegador');
+      setErrorMessage(
+        event.error === 'not-allowed' || event.error === 'service-not-allowed'
+          ? 'Permissão de microfone negada. Libere o microfone e tente de novo.'
+          : 'Falha no reconhecimento local. Tente a gravação normal.',
+      );
+      setCapturePhase('idle');
+    };
+
+    recognition.onend = () => {
+      stopTick();
+      browserRecognition.current = null;
+      setCapturePhase((prev) => (prev === 'recording' ? 'idle' : prev));
+    };
+
+    try {
+      recordingStartedAt.current = Date.now();
+      setRecordingElapsed(0);
+      recordingTick.current = setInterval(() => {
+        setRecordingElapsed(Date.now() - recordingStartedAt.current);
+      }, 500);
+      setCapturePhase('recording');
+      recognition.start();
+    } catch {
+      stopTick();
+      setCapturePhase('idle');
+      setErrorTitle('Reconhecimento do navegador');
+      setErrorMessage('Não consegui iniciar a transcrição local. Tente a gravação normal.');
+    }
+  }, [runParse, setSearchParams]);
+
   const startRecording = async () => {
     clearError();
     setTranscription('');
@@ -134,6 +223,10 @@ export default function VoiceCapture() {
 
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        if (browserSpeechSupported) {
+          startBrowserSpeech();
+          return;
+        }
         throw new Error('Seu navegador não suporta gravação de áudio nesta tela.');
       }
 
@@ -181,6 +274,10 @@ export default function VoiceCapture() {
   const stopRecording = () => {
     if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
     if (recordingTick.current) clearInterval(recordingTick.current);
+    if (browserRecognition.current) {
+      try { browserRecognition.current.stop(); } catch { /* noop */ }
+      return;
+    }
     if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
       mediaRecorder.current.stop();
     }
@@ -368,11 +465,18 @@ export default function VoiceCapture() {
           <CardContent className="py-4 space-y-2">
             {errorTitle && <p className="text-sm font-medium text-destructive">{errorTitle}</p>}
             <p className="text-sm text-destructive/90">{errorMessage}</p>
-            {(activeCaptureId || inboxCount > 0) && (
-              <Button asChild variant="secondary" size="sm" className="praxis-touch-target">
-                <Link to="/capturas">Abrir Revisar capturas</Link>
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {browserSpeechSupported && !busy && (
+                <Button onClick={startBrowserSpeech} variant="secondary" size="sm" className="praxis-touch-target">
+                  <Mic className="w-4 h-4 mr-1" />Tentar pelo navegador
+                </Button>
+              )}
+              {(activeCaptureId || inboxCount > 0) && (
+                <Button asChild variant="secondary" size="sm" className="praxis-touch-target">
+                  <Link to="/capturas">Abrir Revisar capturas</Link>
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

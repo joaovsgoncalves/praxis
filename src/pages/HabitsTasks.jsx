@@ -15,6 +15,7 @@ import TaskForm from '@/components/habits-tasks/TaskForm';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
 import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
+import { hapticLight } from '@/lib/haptics';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import RitualWidget from '@/components/dashboard/RitualWidget';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
@@ -197,11 +198,12 @@ export default function HabitsTasks() {
     mutationFn: (task) => praxisApi.tasks.update(task.id, {
       status: task.status === 'completed' ? 'pending' : 'completed',
     }),
-    onSuccess: (data) => {
+    onSuccess: (data, task) => {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       dispatchPraxisLevelUpFromResponse(data);
       notifyPraxisRecurrenceSpawned(data);
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
+      if (task.status !== 'completed') hapticLight();
     },
   });
 
@@ -220,10 +222,11 @@ export default function HabitsTasks() {
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, { isDone }) => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      if (!isDone) hapticLight();
     },
   });
 

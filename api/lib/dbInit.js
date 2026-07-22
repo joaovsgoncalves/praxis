@@ -1,4 +1,30 @@
-/** Schema init + migrations for Praxis forja.db (idempotent, production-safe). */
+/** Schema init + migrations for Praxis praxis.db (idempotent, production-safe). */
+
+import fs from 'fs';
+import path from 'path';
+
+/**
+ * Resolve o arquivo do banco preferindo praxis.db. Se ele não existir mas o
+ * legado forja.db existir, faz uma cópia fria (arquivo principal + sidecars
+ * WAL/SHM) para praxis.db na inicialização — antes de qualquer conexão ser
+ * aberta — preservando forja.db como backup. Migração transparente, sem perda.
+ */
+export function resolveDbPath(dir, { legacyName = 'forja.db', targetName = 'praxis.db' } = {}) {
+  const targetPath = path.join(dir, targetName);
+  const legacyPath = path.join(dir, legacyName);
+
+  if (fs.existsSync(targetPath)) return targetPath;
+
+  if (fs.existsSync(legacyPath)) {
+    for (const suffix of ['', '-wal', '-shm']) {
+      const from = legacyPath + suffix;
+      if (fs.existsSync(from)) fs.copyFileSync(from, targetPath + suffix);
+    }
+    return targetPath;
+  }
+
+  return targetPath;
+}
 
 function stripPriorityPrefix(title) {
   if (typeof title !== 'string') return title;
