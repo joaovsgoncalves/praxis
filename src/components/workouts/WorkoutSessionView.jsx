@@ -25,6 +25,9 @@ import {
   formatSeconds,
   formatSetResult,
   formatWorkoutTarget,
+  trackingUsesBand,
+  trackingUsesWeight,
+  WORKOUT_BAND_LEVELS,
 } from '@/lib/workouts';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +58,7 @@ function initialSetForm(exercise) {
     reps: previous?.reps ?? '',
     duration_seconds: previous?.duration_seconds ?? exercise?.target_duration_seconds ?? '',
     distance_m: previous?.distance_m ?? '',
+    band_level: previous?.band_level ?? '',
   };
 }
 
@@ -75,7 +79,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(Date.now());
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [setForm, setSetForm] = useState({ weight_kg: '', reps: '', duration_seconds: '', distance_m: '' });
+  const [setForm, setSetForm] = useState({ weight_kg: '', reps: '', duration_seconds: '', distance_m: '', band_level: '' });
   const [restTimer, setRestTimer] = useState(() => loadRestTimer(sessionId));
 
   const { data: session, isLoading, isError, error } = useQuery({
@@ -208,13 +212,17 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
 
   const handleAddSet = () => {
     if (!currentExercise || !hasPrimaryResult(setForm, currentExercise.tracking_type) || addSet.isPending) return;
-    addSet.mutate({
+    const payload = {
       session_exercise_id: currentExercise.id,
       weight_kg: toOptionalNumber(setForm.weight_kg),
       reps: toOptionalNumber(setForm.reps),
       duration_seconds: toOptionalNumber(setForm.duration_seconds),
       distance_m: toOptionalNumber(setForm.distance_m),
-    });
+    };
+    if (trackingUsesBand(currentExercise.tracking_type) && setForm.band_level) {
+      payload.band_level = setForm.band_level;
+    }
+    addSet.mutate(payload);
   };
 
   const goToExercise = (nextIndex) => {
@@ -267,10 +275,13 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
 
   const trackingType = currentExercise?.tracking_type || 'reps';
   const isReps = ['reps', 'weight_reps'].includes(trackingType);
-  const isWeight = trackingType === 'weight_reps';
+  const isWeight = trackingUsesWeight(trackingType);
+  const isBand = trackingUsesBand(trackingType);
   const isDuration = ['duration', 'distance_duration'].includes(trackingType);
   const isDistance = ['distance', 'distance_duration'].includes(trackingType);
   const canAdd = hasPrimaryResult(setForm, trackingType) && !addSet.isPending;
+  const nextSetNumber = (currentExercise?.sets?.length || 0) + 1;
+  const loadColumnLabel = isWeight ? 'Kg' : isBand ? 'Elástico' : '—';
 
   return (
     <div className="praxis-page max-w-xl space-y-4 pb-32">
@@ -357,35 +368,61 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
             </div>
 
             {currentExercise.previous_sets?.length ? (
-              <div className="border-b border-border/60 bg-secondary/20 px-5 py-3.5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                  <History className="h-3.5 w-3.5" /> Último treino
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {currentExercise.previous_sets.map((set) => (
-                    <span key={set.id} className="rounded-full border border-border/70 bg-background/60 px-2.5 py-1 text-xs tabular-nums text-muted-foreground">
-                      {set.set_number}. {formatSetResult(set, trackingType)}
-                    </span>
-                  ))}
+              <div className="border-b border-border/60 bg-secondary/15 px-4 py-3">
+                <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                  <History className="h-3.5 w-3.5" /> Última
+                  <span className="font-normal tabular-nums text-muted-foreground/90">
+                    {currentExercise.previous_sets.map((set) => formatSetResult(set, trackingType)).join(' · ')}
+                  </span>
                 </div>
               </div>
             ) : null}
 
-            {currentExercise.sets?.length ? (
-              <div className="border-b border-border/60 px-5 py-4">
-                <p className="text-xs font-semibold text-muted-foreground">Séries registradas</p>
-                <div className="mt-2 space-y-2">
-                  {currentExercise.sets.map((set) => (
-                    <div key={set.id} className="flex items-center gap-3 rounded-xl bg-secondary/35 px-3 py-2.5">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold tabular-nums text-primary">
-                        {set.set_number}
-                      </div>
-                      <p className="min-w-0 flex-1 text-sm font-medium tabular-nums">{formatSetResult(set, trackingType)}</p>
+            <div className="px-3 py-3 sm:px-4">
+              {/* Logbook table — direction A */}
+              <div className="overflow-hidden rounded-xl border border-border/70">
+                <div
+                  className={cn(
+                    'grid gap-2 border-b border-border/60 bg-secondary/25 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground',
+                    isDuration || isDistance ? 'grid-cols-[2rem_1fr_1fr_2.5rem]' : 'grid-cols-[2rem_1fr_1fr_2.5rem]',
+                  )}
+                >
+                  <span className="tabular-nums">#</span>
+                  <span>{isDuration && !isReps ? 'Tempo' : isDistance && !isReps ? 'Dist.' : 'Reps'}</span>
+                  <span>{isDuration && isDistance ? 'Dist.' : loadColumnLabel}</span>
+                  <span className="sr-only">Ação</span>
+                </div>
+
+                <div className="divide-y divide-border/50">
+                  {currentExercise.sets?.map((set) => (
+                    <div
+                      key={set.id}
+                      className="grid grid-cols-[2rem_1fr_1fr_2.5rem] items-center gap-2 px-3 py-2.5"
+                    >
+                      <span className="text-sm font-semibold tabular-nums text-primary">{set.set_number}</span>
+                      <span className="text-sm font-medium tabular-nums">
+                        {isReps && set.reps != null
+                          ? set.reps
+                          : isDuration && !isReps && set.duration_seconds != null
+                            ? formatSeconds(set.duration_seconds)
+                            : isDistance && set.distance_m != null
+                              ? set.distance_m
+                              : formatSetResult(set, trackingType)}
+                      </span>
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        {isWeight && set.weight_kg != null
+                          ? `${Number(set.weight_kg).toLocaleString('pt-BR')} kg`
+                          : isBand && set.band_level
+                            ? (WORKOUT_BAND_LEVELS.find((b) => b.value === set.band_level)?.label || set.band_level)
+                            : isDistance && isDuration && set.distance_m != null
+                              ? `${set.distance_m} m`
+                              : '—'}
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+                        className="h-10 w-10 justify-self-end rounded-full text-muted-foreground hover:text-destructive"
                         aria-label={`Remover série ${set.set_number}`}
                         disabled={deleteSet.isPending}
                         onClick={() => deleteSet.mutate(set.id)}
@@ -394,84 +431,149 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                       </Button>
                     </div>
                   ))}
+
+                  {/* Input row */}
+                  <div className="space-y-3 bg-secondary/10 px-3 py-3">
+                    <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] items-end gap-2">
+                      <span className="pb-2.5 text-sm font-semibold tabular-nums text-muted-foreground">{nextSetNumber}</span>
+
+                      {isReps ? (
+                        <div className="space-y-1">
+                          <label htmlFor="session-reps" className="sr-only">Repetições</label>
+                          <Input
+                            id="session-reps"
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            value={setForm.reps}
+                            onChange={(event) => setSetForm((current) => ({ ...current, reps: event.target.value }))}
+                            placeholder="0"
+                            className="h-11 text-center text-base font-semibold tabular-nums"
+                          />
+                        </div>
+                      ) : isDuration ? (
+                        <div className="space-y-1">
+                          <label htmlFor="session-duration" className="sr-only">Tempo (s)</label>
+                          <Input
+                            id="session-duration"
+                            type="number"
+                            inputMode="numeric"
+                            min="0"
+                            value={setForm.duration_seconds}
+                            onChange={(event) => setSetForm((current) => ({ ...current, duration_seconds: event.target.value }))}
+                            placeholder="s"
+                            className="h-11 text-center text-base font-semibold tabular-nums"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <label htmlFor="session-distance" className="sr-only">Distância (m)</label>
+                          <Input
+                            id="session-distance"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            value={setForm.distance_m}
+                            onChange={(event) => setSetForm((current) => ({ ...current, distance_m: event.target.value }))}
+                            placeholder="m"
+                            className="h-11 text-center text-base font-semibold tabular-nums"
+                          />
+                        </div>
+                      )}
+
+                      {isWeight ? (
+                        <div className="space-y-1">
+                          <label htmlFor="session-weight" className="sr-only">Carga (kg)</label>
+                          <Input
+                            id="session-weight"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.25"
+                            value={setForm.weight_kg}
+                            onChange={(event) => setSetForm((current) => ({ ...current, weight_kg: event.target.value }))}
+                            placeholder="kg"
+                            className="h-11 text-center text-base font-semibold tabular-nums"
+                          />
+                        </div>
+                      ) : isDistance && isDuration ? (
+                        <div className="space-y-1">
+                          <label htmlFor="session-distance-b" className="sr-only">Distância (m)</label>
+                          <Input
+                            id="session-distance-b"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            value={setForm.distance_m}
+                            onChange={(event) => setSetForm((current) => ({ ...current, distance_m: event.target.value }))}
+                            placeholder="m"
+                            className="h-11 text-center text-base font-semibold tabular-nums"
+                          />
+                        </div>
+                      ) : isBand ? (
+                        <div className="flex h-11 items-center text-xs text-muted-foreground">
+                          {setForm.band_level
+                            ? WORKOUT_BAND_LEVELS.find((b) => b.value === setForm.band_level)?.label
+                            : '—'}
+                        </div>
+                      ) : (
+                        <div className="h-11" />
+                      )}
+
+                      <Button
+                        type="button"
+                        size="icon"
+                        className="h-11 w-11 justify-self-end rounded-xl"
+                        disabled={!canAdd}
+                        aria-label={`Registrar série ${nextSetNumber}`}
+                        onClick={handleAddSet}
+                      >
+                        {addSet.isPending ? <Clock3 className="h-4 w-4 animate-pulse" /> : <Check className="h-5 w-5" />}
+                      </Button>
+                    </div>
+
+                    {isBand ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium text-muted-foreground">Elástico</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {WORKOUT_BAND_LEVELS.map((band) => {
+                            const active = setForm.band_level === band.value;
+                            return (
+                              <button
+                                key={band.value}
+                                type="button"
+                                onClick={() => setSetForm((current) => ({
+                                  ...current,
+                                  band_level: current.band_level === band.value ? '' : band.value,
+                                }))}
+                                className={cn(
+                                  'min-h-10 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                  active
+                                    ? 'border-primary/50 bg-primary/15 text-foreground'
+                                    : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
+                                )}
+                              >
+                                {band.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            ) : null}
 
-            <div className="space-y-4 px-5 py-5">
-              <div className={cn('grid gap-3', isWeight || trackingType === 'distance_duration' ? 'grid-cols-2' : 'grid-cols-1')}>
-                {isWeight ? (
-                  <div className="space-y-1.5">
-                    <label htmlFor="session-weight" className="text-xs font-medium text-muted-foreground">Carga (kg)</label>
-                    <Input
-                      id="session-weight"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.25"
-                      value={setForm.weight_kg}
-                      onChange={(event) => setSetForm((current) => ({ ...current, weight_kg: event.target.value }))}
-                      placeholder="0"
-                      className="h-12 text-center text-lg font-semibold tabular-nums"
-                    />
-                  </div>
-                ) : null}
-
-                {isReps ? (
-                  <div className="space-y-1.5">
-                    <label htmlFor="session-reps" className="text-xs font-medium text-muted-foreground">Repetições</label>
-                    <Input
-                      id="session-reps"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      value={setForm.reps}
-                      onChange={(event) => setSetForm((current) => ({ ...current, reps: event.target.value }))}
-                      placeholder="0"
-                      className="h-12 text-center text-lg font-semibold tabular-nums"
-                    />
-                  </div>
-                ) : null}
-
-                {isDistance ? (
-                  <div className="space-y-1.5">
-                    <label htmlFor="session-distance" className="text-xs font-medium text-muted-foreground">Distância (m)</label>
-                    <Input
-                      id="session-distance"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="1"
-                      value={setForm.distance_m}
-                      onChange={(event) => setSetForm((current) => ({ ...current, distance_m: event.target.value }))}
-                      placeholder="0"
-                      className="h-12 text-center text-lg font-semibold tabular-nums"
-                    />
-                  </div>
-                ) : null}
-
-                {isDuration ? (
-                  <div className="space-y-1.5">
-                    <label htmlFor="session-duration" className="text-xs font-medium text-muted-foreground">Tempo (segundos)</label>
-                    <Input
-                      id="session-duration"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      value={setForm.duration_seconds}
-                      onChange={(event) => setSetForm((current) => ({ ...current, duration_seconds: event.target.value }))}
-                      placeholder="0"
-                      className="h-12 text-center text-lg font-semibold tabular-nums"
-                    />
-                  </div>
-                ) : null}
-              </div>
-
-              <Button type="button" className="h-12 w-full rounded-xl text-base" disabled={!canAdd} onClick={handleAddSet}>
+              <Button
+                type="button"
+                className="mt-3 h-12 w-full rounded-xl text-base"
+                disabled={!canAdd}
+                onClick={handleAddSet}
+              >
                 {addSet.isPending ? (
                   'Registrando...'
                 ) : (
-                  <><Plus className="mr-2 h-5 w-5" /> Registrar série {currentExercise.sets.length + 1}</>
+                  <><Plus className="mr-2 h-5 w-5" /> Registrar série {nextSetNumber}</>
                 )}
               </Button>
             </div>

@@ -6,6 +6,16 @@ export const WORKOUT_TRACKING_TYPES = [
   { value: 'distance_duration', label: 'Distância + tempo' },
 ];
 
+/** Elástico / band na série (calistenia). `null` = não informado. */
+export const WORKOUT_BAND_LEVELS = [
+  { value: 'none', label: 'Nenhum' },
+  { value: 'light', label: 'Leve' },
+  { value: 'medium', label: 'Médio' },
+  { value: 'heavy', label: 'Forte' },
+];
+
+export const WORKOUT_BAND_LABELS = Object.fromEntries(WORKOUT_BAND_LEVELS.map((item) => [item.value, item.label]));
+
 export const WORKOUT_CATEGORIES = [
   { value: 'strength', label: 'Musculação' },
   { value: 'calisthenics', label: 'Calistenia' },
@@ -17,6 +27,20 @@ export const WORKOUT_CATEGORIES = [
 
 export const TRACKING_LABELS = Object.fromEntries(WORKOUT_TRACKING_TYPES.map((item) => [item.value, item.label]));
 export const WORKOUT_CATEGORY_LABELS = Object.fromEntries(WORKOUT_CATEGORIES.map((item) => [item.value, item.label]));
+
+export function formatBandLevel(level) {
+  if (level == null || level === '') return null;
+  return WORKOUT_BAND_LABELS[level] || String(level);
+}
+
+/** Show elastic chips for pure-reps tracking (calisthenics-friendly). */
+export function trackingUsesBand(trackingType = 'reps') {
+  return trackingType === 'reps';
+}
+
+export function trackingUsesWeight(trackingType = 'reps') {
+  return trackingType === 'weight_reps';
+}
 
 export function formatSeconds(seconds) {
   const total = Math.max(0, Number(seconds) || 0);
@@ -83,6 +107,9 @@ export function formatSetResult(set = {}, trackingType = 'reps') {
   } else if (set.reps != null) {
     parts.push(`${set.reps} rep${Number(set.reps) === 1 ? '' : 's'}`);
   }
+  const band = formatBandLevel(set.band_level);
+  if (band && set.band_level !== 'none') parts.push(`elástico ${band.toLowerCase()}`);
+  else if (band && set.band_level === 'none') parts.push('sem elástico');
   return parts.join(' · ') || '—';
 }
 

@@ -19,6 +19,8 @@ export const WORKOUT_EXERCISE_CATEGORIES = [
 
 const WORKOUT_DAY_TYPES = ['training', 'rest'];
 const WORKOUT_SESSION_STATUSES = ['active', 'completed', 'abandoned'];
+/** Elastic/band load for calisthenics sets (null = not set). */
+export const WORKOUT_BAND_LEVELS = ['none', 'light', 'medium', 'heavy'];
 
 function text(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -168,6 +170,7 @@ export function initWorkoutSchema(db) {
       reps INTEGER,
       duration_seconds INTEGER,
       distance_m REAL,
+      band_level TEXT,
       notes TEXT DEFAULT '',
       completed_at TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now')),
@@ -186,6 +189,13 @@ export function initWorkoutSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_workout_session_exercises_session_position ON workout_session_exercises(session_id, position);
     CREATE INDEX IF NOT EXISTS idx_workout_session_sets_exercise_number ON workout_session_sets(session_exercise_id, set_number);
   `);
+
+  // V2 logbook: elastic/band on sets (existing DBs created before this column)
+  try {
+    db.exec('ALTER TABLE workout_session_sets ADD COLUMN band_level TEXT');
+  } catch {
+    /* column already exists */
+  }
 }
 
 function normalizeExerciseBody(body = {}, existing = null) {
@@ -387,6 +397,20 @@ function setActiveProgram(db, programId) {
   return getProgram(db, programId);
 }
 
+function normalizeBandLevel(value, existing = null) {
+  if (value === undefined) {
+    return existing?.band_level ?? null;
+  }
+  if (value === null || value === '') return null;
+  const level = String(value).trim().toLowerCase();
+  if (!WORKOUT_BAND_LEVELS.includes(level)) {
+    const err = new Error('Nível de elástico inválido.');
+    err.status = 400;
+    throw err;
+  }
+  return level;
+}
+
 function sessionSetPayload(body = {}, existing = null) {
   return {
     weight_kg:
@@ -405,6 +429,7 @@ function sessionSetPayload(body = {}, existing = null) {
       body.distance_m === undefined && existing
         ? existing.distance_m
         : numberOrNull(body.distance_m, { min: 0, max: 10000000 }),
+    band_level: normalizeBandLevel(body.band_level, existing),
     notes: body.notes !== undefined ? text(body.notes) : existing?.notes || '',
   };
 }
@@ -894,7 +919,13 @@ export function registerWorkoutRoutes(app, db) {
     `).get(req.body?.session_exercise_id, session.id);
     if (!sessionExercise) return res.status(404).json({ error: 'Exercício não pertence à sessão.' });
 
-    const payload = sessionSetPayload(req.body);
+    let payload;
+    try {
+      payload = sessionSetPayload(req.body);
+    } catch (error) {
+      if (error?.status === 400) return res.status(400).json({ error: error.message });
+      throw error;
+    }
     if (!validateSetForTracking(sessionExercise.tracking_type, payload)) {
       return res.status(400).json({ error: 'Preencha o resultado principal desta série.' });
     }
@@ -906,8 +937,8 @@ export function registerWorkoutRoutes(app, db) {
     db.prepare(`
       INSERT INTO workout_session_sets (
         id, session_id, session_exercise_id, set_number, weight_kg, reps,
-        duration_seconds, distance_m, notes, completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        duration_seconds, distance_m, band_level, notes, completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       session.id,
@@ -917,6 +948,7 @@ export function registerWorkoutRoutes(app, db) {
       payload.reps,
       payload.duration_seconds,
       payload.distance_m,
+      payload.band_level,
       payload.notes,
       new Date().toISOString(),
     );
@@ -933,19 +965,26 @@ export function registerWorkoutRoutes(app, db) {
     if (!existing) return res.status(404).json({ error: 'Série não encontrada.' });
     const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(existing.session_id);
     if (session?.status !== 'active') return res.status(400).json({ error: 'Essa sessão já foi encerrada.' });
-    const payload = sessionSetPayload(req.body, existing);
+    let payload;
+    try {
+      payload = sessionSetPayload(req.body, existing);
+    } catch (error) {
+      if (error?.status === 400) return res.status(400).json({ error: error.message });
+      throw error;
+    }
     if (!validateSetForTracking(existing.tracking_type, payload)) {
       return res.status(400).json({ error: 'Preencha o resultado principal desta série.' });
     }
     db.prepare(`
       UPDATE workout_session_sets
-      SET weight_kg = ?, reps = ?, duration_seconds = ?, distance_m = ?, notes = ?, updated_at = datetime('now')
+      SET weight_kg = ?, reps = ?, duration_seconds = ?, distance_m = ?, band_level = ?, notes = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       payload.weight_kg,
       payload.reps,
       payload.duration_seconds,
       payload.distance_m,
+      payload.band_level,
       payload.notes,
       existing.id,
     );
