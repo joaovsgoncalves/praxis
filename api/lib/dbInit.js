@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 /**
  * Resolve o arquivo do banco preferindo praxis.db. Se ele não existir mas o
@@ -66,6 +67,80 @@ function cleanPriorityTitlePrefixes(db, table) {
 }
 
 /**
+ * Convert active legacy sequences into compound habits. The transaction and
+ * source marker make this safe to run on every boot.
+ */
+export function migrateActiveRitualsToCompoundHabits(db) {
+  const activeRituals = db.prepare(`
+    SELECT * FROM rituals
+    WHERE status = 'active'
+    ORDER BY created_date ASC, id ASC
+  `).all();
+  if (activeRituals.length === 0) return 0;
+
+  const findCompound = db.prepare(
+    "SELECT * FROM habits WHERE source = ? AND kind = 'compound' LIMIT 1",
+  );
+  const insertCompound = db.prepare(`
+    INSERT INTO habits (
+      id, title, description, frequency, category, streak_target, source,
+      status, sort_order, kind, parent_id, position_in_parent
+    )
+    VALUES (?, ?, ?, 'daily', 'wellness', 30, ?, 'active', ?, 'compound', NULL, NULL)
+  `);
+  const findHabit = db.prepare('SELECT id, kind FROM habits WHERE id = ?');
+  const attachChild = db.prepare(`
+    UPDATE habits
+    SET kind = 'simple', parent_id = ?, position_in_parent = ?
+    WHERE id = ?
+  `);
+  const markMigrated = db.prepare("UPDATE rituals SET status = 'migrated' WHERE id = ?");
+
+  const migrate = db.transaction((rows) => {
+    let migrated = 0;
+    let nextOrder = nextSortOrder(db, 'habits');
+
+    for (const ritual of rows) {
+      const source = `ritual_migration:${ritual.id}`;
+      let compound = findCompound.get(source);
+      if (!compound) {
+        const id = randomUUID();
+        insertCompound.run(
+          id,
+          ritual.name,
+          ritual.emoji || '',
+          source,
+          nextOrder,
+        );
+        nextOrder += 1;
+        compound = { id };
+      }
+
+      let habitIds = [];
+      try {
+        const parsed = JSON.parse(ritual.habits_order || '[]');
+        if (Array.isArray(parsed)) habitIds = parsed;
+      } catch {
+        habitIds = [];
+      }
+
+      [...new Set(habitIds.map(String))].forEach((habitId, index) => {
+        const child = findHabit.get(habitId);
+        if (!child || child.kind === 'compound' || child.id === compound.id) return;
+        attachChild.run(compound.id, index, child.id);
+      });
+
+      markMigrated.run(ritual.id);
+      migrated += 1;
+    }
+
+    return migrated;
+  });
+
+  return migrate(activeRituals);
+}
+
+/**
  * Create core tables, seed defaults, run additive migrations.
  * Does not open the DB or change journal mode — caller owns that.
  */
@@ -103,6 +178,9 @@ export function initializeDatabase(db) {
     source TEXT DEFAULT 'manual',
     status TEXT DEFAULT 'active',
     sort_order INTEGER,
+    kind TEXT DEFAULT 'simple',
+    parent_id TEXT,
+    position_in_parent INTEGER,
     created_date TEXT DEFAULT (datetime('now'))
   );
 
@@ -225,7 +303,7 @@ const defaultAchievements = [
   { id: 'diamond', name: 'Diamante', description: '30 dias de streak', emoji: '💎', xp_reward: 200 },
   { id: 'centurion', name: 'Centurião', description: '100 tarefas completas', emoji: '🏆', xp_reward: 100 },
   { id: 'focus_master', name: 'Mestre do Foco', description: '10h de foco total', emoji: '⏱️', xp_reward: 50 },
-  { id: 'early_bird', name: 'Madrugador', description: 'Ritual matinal 5x', emoji: '🌅', xp_reward: 30 },
+  { id: 'early_bird', name: 'Madrugador', description: 'Rotina matinal 5x', emoji: '🌅', xp_reward: 30 },
   { id: 'balanced', name: 'Equilibrado', description: '7 dias de wellness streak', emoji: '🧘', xp_reward: 50 },
   { id: 'creator', name: 'Criador', description: '10 tarefas jotav_fit', emoji: '📸', xp_reward: 50 },
 ];
@@ -268,6 +346,22 @@ if (!habitsCols2.includes('unit')) {
 if (!habitsCols2.includes('preferred_time')) {
   db.exec("ALTER TABLE habits ADD COLUMN preferred_time TEXT DEFAULT ''");
 }
+if (!habitsCols2.includes('kind')) {
+  db.exec("ALTER TABLE habits ADD COLUMN kind TEXT DEFAULT 'simple'");
+}
+if (!habitsCols2.includes('parent_id')) {
+  db.exec('ALTER TABLE habits ADD COLUMN parent_id TEXT');
+}
+if (!habitsCols2.includes('position_in_parent')) {
+  db.exec('ALTER TABLE habits ADD COLUMN position_in_parent INTEGER');
+}
+db.prepare(`
+  UPDATE habits SET kind = 'simple'
+  WHERE kind IS NULL OR kind NOT IN ('simple', 'compound')
+`).run();
+db.exec('CREATE INDEX IF NOT EXISTS idx_habits_parent_position ON habits(parent_id, position_in_parent)');
+
+migrateActiveRitualsToCompoundHabits(db);
 
 const habitLogsCols = db.prepare("PRAGMA table_info(habit_logs)").all().map(c => c.name);
 if (!habitLogsCols.includes('value')) {
@@ -392,6 +486,10 @@ if (!tasksCols2.includes('day_outcome_reason')) {
 db.prepare(`
   UPDATE tasks SET idea_status = 'capturada'
   WHERE category = 'ideias' AND (idea_status IS NULL OR idea_status = '')
+`).run();
+db.prepare(`
+  UPDATE achievements SET description = 'Rotina matinal 5x'
+  WHERE id = 'early_bird' AND COALESCE(description, '') != 'Rotina matinal 5x'
 `).run();
 
 backfillSortOrder(db, 'tasks');

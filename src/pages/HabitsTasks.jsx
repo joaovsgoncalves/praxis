@@ -28,7 +28,7 @@ import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { hapticLight } from '@/lib/haptics';
 import HabitForm from '@/components/habits-tasks/HabitForm';
-import RitualWidget from '@/components/dashboard/RitualWidget';
+import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
 import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
@@ -128,17 +128,13 @@ export default function HabitsTasks() {
     queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
   const { data: habits = [] } = useQuery({
-    queryKey: ['allHabits', habitStatusFilter],
-    queryFn: () => praxisApi.habits.list({ status: habitStatusFilter }),
+    queryKey: ['allHabits', habitStatusFilter, today],
+    queryFn: () => praxisApi.habits.list({ status: habitStatusFilter, date: today }),
   });
   const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => praxisApi.habitLogs.list({ date: today }) });
   const { data: activeHabitsList = [] } = useQuery({
-    queryKey: ['habits', 'active'],
-    queryFn: () => praxisApi.habits.list({ status: 'active' }),
-  });
-  const { data: activeRituals = [] } = useQuery({
-    queryKey: ['rituals', { date: today, status: 'active' }],
-    queryFn: () => praxisApi.rituals.list({ status: 'active', date: today }),
+    queryKey: ['habits', 'active', today],
+    queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
   });
   const { data: userSettings } = useQuery({
     queryKey: ['me'],
@@ -178,7 +174,6 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       queryClient.invalidateQueries({ queryKey: ['goalHabits'] });
-      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       setEditingHabit(null);
     },
   });
@@ -259,7 +254,6 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       toast('Registrado. O importante é não quebrar a corrente dois dias seguidos.');
       setSkipSheetHabit(null);
     },
@@ -382,15 +376,13 @@ export default function HabitsTasks() {
     if (categoryFilter !== 'all' && h.category !== categoryFilter) return false;
     return true;
   });
-  const showRituals = habitStatusFilter === 'active' && categoryFilter === 'all' && activeRituals.length > 0;
-  const activeRitualHabitIds = new Set(
-    activeRituals.flatMap((ritual) => ritual.habits_order || ritual.habits?.map((habit) => habit.id) || []),
+  const compoundHabits = filteredHabits.filter((habit) => habit.kind === 'compound');
+  const flatHabits = filteredHabits.filter((habit) => habit.kind !== 'compound');
+  const showCompounds = compoundHabits.length > 0;
+  const activeLeafHabits = activeHabitsList.flatMap((habit) =>
+    habit.kind === 'compound' ? (habit.children || []) : [habit]
   );
-  const flatHabits = showRituals
-    ? filteredHabits.filter((habit) => !activeRitualHabitIds.has(habit.id))
-    : filteredHabits;
-
-  const activeHabitsDueToday = activeHabitsList.filter(
+  const activeHabitsDueToday = activeLeafHabits.filter(
     (h) => isHabitDueOnDate(h, today)
   );
   const habitDayCounts = countHabitDayOutcomes(activeHabitsDueToday, habitLogs, today);
@@ -764,21 +756,26 @@ export default function HabitsTasks() {
               </div>
             )}
 
-            {showRituals && (
+            {showCompounds && (
               <div className="space-y-2">
-                <RitualWidget collapsible today={today} status="active" />
+                <CompoundHabitsWidget
+                  collapsible
+                  compounds={compoundHabits}
+                  today={today}
+                  status={habitStatusFilter}
+                />
                 <p className="px-1 text-[11px] text-muted-foreground">
-                  Hábitos do ritual se editam pelo lápis em cada passo (e dá pra marcar horário preferido).
+                  Edite cada passo da rotina pelo lápis — inclusive o horário preferido.
                 </p>
               </div>
             )}
 
             {flatHabits.length === 0 ? (
-              !showRituals && (
+              !showCompounds && (
                 <PraxisEmptyState
                   icon={Flame}
                   title="Nenhum hábito ainda"
-                  description="Cadastre hábitos essenciais — eles aparecem no Hoje e nos rituais."
+                  description="Cadastre hábitos essenciais — simples ou organizados em rotinas."
                   action={(
                     <Button
                       onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
@@ -791,7 +788,7 @@ export default function HabitsTasks() {
               )
             ) : (
               <div className="space-y-3">
-                {showRituals && (
+                {showCompounds && (
                   <p className="pt-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
                     Outros hábitos
                   </p>

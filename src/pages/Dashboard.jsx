@@ -10,7 +10,7 @@ import WellnessWidget from '@/components/dashboard/WellnessWidget';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import NutritionTodayCard from '@/components/nutrition/NutritionTodayCard';
 import TodayCalendar from '@/components/dashboard/TodayCalendar';
-import RitualWidget from '@/components/dashboard/RitualWidget';
+import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
 import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
 import CapturePendingBanner from '@/components/dashboard/CapturePendingBanner';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
@@ -92,8 +92,8 @@ export default function Dashboard() {
   }, [allTasks, today]);
 
   const { data: habits = [], isLoading: isLoadingHabits } = useQuery({
-    queryKey: ['habits'],
-    queryFn: () => praxisApi.habits.list({ status: 'active' }),
+    queryKey: ['habits', today],
+    queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
   });
 
   const { data: habitLogs = [], isLoading: isLoadingLogs } = useQuery({
@@ -197,7 +197,6 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       toast('Não rolou — registrado.');
     },
   });
@@ -218,12 +217,32 @@ export default function Dashboard() {
 
   const nowTask = React.useMemo(() => pickNowTask(allTasks, today), [allTasks, today]);
 
-  // Todos os hábitos devidos hoje — sem slice (Hero e lista contam a verdade)
-  const essentialHabits = React.useMemo(
-    () => habits
+  const compoundHabits = React.useMemo(
+    () => habits.filter((habit) => habit.kind === 'compound'),
+    [habits],
+  );
+
+  const standaloneHabits = React.useMemo(
+    () => habits.filter((habit) => habit.kind !== 'compound'),
+    [habits],
+  );
+
+  // O resumo conta apenas folhas: simples avulsos + passos das rotinas.
+  const standaloneHabitsDueToday = React.useMemo(
+    () => standaloneHabits
       .filter((h) => isHabitDueOnDate(h, today))
       .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)),
-    [habits, today],
+    [standaloneHabits, today],
+  );
+
+  const essentialHabits = React.useMemo(
+    () => [
+      ...standaloneHabitsDueToday,
+      ...compoundHabits.flatMap((compound) =>
+        (compound.children || []).filter((habit) => isHabitDueOnDate(habit, today))
+      ),
+    ],
+    [compoundHabits, standaloneHabitsDueToday, today],
   );
 
   const completedTasks = tasks.filter(t => isTaskDone(t)).length;
@@ -331,7 +350,7 @@ export default function Dashboard() {
               <TodayHabits
                 title="Hábitos essenciais"
                 today={today}
-                habits={essentialHabits}
+                habits={standaloneHabitsDueToday}
                 habitLogs={habitLogs}
                 onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
                 onSkipHabit={(habitId, skipReason, skipNote) =>
@@ -347,14 +366,14 @@ export default function Dashboard() {
             icon={Gauge}
             eyebrow="Contexto"
             title="Como seu dia está agora"
-            description="Corpo, agenda, alimentação e rituais no mesmo quadro."
+            description="Corpo, agenda, alimentação e rotinas no mesmo quadro."
             tone="text-domain-wellness"
           />
           <div className="space-y-3 sm:space-y-4">
             <NutritionTodayCard />
             <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
             <TodayCalendar />
-            <RitualWidget />
+            <CompoundHabitsWidget compounds={compoundHabits} today={today} />
           </div>
         </section>
       </div>
@@ -374,7 +393,7 @@ export default function Dashboard() {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4 px-3 pb-5 sm:px-4">
-          {/* Opening ritual fica no RitualWidget (contexto) — sem double manhã (lote 10b) */}
+          {/* A rotina de abertura fica no card de rotinas — sem duplicar a manhã. */}
           <SuggestedGoalCard />
           <WeeklyReviewPrompt />
           <AvoidanceCockpit />

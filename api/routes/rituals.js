@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import { isHabitLogDone, isHabitLogSkipped } from '../lib/habitStreaks.js';
+import { listHabitTree } from './habits.js';
 
 const RITUAL_TEMPLATES = {
   day_open: {
@@ -34,49 +34,27 @@ export function createRitualsRouter({ db, getLocalDateString, nextSortOrder }) {
   }
 
   router.get('/', (req, res) => {
-    const { status } = req.query;
-    let query = 'SELECT * FROM rituals';
-    const params = [];
-    if (status) { query += ' WHERE status = ?'; params.push(status); }
-    query += ' ORDER BY created_date DESC';
+    const requestedStatus = String(req.query.status || 'active');
+    const status = ['active', 'paused', 'archived', 'all'].includes(requestedStatus)
+      ? requestedStatus
+      : 'active';
+    const compounds = listHabitTree({
+      db,
+      getLocalDateString,
+      status,
+      date: req.query.date ? String(req.query.date) : undefined,
+    }).filter((habit) => habit.kind === 'compound');
 
-    const rituals = db.prepare(query).all(...params);
-    const today = getLocalDateString();
-
-    const enriched = rituals.map(ritual => {
-      const habitIds = JSON.parse(ritual.habits_order || '[]');
-      const habits = habitIds.map(hid => {
-        const habit = db.prepare(`
-          SELECT id, title, description, frequency, category, streak_target, goal_id, source,
-                 status, sort_order, recurrence_days, target_value, unit, preferred_time
-          FROM habits WHERE id = ?
-        `).get(hid);
-        if (!habit) return null;
-        const log = db.prepare(
-          'SELECT completed, outcome, skip_reason, note FROM habit_logs WHERE habit_id = ? AND date = ?',
-        ).get(hid, today);
-        const done = isHabitLogDone(log);
-        const skipped = isHabitLogSkipped(log);
-        return {
-          ...habit,
-          completed_today: done,
-          skipped_today: skipped,
-          day_outcome: skipped ? 'skipped' : done ? 'done' : 'open',
-          skip_reason: log?.skip_reason || null,
-          skip_note: (log?.note && String(log.note).trim()) || null,
-        };
-      }).filter(Boolean);
-      // Timed habits first within the ritual (empty time last)
-      habits.sort((a, b) => {
-        const ta = a.preferred_time || '99:99';
-        const tb = b.preferred_time || '99:99';
-        if (ta !== tb) return ta.localeCompare(tb);
-        return 0;
-      });
-      return { ...ritual, habits_order: habitIds, habits };
-    });
-
-    res.json(enriched);
+    res.json(compounds.map((compound) => ({
+      id: compound.id,
+      name: compound.title,
+      emoji: compound.emoji,
+      time_of_day: compound.time_of_day || 'morning',
+      status: compound.status,
+      created_date: compound.created_date,
+      habits_order: compound.children.map((child) => child.id),
+      habits: compound.children,
+    })));
   });
 
   router.get('/:id/progress', (req, res) => {

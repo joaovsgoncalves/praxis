@@ -357,6 +357,11 @@ export const praxisApi = {
     create: (data) => request('/api/habits', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/api/habits/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     reorder: (orderedIds) => request('/api/habits/reorder', { method: 'PATCH', body: JSON.stringify({ ordered_ids: orderedIds }) }),
+    reorderChildren: (id, orderedIds) =>
+      request(`/api/habits/${id}/children`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ordered_ids: orderedIds }),
+      }),
     delete: (id) => request(`/api/habits/${id}`, { method: 'DELETE' }),
   },
 

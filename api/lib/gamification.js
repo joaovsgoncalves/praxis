@@ -46,7 +46,7 @@ export function checkAchievements(db, { getLocalDateString }) {
     newlyUnlocked.push(centurion.id);
   }
 
-  const habits = db.prepare("SELECT id FROM habits WHERE status = 'active'").all();
+  const habits = db.prepare("SELECT id FROM habits WHERE status = 'active' AND kind = 'simple'").all();
   const onFire = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'on_fire'").get();
   if (onFire && !onFire.unlocked_date) {
     for (const h of habits) {
@@ -80,13 +80,34 @@ export function checkAchievements(db, { getLocalDateString }) {
 
   const earlyBird = db.prepare("SELECT id, unlocked_date FROM achievements WHERE id = 'early_bird'").get();
   if (earlyBird && !earlyBird.unlocked_date) {
-    const morningRituals = db.prepare("SELECT id FROM rituals WHERE time_of_day = 'morning' AND status = 'active'").all();
-    for (const r of morningRituals) {
-      const habitIds = [];
-      const ritualRow = db.prepare("SELECT habits_order FROM rituals WHERE id = ?").get(r.id);
-      if (ritualRow) {
-        try { habitIds.push(...JSON.parse(ritualRow.habits_order || '[]')); } catch { /* ignore */ }
-      }
+    const morningSequences = [];
+    const compounds = db.prepare(`
+      SELECT h.id
+      FROM habits h
+      JOIN rituals r ON h.source = 'ritual_migration:' || r.id
+      WHERE h.kind = 'compound' AND h.status = 'active' AND r.time_of_day = 'morning'
+    `).all();
+    for (const compound of compounds) {
+      const childIds = db.prepare(`
+        SELECT id FROM habits
+        WHERE parent_id = ? AND kind = 'simple'
+        ORDER BY position_in_parent IS NULL, position_in_parent ASC, sort_order ASC
+      `).all(compound.id).map((row) => row.id);
+      morningSequences.push(childIds);
+    }
+
+    // One-release compatibility for databases/tests that still have active rows.
+    const legacyRows = db.prepare(
+      "SELECT habits_order FROM rituals WHERE time_of_day = 'morning' AND status = 'active'",
+    ).all();
+    for (const row of legacyRows) {
+      try {
+        const ids = JSON.parse(row.habits_order || '[]');
+        if (Array.isArray(ids)) morningSequences.push(ids);
+      } catch { /* ignore invalid legacy JSON */ }
+    }
+
+    for (const habitIds of morningSequences) {
       if (habitIds.length === 0) continue;
       const allDates = db.prepare(
         `SELECT DISTINCT date FROM habit_logs WHERE habit_id IN (${habitIds.map(() => '?').join(',')}) AND completed = 1`,

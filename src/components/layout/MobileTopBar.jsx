@@ -13,7 +13,6 @@ const ROUTE_TITLES = [
   { prefix: '/nutricao', title: 'Nutrição' },
   { prefix: '/foco', title: 'Modo Foco' },
   { prefix: '/metas', title: 'Metas' },
-  { prefix: '/rituais', title: 'Rituais' },
   { prefix: '/conquistas', title: 'Conquistas' },
   { prefix: '/revisao-semanal', title: 'Revisão semanal' },
   { prefix: '/historico', title: 'Histórico' },

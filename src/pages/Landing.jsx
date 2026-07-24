@@ -55,7 +55,7 @@ const featureCards = [
     icon: CircleDot,
     eyebrow: 'Hoje',
     title: 'Uma tela para saber o que fazer agora.',
-    description: 'Prioridade, tarefas, hábitos, agenda e rituais no lugar certo — sem transformar seu dia em um painel infinito.',
+    description: 'Prioridade, tarefas, hábitos, agenda e rotinas no lugar certo — sem transformar seu dia em um painel infinito.',
     accent: 'domain-gold',
   },
   {
@@ -81,9 +81,9 @@ const featureCards = [
   },
   {
     icon: Target,
-    eyebrow: 'Metas e rituais',
+    eyebrow: 'Metas e rotinas',
     title: 'A intenção precisa sobreviver ao cotidiano.',
-    description: 'Transforme objetivos grandes em rituais repetíveis e mantenha o que importa visível quando a motivação cai.',
+    description: 'Transforme objetivos grandes em rotinas repetíveis e mantenha o que importa visível quando a motivação cai.',
     accent: 'domain-sky',
   },
   {
@@ -267,7 +267,7 @@ export default function Landing() {
                 <h2 className="praxis-title max-w-2xl text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Sua vida inteira não precisa morar em seis aplicativos.</h2>
               </div>
               <p className="max-w-2xl text-base leading-8 text-muted-foreground lg:justify-self-end lg:text-lg">
-                Tarefas, foco, hábitos, treino, nutrição, metas, rituais e revisão compartilham o mesmo contexto. Menos troca de ferramenta. Menos recomeço. Mais continuidade.
+                Tarefas, foco, hábitos, treino, nutrição, metas, rotinas e revisão compartilham o mesmo contexto. Menos troca de ferramenta. Menos recomeço. Mais continuidade.
               </p>
             </div>
 

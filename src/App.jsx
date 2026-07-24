@@ -14,7 +14,6 @@ import Nutricao from '@/pages/Nutricao';
 import Treinos from '@/pages/Treinos';
 import Focus from '@/pages/Focus';
 import Goals from '@/pages/Goals';
-import Rituais from '@/pages/Rituais';
 import History from '@/pages/History';
 import Settings from '@/pages/Settings';
 import VoiceCapture from '@/pages/VoiceCapture';
@@ -100,7 +99,7 @@ const AuthenticatedApp = () => {
         <Route path="/nutricao" element={<Nutricao />} />
         <Route path="/foco" element={<Focus />} />
         <Route path="/metas" element={<Goals />} />
-        <Route path="/rituais" element={<Rituais />} />
+        <Route path="/rituais" element={<Navigate to="/habitos-tarefas?tab=habits" replace />} />
         <Route path="/historico" element={<History />} />
         <Route path="/configuracoes" element={<Settings />} />
         <Route path="/captura" element={<VoiceCapture />} />

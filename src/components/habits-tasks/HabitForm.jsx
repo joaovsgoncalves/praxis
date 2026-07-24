@@ -129,7 +129,7 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
           className="bg-secondary/50"
         />
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Se o hábito roda em um horário fixo (ex.: 22h), marca aqui. Ele aparece com o relógio e sobe na ordem do ritual.
+          Se o hábito roda em um horário fixo (ex.: 22h), marque aqui. Ele aparece com o relógio no passo da rotina.
         </p>
       </div>
 

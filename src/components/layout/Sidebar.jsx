@@ -118,11 +118,6 @@ export default function Sidebar({ open, onClose }) {
     queryFn: () => praxisApi.goals.list(),
     staleTime: 60_000,
   });
-  const { data: rituals = [] } = useQuery({
-    queryKey: ['rituals', 'nav'],
-    queryFn: () => praxisApi.rituals.list({ status: 'active' }),
-    staleTime: 60_000,
-  });
   const { data: gamificationNav } = useQuery({
     queryKey: ['gamification'],
     queryFn: () => praxisApi.gamification.get(),
@@ -130,12 +125,10 @@ export default function Sidebar({ open, onClose }) {
   });
 
   const activeGoalCount = goals.filter((g) => g.status === 'active').length;
-  const activeRitualCount = rituals.length;
   const unlockedAchievementCount = (gamificationNav?.achievements || []).filter((a) => a.unlocked).length;
 
   const secondary = filterSecondaryNav(secondaryNavItems, {
     activeGoalCount,
-    activeRitualCount,
     unlockedAchievementCount,
   });
 

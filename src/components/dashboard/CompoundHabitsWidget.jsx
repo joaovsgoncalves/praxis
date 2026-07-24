@@ -37,9 +37,9 @@ function ConfettiOverlay() {
   );
 }
 
-function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEditHabit, collapsible = false }) {
+function CompoundHabitItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEditHabit, collapsible = true }) {
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isOpen, setIsOpen] = useState(!collapsible);
+  const [isOpen, setIsOpen] = useState(true);
   const prevDoneRef = useRef(null);
 
   const habits = ritual.habits || [];
@@ -52,9 +52,9 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEd
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const nextHabit = habits.find((h) => habitDayState(h) === 'open');
   const statusCopy = isComplete
-    ? 'Ritual completo. Dia registrado.'
+    ? 'Rotina completa. Dia registrado.'
     : isMinimum
-      ? 'Ritual parcial também conta. Sem culpa.'
+      ? 'Rotina parcial também conta. Sem culpa.'
       : skippedCount > 0 && completedCount === 0
         ? 'Tem passo em não rolou — dá pra desfazer ou seguir.'
         : 'Comece pelo mínimo: só o primeiro passo.';
@@ -90,7 +90,7 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEd
           <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
           <span className="text-xs text-muted-foreground shrink-0">
             {completedCount}/{totalCount}
-            {skippedCount > 0 ? ` · ${skippedCount} nr` : ''}
+            {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
           </span>
           <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
         </button>
@@ -110,7 +110,7 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEd
           ) : (
             <span className="text-xs text-muted-foreground shrink-0">
               {completedCount}/{totalCount}
-              {addressedCount > completedCount ? ` · ${skippedCount} nr` : ''}
+              {addressedCount > completedCount ? ` · ${skippedCount} não rolou` : ''}
             </span>
           )}
         </div>
@@ -163,7 +163,7 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEd
                     </span>
                   ) : (
                     <Checkbox
-                      id={`ritual-habit-${ritual.id}-${habit.id}`}
+                      id={`compound-habit-${ritual.id}-${habit.id}`}
                       checked={done}
                       onCheckedChange={() => onToggleHabit(habit.id, done)}
                       className={cn(
@@ -175,7 +175,7 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEd
                     />
                   )}
                   <label
-                    htmlFor={skipped ? undefined : `ritual-habit-${ritual.id}-${habit.id}`}
+                    htmlFor={skipped ? undefined : `compound-habit-${ritual.id}-${habit.id}`}
                     className={cn(
                       'min-w-0 flex-1 text-xs select-none',
                       skipped ? 'text-muted-foreground opacity-80' : 'cursor-pointer',
@@ -244,19 +244,32 @@ function RitualItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEd
   );
 }
 
-export default function RitualWidget({ collapsible = false, today: todayProp, status }) {
+export default function CompoundHabitsWidget({
+  collapsible = true,
+  compounds: compoundsProp,
+  today: todayProp,
+  status = 'active',
+}) {
   const queryClient = useQueryClient();
   const today = todayProp || fortalezaDateKey();
-  const ritualParams = { date: today, ...(status ? { status } : {}) };
-  const ritualQueryKey = ['rituals', ritualParams];
+  const habitParams = { date: today, status };
+  const compoundQueryKey = ['habits', 'compounds', habitParams];
   const [skipHabitTarget, setSkipHabitTarget] = useState(null);
   const [editingHabit, setEditingHabit] = useState(null);
 
-  const { data: rituals = [], isLoading, isError } = useQuery({
-    queryKey: ritualQueryKey,
-    queryFn: () => praxisApi.rituals.list(ritualParams),
+  const { data: queriedHabits = [], isLoading, isError } = useQuery({
+    queryKey: compoundQueryKey,
+    queryFn: () => praxisApi.habits.list(habitParams),
+    enabled: compoundsProp === undefined,
     refetchInterval: 30000,
   });
+  const compounds = compoundsProp
+    ?? queriedHabits.filter((habit) => habit.kind === 'compound');
+  const rituals = compounds.map((compound) => ({
+    ...compound,
+    name: compound.title,
+    habits: compound.children || [],
+  }));
 
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
@@ -274,43 +287,10 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
         });
       }
     },
-    onMutate: async ({ habitId, isDone }) => {
-      await queryClient.cancelQueries({ queryKey: ['rituals'] });
-      const previous = queryClient.getQueryData(ritualQueryKey);
-      queryClient.setQueryData(ritualQueryKey, (old) => {
-        if (!old) return old;
-        return old.map((ritual) => ({
-          ...ritual,
-          habits: ritual.habits.map((h) => {
-            if (h.id !== habitId) return h;
-            if (isDone) {
-              return {
-                ...h,
-                completed_today: false,
-                skipped_today: false,
-                day_outcome: 'open',
-              };
-            }
-            return {
-              ...h,
-              completed_today: true,
-              skipped_today: false,
-              day_outcome: 'done',
-            };
-          }),
-        }));
-      });
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(ritualQueryKey, context.previous);
-      }
-    },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
     },
   });
 
@@ -324,41 +304,14 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
         ...(skipNote ? { note: skipNote } : {}),
       });
     },
-    onMutate: async ({ habitId, skipNote }) => {
-      await queryClient.cancelQueries({ queryKey: ['rituals'] });
-      const previous = queryClient.getQueryData(ritualQueryKey);
-      queryClient.setQueryData(ritualQueryKey, (old) => {
-        if (!old) return old;
-        return old.map((ritual) => ({
-          ...ritual,
-          habits: ritual.habits.map((h) =>
-            h.id === habitId
-              ? {
-                  ...h,
-                  completed_today: false,
-                  skipped_today: true,
-                  day_outcome: 'skipped',
-                  skip_note: skipNote || h.skip_note || null,
-                }
-              : h
-          ),
-        }));
-      });
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(ritualQueryKey, context.previous);
-      }
-    },
     onSuccess: () => {
       toast('Não rolou — registrado.');
       setSkipHabitTarget(null);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
     },
   });
 
@@ -367,7 +320,6 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
     onSuccess: () => {
       toast('Hábito atualizado.');
       setEditingHabit(null);
-      queryClient.invalidateQueries({ queryKey: ['rituals'] });
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
     },
@@ -394,8 +346,8 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
             <Sparkles className="h-4 w-4 text-domain-gold" aria-hidden />
           </div>
           <div>
-            <p className="text-[11px] font-medium text-muted-foreground">Ritmos do dia</p>
-            <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rituais</CardTitle>
+            <p className="text-[11px] font-medium text-muted-foreground">Hábitos compostos</p>
+            <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rotinas</CardTitle>
             <p className="mt-1 text-[11px] text-muted-foreground">
               Toque no lápis pra editar qualquer passo — horário incluso.
             </p>
@@ -412,16 +364,16 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
 
         {isError && (
           <p className="text-sm text-destructive py-4 text-center">
-            Erro ao carregar rituais
+            Erro ao carregar as rotinas
           </p>
         )}
 
         {!isLoading && !isError && rituals.length === 0 && (
           <div className="flex flex-col items-center py-6 gap-2">
             <Sparkles className="w-8 h-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Nenhum ritual ainda</p>
+            <p className="text-sm text-muted-foreground">Nenhuma rotina ainda</p>
             <p className="text-xs text-muted-foreground/60 text-center max-w-xs">
-              Monte uma sequência em Rituais — manhã, tarde ou noite.
+              Agrupe passos que fazem sentido juntos no seu dia.
             </p>
           </div>
         )}
@@ -441,7 +393,7 @@ export default function RitualWidget({ collapsible = false, today: todayProp, st
                   </div>
                   <div className="space-y-2">
                     {groupRituals.map((ritual) => (
-                      <RitualItem
+                      <CompoundHabitItem
                         key={ritual.id}
                         ritual={ritual}
                         collapsible={collapsible}

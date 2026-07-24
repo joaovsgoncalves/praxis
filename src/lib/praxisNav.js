@@ -7,7 +7,6 @@ import {
   ShoppingBag,
   Timer,
   Target,
-  Link2,
   Trophy,
   BarChart3,
   Settings,
@@ -32,7 +31,6 @@ export const secondaryNavItems = [
   { path: '/nutricao', label: 'Nutrição', icon: UtensilsCrossed },
   // /capturas fica acessível por banner/links do Falar — fora do menu (João 2026-07-16)
   { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
-  { path: '/rituais', label: 'Rituais', icon: Link2 },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy, requiresUnlockedAchievements: true },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
@@ -41,12 +39,10 @@ export const secondaryNavItems = [
 export function filterSecondaryNav(items, ctx) {
   const {
     activeGoalCount = 0,
-    activeRitualCount = 0,
     unlockedAchievementCount = 0,
   } = ctx;
   return items.filter((item) => {
     if (item.requiresActiveGoals) return activeGoalCount > 0;
-    if (item.requiresActiveRituals) return activeRitualCount > 0;
     if (item.requiresUnlockedAchievements) return unlockedAchievementCount > 0;
     return true;
   });
