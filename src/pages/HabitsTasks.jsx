@@ -378,7 +378,6 @@ export default function HabitsTasks() {
   });
   const compoundHabits = filteredHabits.filter((habit) => habit.kind === 'compound');
   const flatHabits = filteredHabits.filter((habit) => habit.kind !== 'compound');
-  const showCompounds = compoundHabits.length > 0;
   const activeLeafHabits = activeHabitsList.flatMap((habit) =>
     habit.kind === 'compound' ? (habit.children || []) : [habit]
   );
@@ -756,43 +755,33 @@ export default function HabitsTasks() {
               </div>
             )}
 
-            {showCompounds && (
-              <div className="space-y-2">
+            {filteredHabits.length === 0 ? (
+              <PraxisEmptyState
+                icon={Flame}
+                title="Nenhum hábito ainda"
+                description="Cadastre hábitos essenciais — simples ou organizados em rotinas."
+                action={(
+                  <Button
+                    onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
+                    className="rounded-full praxis-touch-target"
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" /> Novo hábito
+                  </Button>
+                )}
+              />
+            ) : (
+              <div className="space-y-3">
                 <CompoundHabitsWidget
                   collapsible
                   compounds={compoundHabits}
                   today={today}
                   status={habitStatusFilter}
+                  variant="list"
+                  onEditCompound={(compound) => {
+                    setShowHabitForm(false);
+                    setEditingHabit(compound);
+                  }}
                 />
-                <p className="px-1 text-[11px] text-muted-foreground">
-                  Edite cada passo da rotina pelo lápis — inclusive o horário preferido.
-                </p>
-              </div>
-            )}
-
-            {flatHabits.length === 0 ? (
-              !showCompounds && (
-                <PraxisEmptyState
-                  icon={Flame}
-                  title="Nenhum hábito ainda"
-                  description="Cadastre hábitos essenciais — simples ou organizados em rotinas."
-                  action={(
-                    <Button
-                      onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
-                      className="rounded-full praxis-touch-target"
-                    >
-                      <Plus className="mr-1.5 h-4 w-4" /> Novo hábito
-                    </Button>
-                  )}
-                />
-              )
-            ) : (
-              <div className="space-y-3">
-                {showCompounds && (
-                  <p className="pt-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                    Outros hábitos
-                  </p>
-                )}
                 {flatHabits.map((habit, index) => {
                   const outcome = habitDayOutcome(habit.id);
                   const done = outcome === 'done';
@@ -987,8 +976,8 @@ export default function HabitsTasks() {
       </Dialog>
 
       <Dialog open={showHabitForm} onOpenChange={setShowHabitForm}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Novo Hábito</DialogTitle></DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle>Novo hábito</DialogTitle></DialogHeader>
           <HabitForm
             key="habit-create"
             onSubmit={(data) => createHabit.mutate(data)}
@@ -998,8 +987,10 @@ export default function HabitsTasks() {
       </Dialog>
 
       <Dialog open={Boolean(editingHabit)} onOpenChange={(open) => { if (!open) setEditingHabit(null); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar hábito</DialogTitle></DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingHabit?.kind === 'compound' ? 'Editar rotina' : 'Editar hábito'}</DialogTitle>
+          </DialogHeader>
           {editingHabit && (
             <HabitForm
               key={editingHabit.id}

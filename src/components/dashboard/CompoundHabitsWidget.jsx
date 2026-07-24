@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle2, ChevronDown, Clock, Flame, Minus, Pencil, Sparkles } from 'lucide-react';
+import { ChevronDown, Clock, Flame, Minus, Pencil, Sparkles } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -15,12 +14,6 @@ import { formatPreferredTime } from '@/lib/habits';
 import { toast } from 'sonner';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
 import HabitForm from '@/components/habits-tasks/HabitForm';
-
-const timeOfDayConfig = {
-  morning: { emoji: '🌅', label: 'Manhã', order: 0 },
-  afternoon: { emoji: '☀️', label: 'Tarde', order: 1 },
-  evening: { emoji: '🌙', label: 'Noite', order: 2 },
-};
 
 function habitDayState(habit) {
   if (habit?.day_outcome === 'skipped' || habit?.skipped_today) return 'skipped';
@@ -37,119 +30,131 @@ function ConfettiOverlay() {
   );
 }
 
-function CompoundHabitItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimum, onEditHabit, collapsible = true }) {
+function CompoundHabitItem({
+  compound,
+  onToggleHabit,
+  onOpenSkip,
+  onCompleteMinimum,
+  onEditCompound,
+  collapsible = true,
+  listItem = false,
+}) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
-  const prevDoneRef = useRef(null);
-
-  const habits = ritual.habits || [];
-  const completedCount = habits.filter((h) => habitDayState(h) === 'done').length;
-  const skippedCount = habits.filter((h) => habitDayState(h) === 'skipped').length;
+  const prevAllDoneRef = useRef(null);
+  const steps = compound.children || [];
+  const completedCount = steps.filter((step) => habitDayState(step) === 'done').length;
+  const skippedCount = steps.filter((step) => habitDayState(step) === 'skipped').length;
   const addressedCount = completedCount + skippedCount;
-  const totalCount = habits.length;
-  const isComplete = totalCount > 0 && completedCount === totalCount;
-  const isMinimum = completedCount > 0 && !isComplete;
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-  const nextHabit = habits.find((h) => habitDayState(h) === 'open');
-  const statusCopy = isComplete
-    ? 'Rotina completa. Dia registrado.'
-    : isMinimum
-      ? 'Rotina parcial também conta. Sem culpa.'
-      : skippedCount > 0 && completedCount === 0
-        ? 'Tem passo em não rolou — dá pra desfazer ou seguir.'
-        : 'Comece pelo mínimo: só o primeiro passo.';
+  const totalCount = steps.length;
+  const isClosed = totalCount > 0 && addressedCount === totalCount;
+  const allDone = totalCount > 0 && completedCount === totalCount;
+  const isPartial = addressedCount > 0 && !isClosed;
+  const progressPercent = totalCount > 0 ? Math.round((addressedCount / totalCount) * 100) : 0;
+  const nextStep = steps.find((step) => habitDayState(step) === 'open');
+  const statusCopy = isClosed
+    ? skippedCount > 0
+      ? `Dia registrado · ${completedCount} ${completedCount === 1 ? 'feito' : 'feitos'} · ${skippedCount} não rolou`
+      : 'Rotina concluída. Dia registrado.'
+    : isPartial
+      ? 'Você já começou. Siga pelo próximo passo.'
+      : 'Comece pelo mínimo: só o primeiro passo.';
 
   useEffect(() => {
-    if (prevDoneRef.current === false && isComplete) {
+    if (prevAllDoneRef.current === false && allDone) {
       setShowConfetti(true);
       const timer = setTimeout(() => setShowConfetti(false), 1200);
       return () => clearTimeout(timer);
     }
-    prevDoneRef.current = isComplete;
-  }, [isComplete]);
+    prevAllDoneRef.current = allDone;
+  }, [allDone]);
 
   return (
-    <div className={cn(
-      'relative rounded-xl border p-3.5 transition-[background-color,border-color,box-shadow]',
-      isComplete
-        ? 'border-domain-wellness/18 bg-domain-wellness/[0.065]'
-        : isMinimum
-          ? 'border-domain-gold/18 bg-domain-gold/[0.055]'
-          : 'border-white/[0.05] bg-white/[0.022] hover:border-white/[0.09] hover:bg-white/[0.035]'
-    )}>
+    <div
+      className={cn(
+        'relative rounded-xl border p-3.5 transition-[background-color,border-color,box-shadow]',
+        listItem && 'card-domain domain-wellness bg-card/75',
+        isClosed
+          ? 'border-domain-wellness/25 bg-domain-wellness/[0.07]'
+          : isPartial
+            ? 'border-domain-gold/18 bg-domain-gold/[0.055]'
+            : 'border-white/[0.07] bg-white/[0.022] hover:border-white/[0.11] hover:bg-white/[0.035]',
+      )}
+    >
       {showConfetti && <ConfettiOverlay />}
 
-      {collapsible ? (
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 text-left"
-          onClick={() => setIsOpen((open) => !open)}
-          aria-expanded={isOpen}
-        >
-          <span className="text-lg">{ritual.emoji || '⚡'}</span>
-          <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {completedCount}/{totalCount}
-            {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
-          </span>
-          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
-        </button>
-      ) : (
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">{ritual.emoji || '⚡'}</span>
-          <span className="text-sm font-medium flex-1 truncate">{ritual.name}</span>
-          {isComplete ? (
-            <Badge variant="outline" className="shrink-0 border-domain-wellness/20 bg-domain-wellness/[0.08] text-xs text-domain-wellness">
-              <CheckCircle2 className="w-3 h-3 mr-1" />
-              Completo
-            </Badge>
-          ) : isMinimum ? (
-            <Badge variant="outline" className="shrink-0 border-domain-gold/20 bg-domain-gold/[0.07] text-xs text-domain-gold">
-              Parcial
-            </Badge>
-          ) : (
-            <span className="text-xs text-muted-foreground shrink-0">
+      <div className="flex items-center gap-1">
+        {collapsible ? (
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            onClick={() => setIsOpen((open) => !open)}
+            aria-expanded={isOpen}
+          >
+            <span className="text-lg">{compound.emoji || '⚡'}</span>
+            <span className="flex-1 truncate text-sm font-medium">{compound.title}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
               {completedCount}/{totalCount}
-              {addressedCount > completedCount ? ` · ${skippedCount} não rolou` : ''}
+              {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
             </span>
-          )}
-        </div>
-      )}
+            <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="text-lg">{compound.emoji || '⚡'}</span>
+            <span className="flex-1 truncate text-sm font-medium">{compound.title}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {completedCount}/{totalCount}
+              {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
+            </span>
+          </div>
+        )}
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          aria-label={`Editar rotina ${compound.title}`}
+          onClick={() => onEditCompound(compound)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </div>
 
       {(!collapsible || isOpen) && (
-        <div className={collapsible ? 'mt-3' : ''}>
+        <div className="mt-3">
           <Progress
             value={progressPercent}
-            className={cn('h-1.5 mb-2', isComplete ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
+            className={cn('mb-2 h-1.5', isClosed ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
           />
-
-          <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-[11px] text-muted-foreground">{statusCopy}</p>
-            {!isComplete && nextHabit && (
+            {!isClosed && nextStep && (
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-6 px-2 text-[11px] text-gold hover:text-gold"
-                onClick={() => onCompleteMinimum(nextHabit.id)}
+                className="h-7 px-2 text-[11px] text-gold hover:text-gold"
+                onClick={() => onCompleteMinimum(nextStep.id)}
               >
-                <Flame className="w-3 h-3" />
+                <Flame className="h-3 w-3" />
                 Mínimo
               </Button>
             )}
           </div>
 
           <ul className="space-y-1.5">
-            {habits.map((habit) => {
-              const state = habitDayState(habit);
+            {steps.map((step) => {
+              const state = habitDayState(step);
               const done = state === 'done';
               const skipped = state === 'skipped';
-              const timeLabel = formatPreferredTime(habit.preferred_time);
+              const timeLabel = formatPreferredTime(step.preferred_time);
+              const checkboxId = `compound-habit-${compound.id}-${step.id}`;
               return (
                 <li
-                  key={habit.id}
+                  key={step.id}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg px-1 py-1.5 group',
+                    'group flex items-center gap-2 rounded-lg px-1 py-1.5',
                     skipped && 'bg-amber-500/[0.06]',
                     timeLabel && !done && !skipped && 'bg-domain-gold/[0.04]',
                   )}
@@ -163,53 +168,52 @@ function CompoundHabitItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimu
                     </span>
                   ) : (
                     <Checkbox
-                      id={`compound-habit-${ritual.id}-${habit.id}`}
+                      id={checkboxId}
                       checked={done}
-                      onCheckedChange={() => onToggleHabit(habit.id, done)}
+                      onCheckedChange={() => onToggleHabit(step.id, done)}
                       className={cn(
                         'h-4 w-4 shrink-0',
                         done
-                          ? 'data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
-                          : 'border-muted-foreground/40'
+                          ? 'data-[state=checked]:border-green-500 data-[state=checked]:bg-green-500'
+                          : 'border-muted-foreground/40',
                       )}
                     />
                   )}
                   <label
-                    htmlFor={skipped ? undefined : `compound-habit-${ritual.id}-${habit.id}`}
+                    htmlFor={skipped ? undefined : checkboxId}
                     className={cn(
-                      'min-w-0 flex-1 text-xs select-none',
+                      'min-w-0 flex-1 select-none text-xs',
                       skipped ? 'text-muted-foreground opacity-80' : 'cursor-pointer',
                       done
-                        ? 'line-through text-muted-foreground'
+                        ? 'text-muted-foreground line-through'
                         : !skipped && 'text-foreground/80 group-hover:text-foreground',
                     )}
                   >
                     <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      {habit.emoji ? <span>{habit.emoji}</span> : null}
-                      <span>{habit.title || habit.name}</span>
-                      {timeLabel ? (
+                      <span>{step.title}</span>
+                      {timeLabel && (
                         <span className="inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-domain-gold">
                           <Clock className="h-2.5 w-2.5" aria-hidden />
                           {timeLabel}
                         </span>
-                      ) : null}
-                      {skipped ? (
+                      )}
+                      {skipped && (
                         <span className="text-[10px] font-medium text-amber-200/80">Não rolou</span>
-                      ) : null}
+                      )}
                     </span>
-                    {skipped && habit.skip_note ? (
+                    {skipped && step.skip_note && (
                       <span className="mt-0.5 block text-[10px] leading-snug text-amber-100/70">
-                        “{habit.skip_note}”
+                        “{step.skip_note}”
                       </span>
-                    ) : null}
+                    )}
                   </label>
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    aria-label={`Editar ${habit.title || habit.name || 'hábito'}`}
-                    onClick={() => onEditHabit?.(habit)}
+                    aria-label={`Editar rotina e passo ${step.title}`}
+                    onClick={() => onEditCompound(compound)}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -219,7 +223,7 @@ function CompoundHabitItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimu
                       size="sm"
                       variant="ghost"
                       className="h-7 shrink-0 px-2 text-[11px] text-muted-foreground"
-                      onClick={() => onOpenSkip?.(habit)}
+                      onClick={() => onOpenSkip(step)}
                     >
                       Nomear
                     </Button>
@@ -229,7 +233,7 @@ function CompoundHabitItem({ ritual, onToggleHabit, onOpenSkip, onCompleteMinimu
                       size="sm"
                       variant="outline"
                       className="h-7 shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 px-2 text-[11px] text-amber-100 hover:bg-amber-500/20"
-                      onClick={() => onOpenSkip?.(habit)}
+                      onClick={() => onOpenSkip(step)}
                     >
                       Não rolou
                     </Button>
@@ -249,13 +253,15 @@ export default function CompoundHabitsWidget({
   compounds: compoundsProp,
   today: todayProp,
   status = 'active',
+  variant = 'card',
+  onEditCompound: onEditCompoundProp,
 }) {
   const queryClient = useQueryClient();
   const today = todayProp || fortalezaDateKey();
   const habitParams = { date: today, status };
   const compoundQueryKey = ['habits', 'compounds', habitParams];
   const [skipHabitTarget, setSkipHabitTarget] = useState(null);
-  const [editingHabit, setEditingHabit] = useState(null);
+  const [editingCompound, setEditingCompound] = useState(null);
 
   const { data: queriedHabits = [], isLoading, isError } = useQuery({
     queryKey: compoundQueryKey,
@@ -265,19 +271,12 @@ export default function CompoundHabitsWidget({
   });
   const compounds = compoundsProp
     ?? queriedHabits.filter((habit) => habit.kind === 'compound');
-  const rituals = compounds.map((compound) => ({
-    ...compound,
-    name: compound.title,
-    habits: compound.children || [],
-  }));
 
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
       if (isDone) {
         const logs = await praxisApi.habitLogs.list({ habit_id: habitId, date: today });
-        if (logs.length > 0) {
-          await praxisApi.habitLogs.delete(logs[0].id);
-        }
+        if (logs.length > 0) await praxisApi.habitLogs.delete(logs[0].id);
       } else {
         await praxisApi.habitLogs.create({
           habit_id: habitId,
@@ -295,15 +294,13 @@ export default function CompoundHabitsWidget({
   });
 
   const skipHabitMutation = useMutation({
-    mutationFn: async ({ habitId, skipReason, skipNote }) => {
-      await praxisApi.habitLogs.create({
-        habit_id: habitId,
-        date: today,
-        outcome: 'skipped',
-        ...(skipReason ? { skip_reason: skipReason } : {}),
-        ...(skipNote ? { note: skipNote } : {}),
-      });
-    },
+    mutationFn: ({ habitId, skipReason, skipNote }) => praxisApi.habitLogs.create({
+      habit_id: habitId,
+      date: today,
+      outcome: 'skipped',
+      ...(skipReason ? { skip_reason: skipReason } : {}),
+      ...(skipNote ? { note: skipNote } : {}),
+    }),
     onSuccess: () => {
       toast('Não rolou — registrado.');
       setSkipHabitTarget(null);
@@ -315,110 +312,89 @@ export default function CompoundHabitsWidget({
     },
   });
 
-  const updateHabitMutation = useMutation({
+  const updateCompoundMutation = useMutation({
     mutationFn: ({ id, data }) => praxisApi.habits.update(id, data),
     onSuccess: () => {
-      toast('Hábito atualizado.');
-      setEditingHabit(null);
+      toast('Rotina atualizada.');
+      setEditingCompound(null);
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       queryClient.invalidateQueries({ queryKey: ['allHabits'] });
     },
-    onError: () => {
-      toast.error('Não deu pra salvar o hábito.');
-    },
+    onError: () => toast.error('Não deu pra salvar a rotina.'),
   });
 
-  const grouped = rituals.reduce((acc, ritual) => {
-    const tod = ritual.time_of_day || 'morning';
-    if (!acc[tod]) acc[tod] = [];
-    acc[tod].push(ritual);
-    return acc;
-  }, {});
+  const openCompoundEditor = (compound) => {
+    if (onEditCompoundProp) onEditCompoundProp(compound);
+    else setEditingCompound(compound);
+  };
 
-  const orderedKeys = Object.keys(timeOfDayConfig)
-    .filter((k) => grouped[k]?.length > 0);
+  const content = (
+    <>
+      {isLoading && (
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      )}
+      {isError && <p className="py-4 text-center text-sm text-destructive">Erro ao carregar as rotinas</p>}
+      {!isLoading && !isError && compounds.length === 0 && variant === 'card' && (
+        <div className="flex flex-col items-center gap-2 py-6">
+          <Sparkles className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Nenhuma rotina ainda</p>
+          <p className="max-w-xs text-center text-xs text-muted-foreground/60">
+            Agrupe passos que fazem sentido juntos no seu dia.
+          </p>
+        </div>
+      )}
+      {!isLoading && !isError && compounds.length > 0 && (
+        <div className="space-y-3">
+          {compounds.map((compound) => (
+            <CompoundHabitItem
+              key={compound.id}
+              compound={compound}
+              collapsible={collapsible}
+              listItem={variant === 'list'}
+              onToggleHabit={(habitId, isDone) =>
+                toggleHabitMutation.mutate({ habitId, isDone })
+              }
+              onOpenSkip={setSkipHabitTarget}
+              onEditCompound={openCompoundEditor}
+              onCompleteMinimum={(habitId) =>
+                toggleHabitMutation.mutate({ habitId, isDone: false })
+              }
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
 
   return (
-    <Card className="praxis-dashboard-card praxis-context-card">
-      <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-domain-gold/15 bg-domain-gold/[0.07]">
-            <Sparkles className="h-4 w-4 text-domain-gold" aria-hidden />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-muted-foreground">Hábitos compostos</p>
-            <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rotinas</CardTitle>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Toque no lápis pra editar qualquer passo — horário incluso.
-            </p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="px-5 pb-5 sm:px-5 sm:pb-5">
-        {isLoading && (
-          <div className="space-y-3">
-            <Skeleton className="h-20 w-full rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
-          </div>
-        )}
-
-        {isError && (
-          <p className="text-sm text-destructive py-4 text-center">
-            Erro ao carregar as rotinas
-          </p>
-        )}
-
-        {!isLoading && !isError && rituals.length === 0 && (
-          <div className="flex flex-col items-center py-6 gap-2">
-            <Sparkles className="w-8 h-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Nenhuma rotina ainda</p>
-            <p className="text-xs text-muted-foreground/60 text-center max-w-xs">
-              Agrupe passos que fazem sentido juntos no seu dia.
-            </p>
-          </div>
-        )}
-
-        {!isLoading && !isError && rituals.length > 0 && (
-          <div className="space-y-4">
-            {orderedKeys.map((tod) => {
-              const config = timeOfDayConfig[tod];
-              const groupRituals = grouped[tod];
-              return (
-                <div key={tod}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm">{config.emoji}</span>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {config.label}
-                    </h3>
-                  </div>
-                  <div className="space-y-2">
-                    {groupRituals.map((ritual) => (
-                      <CompoundHabitItem
-                        key={ritual.id}
-                        ritual={ritual}
-                        collapsible={collapsible}
-                        onToggleHabit={(habitId, isDone) =>
-                          toggleHabitMutation.mutate({ habitId, isDone })
-                        }
-                        onOpenSkip={(habit) => setSkipHabitTarget(habit)}
-                        onEditHabit={(habit) => setEditingHabit(habit)}
-                        onCompleteMinimum={(habitId) =>
-                          toggleHabitMutation.mutate({ habitId, isDone: false })
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
+    <>
+      {variant === 'list' ? content : (
+        <Card className="praxis-dashboard-card">
+          <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-domain-gold/15 bg-domain-gold/[0.07]">
+                <Sparkles className="h-4 w-4 text-domain-gold" aria-hidden />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground">Hábitos compostos</p>
+                <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rotinas</CardTitle>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Faça, nomeie o que não rolou e siga pelo próximo passo.
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-5 pb-5 sm:px-5 sm:pb-5">{content}</CardContent>
+        </Card>
+      )}
 
       <SkipHabitSheet
         open={Boolean(skipHabitTarget)}
         onOpenChange={(open) => { if (!open) setSkipHabitTarget(null); }}
-        habitTitle={skipHabitTarget?.title || skipHabitTarget?.name || 'Hábito'}
+        habitTitle={skipHabitTarget?.title || 'Hábito'}
         outcome={skipHabitTarget ? habitDayState(skipHabitTarget) : 'open'}
         initialNote={skipHabitTarget?.skip_note || ''}
         busy={skipHabitMutation.isPending}
@@ -441,21 +417,26 @@ export default function CompoundHabitsWidget({
         }}
       />
 
-      <Dialog open={Boolean(editingHabit)} onOpenChange={(open) => { if (!open) setEditingHabit(null); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar hábito</DialogTitle>
-          </DialogHeader>
-          {editingHabit ? (
-            <HabitForm
-              key={editingHabit.id}
-              initial={editingHabit}
-              onSubmit={(data) => updateHabitMutation.mutate({ id: editingHabit.id, data })}
-              onCancel={() => setEditingHabit(null)}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </Card>
+      {!onEditCompoundProp && (
+        <Dialog
+          open={Boolean(editingCompound)}
+          onOpenChange={(open) => { if (!open) setEditingCompound(null); }}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Editar rotina</DialogTitle>
+            </DialogHeader>
+            {editingCompound && (
+              <HabitForm
+                key={editingCompound.id}
+                initial={editingCompound}
+                onSubmit={(data) => updateCompoundMutation.mutate({ id: editingCompound.id, data })}
+                onCancel={() => setEditingCompound(null)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }

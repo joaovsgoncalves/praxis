@@ -5,7 +5,8 @@ export const CATEGORIES = {
   jotav_fit: { emoji: '📸', label: '@jotav.fit', color: 'bg-pink-500/20 text-pink-400' },
   ideias: { emoji: '💡', label: 'Ideias', color: 'bg-cyan-500/20 text-cyan-400' },
   pessoal: { emoji: '🏠', label: 'Pessoal', color: 'bg-yellow-500/20 text-yellow-400' },
-  rotina: { emoji: '🔥', label: 'Rotina', color: 'bg-orange-500/20 text-orange-400' }
+  rotina: { emoji: '🔥', label: 'Rotina', color: 'bg-orange-500/20 text-orange-400' },
+  wellness: { emoji: '🧘', label: 'Bem-estar', color: 'bg-emerald-500/20 text-emerald-300' }
 };
 
 export const CategoryBadge = ({ category, className = '' }) => {

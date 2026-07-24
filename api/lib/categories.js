@@ -6,6 +6,7 @@ export const CATEGORIES = {
   ideias: { emoji: '💡', label: 'Ideias', color: 'cyan' },
   pessoal: { emoji: '🏠', label: 'Pessoal', color: 'yellow' },
   rotina: { emoji: '🔥', label: 'Rotina', color: 'orange' },
+  wellness: { emoji: '🧘', label: 'Bem-estar', color: 'green' },
 };
 
 export function enrichCategory(row) {

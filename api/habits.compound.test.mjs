@@ -31,7 +31,8 @@ test('boot migration turns each active legacy sequence into one ordered compound
   `).get();
   assert.equal(compound.kind, 'compound');
   assert.equal(compound.title, 'Rotina matinal');
-  assert.equal(compound.description, '🌅');
+  assert.equal(compound.description, '');
+  assert.equal(compound.emoji, '🌅');
 
   const children = db.prepare(`
     SELECT id, parent_id, position_in_parent, preferred_time
@@ -66,36 +67,80 @@ test('compound API creates and reorders children, nests day outcomes, and keeps 
 
   const compound = await requestJson(server.base, '/api/habits', {
     method: 'POST',
-    body: { title: 'Rotina noturna', kind: 'compound', emoji: '🌙' },
+    body: {
+      title: 'Rotina noturna',
+      kind: 'compound',
+      emoji: '🌙',
+      frequency: 'daily',
+      category: 'wellness',
+      children: [
+        { title: 'Desligar telas', preferred_time: '22:00' },
+        { title: 'Preparar amanhã', preferred_time: '21:45' },
+      ],
+    },
   });
   assert.equal(compound.kind, 'compound');
-  assert.deepEqual(compound.children, []);
+  assert.equal(compound.emoji, '🌙');
+  assert.equal(compound.description, '');
+  assert.deepEqual(
+    compound.children.map((child) => [child.title, child.preferred_time]),
+    [['Desligar telas', '22:00'], ['Preparar amanhã', '21:45']],
+  );
+  assert.equal(compound.time_of_day, 'evening');
+  const [first, second] = compound.children;
 
-  const first = await requestJson(server.base, '/api/habits', {
+  const invalidAtomicCreate = await fetch(`${server.base}/api/habits`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: 'Não deve persistir',
+      kind: 'compound',
+      children: [{ title: 'Horário inválido', preferred_time: '29:90' }],
+    }),
+  });
+  assert.equal(invalidAtomicCreate.status, 400);
+  assert.equal(
+    db.prepare("SELECT COUNT(*) AS count FROM habits WHERE title = 'Não deve persistir'").get().count,
+    0,
+  );
+  const untimed = await requestJson(server.base, '/api/habits', {
     method: 'POST',
     body: {
-      title: 'Desligar telas',
-      parent_id: compound.id,
-      preferred_time: '22:00',
+      title: 'Rotina sem horário',
+      kind: 'compound',
+      children: [{ title: 'Passo livre' }],
     },
   });
-  const second = await requestJson(server.base, '/api/habits', {
-    method: 'POST',
-    body: {
-      title: 'Preparar amanhã',
-      parent_id: compound.id,
-      preferred_time: '21:45',
-    },
-  });
+  assert.equal(untimed.time_of_day, null);
+  await requestJson(server.base, `/api/habits/${untimed.id}`, { method: 'DELETE' });
 
-  await requestJson(server.base, `/api/habits/${compound.id}/children`, {
-    method: 'PATCH',
-    body: { ordered_ids: [second.id, first.id] },
+  const updated = await requestJson(server.base, `/api/habits/${compound.id}`, {
+    method: 'PUT',
+    body: {
+      title: 'Fechamento do dia',
+      emoji: '🌘',
+      children: [
+        { id: second.id, title: 'Preparar o amanhã', preferred_time: '21:30' },
+        { title: 'Ler dez páginas', preferred_time: '' },
+      ],
+    },
   });
+  assert.equal(updated.title, 'Fechamento do dia');
+  assert.equal(updated.emoji, '🌘');
+  assert.deepEqual(
+    updated.children.map((child) => [child.title, child.preferred_time]),
+    [['Preparar o amanhã', '21:30'], ['Ler dez páginas', '']],
+  );
+  assert.equal(
+    db.prepare('SELECT status FROM habits WHERE id = ?').get(first.id).status,
+    'archived',
+  );
+  const [updatedSecond, third] = updated.children;
+
   await requestJson(server.base, '/api/habit-logs', {
     method: 'POST',
     body: {
-      habit_id: second.id,
+      habit_id: updatedSecond.id,
       date: '2026-07-18',
       outcome: 'done',
       completed: true,
@@ -104,7 +149,7 @@ test('compound API creates and reorders children, nests day outcomes, and keeps 
   await requestJson(server.base, '/api/habit-logs', {
     method: 'POST',
     body: {
-      habit_id: first.id,
+      habit_id: third.id,
       date: '2026-07-18',
       outcome: 'skipped',
       skip_reason: 'energy',
@@ -122,9 +167,10 @@ test('compound API creates and reorders children, nests day outcomes, and keeps 
   assert.equal(habits[0].completed_steps, 1);
   assert.equal(habits[0].skipped_steps, 1);
   assert.equal(habits[0].total_steps, 2);
-  assert.deepEqual(habits[0].children.map((child) => child.id), [second.id, first.id]);
+  assert.equal(habits[0].day_outcome, 'done');
+  assert.deepEqual(habits[0].children.map((child) => child.id), [updatedSecond.id, third.id]);
   assert.equal(habits[0].children[0].completed_today, true);
-  assert.equal(habits[0].children[0].preferred_time, '21:45');
+  assert.equal(habits[0].children[0].preferred_time, '21:30');
   assert.equal(habits[0].children[1].day_outcome, 'skipped');
   assert.equal(habits[0].children[1].skip_note, 'Cheguei tarde');
 
@@ -148,6 +194,13 @@ test('compound API creates and reorders children, nests day outcomes, and keeps 
     '/api/rituals?status=active&date=2026-07-18',
   );
   assert.equal(shim.length, 1);
-  assert.equal(shim[0].name, 'Rotina noturna');
-  assert.deepEqual(shim[0].habits_order, [second.id, first.id]);
+  assert.equal(shim[0].name, 'Fechamento do dia');
+  assert.deepEqual(shim[0].habits_order, [updatedSecond.id, third.id]);
+
+  const legacyWrite = await fetch(`${server.base}/api/rituals/from-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template: 'day_open' }),
+  });
+  assert.equal(legacyWrite.status, 410);
 });

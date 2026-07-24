@@ -358,6 +358,9 @@ export default function Dashboard() {
                 }
               />
             </Slot>
+            <Slot domain="wellness">
+              <CompoundHabitsWidget compounds={compoundHabits} today={today} />
+            </Slot>
           </div>
         </section>
 
@@ -366,14 +369,13 @@ export default function Dashboard() {
             icon={Gauge}
             eyebrow="Contexto"
             title="Como seu dia está agora"
-            description="Corpo, agenda, alimentação e rotinas no mesmo quadro."
+            description="Corpo, agenda e alimentação no mesmo quadro."
             tone="text-domain-wellness"
           />
           <div className="space-y-3 sm:space-y-4">
             <NutritionTodayCard />
             <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
             <TodayCalendar />
-            <CompoundHabitsWidget compounds={compoundHabits} today={today} />
           </div>
         </section>
       </div>

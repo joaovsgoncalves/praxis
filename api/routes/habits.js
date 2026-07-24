@@ -25,6 +25,23 @@ function legacyMetadataByCompoundSource(db) {
   return metadata;
 }
 
+function preferredTimeBucket(preferredTime) {
+  const raw = String(preferredTime || '');
+  if (!/^\d{2}:\d{2}$/.test(raw)) return null;
+  const hour = Number(raw.slice(0, 2));
+  if (!Number.isInteger(hour)) return null;
+  if (hour < 12) return 'morning';
+  if (hour < 18) return 'afternoon';
+  return 'evening';
+}
+
+function deriveCompoundTimeOfDay(children) {
+  const buckets = new Set(
+    children.map((child) => preferredTimeBucket(child.preferred_time)).filter(Boolean),
+  );
+  return buckets.size === 1 ? [...buckets][0] : null;
+}
+
 function findHabitInTree(tree, habitId) {
   for (const habit of tree) {
     if (habit.id === habitId) return habit;
@@ -74,7 +91,7 @@ export function listHabitTree({ db, getLocalDateString, status = 'active', date 
       value_today: log?.value ?? null,
       ...(habit.kind === 'compound'
         ? {
-            emoji: legacy?.emoji || habit.description || '🔗',
+            emoji: habit.emoji || legacy?.emoji || '🔗',
             time_of_day: legacy?.time_of_day || null,
           }
         : {}),
@@ -102,7 +119,10 @@ export function listHabitTree({ db, getLocalDateString, status = 'active', date 
         completed_steps: completedSteps,
         skipped_steps: skippedSteps,
         total_steps: children.length,
-        day_outcome: children.length > 0 && completedSteps === children.length ? 'done' : 'open',
+        time_of_day: habit.time_of_day || deriveCompoundTimeOfDay(children),
+        day_outcome: children.length > 0 && completedSteps + skippedSteps === children.length
+          ? 'done'
+          : 'open',
       };
     });
 }
@@ -187,31 +207,112 @@ export function createHabitsRouter(ctx) {
     return Number(row?.next_position || 0);
   }
 
-  function replaceCompoundChildren(compoundId, orderedIds) {
-    const compound = db.prepare('SELECT id, kind FROM habits WHERE id = ?').get(compoundId);
+  function syncCompoundChildren(compoundId, requestedChildren) {
+    const compound = db.prepare(`
+      SELECT id, kind, frequency, category, recurrence_days, status
+      FROM habits WHERE id = ?
+    `).get(compoundId);
     if (!compound || compound.kind !== 'compound') {
       return { error: 'Habit must be compound' };
     }
-    if (!Array.isArray(orderedIds)) return { error: 'ordered_ids must be an array' };
+    if (!Array.isArray(requestedChildren)) return { error: 'children must be an array' };
 
-    const ids = [...new Set(orderedIds.filter(Boolean).map(String))];
-    const children = ids.map((id) => db.prepare('SELECT id, kind FROM habits WHERE id = ?').get(id));
-    if (children.some((child) => !child || child.kind !== 'simple' || child.id === compoundId)) {
-      return { error: 'Every child must be an existing simple habit' };
+    const normalized = [];
+    const seenIds = new Set();
+    for (const rawChild of requestedChildren) {
+      const child = typeof rawChild === 'string' ? { id: rawChild } : rawChild;
+      if (!child || typeof child !== 'object') {
+        return { error: 'Each child must be an id or an object' };
+      }
+      const id = child.id ? String(child.id) : null;
+      if (id && seenIds.has(id)) return { error: 'Child ids must be unique' };
+      if (id) seenIds.add(id);
+
+      const existing = id
+        ? db.prepare(`
+            SELECT id, title, kind, parent_id, preferred_time
+            FROM habits WHERE id = ?
+          `).get(id)
+        : null;
+      if (id && (!existing || existing.kind !== 'simple' || existing.id === compoundId)) {
+        return { error: 'Every existing child must be a simple habit' };
+      }
+      if (existing?.parent_id && existing.parent_id !== compoundId) {
+        return { error: 'A child cannot belong to two compound habits' };
+      }
+
+      const title = child.title !== undefined
+        ? stripPriorityPrefix(String(child.title)).trim()
+        : existing?.title;
+      if (!title) return { error: 'Every child needs a title' };
+      const preferredTime = normalizePreferredTime(
+        child.preferred_time !== undefined
+          ? child.preferred_time
+          : existing?.preferred_time || '',
+      );
+      if (preferredTime === null) {
+        return { error: 'Child preferred_time must be HH:MM or empty' };
+      }
+      normalized.push({ id, title, preferred_time: preferredTime || '' });
     }
 
-    const replace = db.transaction(() => {
-      db.prepare(`
-        UPDATE habits SET parent_id = NULL, position_in_parent = NULL
-        WHERE parent_id = ?
-      `).run(compoundId);
-      const attach = db.prepare(`
-        UPDATE habits SET parent_id = ?, position_in_parent = ? WHERE id = ?
-      `);
-      ids.forEach((id, index) => attach.run(compoundId, index, id));
+    const currentIds = db.prepare('SELECT id FROM habits WHERE parent_id = ?').all(compoundId)
+      .map((row) => row.id);
+    const retainedIds = new Set(normalized.map((child) => child.id).filter(Boolean));
+    const archive = db.prepare(`
+      UPDATE habits
+      SET status = 'archived', parent_id = NULL, position_in_parent = NULL
+      WHERE id = ?
+    `);
+    currentIds.filter((id) => !retainedIds.has(id)).forEach((id) => archive.run(id));
+
+    const update = db.prepare(`
+      UPDATE habits
+      SET title = ?, preferred_time = ?, frequency = ?, category = ?,
+          recurrence_days = ?, status = ?, parent_id = ?, position_in_parent = ?
+      WHERE id = ?
+    `);
+    const insert = db.prepare(`
+      INSERT INTO habits (
+        id, title, description, emoji, frequency, category, streak_target, source,
+        status, sort_order, recurrence_days, target_value, unit, preferred_time,
+        kind, parent_id, position_in_parent
+      )
+      VALUES (?, ?, '', '', ?, ?, 30, ?, ?, ?, ?, NULL, '', ?, 'simple', ?, ?)
+    `);
+
+    normalized.forEach((child, index) => {
+      if (child.id) {
+        update.run(
+          child.title,
+          child.preferred_time,
+          compound.frequency,
+          compound.category,
+          compound.recurrence_days || '[]',
+          compound.status,
+          compoundId,
+          index,
+          child.id,
+        );
+        return;
+      }
+      child.id = randomUUID();
+      insert.run(
+        child.id,
+        child.title,
+        compound.frequency,
+        compound.category,
+        `compound:${compoundId}`,
+        compound.status,
+        nextSortOrder('habits'),
+        compound.recurrence_days || '[]',
+        child.preferred_time,
+        compoundId,
+        index,
+      );
     });
-    replace();
-    return { updated: ids.length };
+
+    return { updated: normalized.length, ids: normalized.map((child) => child.id) };
   }
 
   router.post('/', (req, res) => {
@@ -256,25 +357,24 @@ export function createHabitsRouter(ctx) {
     const childPosition = parent_id
       ? (position_in_parent !== undefined ? Number(position_in_parent) : nextChildPosition(parent_id))
       : null;
-    const compoundDescription = kind === 'compound' && !description && emoji ? emoji : description;
-
     const create = db.transaction(() => {
       db.prepare(`
         INSERT INTO habits (
-          id, title, description, frequency, category, streak_target, goal_id, source,
+          id, title, description, emoji, frequency, category, streak_target, goal_id, source,
           sort_order, recurrence_days, target_value, unit, preferred_time, kind,
           parent_id, position_in_parent
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        id, habitTitle, compoundDescription, freq, category, Number(streak_target) || 30,
+        id, habitTitle, description, kind === 'compound' ? String(emoji || '') : '', freq,
+        category, Number(streak_target) || 30,
         goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || '',
         prefTime || '', kind, parent_id || null, childPosition
       );
 
       const requestedChildren = children_ids ?? children;
       if (kind === 'compound' && requestedChildren !== undefined) {
-        const result = replaceCompoundChildren(id, requestedChildren);
+        const result = syncCompoundChildren(id, requestedChildren);
         if (result.error) throw new Error(result.error);
       }
     });
@@ -292,11 +392,16 @@ export function createHabitsRouter(ctx) {
   });
 
   router.patch('/:id/children', (req, res) => {
-    const result = replaceCompoundChildren(
-      req.params.id,
-      req.body?.ordered_ids ?? req.body?.children_ids ?? req.body?.children,
-    );
-    if (result.error) return res.status(400).json({ error: result.error });
+    let result;
+    try {
+      result = db.transaction(() => syncCompoundChildren(
+        req.params.id,
+        req.body?.ordered_ids ?? req.body?.children_ids ?? req.body?.children,
+      ))();
+      if (result.error) return res.status(400).json({ error: result.error });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
     const habit = listHabitTree({ db, getLocalDateString, status: 'all' })
       .find((item) => item.id === req.params.id);
     res.json({ success: true, updated: result.updated, habit });
@@ -309,7 +414,7 @@ export function createHabitsRouter(ctx) {
     const {
       title, description, frequency, category, streak_target, goal_id, source, status,
       sort_order, recurrence_days, target_value, unit, preferred_time, kind,
-      parent_id, position_in_parent, children_ids, children,
+      parent_id, position_in_parent, children_ids, children, emoji,
     } = req.body;
 
     if (status !== undefined && status !== null && !HABIT_STATUSES.has(status)) {
@@ -344,51 +449,64 @@ export function createHabitsRouter(ctx) {
         ? nextChildPosition(parent_id)
         : null;
 
-    db.prepare(`
-      UPDATE habits SET 
-        title = COALESCE(?, title),
-        description = COALESCE(?, description),
-        frequency = COALESCE(?, frequency),
-        category = COALESCE(?, category),
-        streak_target = COALESCE(?, streak_target),
-        goal_id = COALESCE(?, goal_id),
-        source = COALESCE(?, source),
-        status = COALESCE(?, status),
-        sort_order = COALESCE(?, sort_order),
-        recurrence_days = COALESCE(?, recurrence_days),
-        target_value = COALESCE(?, target_value),
-        unit = COALESCE(?, unit),
-        preferred_time = COALESCE(?, preferred_time),
-        kind = COALESCE(?, kind),
-        parent_id = CASE WHEN ? = 1 THEN ? ELSE parent_id END,
-        position_in_parent = CASE WHEN ? = 1 THEN ? ELSE position_in_parent END
-      WHERE id = ?
-    `).run(
-      title !== undefined ? stripPriorityPrefix(title) : null,
-      description,
-      frequency,
-      category,
-      streak_target !== undefined ? Number(streak_target) : null,
-      goal_id,
-      source,
-      status,
-      sort_order !== undefined ? Number(sort_order) : null,
-      recDays,
-      tgt !== undefined ? tgt : null,
-      unit,
-      prefTime !== undefined ? prefTime : null,
-      kind ?? null,
-      parent_id !== undefined ? 1 : 0,
-      parent_id || null,
-      shouldUpdatePosition ? 1 : 0,
-      nextPosition,
-      req.params.id
-    );
-
     const requestedChildren = children_ids ?? children;
-    if (requestedChildren !== undefined) {
-      const result = replaceCompoundChildren(req.params.id, requestedChildren);
-      if (result.error) return res.status(400).json({ error: result.error });
+    const update = db.transaction(() => {
+      db.prepare(`
+        UPDATE habits SET
+          title = COALESCE(?, title),
+          description = COALESCE(?, description),
+          emoji = CASE WHEN ? = 1 THEN ? ELSE emoji END,
+          frequency = COALESCE(?, frequency),
+          category = COALESCE(?, category),
+          streak_target = COALESCE(?, streak_target),
+          goal_id = COALESCE(?, goal_id),
+          source = COALESCE(?, source),
+          status = COALESCE(?, status),
+          sort_order = COALESCE(?, sort_order),
+          recurrence_days = COALESCE(?, recurrence_days),
+          target_value = COALESCE(?, target_value),
+          unit = COALESCE(?, unit),
+          preferred_time = COALESCE(?, preferred_time),
+          kind = COALESCE(?, kind),
+          parent_id = CASE WHEN ? = 1 THEN ? ELSE parent_id END,
+          position_in_parent = CASE WHEN ? = 1 THEN ? ELSE position_in_parent END
+        WHERE id = ?
+      `).run(
+        title !== undefined ? stripPriorityPrefix(title) : null,
+        description,
+        emoji !== undefined ? 1 : 0,
+        emoji !== undefined ? String(emoji || '') : null,
+        frequency,
+        category,
+        streak_target !== undefined ? Number(streak_target) : null,
+        goal_id,
+        source,
+        status,
+        sort_order !== undefined ? Number(sort_order) : null,
+        recDays,
+        tgt !== undefined ? tgt : null,
+        unit,
+        prefTime !== undefined ? prefTime : null,
+        kind ?? null,
+        parent_id !== undefined ? 1 : 0,
+        parent_id || null,
+        shouldUpdatePosition ? 1 : 0,
+        nextPosition,
+        req.params.id
+      );
+
+      if (requestedChildren !== undefined) {
+        const result = syncCompoundChildren(req.params.id, requestedChildren);
+        if (result.error) throw new Error(result.error);
+      }
+      if (nextKind === 'compound' && status !== undefined) {
+        db.prepare('UPDATE habits SET status = ? WHERE parent_id = ?').run(status, req.params.id);
+      }
+    });
+    try {
+      update();
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
     }
 
     const habit = findHabitInTree(
@@ -402,27 +520,29 @@ export function createHabitsRouter(ctx) {
   router.delete('/:id', (req, res) => {
     const habitId = req.params.id;
     const habit = db.prepare('SELECT kind FROM habits WHERE id = ?').get(habitId);
-    if (habit?.kind === 'compound') {
-      db.prepare(`
-        UPDATE habits SET parent_id = NULL, position_in_parent = NULL
-        WHERE parent_id = ?
-      `).run(habitId);
-    }
-    // Delete logs first (FK dependency)
-    db.prepare('DELETE FROM habit_logs WHERE habit_id = ?').run(habitId);
-    // Remove from rituals (habits_order JSON arrays)
-    const rituals = db.prepare('SELECT id, habits_order FROM rituals').all();
-    for (const r of rituals) {
-      try {
-        const order = JSON.parse(r.habits_order || '[]');
-        if (order.includes(habitId)) {
-          const updated = order.filter(h => h !== habitId);
-          db.prepare('UPDATE rituals SET habits_order = ? WHERE id = ?').run(JSON.stringify(updated), r.id);
-        }
-      } catch {}
-    }
-    // Delete the habit
-    db.prepare('DELETE FROM habits WHERE id = ?').run(habitId);
+    db.transaction(() => {
+      if (habit?.kind === 'compound') {
+        db.prepare(`
+          UPDATE habits
+          SET status = 'archived', parent_id = NULL, position_in_parent = NULL
+          WHERE parent_id = ?
+        `).run(habitId);
+      }
+      // Delete logs first (FK dependency)
+      db.prepare('DELETE FROM habit_logs WHERE habit_id = ?').run(habitId);
+      // Remove from rituals (habits_order JSON arrays)
+      const rituals = db.prepare('SELECT id, habits_order FROM rituals').all();
+      for (const r of rituals) {
+        try {
+          const order = JSON.parse(r.habits_order || '[]');
+          if (order.includes(habitId)) {
+            const updated = order.filter(h => h !== habitId);
+            db.prepare('UPDATE rituals SET habits_order = ? WHERE id = ?').run(JSON.stringify(updated), r.id);
+          }
+        } catch {}
+      }
+      db.prepare('DELETE FROM habits WHERE id = ?').run(habitId);
+    })();
     res.json({ success: true });
   });
 

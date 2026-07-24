@@ -83,10 +83,10 @@ export function migrateActiveRitualsToCompoundHabits(db) {
   );
   const insertCompound = db.prepare(`
     INSERT INTO habits (
-      id, title, description, frequency, category, streak_target, source,
+      id, title, description, emoji, frequency, category, streak_target, source,
       status, sort_order, kind, parent_id, position_in_parent
     )
-    VALUES (?, ?, ?, 'daily', 'wellness', 30, ?, 'active', ?, 'compound', NULL, NULL)
+    VALUES (?, ?, '', ?, 'daily', 'wellness', 30, ?, 'active', ?, 'compound', NULL, NULL)
   `);
   const findHabit = db.prepare('SELECT id, kind FROM habits WHERE id = ?');
   const attachChild = db.prepare(`
@@ -181,6 +181,7 @@ export function initializeDatabase(db) {
     kind TEXT DEFAULT 'simple',
     parent_id TEXT,
     position_in_parent INTEGER,
+    emoji TEXT DEFAULT '',
     created_date TEXT DEFAULT (datetime('now'))
   );
 
@@ -355,6 +356,17 @@ if (!habitsCols2.includes('parent_id')) {
 if (!habitsCols2.includes('position_in_parent')) {
   db.exec('ALTER TABLE habits ADD COLUMN position_in_parent INTEGER');
 }
+if (!habitsCols2.includes('emoji')) {
+  db.exec("ALTER TABLE habits ADD COLUMN emoji TEXT DEFAULT ''");
+}
+db.prepare(`
+  UPDATE habits
+  SET emoji = description, description = ''
+  WHERE kind = 'compound'
+    AND source LIKE 'ritual_migration:%'
+    AND COALESCE(emoji, '') = ''
+    AND COALESCE(description, '') != ''
+`).run();
 db.prepare(`
   UPDATE habits SET kind = 'simple'
   WHERE kind IS NULL OR kind NOT IN ('simple', 'compound')

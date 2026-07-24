@@ -15,7 +15,6 @@ const OFFLINE_CACHEABLE = [
   '/api/habits',
   '/api/habit-logs',
   '/api/wellness',
-  '/api/rituals',
   '/api/goals',
   '/api/gamification',
   '/api/calendar/today',
@@ -392,21 +391,6 @@ export const praxisApi = {
     },
     create: (data) => request('/api/focus', { method: 'POST', body: JSON.stringify(data) }),
     stats: (days = 30) => request(`/api/focus/stats?days=${days}`),
-  },
-
-  // Rituals
-  rituals: {
-    list: (params = {}) => {
-      const query = new URLSearchParams(params).toString();
-      return request(`/api/rituals${query ? '?' + query : ''}`);
-    },
-    get: (id) => request(`/api/rituals/${id}`),
-    getProgress: (id, date) => request(`/api/rituals/${id}/progress?date=${date}`),
-    create: (data) => request('/api/rituals', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id, data) => request(`/api/rituals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id) => request(`/api/rituals/${id}`, { method: 'DELETE' }),
-    fromTemplate: (template) =>
-      request('/api/rituals/from-template', { method: 'POST', body: JSON.stringify({ template }) }),
   },
 
   // Goals
