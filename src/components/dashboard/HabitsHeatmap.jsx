@@ -111,7 +111,7 @@ export default function HabitsHeatmap() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto -mx-2 px-2">
+        <div className="overflow-x-auto -mx-2 px-2 praxis-hide-scrollbar praxis-scroll-x">
           <div className="min-w-[560px]">
             {/* Month labels */}
             <div className="flex gap-[3px] mb-1.5 ml-7">

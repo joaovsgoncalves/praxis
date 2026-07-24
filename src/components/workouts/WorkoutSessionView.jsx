@@ -324,7 +324,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
         </Card>
       ) : null}
 
-      <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Exercícios da sessão">
+      <div className="flex gap-2 overflow-x-auto pb-1 praxis-hide-scrollbar praxis-scroll-x" aria-label="Exercícios da sessão">
         {session.exercises.map((exercise, index) => {
           const done = exercise.sets.length >= Number(exercise.target_sets || 1);
           return (

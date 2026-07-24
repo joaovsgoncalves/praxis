@@ -20,7 +20,7 @@ export default function AppLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="praxis-app min-h-screen bg-background relative">
       <PraxisLevelUpListener />
       <ParticleBackground />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />

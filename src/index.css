@@ -316,6 +316,67 @@
   height: 0;
 }
 
+/* Hide native OS scrollbars on chip rows / horizontal rails (João 2026-07-24) */
+.praxis-hide-scrollbar,
+.praxis-scroll-x {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.praxis-hide-scrollbar::-webkit-scrollbar,
+.praxis-scroll-x::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/*
+ * Dark app: thin muted scrollbars instead of Windows light chrome.
+ * Dialogs / long lists keep scroll, without white trough + arrows.
+ */
+.praxis-app,
+.praxis-app * {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.praxis-app *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.praxis-app *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.praxis-app *::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.praxis-app *::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.45);
+}
+
+.praxis-app *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Prefer hide on intentional chip/rail scrollers even inside .praxis-app */
+.praxis-app .praxis-hide-scrollbar,
+.praxis-app .praxis-scroll-x {
+  scrollbar-width: none;
+}
+
+.praxis-app .praxis-hide-scrollbar::-webkit-scrollbar,
+.praxis-app .praxis-scroll-x::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .praxis-brand-mark {
   transition:
     border-color 220ms ease,

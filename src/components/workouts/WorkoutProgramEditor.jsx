@@ -210,7 +210,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   return (
     <div className="space-y-5">
       {programs.length > 1 ? (
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Programas de treino">
+        <div className="flex gap-2 overflow-x-auto pb-1 praxis-hide-scrollbar praxis-scroll-x" aria-label="Programas de treino">
           {programs.map((item) => (
             <button
               key={item.id}
