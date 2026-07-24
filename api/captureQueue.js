@@ -97,7 +97,7 @@ function touchCapture(db, id, fields) {
 /**
  * Run STT up to max_attempts; persists audio_path before first attempt.
  */
-export function runCaptureTranscription(db, captureId, { runLocalTranscription, startedAt = Date.now() }) {
+export async function runCaptureTranscription(db, captureId, { runLocalTranscription, startedAt = Date.now() }) {
   const row = db.prepare('SELECT * FROM capture_queue WHERE id = ?').get(captureId);
   if (!row) return { ok: false, error: 'Capture not found' };
   if (!row.audio_path || !fs.existsSync(row.audio_path)) {
@@ -118,7 +118,7 @@ export function runCaptureTranscription(db, captureId, { runLocalTranscription, 
     attemptsUsed += 1;
     touchCapture(db, captureId, { attempt_count: attemptsUsed });
     try {
-      const result = runLocalTranscription(row.audio_path);
+      const result = await runLocalTranscription(row.audio_path);
       const text = String(result.text || '').trim();
       if (!text) {
         lastError = 'Transcrição vazia';

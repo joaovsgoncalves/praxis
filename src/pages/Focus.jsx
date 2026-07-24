@@ -28,7 +28,7 @@ import {
 import { PageHero, StatGrid, StatTile, SectionHeading } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import { buildSnoozeTomorrowUpdate, fortalezaDateKey } from '@/lib/dates';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 const PRESETS = [
   { label: 'Pomodoro clássico', shortLabel: 'Clássico', focus: 25, brk: 5, Icon: Timer },

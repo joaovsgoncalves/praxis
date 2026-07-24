@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { praxisApi } from '@/api/praxisClient';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 

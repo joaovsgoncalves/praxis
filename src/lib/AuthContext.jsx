@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k?.startsWith('forja:offline:')) keys.push(k);
+        if (k?.startsWith('praxis:offline:') || k?.startsWith('forja:offline:')) keys.push(k);
       }
       keys.forEach((k) => localStorage.removeItem(k));
     } catch {}

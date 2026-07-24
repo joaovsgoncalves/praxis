@@ -24,7 +24,7 @@ import WorkoutHistory from '@/components/workouts/WorkoutHistory';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatSeconds, formatWorkoutTarget, workoutDayShortLabel } from '@/lib/workouts';
 
@@ -39,7 +39,6 @@ export default function Treinos() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [programDialogOpen, setProgramDialogOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   const { data: summary, isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'summary'],
@@ -61,7 +60,7 @@ export default function Treinos() {
       setProgramDialogOpen(false);
       setTab('programa');
       refresh();
-      toast({ title: 'Programa criado', description: 'Agora adiciona os dias e monta teus treinos.' });
+      toast.success('Programa criado', { description: 'Agora adiciona os dias e monta teus treinos.' });
     },
     onError: (mutationError) => toast({
       title: 'Não deu pra criar o programa',
@@ -93,7 +92,7 @@ export default function Treinos() {
     mutationFn: ({ programId, dayId }) => praxisApi.workouts.programs.advance(programId, { current_day_id: dayId }),
     onSuccess: () => {
       refresh();
-      toast({ title: 'Descanso concluído', description: 'O próximo dia do ciclo já está pronto.' });
+      toast('Descanso concluído', { description: 'O próximo dia do ciclo já está pronto.' });
     },
     onError: (mutationError) => toast({
       title: 'Não deu pra avançar o ciclo',

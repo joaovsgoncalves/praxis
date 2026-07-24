@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, Zap } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 

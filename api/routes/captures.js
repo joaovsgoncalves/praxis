@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
@@ -58,16 +58,32 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
 
   function runLocalTranscription(audioPath) {
     const scriptPath = path.join(apiDir, 'transcribe_audio.py');
-    const output = execFileSync(TRANSCRIBE_PYTHON, [scriptPath, audioPath], {
-      encoding: 'utf-8',
-      timeout: TRANSCRIBE_TIMEOUT_MS,
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || '/root',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
+    return new Promise((resolve, reject) => {
+      execFile(
+        TRANSCRIBE_PYTHON,
+        [scriptPath, audioPath],
+        {
+          encoding: 'utf-8',
+          timeout: TRANSCRIBE_TIMEOUT_MS,
+          env: {
+            ...process.env,
+            HOME: process.env.HOME || '/root',
+          },
+          maxBuffer: 10 * 1024 * 1024,
+        },
+        (error, stdout) => {
+          if (error) {
+            return reject(error);
+          }
+          try {
+            const parsed = JSON.parse(stdout || '{}');
+            resolve(parsed);
+          } catch (parseError) {
+            reject(parseError);
+          }
+        }
+      );
     });
-    return JSON.parse(output || '{}');
   }
 
   // ==================== TRANSCRIPTION ====================
@@ -89,7 +105,7 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
 
       let result;
       try {
-        result = runLocalTranscription(audioPath);
+        result = await runLocalTranscription(audioPath);
       } catch (sttError) {
         console.error('Local STT error:', sttError.message);
         return res.status(503).json({
@@ -191,7 +207,7 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
         req.file.size || 0,
       );
 
-      const result = runCaptureTranscription(db, captureId, {
+      const result = await runCaptureTranscription(db, captureId, {
         runLocalTranscription,
         startedAt,
       });
@@ -261,7 +277,7 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
         `UPDATE capture_queue SET attempt_count = 0, error_message = NULL, updated_date = datetime('now') WHERE id = ?`,
       ).run(req.params.id);
 
-      const result = runCaptureTranscription(db, req.params.id, {
+      const result = await runCaptureTranscription(db, req.params.id, {
         runLocalTranscription,
         startedAt,
       });

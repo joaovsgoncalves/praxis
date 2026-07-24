@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatSeconds, formatWorkoutTarget, workoutDayShortLabel } from '@/lib/workouts';
 import WorkoutProgramDialog from './WorkoutProgramDialog';
@@ -40,7 +40,6 @@ function workoutExerciseAsCatalog(exercise) {
 
 export default function WorkoutProgramEditor({ program, programs = [] }) {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [selectedDayId, setSelectedDayId] = useState(null);
   const [programDialog, setProgramDialog] = useState({ open: false, initial: null });
   const [dayDialog, setDayDialog] = useState({ open: false, initial: null });
@@ -76,7 +75,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
       if (!created.is_active) await praxisApi.workouts.programs.activate(created.id);
       setProgramDialog({ open: false, initial: null });
       refresh();
-      toast({ title: 'Programa criado', description: 'Agora monta os dias do teu ciclo.' });
+      toast.success('Programa criado', { description: 'Agora monta os dias do teu ciclo.' });
     },
     onError: fail('Não deu pra criar o programa'),
   });
@@ -86,7 +85,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     onSuccess: () => {
       setProgramDialog({ open: false, initial: null });
       refresh();
-      toast({ title: 'Programa atualizado' });
+      toast('Programa atualizado');
     },
     onError: fail('Não deu pra atualizar'),
   });
@@ -95,7 +94,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     mutationFn: (id) => praxisApi.workouts.programs.activate(id),
     onSuccess: () => {
       refresh();
-      toast({ title: 'Programa ativado' });
+      toast('Programa ativado');
     },
     onError: fail('Não deu pra trocar o programa'),
   });
@@ -105,7 +104,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     onSuccess: () => {
       setSelectedDayId(null);
       refresh();
-      toast({ title: 'Programa removido', description: 'O histórico das sessões foi preservado.' });
+      toast('Programa removido', { description: 'O histórico das sessões foi preservado.' });
     },
     onError: fail('Não deu pra remover o programa'),
   });
@@ -117,7 +116,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
       if (newest) setSelectedDayId(newest.id);
       setDayDialog({ open: false, initial: null });
       refresh();
-      toast({ title: 'Dia adicionado' });
+      toast('Dia adicionado');
     },
     onError: fail('Não deu pra adicionar o dia'),
   });
@@ -127,7 +126,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     onSuccess: () => {
       setDayDialog({ open: false, initial: null });
       refresh();
-      toast({ title: 'Dia atualizado' });
+      toast('Dia atualizado');
     },
     onError: fail('Não deu pra atualizar o dia'),
   });
@@ -136,7 +135,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     mutationFn: (id) => praxisApi.workouts.days.delete(id),
     onSuccess: () => {
       refresh();
-      toast({ title: 'Dia removido' });
+      toast('Dia removido');
     },
     onError: fail('Não deu pra remover o dia'),
   });
@@ -151,7 +150,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     mutationFn: (dayId) => praxisApi.workouts.programs.update(program.id, { current_day_id: dayId }),
     onSuccess: () => {
       refresh();
-      toast({ title: 'Próximo treino atualizado' });
+      toast('Próximo treino atualizado');
     },
     onError: fail('Não deu pra definir o próximo treino'),
   });
@@ -164,7 +163,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     onSuccess: () => {
       setExerciseConfig({ open: false, day: null, exercise: null, initial: null });
       refresh();
-      toast({ title: 'Exercício adicionado' });
+      toast('Exercício adicionado');
     },
     onError: fail('Não deu pra adicionar o exercício'),
   });
@@ -174,7 +173,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     onSuccess: () => {
       setExerciseConfig({ open: false, day: null, exercise: null, initial: null });
       refresh();
-      toast({ title: 'Exercício atualizado' });
+      toast('Exercício atualizado');
     },
     onError: fail('Não deu pra atualizar o exercício'),
   });
@@ -183,7 +182,7 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
     mutationFn: (id) => praxisApi.workouts.dayExercises.delete(id),
     onSuccess: () => {
       refresh();
-      toast({ title: 'Exercício removido do treino' });
+      toast('Exercício removido do treino');
     },
     onError: fail('Não deu pra remover o exercício'),
   });

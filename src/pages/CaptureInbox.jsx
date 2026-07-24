@@ -9,7 +9,7 @@ import { PageHero, PraxisListSkeleton, PraxisEmptyState } from '@/components/lay
 import { Inbox, Mic, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { humanizeCaptureError, humanizeStoredCaptureError } from '@/lib/captureErrorMessage';
 import { cn } from '@/lib/utils';
 
@@ -52,7 +52,7 @@ export default function CaptureInbox() {
     mutationFn: (id) => praxisApi.captures.retry(id),
     onSuccess: (data, id) => {
       queryClient.invalidateQueries({ queryKey: ['captures'] });
-      toast({ title: 'Transcrição OK', description: 'Abrindo revisão dos itens.' });
+      toast('Transcrição OK', { description: 'Abrindo revisão dos itens.' });
       if (data?.text) {
         navigate(`/captura?capture=${id}`);
       }
@@ -63,7 +63,7 @@ export default function CaptureInbox() {
         body: error.body || {},
         message: error.message,
       });
-      toast({ title, description: detail, variant: 'destructive' });
+      toast.error(title, { description: detail });
       queryClient.invalidateQueries({ queryKey: ['captures'] });
     },
   });

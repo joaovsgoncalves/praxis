@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import {
   formatClock,
   formatSeconds,
@@ -73,7 +73,6 @@ function toOptionalNumber(value) {
 
 export default function WorkoutSessionView({ sessionId, onExit }) {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [now, setNow] = useState(Date.now());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [setForm, setSetForm] = useState({ weight_kg: '', reps: '', duration_seconds: '', distance_m: '' });
@@ -183,9 +182,9 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     mutationFn: (setId) => praxisApi.workouts.sessions.deleteSet(setId),
     onSuccess: (updated) => {
       updateSessionCache(updated);
-      toast({ title: 'Série removida' });
+      toast('Série removida');
     },
-    onError: (mutationError) => toast({ title: 'Não deu pra remover', description: mutationError?.message, variant: 'destructive' }),
+    onError: (mutationError) => toast.error('Não deu pra remover', { description: mutationError?.message }),
   });
 
   const finishSession = useMutation({
@@ -212,10 +211,10 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     onSuccess: (updated) => {
       localStorage.removeItem(localRestKey(sessionId));
       queryClient.invalidateQueries({ queryKey: ['workouts'] });
-      toast({ title: 'Treino encerrado sem concluir' });
+      toast('Treino encerrado sem concluir');
       onExit?.({ completed: false, session: updated });
     },
-    onError: (mutationError) => toast({ title: 'Não deu pra encerrar', description: mutationError?.message, variant: 'destructive' }),
+    onError: (mutationError) => toast.error('Não deu pra encerrar', { description: mutationError?.message }),
   });
 
   const handleAddSet = () => {

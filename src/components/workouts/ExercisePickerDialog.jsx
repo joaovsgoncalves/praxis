@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { WORKOUT_CATEGORIES, WORKOUT_TRACKING_TYPES, TRACKING_LABELS, WORKOUT_CATEGORY_LABELS } from '@/lib/workouts';
 
 const EMPTY_CUSTOM = {
@@ -25,7 +25,6 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
   const [custom, setCustom] = useState(EMPTY_CUSTOM);
   const deferredQuery = useDeferredValue(query.trim());
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +44,7 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
     mutationFn: (payload) => praxisApi.workouts.exercises.create(payload),
     onSuccess: (exercise) => {
       queryClient.invalidateQueries({ queryKey: ['workouts', 'exercise-library'] });
-      toast({ title: 'Exercício criado', description: `${exercise.name} já entrou na tua biblioteca.` });
+      toast.success('Exercício criado', { description: `${exercise.name} já entrou na tua biblioteca.` });
       onSelect?.(exercise);
       onOpenChange(false);
     },
@@ -56,7 +55,7 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
         onOpenChange(false);
         return;
       }
-      toast({ title: 'Não deu pra criar', description: error?.message || 'Tenta novamente.', variant: 'destructive' });
+      toast.error('Não deu pra criar', { description: error?.message || 'Tenta novamente.' });
     },
   });
 

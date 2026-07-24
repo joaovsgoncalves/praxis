@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 const shownLevels = new Set();
 

@@ -17,7 +17,7 @@ import {
   IDEA_STATUSES,
   ideasForWeeklyReview,
 } from '@/lib/ideas';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { stripQueryParam } from '@/lib/urlDeepLinks';
 import { PageHero, StatGrid, StatTile, SectionHeading, PraxisListSkeleton, PraxisEmptyState } from '@/components/layout/PraxisPage';
 
@@ -102,7 +102,7 @@ export default function Ideas() {
       });
     },
     onError: (err) => {
-      toast({ title: 'Não deu', description: err?.message || 'Tente de novo.', variant: 'destructive' });
+      toast.error('Não deu', { description: err?.message || 'Tente de novo.' });
     },
   });
 
