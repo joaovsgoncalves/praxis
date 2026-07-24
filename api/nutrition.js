@@ -524,6 +524,15 @@ export function updateFood(db, id, body = {}) {
     data.status,
     id,
   );
+  // barcode fica fora do normalize (coluna adicionada na fase 12); só toca se veio no body
+  if (body.barcode !== undefined) {
+    const bc = normalizeBarcode(body.barcode) || null;
+    try {
+      db.prepare('UPDATE food_items SET barcode = ? WHERE id = ?').run(bc, id);
+    } catch {
+      /* ignore */
+    }
+  }
   return getFood(db, id);
 }
 

@@ -14,8 +14,7 @@ import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
 import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
 import CapturePendingBanner from '@/components/dashboard/CapturePendingBanner';
 import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
-import AvoidanceCockpit from '@/components/dashboard/AvoidanceCockpit';
-import OfflineBanner from '@/components/shared/OfflineBanner';
+import AvoidanceWidget from '@/components/dashboard/AvoidanceWidget';
 import PwaInstallBanner from '@/components/shared/PwaInstallBanner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -286,10 +285,8 @@ export default function Dashboard() {
 
   return (
     <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5">
-      <div className="flex flex-col gap-2">
-        <OfflineBanner />
-        <PwaInstallBanner />
-      </div>
+      {/* OfflineBanner vive no AppLayout — vale para todas as abas, não só o Hoje. */}
+      <PwaInstallBanner />
 
       {/* Agora first — decisão do dia antes do resumo (lote 10a) */}
       <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '20ms' }}>
@@ -398,7 +395,7 @@ export default function Dashboard() {
           {/* A rotina de abertura fica no card de rotinas — sem duplicar a manhã. */}
           <SuggestedGoalCard />
           <WeeklyReviewPrompt />
-          <AvoidanceCockpit />
+          <AvoidanceWidget />
         </CollapsibleContent>
       </Collapsible>
 

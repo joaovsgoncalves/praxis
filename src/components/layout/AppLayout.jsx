@@ -5,6 +5,7 @@ import MobileBottomNav from './MobileBottomNav';
 import MobileTopBar from './MobileTopBar';
 import ParticleBackground from '@/components/shared/ParticleBackground';
 import PraxisLevelUpListener from '@/components/gamification/PraxisLevelUpListener';
+import OfflineBanner from '@/components/shared/OfflineBanner';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,6 +35,7 @@ export default function AppLayout() {
               : 'mx-auto max-w-[1480px] p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-5 md:pb-10 lg:p-6 lg:pb-10'
           }
         >
+          {!isLogin && <OfflineBanner />}
           <Outlet />
         </main>
       </div>

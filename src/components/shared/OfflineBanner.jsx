@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { praxisApi } from '@/api/praxisClient';
+import { praxisApi, getStaleState, subscribeStaleState } from '@/api/praxisClient';
 import { WifiOff } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// We piggy-back on the health endpoint. If it fails, the offline cache in
-// praxisClient is already serving stale data — we just surface that to the user.
+// Mounted once in AppLayout, so any screen served from the offline cache warns
+// the user instead of showing yesterday's numbers as if they were fresh.
+// Two signals: the client telling us it fell back to cache (__stale), and the
+// health endpoint / navigator saying the backend is unreachable.
 export default function OfflineBanner() {
   const [navigatorOnline, setNavigatorOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+  const [stale, setStale] = useState(() => getStaleState());
 
   useEffect(() => {
     const onChange = () => setNavigatorOnline(navigator.onLine);
@@ -22,6 +25,8 @@ export default function OfflineBanner() {
     };
   }, []);
 
+  useEffect(() => subscribeStaleState(setStale), []);
+
   const { isError, dataUpdatedAt } = useQuery({
     queryKey: ['health'],
     queryFn: () => praxisApi.health(),
@@ -30,22 +35,28 @@ export default function OfflineBanner() {
     staleTime: 30_000,
   });
 
-  const isDown = !navigatorOnline || isError;
+  const isDown = !navigatorOnline || isError || stale.stale;
   if (!isDown) return null;
 
-  const lastSync = dataUpdatedAt
-    ? formatDistanceToNow(dataUpdatedAt, { locale: ptBR, addSuffix: true })
+  const syncedAt = stale.cachedAt || dataUpdatedAt || null;
+  const lastSync = syncedAt
+    ? formatDistanceToNow(syncedAt, { locale: ptBR, addSuffix: true })
     : null;
 
+  const message = !navigatorOnline
+    ? 'Você está offline — mostrando a última cópia local.'
+    : stale.stale
+      ? 'Sem resposta do servidor — estes dados são de uma cópia salva, não do que está lá agora.'
+      : 'API indisponível — mostrando dados em cache.';
+
   return (
-    <div className="flex items-center gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
-      <WifiOff className="w-4 h-4 shrink-0" />
-      <span className="flex-1">
-        {navigatorOnline
-          ? 'API indisponível — mostrando dados em cache.'
-          : 'Você está offline — mostrando última cópia local.'}
-      </span>
-      {lastSync && <span className="opacity-70 shrink-0">sync {lastSync}</span>}
+    <div
+      role="status"
+      className="mb-4 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-300"
+    >
+      <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="flex-1">{message}</span>
+      {lastSync && <span className="shrink-0 opacity-70">salvo {lastSync}</span>}
     </div>
   );
 }

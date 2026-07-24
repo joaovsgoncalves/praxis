@@ -15,7 +15,7 @@ const SEVERITY_DOT = {
   low: 'bg-muted-foreground/40',
 };
 
-export default function AvoidanceCockpit() {
+export default function AvoidanceWidget() {
   const today = fortalezaDateKey();
 
   const { data, isLoading, isError } = useQuery({

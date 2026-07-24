@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mic, Square, Loader2, Check, X, Sparkles, Inbox, Upload, FileAudio } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Mic, Square, Loader2, Check, Copy, X, Sparkles, Inbox, Upload, FileAudio } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
@@ -39,12 +40,18 @@ export default function VoiceCapture() {
   const [errorMessage, setErrorMessage] = useState('');
   const [activeCaptureId, setActiveCaptureId] = useState(captureParam || null);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
+  // Texto que o navegador entendeu enquanto gravava. Só aparece quando o envio
+  // do áudio falha — aí o que foi falado não morre junto com a requisição.
+  const [rescuedText, setRescuedText] = useState('');
+  const [copiedRescued, setCopiedRescued] = useState(false);
   const mediaRecorder = useRef(null);
   const audioChunks = useRef([]);
   const recordingTimeout = useRef(null);
   const recordingStartedAt = useRef(0);
   const recordingTick = useRef(null);
   const browserRecognition = useRef(null);
+  const shadowRecognition = useRef(null);
+  const shadowTranscript = useRef('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -128,6 +135,43 @@ export default function VoiceCapture() {
 
   const browserSpeechSupported = typeof window !== 'undefined'
     && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  // Reconhecimento "sombra": roda em paralelo ao MediaRecorder só pra ter um
+  // texto local se o envio do áudio falhar. Nunca interrompe nem atrasa a
+  // gravação — qualquer erro dele é engolido de propósito.
+  const startShadowSpeech = useCallback(() => {
+    shadowTranscript.current = '';
+    if (!browserSpeechSupported) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    try {
+      const recognition = new SR();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          if (!event.results[i].isFinal) continue;
+          const chunk = event.results[i][0]?.transcript || '';
+          if (chunk) {
+            shadowTranscript.current = `${shadowTranscript.current} ${chunk}`.trim();
+          }
+        }
+      };
+      recognition.onerror = () => { /* seguro silencioso — o áudio é a via principal */ };
+      recognition.onend = () => { shadowRecognition.current = null; };
+      recognition.start();
+      shadowRecognition.current = recognition;
+    } catch {
+      shadowRecognition.current = null;
+    }
+  }, [browserSpeechSupported]);
+
+  const stopShadowSpeech = useCallback(() => {
+    const recognition = shadowRecognition.current;
+    shadowRecognition.current = null;
+    if (!recognition) return;
+    try { recognition.stop(); } catch { /* noop */ }
+  }, []);
 
   // Fallback nativo: transcreve pelo próprio navegador (Web Speech API) sem
   // depender do backend de STT. Usado quando o MediaRecorder não existe ou
@@ -219,6 +263,8 @@ export default function VoiceCapture() {
     setTranscription('');
     setItems([]);
     setActiveCaptureId(null);
+    setRescuedText('');
+    setCopiedRescued(false);
     setSearchParams({});
 
     try {
@@ -242,6 +288,7 @@ export default function VoiceCapture() {
       mediaRecorder.current.onstop = async () => {
         if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
         if (recordingTick.current) clearInterval(recordingTick.current);
+        stopShadowSpeech();
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(audioChunks.current, { type: mimeType || 'audio/webm' });
         const durationMs = Date.now() - recordingStartedAt.current;
@@ -256,6 +303,7 @@ export default function VoiceCapture() {
       };
 
       mediaRecorder.current.start();
+      startShadowSpeech();
       recordingStartedAt.current = Date.now();
       setRecordingElapsed(0);
       recordingTick.current = setInterval(() => {
@@ -294,6 +342,7 @@ export default function VoiceCapture() {
       setActiveCaptureId(captureId);
       const text = captureRes.text || '';
       setTranscription(text);
+      shadowTranscript.current = '';
       setCapturePhase('parsing');
       await runParse(text, captureId);
       queryClient.invalidateQueries({ queryKey: ['captures'] });
@@ -303,9 +352,43 @@ export default function VoiceCapture() {
       const captureId = body.capture_id;
       if (captureId) setActiveCaptureId(captureId);
       setCaptureError({ status: error.status, body, message: error.message });
+      // O envio morreu, mas o que o navegador entendeu fica na tela pra copiar
+      // ou organizar — não se perde o que foi falado.
+      const localText = shadowTranscript.current.trim();
+      if (localText) {
+        setRescuedText(localText);
+        setCopiedRescued(false);
+      }
       queryClient.invalidateQueries({ queryKey: ['captures'] });
     }
 
+    setCapturePhase('idle');
+  };
+
+  // Limpa o reconhecimento sombra se a tela sair no meio da gravação.
+  useEffect(() => () => stopShadowSpeech(), [stopShadowSpeech]);
+
+  const copyRescuedText = async () => {
+    try {
+      await navigator.clipboard.writeText(rescuedText);
+      setCopiedRescued(true);
+    } catch {
+      setCopiedRescued(false);
+    }
+  };
+
+  const organizeRescuedText = async () => {
+    const text = rescuedText.trim();
+    if (!text) return;
+    clearError();
+    setTranscription(text);
+    setCapturePhase('parsing');
+    try {
+      await runParse(text, null);
+      setRescuedText('');
+    } catch (error) {
+      setCaptureError({ status: error.status, body: error.body || {}, message: error.message });
+    }
     setCapturePhase('idle');
   };
 
@@ -476,6 +559,44 @@ export default function VoiceCapture() {
                   <Link to="/capturas">Abrir Revisar capturas</Link>
                 </Button>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {rescuedText && (
+        <Card className="bg-secondary/30 border-amber-500/30">
+          <CardContent className="py-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium">O que o navegador entendeu</p>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                O áudio não subiu, mas isto aqui não se perdeu. Ajuste se precisar,
+                copie ou mande organizar.
+              </p>
+            </div>
+            <Textarea
+              value={rescuedText}
+              onChange={(e) => {
+                setRescuedText(e.target.value);
+                setCopiedRescued(false);
+              }}
+              rows={4}
+              className="bg-background/60 text-sm"
+              aria-label="Texto reconhecido pelo navegador"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={copyRescuedText} variant="secondary" size="sm" className="praxis-touch-target">
+                {copiedRescued ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                {copiedRescued ? 'Copiado' : 'Copiar texto'}
+              </Button>
+              <Button
+                onClick={organizeRescuedText}
+                size="sm"
+                className="praxis-touch-target"
+                disabled={busy || !rescuedText.trim()}
+              >
+                <Sparkles className="w-4 h-4 mr-1" />Organizar este texto
+              </Button>
             </div>
           </CardContent>
         </Card>

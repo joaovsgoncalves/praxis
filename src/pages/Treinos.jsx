@@ -106,7 +106,7 @@ export default function Treinos() {
   const activeSession = summary?.active_session || null;
 
   return (
-    <div className="praxis-page max-w-xl space-y-6 pb-24">
+    <div className="praxis-page space-y-6 pb-24">
       <PageHero
         kicker="Corpo"
         kickerIcon={Dumbbell}

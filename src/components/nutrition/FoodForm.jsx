@@ -20,6 +20,7 @@ export default function FoodForm({ initial = {}, onSubmit, onCancel, submitting 
     carbs_g: str(initial.carbs_g ?? ''),
     fat_g: str(initial.fat_g ?? ''),
     fiber_g: str(initial.fiber_g ?? ''),
+    barcode: str(initial.barcode ?? ''),
     is_favorite: !!(initial.is_favorite === 1 || initial.is_favorite === true),
   });
 
@@ -51,6 +52,7 @@ export default function FoodForm({ initial = {}, onSubmit, onCancel, submitting 
       carbs_g: num(form.carbs_g),
       fat_g: num(form.fat_g),
       fiber_g: num(form.fiber_g),
+      barcode: form.barcode.replace(/\D/g, '') || null,
       is_favorite: form.is_favorite ? 1 : 0,
       source: initial.source || 'custom',
     });
@@ -150,6 +152,21 @@ export default function FoodForm({ initial = {}, onSubmit, onCancel, submitting 
             onChange={(e) => setField('fat_g', e.target.value)}
           />
         </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="food-barcode">Código de barras — opcional</Label>
+        <Input
+          id="food-barcode"
+          inputMode="numeric"
+          autoComplete="off"
+          className="tabular-nums tracking-wide"
+          value={form.barcode}
+          onChange={(e) => setField('barcode', e.target.value)}
+          placeholder="Ex.: 7891000100103"
+        />
+        <p className="text-xs text-muted-foreground">
+          Com o código salvo, da próxima vez o alimento aparece direto ao escanear.
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="food-fiber">Fibra (g) — opcional</Label>

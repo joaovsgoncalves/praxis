@@ -74,6 +74,42 @@ export function getOfflineStatus() {
   return { lastSyncAt: mostRecent || null };
 }
 
+// ---------------------------------------------------------------------------
+// Stale-serving signal.
+// A cacheable GET that falls back to localStorage returns data flagged with
+// __stale, but every screen would have to read that flag to warn the user.
+// Instead the client broadcasts the transition once and OfflineBanner (mounted
+// in AppLayout) renders the warning for whatever page is open.
+// ---------------------------------------------------------------------------
+const OFFLINE_STATE_EVENT = 'praxis:offline-state';
+let servingStale = false;
+let servingStaleSince = null;
+
+function emitOfflineState(stale, cachedAt = null) {
+  if (stale === servingStale && cachedAt === servingStaleSince) return;
+  servingStale = stale;
+  servingStaleSince = stale ? cachedAt : null;
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(
+    new CustomEvent(OFFLINE_STATE_EVENT, {
+      detail: { stale: servingStale, cachedAt: servingStaleSince },
+    }),
+  );
+}
+
+/** Current stale state — for components mounting after the last transition. */
+export function getStaleState() {
+  return { stale: servingStale, cachedAt: servingStaleSince };
+}
+
+/** Subscribe to stale transitions. Returns an unsubscribe function. */
+export function subscribeStaleState(listener) {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (event) => listener(event.detail);
+  window.addEventListener(OFFLINE_STATE_EVENT, handler);
+  return () => window.removeEventListener(OFFLINE_STATE_EVENT, handler);
+}
+
 async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
 
@@ -94,7 +130,10 @@ async function request(path, options = {}) {
     }
     if (res.status === 204) return null;
     const data = await res.json();
-    if (isGet && isCacheable(path)) writeOfflineCache(path, data);
+    if (isGet && isCacheable(path)) {
+      writeOfflineCache(path, data);
+      emitOfflineState(false);
+    }
     return data;
   } catch (err) {
     if (err?.status === 401 || err?.status === 403) throw err;
@@ -102,6 +141,7 @@ async function request(path, options = {}) {
     if (isGet && isCacheable(path)) {
       const cached = readOfflineCache(path);
       if (cached) {
+        emitOfflineState(true, cached.timestamp);
         const stale = { __stale: true, __cachedAt: cached.timestamp };
         return Array.isArray(cached.data)
           ? Object.assign(cached.data.slice(), stale)

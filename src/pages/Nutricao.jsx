@@ -97,7 +97,7 @@ export default function Nutricao() {
     (hasTargets || (totals.kcal ?? 0) > 0);
 
   return (
-    <div className="praxis-page space-y-6 pb-24 max-w-xl">
+    <div className="praxis-page space-y-6 pb-24">
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"

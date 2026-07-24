@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ScanBarcode } from 'lucide-react';
+import { PackagePlus, ScanBarcode } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
+import FoodForm from '@/components/nutrition/FoodForm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,32 +46,56 @@ export default function NutritionBarcodeEntry({
   const [slot, setSlot] = useState(defaultSlot);
   const [servings, setServings] = useState('1');
   const [result, setResult] = useState(null);
+  // Código escaneado que não existe em lugar nenhum — vira cadastro manual
+  // pré-preenchido em vez de sumir junto com o toast de erro.
+  const [unknownCode, setUnknownCode] = useState('');
+  const [creatingFood, setCreatingFood] = useState(false);
 
   const reset = () => {
     setCode('');
     setResult(null);
     setServings('1');
+    setUnknownCode('');
+    setCreatingFood(false);
   };
 
   const lookupMut = useMutation({
     mutationFn: (raw) => praxisApi.nutrition.barcode.lookup(raw),
     onSuccess: (data) => {
       setResult(data);
+      setUnknownCode('');
+      setCreatingFood(false);
       toast.success(
         data.source === 'cache'
           ? 'Achei no teu catálogo'
           : 'Achei no Open Food Facts (salvo no catálogo)',
       );
     },
-    onError: (err) => {
+    onError: (err, raw) => {
       setResult(null);
-      const msg =
-        err?.message ||
-        (String(err).includes('404')
-          ? 'Produto não encontrado'
-          : 'Não deu pra buscar o código');
-      toast.error(msg);
+      // 404 = código válido, produto desconhecido: guarda pro cadastro manual.
+      const notFound = err?.status === 404 || err?.body?.source === 'not_found';
+      setUnknownCode(notFound ? err?.body?.barcode || raw : '');
+      setCreatingFood(false);
+      toast.error(
+        notFound
+          ? 'Não achei esse produto — dá pra cadastrar com o código'
+          : err?.message || 'Não deu pra buscar o código',
+      );
     },
+  });
+
+  const createFoodMut = useMutation({
+    mutationFn: (data) => praxisApi.nutrition.foods.create(data),
+    onSuccess: (food) => {
+      queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
+      setResult({ source: 'cache', barcode: food.barcode || unknownCode, food });
+      setUnknownCode('');
+      setCreatingFood(false);
+      toast.success('Alimento cadastrado com o código');
+    },
+    onError: (err) =>
+      toast.error('Não deu pra cadastrar', { description: err?.message }),
   });
 
   const logMut = useMutation({
@@ -100,6 +125,8 @@ export default function NutritionBarcodeEntry({
       toast.error('Código precisa ter pelo menos 8 dígitos');
       return;
     }
+    setUnknownCode('');
+    setCreatingFood(false);
     lookupMut.mutate(digits);
   };
 
@@ -165,6 +192,49 @@ export default function NutritionBarcodeEntry({
             >
               {lookupMut.isPending ? 'Buscando…' : 'Buscar produto'}
             </Button>
+
+            {unknownCode && !creatingFood ? (
+              <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold leading-snug">
+                    Esse código não está em lugar nenhum ainda
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Nem no teu catálogo, nem no Open Food Facts. Cadastra os macros
+                    uma vez e o código{' '}
+                    <span className="tabular-nums text-foreground">{unknownCode}</span>{' '}
+                    passa a achar o produto direto.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full rounded-full"
+                  onClick={() => setCreatingFood(true)}
+                >
+                  <PackagePlus className="w-4 h-4 mr-1.5" />
+                  Cadastrar com este código
+                </Button>
+              </div>
+            ) : null}
+
+            {creatingFood && unknownCode ? (
+              <div className="rounded-xl border border-border/60 bg-secondary/20 p-4">
+                <p className="mb-3 text-sm font-semibold leading-snug">
+                  Novo alimento ·{' '}
+                  <span className="tabular-nums font-normal text-muted-foreground">
+                    {unknownCode}
+                  </span>
+                </p>
+                <FoodForm
+                  key={unknownCode}
+                  initial={{ barcode: unknownCode, source: 'barcode' }}
+                  submitting={createFoodMut.isPending}
+                  onCancel={() => setCreatingFood(false)}
+                  onSubmit={(data) => createFoodMut.mutate(data)}
+                />
+              </div>
+            ) : null}
 
             {food ? (
               <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 space-y-3">
