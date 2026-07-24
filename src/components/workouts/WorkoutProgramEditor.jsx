@@ -47,10 +47,8 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
   const [exerciseConfig, setExerciseConfig] = useState({ open: false, day: null, exercise: null, initial: null });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['workouts'] });
-  const fail = (title) => (error) => toast({
-    title,
+  const fail = (title) => (error) => toast.error(title, {
     description: error?.message || 'Tenta novamente.',
-    variant: 'destructive',
   });
 
   useEffect(() => {

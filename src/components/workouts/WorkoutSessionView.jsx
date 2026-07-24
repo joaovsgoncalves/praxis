@@ -171,11 +171,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
       const updatedExercise = updated.exercises.find((exercise) => exercise.id === currentExercise?.id);
       setSetForm(initialSetForm(updatedExercise));
     },
-    onError: (mutationError) => toast({
-      title: 'Não deu pra registrar a série',
-      description: mutationError?.message || 'Confere os campos e tenta de novo.',
-      variant: 'destructive',
-    }),
+    onError: (mutationError) => toast.error('Não deu pra registrar a série', { description: mutationError?.message || 'Confere os campos e tenta de novo.' }),
   });
 
   const deleteSet = useMutation({
@@ -193,17 +189,10 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
       localStorage.removeItem(localRestKey(sessionId));
       queryClient.setQueryData(['workouts', 'session', sessionId], updated);
       queryClient.invalidateQueries({ queryKey: ['workouts'] });
-      toast({
-        title: 'Treino concluído',
-        description: `${updated.workout_day_name_snapshot} · ${updated.completed_sets || totalCompletedSets} séries registradas.`,
-      });
+      toast.success('Treino concluído', { description: `${updated.workout_day_name_snapshot} · ${updated.completed_sets || totalCompletedSets} séries registradas.` });
       onExit?.({ completed: true, session: updated });
     },
-    onError: (mutationError) => toast({
-      title: 'Não deu pra finalizar',
-      description: mutationError?.message || 'Tenta novamente.',
-      variant: 'destructive',
-    }),
+    onError: (mutationError) => toast.error('Não deu pra finalizar', { description: mutationError?.message || 'Tenta novamente.' }),
   });
 
   const abandonSession = useMutation({

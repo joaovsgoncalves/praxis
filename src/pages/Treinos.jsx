@@ -62,11 +62,7 @@ export default function Treinos() {
       refresh();
       toast.success('Programa criado', { description: 'Agora adiciona os dias e monta teus treinos.' });
     },
-    onError: (mutationError) => toast({
-      title: 'Não deu pra criar o programa',
-      description: mutationError?.message || 'Tenta novamente.',
-      variant: 'destructive',
-    }),
+    onError: (mutationError) => toast.error('Não deu pra criar o programa', { description: mutationError?.message || 'Tenta novamente.' }),
   });
 
   const startSession = useMutation({
@@ -80,11 +76,7 @@ export default function Treinos() {
         setActiveSessionId(mutationError.body.session.id);
         return;
       }
-      toast({
-        title: 'Não deu pra começar o treino',
-        description: mutationError?.message || 'Tenta novamente.',
-        variant: 'destructive',
-      });
+      toast.error('Não deu pra começar o treino', { description: mutationError?.message || 'Tenta novamente.' });
     },
   });
 
@@ -94,11 +86,7 @@ export default function Treinos() {
       refresh();
       toast('Descanso concluído', { description: 'O próximo dia do ciclo já está pronto.' });
     },
-    onError: (mutationError) => toast({
-      title: 'Não deu pra avançar o ciclo',
-      description: mutationError?.message || 'Tenta novamente.',
-      variant: 'destructive',
-    }),
+    onError: (mutationError) => toast.error('Não deu pra avançar o ciclo', { description: mutationError?.message || 'Tenta novamente.' }),
   });
 
   if (activeSessionId) {

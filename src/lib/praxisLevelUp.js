@@ -9,11 +9,7 @@ export function notifyPraxisLevelUp(detail) {
   const level = detail.level;
   if (shownLevels.has(level)) return;
   shownLevels.add(level);
-  toast({
-    title: 'Subiu de nível no Praxis',
-    description: `Nível ${level} — ${detail.level_name || ''}`.trim(),
-    duration: 6000,
-  });
+  toast.success('Subiu de nível no Praxis', { description: `Nível ${level} — ${detail.level_name || ''}`.trim(), duration: 6000 });
   window.dispatchEvent(new CustomEvent('praxis-confetti'));
 }
 

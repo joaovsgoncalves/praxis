@@ -28,10 +28,7 @@ export default function CapturePendingBanner() {
     }
     if (count > prevCount.current) {
       const delta = count - prevCount.current;
-      toast({
-        title: delta === 1 ? 'Captura pronta para revisar' : `${delta} capturas na fila`,
-        description: 'Abra Revisar capturas para ver transcrição ou tentar de novo.',
-      });
+      toast.success(delta === 1 ? 'Captura pronta para revisar' : `${delta} capturas na fila`, { description: 'Abra Revisar capturas para ver transcrição ou tentar de novo.' });
     }
     prevCount.current = count;
   }, [count]);

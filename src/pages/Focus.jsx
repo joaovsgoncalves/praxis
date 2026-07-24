@@ -219,10 +219,7 @@ export default function Focus() {
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
       dispatchPraxisLevelUpFromResponse(task);
       setPostSessionOpen(false);
-      toast({
-        title: 'Tarefa concluída',
-        description: task?.title || 'Marcada como feita no Praxis.',
-      });
+      toast.success('Tarefa concluída', { description: task?.title || 'Marcada como feita no Praxis.' });
     },
   });
 
@@ -233,10 +230,7 @@ export default function Focus() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
       setPostSessionOpen(false);
-      toast({
-        title: 'Adiada para amanhã',
-        description: task?.title ? `"${task.title}" volta amanhã.` : 'Tarefa reagendada.',
-      });
+      toast.success('Adiada para amanhã', { description: task?.title ? `"${task.title}" volta amanhã.` : 'Tarefa reagendada.' });
     },
   });
 
@@ -303,10 +297,7 @@ export default function Focus() {
       });
       setPostSessionOpen(true);
     } else if (sessionStart && totalSeconds === 0) {
-      toast({
-        title: 'Sessão descartada',
-        description: 'Menos de 1 segundo de foco — nada foi salvo.',
-      });
+      toast('Sessão descartada', { description: 'Menos de 1 segundo de foco — nada foi salvo.' });
     }
     setSessionStart(null);
     setTimeLeft(focusDuration * 60);
@@ -464,10 +455,7 @@ export default function Focus() {
 
   const dismissPostSession = () => {
     setPostSessionOpen(false);
-    toast({
-      title: 'Tempo registrado',
-      description: 'A sessão ficou salva no histórico de foco.',
-    });
+    toast.success('Tempo registrado', { description: 'A sessão ficou salva no histórico de foco.' });
   };
 
   return (

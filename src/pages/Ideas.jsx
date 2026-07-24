@@ -96,10 +96,7 @@ export default function Ideas() {
     mutationFn: (id) => praxisApi.ideas.promoteToTask(id, { date: fortalezaDateKey(), priority: 'medium' }),
     onSuccess: (res) => {
       invalidateIdeas();
-      toast({
-        title: 'Virou tarefa',
-        description: res?.task?.title ? `"${cleanIdeaTitle(res.task.title)}" está no radar de hoje.` : 'Tarefa criada.',
-      });
+      toast.success('Virou tarefa', { description: res?.task?.title ? `"${cleanIdeaTitle(res.task.title)}" está no radar de hoje.` : 'Tarefa criada.' });
     },
     onError: (err) => {
       toast.error('Não deu', { description: err?.message || 'Tente de novo.' });

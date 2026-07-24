@@ -67,11 +67,7 @@ export default function GamificationWidget() {
       const { leveled_up, level, level_name } = e.detail || {};
       if (leveled_up && !levelUpShown.current.has(level)) {
         levelUpShown.current.add(level);
-        toast({
-          title: 'Subiu de nível no Praxis',
-          description: `Nível ${level} — ${level_name}`,
-          duration: 6000,
-        });
+        toast.success('Subiu de nível no Praxis', { description: `Nível ${level} — ${level_name}`, duration: 6000 });
         // Dispatch custom event so the widget can show confetti
         window.dispatchEvent(new CustomEvent('praxis-confetti'));
       }
