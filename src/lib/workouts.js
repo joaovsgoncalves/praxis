@@ -12,6 +12,7 @@ export const WORKOUT_BAND_LEVELS = [
   { value: 'light', label: 'Leve' },
   { value: 'medium', label: 'Médio' },
   { value: 'heavy', label: 'Forte' },
+  { value: 'extra_heavy', label: 'Extra forte' },
 ];
 
 export const WORKOUT_BAND_LABELS = Object.fromEntries(WORKOUT_BAND_LEVELS.map((item) => [item.value, item.label]));

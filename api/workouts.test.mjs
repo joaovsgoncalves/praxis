@@ -84,12 +84,12 @@ describe('workout routes', () => {
       body: {
         session_exercise_id: session.exercises[0].id,
         reps: 10,
-        band_level: 'medium',
+        band_level: 'extra_heavy',
       },
     });
     assert.equal(session.exercises[0].sets.length, 1);
     assert.equal(session.exercises[0].sets[0].reps, 10);
-    assert.equal(session.exercises[0].sets[0].band_level, 'medium');
+    assert.equal(session.exercises[0].sets[0].band_level, 'extra_heavy');
 
     await assert.rejects(
       () => request(`/api/workouts/sessions/${session.id}/sets`, {
@@ -126,7 +126,7 @@ describe('workout routes', () => {
     });
     assert.equal(second.exercises[0].previous_sets.length, 1);
     assert.equal(second.exercises[0].previous_sets[0].reps, 10);
-    assert.equal(second.exercises[0].previous_sets[0].band_level, 'medium');
+    assert.equal(second.exercises[0].previous_sets[0].band_level, 'extra_heavy');
 
     await request(`/api/workouts/sessions/${second.id}/sets`, {
       method: 'POST',

@@ -20,7 +20,7 @@ export const WORKOUT_EXERCISE_CATEGORIES = [
 const WORKOUT_DAY_TYPES = ['training', 'rest'];
 const WORKOUT_SESSION_STATUSES = ['active', 'completed', 'abandoned'];
 /** Elastic/band load for calisthenics sets (null = not set). */
-export const WORKOUT_BAND_LEVELS = ['none', 'light', 'medium', 'heavy'];
+export const WORKOUT_BAND_LEVELS = ['none', 'light', 'medium', 'heavy', 'extra_heavy'];
 /** Training objective for a programmed exercise (logbook V1.1). */
 export const WORKOUT_PURPOSES = ['skill', 'strength', 'hypertrophy', 'preparation'];
 /** Whether a logged set counts as a warmup or a working set. Null historic role behaves as work. */
