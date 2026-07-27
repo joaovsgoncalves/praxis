@@ -4,7 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { TRACKING_LABELS, WORKOUT_CATEGORY_LABELS } from '@/lib/workouts';
+import { cn } from '@/lib/utils';
+import { TRACKING_LABELS, WORKOUT_CATEGORY_LABELS, WORKOUT_PURPOSES } from '@/lib/workouts';
+
+/** Objetivos em que o critério é técnico, não carga — RIR fica de-enfatizado. */
+const RIR_SOFT_PURPOSES = ['skill', 'preparation'];
 
 function defaultsFor(exercise, initial) {
   const trackingType = exercise?.tracking_type || initial?.tracking_type || 'reps';
@@ -14,6 +18,9 @@ function defaultsFor(exercise, initial) {
     rep_max: initial?.rep_max ?? (['reps', 'weight_reps'].includes(trackingType) ? 12 : ''),
     target_duration_seconds: initial?.target_duration_seconds ?? (trackingType === 'duration' ? 10 : ''),
     rest_seconds: initial?.rest_seconds ?? 90,
+    purpose: initial?.purpose ?? 'strength',
+    target_rir_min: initial?.target_rir_min ?? '',
+    target_rir_max: initial?.target_rir_max ?? '',
     notes: initial?.notes || '',
   };
 }
@@ -29,6 +36,7 @@ export default function WorkoutExerciseConfigDialog({
   const [form, setForm] = useState(() => defaultsFor(exercise, initial));
   const trackingType = exercise?.tracking_type || initial?.tracking_type || 'reps';
   const isRepBased = ['reps', 'weight_reps'].includes(trackingType);
+  const rirSoft = RIR_SOFT_PURPOSES.includes(form.purpose);
 
   useEffect(() => {
     if (open) setForm(defaultsFor(exercise, initial));
@@ -46,6 +54,9 @@ export default function WorkoutExerciseConfigDialog({
           ? Number(form.target_duration_seconds)
           : null,
       rest_seconds: form.rest_seconds !== '' ? Number(form.rest_seconds) : 0,
+      purpose: form.purpose || 'strength',
+      target_rir_min: form.target_rir_min !== '' ? Number(form.target_rir_min) : null,
+      target_rir_max: form.target_rir_max !== '' ? Number(form.target_rir_max) : null,
       notes: form.notes.trim(),
     });
   };
@@ -61,6 +72,31 @@ export default function WorkoutExerciseConfigDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Objetivo</Label>
+            <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Objetivo do exercício">
+              {WORKOUT_PURPOSES.map((option) => {
+                const active = form.purpose === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setForm((current) => ({ ...current, purpose: option.value }))}
+                    className={cn(
+                      'min-h-10 rounded-lg border px-1 py-2 text-xs font-medium transition-colors',
+                      active
+                        ? 'border-primary/50 bg-primary/15 text-foreground'
+                        : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="exercise-target-sets">Séries</Label>
@@ -117,6 +153,43 @@ export default function WorkoutExerciseConfigDialog({
               </div>
             </div>
           ) : null}
+
+          <div className={cn('space-y-2', rirSoft && 'opacity-70')}>
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="exercise-rir-min">RIR alvo <span className="text-muted-foreground">(opcional)</span></Label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="exercise-rir-min" className="text-xs text-muted-foreground">de</Label>
+                <Input
+                  id="exercise-rir-min"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="10"
+                  value={form.target_rir_min}
+                  onChange={(event) => setForm((current) => ({ ...current, target_rir_min: event.target.value }))}
+                  placeholder="—"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="exercise-rir-max" className="text-xs text-muted-foreground">até</Label>
+                <Input
+                  id="exercise-rir-max"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="10"
+                  value={form.target_rir_max}
+                  onChange={(event) => setForm((current) => ({ ...current, target_rir_max: event.target.value }))}
+                  placeholder="—"
+                />
+              </div>
+            </div>
+            {rirSoft ? (
+              <p className="text-xs text-muted-foreground">Use notas para o critério técnico; RIR é opcional.</p>
+            ) : null}
+          </div>
 
           {trackingType === 'duration' ? (
             <div className="space-y-2">

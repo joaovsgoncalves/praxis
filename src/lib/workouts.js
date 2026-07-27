@@ -16,6 +16,31 @@ export const WORKOUT_BAND_LEVELS = [
 
 export const WORKOUT_BAND_LABELS = Object.fromEntries(WORKOUT_BAND_LEVELS.map((item) => [item.value, item.label]));
 
+/** Objetivo do exercício programado (logbook V1.1). */
+export const WORKOUT_PURPOSES = [
+  { value: 'skill', label: 'Skill' },
+  { value: 'strength', label: 'Força' },
+  { value: 'hypertrophy', label: 'Hipertrofia' },
+  { value: 'preparation', label: 'Preparação' },
+];
+
+export const WORKOUT_PURPOSE_LABELS = Object.fromEntries(WORKOUT_PURPOSES.map((item) => [item.value, item.label]));
+
+/** Qualidade técnica opcional de uma série. */
+export const WORKOUT_TECHNICAL_QUALITIES = [
+  { value: 'clean', label: 'Limpa' },
+  { value: 'acceptable', label: 'Aceitável' },
+  { value: 'broke', label: 'Quebrou' },
+];
+
+export const WORKOUT_TECHNICAL_QUALITY_LABELS = Object.fromEntries(
+  WORKOUT_TECHNICAL_QUALITIES.map((item) => [item.value, item.label]),
+);
+
+/** RIR chips usados na sessão. O último (`4`) representa "4 ou mais". */
+export const WORKOUT_RIR_OPTIONS = [0, 1, 2, 3, 4];
+export const WORKOUT_RIR_MAX_CHIP = 4;
+
 export const WORKOUT_CATEGORIES = [
   { value: 'strength', label: 'Musculação' },
   { value: 'calisthenics', label: 'Calistenia' },
@@ -31,6 +56,54 @@ export const WORKOUT_CATEGORY_LABELS = Object.fromEntries(WORKOUT_CATEGORIES.map
 export function formatBandLevel(level) {
   if (level == null || level === '') return null;
   return WORKOUT_BAND_LABELS[level] || String(level);
+}
+
+export function formatPurpose(purpose) {
+  if (purpose == null || purpose === '') return null;
+  return WORKOUT_PURPOSE_LABELS[purpose] || String(purpose);
+}
+
+export function formatTechnicalQuality(quality) {
+  if (quality == null || quality === '') return null;
+  return WORKOUT_TECHNICAL_QUALITY_LABELS[quality] || String(quality);
+}
+
+/** A null/undefined historic role behaves as a working set. */
+export function isWarmupSet(set = {}) {
+  return set.set_role === 'warmup';
+}
+
+/** RIR só faz sentido em repetições / carga + repetições. Nunca em tempo/distância. */
+export function trackingUsesRir(trackingType = 'reps') {
+  return trackingType === 'reps' || trackingType === 'weight_reps';
+}
+
+/** Meta de RIR programada (ex.: "RIR 1–2"). `null` quando não configurada. */
+export function formatTargetRir(item = {}) {
+  const min = item.target_rir_min;
+  const max = item.target_rir_max;
+  if (min == null && max == null) return null;
+  if (min != null && max != null) return min === max ? `RIR ${min}` : `RIR ${min}–${max}`;
+  if (min != null) return `RIR ${min}+`;
+  return `RIR até ${max}`;
+}
+
+/** Rótulo curto do RIR anotado numa série. Trata o topo (chip 4+) de forma sensata. */
+export function formatSetRir(rir) {
+  if (rir == null || rir === '') return null;
+  const value = Number(rir);
+  if (!Number.isFinite(value)) return null;
+  return value >= WORKOUT_RIR_MAX_CHIP ? `RIR ${WORKOUT_RIR_MAX_CHIP}+` : `RIR ${value}`;
+}
+
+/** Metadados opcionais de uma série (RIR, qualidade técnica, nota) — só o que existir. */
+export function setMetaChips(set = {}) {
+  const chips = [];
+  const rir = formatSetRir(set.rir);
+  if (rir) chips.push(rir);
+  const quality = formatTechnicalQuality(set.technical_quality);
+  if (quality) chips.push(quality);
+  return chips;
 }
 
 /** Show elastic chips for pure-reps tracking (calisthenics-friendly). */

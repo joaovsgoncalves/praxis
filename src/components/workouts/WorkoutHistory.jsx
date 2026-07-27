@@ -5,7 +5,35 @@ import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
-import { formatSessionDuration, formatSetResult, workoutDateLabel } from '@/lib/workouts';
+import { cn } from '@/lib/utils';
+import {
+  formatSessionDuration,
+  formatSetResult,
+  formatSetRir,
+  formatTechnicalQuality,
+  isWarmupSet,
+  workoutDateLabel,
+} from '@/lib/workouts';
+
+/** séries de trabalho registradas — cai para o total legado quando o campo não existe. */
+function workSetsCount(session = {}) {
+  if (session.completed_work_sets != null) return Number(session.completed_work_sets);
+  return Number(session.completed_sets || 0);
+}
+
+/** Rótulos estáveis por série: aquecimentos viram A1/A2…, séries de trabalho mantêm o número. */
+function labelSets(sets = []) {
+  let warmup = 0;
+  let work = 0;
+  return sets.map((set) => {
+    if (isWarmupSet(set)) {
+      warmup += 1;
+      return { set, label: `A${warmup}`, warmup: true };
+    }
+    work += 1;
+    return { set, label: `${work}`, warmup: false };
+  });
+}
 
 export default function WorkoutHistory() {
   const [selectedId, setSelectedId] = useState(null);
@@ -63,7 +91,12 @@ export default function WorkoutHistory() {
                 <p className="mt-1 text-xs text-muted-foreground">{workoutDateLabel(session.started_at)}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> {formatSessionDuration(session.duration_seconds)}</span>
-                  <span className="inline-flex items-center gap-1"><Layers3 className="h-3.5 w-3.5" /> {session.completed_sets} séries</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Layers3 className="h-3.5 w-3.5" /> {workSetsCount(session)} séries
+                    {Number(session.completed_warmup_sets) > 0
+                      ? <span className="text-muted-foreground/70"> +{session.completed_warmup_sets} aquec.</span>
+                      : null}
+                  </span>
                   <span>{session.exercise_count} {Number(session.exercise_count) === 1 ? 'exercício' : 'exercícios'}</span>
                 </div>
               </div>
@@ -84,38 +117,61 @@ export default function WorkoutHistory() {
               <DialogHeader className="pr-8">
                 <DialogTitle>{detail.workout_day_name_snapshot}</DialogTitle>
                 <DialogDescription>
-                  {workoutDateLabel(detail.started_at)} · {formatSessionDuration(detail.duration_seconds)} · {detail.completed_sets} séries
+                  {workoutDateLabel(detail.started_at)} · {formatSessionDuration(detail.duration_seconds)} · {workSetsCount(detail)} séries de trabalho
+                  {Number(detail.completed_warmup_sets) > 0 ? ` · ${detail.completed_warmup_sets} aquec.` : ''}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3 pt-2">
-                {detail.exercises.map((exercise, index) => (
-                  <Card key={exercise.id} className="border-border/70 bg-card/35 shadow-none">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary/60 text-xs font-semibold tabular-nums text-muted-foreground">
-                          {index + 1}
+                {detail.exercises.map((exercise, index) => {
+                  const labelled = labelSets(exercise.sets);
+                  const workDone = labelled.filter((item) => !item.warmup).length;
+                  const warmupDone = labelled.length - workDone;
+                  return (
+                    <Card key={exercise.id} className="border-border/70 bg-card/35 shadow-none">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary/60 text-xs font-semibold tabular-nums text-muted-foreground">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{exercise.exercise_name_snapshot}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {workDone} {workDone === 1 ? 'série de trabalho' : 'séries de trabalho'}
+                              {warmupDone ? ` · ${warmupDone} aquec.` : ''}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{exercise.exercise_name_snapshot}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">{exercise.sets.length} {exercise.sets.length === 1 ? 'série registrada' : 'séries registradas'}</p>
-                        </div>
-                      </div>
 
-                      {exercise.sets.length ? (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {exercise.sets.map((set) => (
-                            <span key={set.id} className="rounded-full border border-border/70 bg-secondary/30 px-2.5 py-1 text-xs tabular-nums text-muted-foreground">
-                              {set.set_number}. {formatSetResult(set, exercise.tracking_type)}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-3 text-xs text-muted-foreground">Sem séries registradas.</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                        {labelled.length ? (
+                          <div className="mt-3 flex flex-col gap-1.5">
+                            {labelled.map(({ set, label, warmup }) => {
+                              const rir = formatSetRir(set.rir);
+                              const quality = formatTechnicalQuality(set.technical_quality);
+                              return (
+                                <div
+                                  key={set.id}
+                                  className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-muted-foreground"
+                                >
+                                  <span className={cn('font-semibold tabular-nums', warmup ? 'text-muted-foreground/80' : 'text-foreground')}>
+                                    {label}.
+                                  </span>
+                                  <span className="tabular-nums">{formatSetResult(set, exercise.tracking_type)}</span>
+                                  {warmup ? <span className="uppercase tracking-wide text-muted-foreground/70">aquec.</span> : null}
+                                  {rir ? <span className="tabular-nums">{rir}</span> : null}
+                                  {quality ? <span>{quality}</span> : null}
+                                  {set.notes ? <span className="italic text-muted-foreground/80">“{set.notes}”</span> : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-muted-foreground">Sem séries registradas.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </>
           )}

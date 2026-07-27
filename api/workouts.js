@@ -21,6 +21,12 @@ const WORKOUT_DAY_TYPES = ['training', 'rest'];
 const WORKOUT_SESSION_STATUSES = ['active', 'completed', 'abandoned'];
 /** Elastic/band load for calisthenics sets (null = not set). */
 export const WORKOUT_BAND_LEVELS = ['none', 'light', 'medium', 'heavy'];
+/** Training objective for a programmed exercise (logbook V1.1). */
+export const WORKOUT_PURPOSES = ['skill', 'strength', 'hypertrophy', 'preparation'];
+/** Whether a logged set counts as a warmup or a working set. Null historic role behaves as work. */
+export const WORKOUT_SET_ROLES = ['warmup', 'work'];
+/** Optional technical quality note for a set (null = not informed). */
+export const WORKOUT_TECHNICAL_QUALITIES = ['clean', 'acceptable', 'broke'];
 
 function text(value, fallback = '') {
   if (value === undefined || value === null) return fallback;
@@ -118,6 +124,9 @@ export function initWorkoutSchema(db) {
       rep_max INTEGER,
       target_duration_seconds INTEGER,
       rest_seconds INTEGER DEFAULT 90,
+      purpose TEXT NOT NULL DEFAULT 'strength',
+      target_rir_min INTEGER,
+      target_rir_max INTEGER,
       notes TEXT DEFAULT '',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -155,6 +164,9 @@ export function initWorkoutSchema(db) {
       rep_max INTEGER,
       target_duration_seconds INTEGER,
       rest_seconds INTEGER DEFAULT 90,
+      purpose TEXT NOT NULL DEFAULT 'strength',
+      target_rir_min INTEGER,
+      target_rir_max INTEGER,
       notes TEXT DEFAULT '',
       FOREIGN KEY (session_id) REFERENCES workout_sessions(id),
       FOREIGN KEY (workout_day_exercise_id) REFERENCES workout_day_exercises(id),
@@ -171,6 +183,9 @@ export function initWorkoutSchema(db) {
       duration_seconds INTEGER,
       distance_m REAL,
       band_level TEXT,
+      set_role TEXT NOT NULL DEFAULT 'work',
+      rir INTEGER,
+      technical_quality TEXT,
       notes TEXT DEFAULT '',
       completed_at TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now')),
@@ -195,6 +210,28 @@ export function initWorkoutSchema(db) {
     db.exec('ALTER TABLE workout_session_sets ADD COLUMN band_level TEXT');
   } catch {
     /* column already exists */
+  }
+
+  // V1.1 logbook: objective + target RIR on programmed/snapshot exercises,
+  // and warmup/work role + RIR + technical quality on logged sets.
+  // Each ALTER is idempotent (throws only if the column already exists).
+  const idempotentColumns = [
+    ['workout_day_exercises', "purpose TEXT NOT NULL DEFAULT 'strength'"],
+    ['workout_day_exercises', 'target_rir_min INTEGER'],
+    ['workout_day_exercises', 'target_rir_max INTEGER'],
+    ['workout_session_exercises', "purpose TEXT NOT NULL DEFAULT 'strength'"],
+    ['workout_session_exercises', 'target_rir_min INTEGER'],
+    ['workout_session_exercises', 'target_rir_max INTEGER'],
+    ['workout_session_sets', "set_role TEXT NOT NULL DEFAULT 'work'"],
+    ['workout_session_sets', 'rir INTEGER'],
+    ['workout_session_sets', 'technical_quality TEXT'],
+  ];
+  for (const [table, definition] of idempotentColumns) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    } catch {
+      /* column already exists */
+    }
   }
 }
 
@@ -229,6 +266,9 @@ function exerciseRowsForDay(db, dayId) {
       wde.rep_max,
       wde.target_duration_seconds,
       wde.rest_seconds,
+      wde.purpose,
+      wde.target_rir_min,
+      wde.target_rir_max,
       wde.notes,
       e.name AS exercise_name,
       e.category AS exercise_category,
@@ -291,7 +331,9 @@ function getSessionSummary(db, sessionId) {
     SELECT
       s.*,
       (SELECT COUNT(*) FROM workout_session_exercises se WHERE se.session_id = s.id) AS exercise_count,
-      (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id) AS completed_sets
+      (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id) AS completed_sets,
+      (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id AND (ss.set_role IS NULL OR ss.set_role != 'warmup')) AS completed_work_sets,
+      (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id AND ss.set_role = 'warmup') AS completed_warmup_sets
     FROM workout_sessions s
     WHERE s.id = ?
   `).get(sessionId);
@@ -311,9 +353,11 @@ function getPreviousSets(db, sessionExercise, session) {
     LIMIT 1
   `).get(sessionExercise.exercise_id, session.started_at, session.id);
   if (!previousExercise) return [];
+  // Prefill from working sets only; historic rows with a null role count as work.
   return db.prepare(`
     SELECT * FROM workout_session_sets
     WHERE session_exercise_id = ?
+      AND (set_role IS NULL OR set_role != 'warmup')
     ORDER BY set_number ASC, completed_at ASC
   `).all(previousExercise.id);
 }
@@ -337,6 +381,18 @@ function getSessionDetail(db, sessionId) {
   return { ...session, exercises };
 }
 
+function normalizePurpose(value, existing = null) {
+  const fallback = existing?.purpose ?? 'strength';
+  if (value === undefined || value === null || value === '') return fallback;
+  const purpose = String(value).trim().toLowerCase();
+  if (!WORKOUT_PURPOSES.includes(purpose)) {
+    const err = new Error('Objetivo do exercício inválido.');
+    err.status = 400;
+    throw err;
+  }
+  return purpose;
+}
+
 function normalizeDayExerciseBody(body = {}, existing = null) {
   const targetSets = intOrNull(body.target_sets, { min: 1, max: 20 }) ?? existing?.target_sets ?? 3;
   let repMin = intOrNull(body.rep_min, { min: 0, max: 10000 });
@@ -345,6 +401,14 @@ function normalizeDayExerciseBody(body = {}, existing = null) {
   if (body.rep_max === undefined && existing) repMax = existing.rep_max;
   if (repMin !== null && repMax !== null && repMax < repMin) {
     [repMin, repMax] = [repMax, repMin];
+  }
+
+  let rirMin = intOrNull(body.target_rir_min, { min: 0, max: 10 });
+  let rirMax = intOrNull(body.target_rir_max, { min: 0, max: 10 });
+  if (body.target_rir_min === undefined && existing) rirMin = existing.target_rir_min ?? null;
+  if (body.target_rir_max === undefined && existing) rirMax = existing.target_rir_max ?? null;
+  if (rirMin !== null && rirMax !== null && rirMax < rirMin) {
+    [rirMin, rirMax] = [rirMax, rirMin];
   }
 
   return {
@@ -357,6 +421,9 @@ function normalizeDayExerciseBody(body = {}, existing = null) {
         : intOrNull(body.target_duration_seconds, { min: 1, max: 86400 }),
     rest_seconds:
       intOrNull(body.rest_seconds, { min: 0, max: 3600 }) ?? existing?.rest_seconds ?? 90,
+    purpose: normalizePurpose(body.purpose, existing),
+    target_rir_min: rirMin,
+    target_rir_max: rirMax,
     notes: body.notes !== undefined ? text(body.notes) : existing?.notes || '',
   };
 }
@@ -411,6 +478,30 @@ function normalizeBandLevel(value, existing = null) {
   return level;
 }
 
+function normalizeSetRole(value, existing = null) {
+  if (value === undefined) return existing?.set_role ?? 'work';
+  if (value === null || value === '') return existing?.set_role ?? 'work';
+  const role = String(value).trim().toLowerCase();
+  if (!WORKOUT_SET_ROLES.includes(role)) {
+    const err = new Error('Tipo de série inválido.');
+    err.status = 400;
+    throw err;
+  }
+  return role;
+}
+
+function normalizeTechnicalQuality(value, existing = null) {
+  if (value === undefined) return existing?.technical_quality ?? null;
+  if (value === null || value === '') return null;
+  const quality = String(value).trim().toLowerCase();
+  if (!WORKOUT_TECHNICAL_QUALITIES.includes(quality)) {
+    const err = new Error('Qualidade técnica inválida.');
+    err.status = 400;
+    throw err;
+  }
+  return quality;
+}
+
 function sessionSetPayload(body = {}, existing = null) {
   return {
     weight_kg:
@@ -430,6 +521,12 @@ function sessionSetPayload(body = {}, existing = null) {
         ? existing.distance_m
         : numberOrNull(body.distance_m, { min: 0, max: 10000000 }),
     band_level: normalizeBandLevel(body.band_level, existing),
+    set_role: normalizeSetRole(body.set_role, existing),
+    rir:
+      body.rir === undefined && existing
+        ? existing.rir
+        : intOrNull(body.rir, { min: 0, max: 10 }),
+    technical_quality: normalizeTechnicalQuality(body.technical_quality, existing),
     notes: body.notes !== undefined ? text(body.notes) : existing?.notes || '',
   };
 }
@@ -755,12 +852,18 @@ export function registerWorkoutRoutes(app, db) {
     if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
     const id = randomUUID();
     const position = nextPosition(db, 'workout_day_exercises', 'workout_day_id', day.id);
-    const config = normalizeDayExerciseBody(req.body);
+    let config;
+    try {
+      config = normalizeDayExerciseBody(req.body);
+    } catch (error) {
+      if (error?.status === 400) return res.status(400).json({ error: error.message });
+      throw error;
+    }
     db.prepare(`
       INSERT INTO workout_day_exercises (
         id, workout_day_id, exercise_id, position, target_sets, rep_min, rep_max,
-        target_duration_seconds, rest_seconds, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        target_duration_seconds, rest_seconds, purpose, target_rir_min, target_rir_max, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       day.id,
@@ -771,6 +874,9 @@ export function registerWorkoutRoutes(app, db) {
       config.rep_max,
       config.target_duration_seconds,
       config.rest_seconds,
+      config.purpose,
+      config.target_rir_min,
+      config.target_rir_max,
       config.notes,
     );
     res.status(201).json(getProgram(db, day.program_id));
@@ -779,10 +885,17 @@ export function registerWorkoutRoutes(app, db) {
   app.patch('/api/workouts/day-exercises/:id', handle((req, res) => {
     const existing = db.prepare('SELECT * FROM workout_day_exercises WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Exercício do treino não encontrado.' });
-    const config = normalizeDayExerciseBody(req.body, existing);
+    let config;
+    try {
+      config = normalizeDayExerciseBody(req.body, existing);
+    } catch (error) {
+      if (error?.status === 400) return res.status(400).json({ error: error.message });
+      throw error;
+    }
     db.prepare(`
       UPDATE workout_day_exercises
-      SET target_sets = ?, rep_min = ?, rep_max = ?, target_duration_seconds = ?, rest_seconds = ?, notes = ?, updated_at = datetime('now')
+      SET target_sets = ?, rep_min = ?, rep_max = ?, target_duration_seconds = ?, rest_seconds = ?,
+          purpose = ?, target_rir_min = ?, target_rir_max = ?, notes = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       config.target_sets,
@@ -790,6 +903,9 @@ export function registerWorkoutRoutes(app, db) {
       config.rep_max,
       config.target_duration_seconds,
       config.rest_seconds,
+      config.purpose,
+      config.target_rir_min,
+      config.target_rir_max,
       config.notes,
       existing.id,
     );
@@ -827,7 +943,9 @@ export function registerWorkoutRoutes(app, db) {
       SELECT
         s.*,
         (SELECT COUNT(*) FROM workout_session_exercises se WHERE se.session_id = s.id) AS exercise_count,
-        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id) AS completed_sets
+        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id) AS completed_sets,
+        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id AND (ss.set_role IS NULL OR ss.set_role != 'warmup')) AS completed_work_sets,
+        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id AND ss.set_role = 'warmup') AS completed_warmup_sets
       FROM workout_sessions s
       WHERE s.status = ?
       ORDER BY s.started_at DESC
@@ -869,8 +987,8 @@ export function registerWorkoutRoutes(app, db) {
       INSERT INTO workout_session_exercises (
         id, session_id, workout_day_exercise_id, exercise_id, exercise_name_snapshot,
         tracking_type, position, target_sets, rep_min, rep_max, target_duration_seconds,
-        rest_seconds, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        rest_seconds, purpose, target_rir_min, target_rir_max, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const tx = db.transaction(() => {
@@ -895,6 +1013,9 @@ export function registerWorkoutRoutes(app, db) {
           item.rep_max,
           item.target_duration_seconds,
           item.rest_seconds,
+          item.purpose ?? 'strength',
+          item.target_rir_min ?? null,
+          item.target_rir_max ?? null,
           item.notes,
         );
       }
@@ -937,8 +1058,8 @@ export function registerWorkoutRoutes(app, db) {
     db.prepare(`
       INSERT INTO workout_session_sets (
         id, session_id, session_exercise_id, set_number, weight_kg, reps,
-        duration_seconds, distance_m, band_level, notes, completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        duration_seconds, distance_m, band_level, set_role, rir, technical_quality, notes, completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       session.id,
@@ -949,6 +1070,9 @@ export function registerWorkoutRoutes(app, db) {
       payload.duration_seconds,
       payload.distance_m,
       payload.band_level,
+      payload.set_role,
+      payload.rir,
+      payload.technical_quality,
       payload.notes,
       new Date().toISOString(),
     );
@@ -977,7 +1101,8 @@ export function registerWorkoutRoutes(app, db) {
     }
     db.prepare(`
       UPDATE workout_session_sets
-      SET weight_kg = ?, reps = ?, duration_seconds = ?, distance_m = ?, band_level = ?, notes = ?, updated_at = datetime('now')
+      SET weight_kg = ?, reps = ?, duration_seconds = ?, distance_m = ?, band_level = ?,
+          set_role = ?, rir = ?, technical_quality = ?, notes = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       payload.weight_kg,
@@ -985,6 +1110,9 @@ export function registerWorkoutRoutes(app, db) {
       payload.duration_seconds,
       payload.distance_m,
       payload.band_level,
+      payload.set_role,
+      payload.rir,
+      payload.technical_quality,
       payload.notes,
       existing.id,
     );
@@ -1004,8 +1132,12 @@ export function registerWorkoutRoutes(app, db) {
     const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(req.params.id);
     if (!session) return res.status(404).json({ error: 'Sessão não encontrada.' });
     if (session.status !== 'active') return res.status(400).json({ error: 'Essa sessão já foi encerrada.' });
-    const setsCount = db.prepare('SELECT COUNT(*) AS count FROM workout_session_sets WHERE session_id = ?').get(session.id)?.count || 0;
-    if (!setsCount) return res.status(400).json({ error: 'Registre pelo menos uma série antes de finalizar.' });
+    // Only working sets count toward finishing — a warmup-only session cannot be completed.
+    const workSetsCount = db.prepare(`
+      SELECT COUNT(*) AS count FROM workout_session_sets
+      WHERE session_id = ? AND (set_role IS NULL OR set_role != 'warmup')
+    `).get(session.id)?.count || 0;
+    if (!workSetsCount) return res.status(400).json({ error: 'Registre pelo menos uma série de trabalho antes de finalizar.' });
 
     const completedAt = new Date().toISOString();
     const startedMs = Date.parse(session.started_at);
