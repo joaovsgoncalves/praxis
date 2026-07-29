@@ -518,13 +518,20 @@ export default function HabitsTasks() {
         </div>
       </section>
 
-      <div className={cn('grid gap-6', view === 'all' && 'xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start')}>
+      <div className={cn('grid gap-6', view === 'all' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
         {(view === 'all' || view === 'tasks') && (
-          <section className="space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <section className="min-w-0 space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
+                <p className="praxis-kicker">Execução</p>
+                <h2 className="praxis-title text-2xl font-semibold">
+                  Tarefas
+                  <span className="ml-2 text-base font-normal text-muted-foreground">
+                    ({filteredTasks.length})
+                  </span>
+                </h2>
                 {overdueInScope > 0 && taskScope !== 'overdue' && (
-                  <p className="text-xs text-destructive">
+                  <p className="mt-1 text-xs text-destructive">
                     {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste recorte
                   </p>
                 )}
@@ -713,11 +720,16 @@ export default function HabitsTasks() {
         )}
 
         {(view === 'all' || view === 'habits') && (
-          <section className="space-y-3">
+          <section className="min-w-0 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="praxis-kicker">Consistência</p>
-                <h2 className="praxis-title text-2xl font-semibold">Hábitos</h2>
+                <h2 className="praxis-title text-2xl font-semibold">
+                  Hábitos
+                  <span className="ml-2 text-base font-normal text-muted-foreground">
+                    ({filteredHabits.length})
+                  </span>
+                </h2>
               </div>
               <Select value={habitStatusFilter} onValueChange={setHabitStatusFilter}>
                 <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-48">

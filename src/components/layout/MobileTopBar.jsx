@@ -4,7 +4,7 @@ import { Menu } from 'lucide-react';
 import PraxisBrand from '@/components/brand/PraxisBrand';
 
 const ROUTE_TITLES = [
-  { prefix: '/habitos-tarefas', title: 'Tarefas' },
+  { prefix: '/habitos-tarefas', title: 'Lista' },
   { prefix: '/capturas', title: 'Revisar capturas' },
   { prefix: '/captura', title: 'Captura por voz' },
   { prefix: '/ideias', title: 'Ideias' },

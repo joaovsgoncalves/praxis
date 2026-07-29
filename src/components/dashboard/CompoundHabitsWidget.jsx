@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
 import { formatPreferredTime } from '@/lib/habits';
+import { sortCompoundHabitsForDay } from '@/lib/compoundHabitOrder';
 import { toast } from 'sonner';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
 import HabitForm from '@/components/habits-tasks/HabitForm';
@@ -72,7 +73,8 @@ function CompoundHabitItem({
   return (
     <div
       className={cn(
-        'relative rounded-xl border p-3.5 transition-[background-color,border-color,box-shadow]',
+        'relative rounded-xl border transition-[background-color,border-color,box-shadow]',
+        listItem ? 'p-4 sm:p-5' : 'p-3.5',
         listItem && 'card-domain domain-wellness bg-card/75',
         isClosed
           ? 'border-domain-wellness/25 bg-domain-wellness/[0.07]'
@@ -83,27 +85,54 @@ function CompoundHabitItem({
     >
       {showConfetti && <ConfettiOverlay />}
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {collapsible ? (
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-2.5 text-left',
+              listItem && 'min-h-11 py-0.5',
+            )}
             onClick={() => setIsOpen((open) => !open)}
             aria-expanded={isOpen}
           >
-            <span className="text-lg">{compound.emoji || '⚡'}</span>
-            <span className="flex-1 truncate text-sm font-medium">{compound.title}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <span className={cn(listItem ? 'text-xl' : 'text-lg')}>{compound.emoji || '⚡'}</span>
+            <span
+              className={cn(
+                'flex-1 truncate font-medium',
+                listItem ? 'text-base font-semibold tracking-[-0.02em]' : 'text-sm',
+              )}
+            >
+              {compound.title}
+            </span>
+            <span
+              className={cn(
+                'shrink-0 tabular-nums text-muted-foreground',
+                listItem ? 'rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium' : 'text-xs',
+              )}
+            >
               {completedCount}/{totalCount}
               {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
             </span>
             <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="text-lg">{compound.emoji || '⚡'}</span>
-            <span className="flex-1 truncate text-sm font-medium">{compound.title}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
+          <div className={cn('flex min-w-0 flex-1 items-center gap-2.5', listItem && 'min-h-11')}>
+            <span className={cn(listItem ? 'text-xl' : 'text-lg')}>{compound.emoji || '⚡'}</span>
+            <span
+              className={cn(
+                'flex-1 truncate font-medium',
+                listItem ? 'text-base font-semibold tracking-[-0.02em]' : 'text-sm',
+              )}
+            >
+              {compound.title}
+            </span>
+            <span
+              className={cn(
+                'shrink-0 tabular-nums text-muted-foreground',
+                listItem ? 'rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium' : 'text-xs',
+              )}
+            >
               {completedCount}/{totalCount}
               {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
             </span>
@@ -113,7 +142,10 @@ function CompoundHabitItem({
           type="button"
           size="icon"
           variant="ghost"
-          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          className={cn(
+            'shrink-0 text-muted-foreground hover:text-foreground',
+            listItem ? 'h-11 w-11' : 'h-8 w-8',
+          )}
           aria-label={`Editar rotina ${compound.title}`}
           onClick={() => onEditCompound(compound)}
         >
@@ -122,19 +154,27 @@ function CompoundHabitItem({
       </div>
 
       {(!collapsible || isOpen) && (
-        <div className="mt-3">
+        <div className={cn(listItem ? 'mt-4' : 'mt-3')}>
           <Progress
             value={progressPercent}
-            className={cn('mb-2 h-1.5', isClosed ? '[&>div]:bg-green-500' : '[&>div]:bg-gold')}
+            className={cn(
+              listItem ? 'mb-2.5 h-2' : 'mb-2 h-1.5',
+              isClosed ? '[&>div]:bg-green-500' : '[&>div]:bg-gold',
+            )}
           />
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">{statusCopy}</p>
+          <div className={cn('flex items-center justify-between gap-2', listItem ? 'mb-3.5' : 'mb-3')}>
+            <p className={cn('text-muted-foreground', listItem ? 'text-xs leading-snug' : 'text-[11px]')}>
+              {statusCopy}
+            </p>
             {!isClosed && nextStep && (
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-[11px] text-gold hover:text-gold"
+                className={cn(
+                  'shrink-0 text-gold hover:text-gold',
+                  listItem ? 'h-9 px-2.5 text-xs' : 'h-7 px-2 text-[11px]',
+                )}
                 onClick={() => onCompleteMinimum(nextStep.id)}
               >
                 <Flame className="h-3 w-3" />
@@ -143,7 +183,7 @@ function CompoundHabitItem({
             )}
           </div>
 
-          <ul className="space-y-1.5">
+          <ul className={cn(listItem ? 'space-y-2' : 'space-y-1.5')}>
             {steps.map((step) => {
               const state = habitDayState(step);
               const done = state === 'done';
@@ -154,17 +194,21 @@ function CompoundHabitItem({
                 <li
                   key={step.id}
                   className={cn(
-                    'group flex items-center gap-2 rounded-lg px-1 py-1.5',
+                    'group flex items-center gap-2 rounded-lg',
+                    listItem ? 'min-h-11 gap-2.5 px-2 py-2' : 'px-1 py-1.5',
                     skipped && 'bg-amber-500/[0.06]',
                     timeLabel && !done && !skipped && 'bg-domain-gold/[0.04]',
                   )}
                 >
                   {skipped ? (
                     <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400"
+                      className={cn(
+                        'flex shrink-0 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400',
+                        listItem ? 'h-5 w-5' : 'h-4 w-4',
+                      )}
                       aria-hidden
                     >
-                      <Minus className="h-2.5 w-2.5" />
+                      <Minus className={listItem ? 'h-3 w-3' : 'h-2.5 w-2.5'} />
                     </span>
                   ) : (
                     <Checkbox
@@ -172,7 +216,8 @@ function CompoundHabitItem({
                       checked={done}
                       onCheckedChange={() => onToggleHabit(step.id, done)}
                       className={cn(
-                        'h-4 w-4 shrink-0',
+                        'shrink-0',
+                        listItem ? 'h-5 w-5' : 'h-4 w-4',
                         done
                           ? 'data-[state=checked]:border-green-500 data-[state=checked]:bg-green-500'
                           : 'border-muted-foreground/40',
@@ -182,27 +227,40 @@ function CompoundHabitItem({
                   <label
                     htmlFor={skipped ? undefined : checkboxId}
                     className={cn(
-                      'min-w-0 flex-1 select-none text-xs',
+                      'min-w-0 flex-1 select-none',
+                      listItem ? 'text-sm leading-snug' : 'text-xs',
                       skipped ? 'text-muted-foreground opacity-80' : 'cursor-pointer',
                       done
                         ? 'text-muted-foreground line-through'
                         : !skipped && 'text-foreground/80 group-hover:text-foreground',
                     )}
                   >
-                    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      <span>{step.title}</span>
+                    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      <span className={listItem ? 'font-medium' : undefined}>{step.title}</span>
                       {timeLabel && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-domain-gold">
-                          <Clock className="h-2.5 w-2.5" aria-hidden />
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 font-semibold tabular-nums text-domain-gold',
+                            listItem ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-0.5 text-[10px]',
+                          )}
+                        >
+                          <Clock className={listItem ? 'h-3 w-3' : 'h-2.5 w-2.5'} aria-hidden />
                           {timeLabel}
                         </span>
                       )}
                       {skipped && (
-                        <span className="text-[10px] font-medium text-amber-200/80">Não rolou</span>
+                        <span className={cn('font-medium text-amber-200/80', listItem ? 'text-[11px]' : 'text-[10px]')}>
+                          Não rolou
+                        </span>
                       )}
                     </span>
                     {skipped && step.skip_note && (
-                      <span className="mt-0.5 block text-[10px] leading-snug text-amber-100/70">
+                      <span
+                        className={cn(
+                          'mt-0.5 block leading-snug text-amber-100/70',
+                          listItem ? 'text-[11px]' : 'text-[10px]',
+                        )}
+                      >
                         “{step.skip_note}”
                       </span>
                     )}
@@ -211,7 +269,10 @@ function CompoundHabitItem({
                     type="button"
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    className={cn(
+                      'shrink-0 text-muted-foreground hover:text-foreground',
+                      listItem ? 'h-11 w-11' : 'h-7 w-7',
+                    )}
                     aria-label={`Editar rotina e passo ${step.title}`}
                     onClick={() => onEditCompound(compound)}
                   >
@@ -222,7 +283,10 @@ function CompoundHabitItem({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="h-7 shrink-0 px-2 text-[11px] text-muted-foreground"
+                      className={cn(
+                        'shrink-0 text-muted-foreground',
+                        listItem ? 'h-11 min-w-[4.5rem] px-3 text-xs' : 'h-7 px-2 text-[11px]',
+                      )}
                       onClick={() => onOpenSkip(step)}
                     >
                       Nomear
@@ -232,7 +296,10 @@ function CompoundHabitItem({
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-7 shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 px-2 text-[11px] text-amber-100 hover:bg-amber-500/20"
+                      className={cn(
+                        'shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20',
+                        listItem ? 'h-11 min-w-[5.5rem] px-3 text-xs font-medium' : 'h-7 px-2 text-[11px]',
+                      )}
                       onClick={() => onOpenSkip(step)}
                     >
                       Não rolou
@@ -269,8 +336,9 @@ export default function CompoundHabitsWidget({
     enabled: compoundsProp === undefined,
     refetchInterval: 30000,
   });
-  const compounds = compoundsProp
+  const compoundsRaw = compoundsProp
     ?? queriedHabits.filter((habit) => habit.kind === 'compound');
+  const compounds = sortCompoundHabitsForDay(compoundsRaw);
 
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
@@ -347,7 +415,7 @@ export default function CompoundHabitsWidget({
         </div>
       )}
       {!isLoading && !isError && compounds.length > 0 && (
-        <div className="space-y-3">
+        <div className={cn(variant === 'list' ? 'space-y-4' : 'space-y-3')}>
           {compounds.map((compound) => (
             <CompoundHabitItem
               key={compound.id}

@@ -17,7 +17,7 @@ import {
 /** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
 export const primaryNavItems = [
   { path: '/', label: 'Hoje', icon: LayoutDashboard, end: true },
-  { path: '/habitos-tarefas', label: 'Tarefas', icon: ListTodo },
+  { path: '/habitos-tarefas', label: 'Lista', icon: ListTodo },
   { path: '/captura', label: 'Falar', icon: Mic },
   { path: '/revisao-semanal', label: 'Revisar', icon: BookOpen },
 ];

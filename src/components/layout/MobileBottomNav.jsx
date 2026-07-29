@@ -41,7 +41,7 @@ export default function MobileBottomNav({ onOpenMenu }) {
           }
         >
           <ListTodo className="h-5 w-5 shrink-0" aria-hidden />
-          <span>Tarefas</span>
+          <span>Lista</span>
         </NavLink>
 
         <NavLink
