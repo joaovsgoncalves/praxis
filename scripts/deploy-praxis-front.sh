@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Build + Vercel prod + aliases canônicos Praxis.
 set -euo pipefail
-export HOME="${HOME:-/root/.hermes/home}"
+# Prefer root Vercel auth when present (hermes home auth drifts/expires often).
+if [[ -f /root/.local/share/com.vercel.cli/auth.json ]]; then
+  export HOME=/root
+elif [[ -z "${HOME:-}" ]]; then
+  export HOME=/root/.hermes/home
+fi
 cd "$(dirname "$0")/.."
 npm run prepush:check
 vercel --prod --yes
