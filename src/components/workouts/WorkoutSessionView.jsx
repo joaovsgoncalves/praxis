@@ -11,10 +11,10 @@ import {
   Flag,
   Flame,
   History,
+  Minus,
   Pause,
   Plus,
   Trash2,
-  X,
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
@@ -110,6 +110,92 @@ function toOptionalNumber(value) {
   if (value === '' || value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function StepperInput({
+  id,
+  label,
+  value,
+  onChange,
+  step = 1,
+  inputMode = 'decimal',
+  placeholder = '0',
+  suffix,
+}) {
+  const adjust = (direction) => {
+    const current = Number(value);
+    const base = Number.isFinite(current) ? current : 0;
+    const decimals = String(step).includes('.') ? String(step).split('.')[1].length : 0;
+    const next = Math.max(0, Number((base + direction * step).toFixed(decimals)));
+    onChange(String(next));
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-[11px] font-medium text-muted-foreground">{label}</label>
+        {suffix ? <span className="text-[10px] text-muted-foreground/75">{suffix}</span> : null}
+      </div>
+      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.5rem] overflow-hidden rounded-xl border border-border/80 bg-background/55">
+        <button
+          type="button"
+          className="flex min-h-14 items-center justify-center border-r border-border/70 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          aria-label={`Diminuir ${label.toLowerCase()}`}
+          onClick={() => adjust(-1)}
+        >
+          <Minus className="h-5 w-5" />
+        </button>
+        <Input
+          id={id}
+          type="number"
+          inputMode={inputMode}
+          min="0"
+          step={step}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className="h-14 rounded-none border-0 bg-transparent px-1 text-center text-2xl font-semibold tabular-nums shadow-none focus-visible:ring-0 md:text-2xl"
+        />
+        <button
+          type="button"
+          className="flex min-h-14 items-center justify-center border-l border-border/70 text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          aria-label={`Aumentar ${label.toLowerCase()}`}
+          onClick={() => adjust(1)}
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BandPicker({ value, onChange }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-medium text-muted-foreground">Elástico</p>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Elástico da série">
+        {WORKOUT_BAND_LEVELS.map((band) => {
+          const active = value === band.value;
+          return (
+            <button
+              key={band.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(active ? '' : band.value)}
+              className={cn(
+                'min-h-10 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                active
+                  ? 'border-primary/50 bg-primary/15 text-foreground'
+                  : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {band.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function WorkoutSessionView({ sessionId, onExit }) {
@@ -347,6 +433,13 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const nextWorkNumber = currentWorkCount + 1;
   const nextWarmupNumber = currentWarmupCount + 1;
   const nextSetLabel = isWarmup ? `A${nextWarmupNumber}` : `${nextWorkNumber}`;
+  const lastCompletedSet = currentExercise?.sets?.[currentExercise.sets.length - 1] || null;
+  const showBandInline = isBand && Boolean(setForm.band_level || lastCompletedSet?.band_level);
+  const moreHasValue = isWarmup
+    || setForm.rir !== ''
+    || Boolean(setForm.technical_quality)
+    || Boolean(setForm.note)
+    || (isBand && Boolean(setForm.band_level));
 
   // Stable per-set display labels: warmups get A1/A2…, working sets keep their ordinal.
   const setLabels = new Map();
@@ -375,7 +468,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
           </div>
           <div className="w-10" aria-hidden />
         </div>
-        <Progress value={sessionProgress} className="h-1.5" />
+        <Progress value={sessionProgress} className="h-2 bg-primary/25" />
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span>{sessionProgress}% do planejado</span>
           <span>
@@ -386,21 +479,17 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
       </header>
 
       {restRemaining > 0 ? (
-        <Card className="border-primary/30 bg-primary/10 shadow-none">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-              <Pause className="h-5 w-5" />
+        <Card className="border-primary/35 bg-primary/10 shadow-none">
+          <CardContent className="p-5 text-center">
+            <div className="flex items-center justify-center gap-2 text-primary">
+              <Pause className="h-4 w-4" />
+              <p className="text-xs font-semibold uppercase tracking-[0.14em]">Descanso</p>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Descanso</p>
-              <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight">{formatClock(restRemaining)}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button type="button" variant="outline" size="sm" className="h-9 rounded-full px-2.5 text-xs" onClick={() => adjustRest(-15)}>-15s</Button>
-              <Button type="button" variant="outline" size="sm" className="h-9 rounded-full px-2.5 text-xs" onClick={() => adjustRest(15)}>+15s</Button>
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-full" aria-label="Pular descanso" onClick={() => adjustRest(-restRemaining)}>
-                <X className="h-4 w-4" />
-              </Button>
+            <p className="mt-2 text-4xl font-semibold tabular-nums tracking-[-0.04em] sm:text-5xl">{formatClock(restRemaining)}</p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <Button type="button" variant="outline" className="h-11 rounded-xl tabular-nums" onClick={() => adjustRest(-15)}>−15s</Button>
+              <Button type="button" variant="outline" className="h-11 rounded-xl tabular-nums" onClick={() => adjustRest(15)}>+15s</Button>
+              <Button type="button" variant="secondary" className="h-11 rounded-xl" onClick={() => adjustRest(-restRemaining)}>Pular</Button>
             </div>
           </CardContent>
         </Card>
@@ -549,235 +638,184 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                     );
                   })}
 
-                  {/* Input row */}
-                  <div className="space-y-3 bg-secondary/10 px-3 py-3">
-                    {/* Warmup / work toggle — default Trabalho */}
-                    <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Tipo da série">
-                      {[
-                        { value: 'work', label: 'Trabalho' },
-                        { value: 'warmup', label: 'Aquecimento' },
-                      ].map((option) => {
-                        const active = setForm.set_role === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => setSetForm((current) => ({ ...current, set_role: option.value }))}
-                            className={cn(
-                              'flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors',
-                              active
-                                ? option.value === 'warmup'
-                                  ? 'border-amber-500/50 bg-amber-500/10 text-foreground'
-                                  : 'border-primary/50 bg-primary/15 text-foreground'
-                                : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
-                            )}
-                          >
-                            {option.value === 'warmup' ? <Flame className="h-4 w-4" aria-hidden /> : null}
-                            {option.label}
-                          </button>
-                        );
-                      })}
+                  <div className="space-y-4 bg-secondary/10 px-3 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold">
+                        {isWarmup ? 'Aquecimento' : 'Série'} <span className="tabular-nums text-primary">{nextSetLabel}</span>
+                      </p>
+                      <span className="text-[11px] text-muted-foreground">{isWarmup ? 'Preparação' : 'Trabalho'}</span>
                     </div>
 
-                    <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] items-end gap-2">
-                      <span className="pb-2.5 text-sm font-semibold tabular-nums text-muted-foreground">{nextSetLabel}</span>
-
+                    <div className={cn('grid gap-3', (isWeight || (isDistance && isDuration)) && 'sm:grid-cols-2')}>
                       {isReps ? (
-                        <div className="space-y-1">
-                          <label htmlFor="session-reps" className="sr-only">Repetições</label>
-                          <Input
-                            id="session-reps"
-                            type="number"
-                            inputMode="numeric"
-                            min="0"
-                            value={setForm.reps}
-                            onChange={(event) => setSetForm((current) => ({ ...current, reps: event.target.value }))}
-                            placeholder="0"
-                            className="h-11 text-center text-base font-semibold tabular-nums"
-                          />
-                        </div>
+                        <StepperInput
+                          id="session-reps"
+                          label="Repetições"
+                          value={setForm.reps}
+                          onChange={(value) => setSetForm((current) => ({ ...current, reps: value }))}
+                          step={1}
+                          inputMode="numeric"
+                        />
                       ) : isDuration ? (
-                        <div className="space-y-1">
-                          <label htmlFor="session-duration" className="sr-only">Tempo (s)</label>
-                          <Input
-                            id="session-duration"
-                            type="number"
-                            inputMode="numeric"
-                            min="0"
-                            value={setForm.duration_seconds}
-                            onChange={(event) => setSetForm((current) => ({ ...current, duration_seconds: event.target.value }))}
-                            placeholder="s"
-                            className="h-11 text-center text-base font-semibold tabular-nums"
-                          />
-                        </div>
+                        <StepperInput
+                          id="session-duration"
+                          label="Tempo (s)"
+                          value={setForm.duration_seconds}
+                          onChange={(value) => setSetForm((current) => ({ ...current, duration_seconds: value }))}
+                          step={5}
+                          inputMode="numeric"
+                          suffix="±5s"
+                        />
                       ) : (
-                        <div className="space-y-1">
-                          <label htmlFor="session-distance" className="sr-only">Distância (m)</label>
-                          <Input
-                            id="session-distance"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            value={setForm.distance_m}
-                            onChange={(event) => setSetForm((current) => ({ ...current, distance_m: event.target.value }))}
-                            placeholder="m"
-                            className="h-11 text-center text-base font-semibold tabular-nums"
-                          />
-                        </div>
+                        <StepperInput
+                          id="session-distance"
+                          label="Distância (m)"
+                          value={setForm.distance_m}
+                          onChange={(value) => setSetForm((current) => ({ ...current, distance_m: value }))}
+                          step={1}
+                        />
                       )}
 
                       {isWeight ? (
-                        <div className="space-y-1">
-                          <label htmlFor="session-weight" className="sr-only">Carga (kg)</label>
-                          <Input
-                            id="session-weight"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.25"
-                            value={setForm.weight_kg}
-                            onChange={(event) => setSetForm((current) => ({ ...current, weight_kg: event.target.value }))}
-                            placeholder="kg"
-                            className="h-11 text-center text-base font-semibold tabular-nums"
-                          />
-                        </div>
+                        <StepperInput
+                          id="session-weight"
+                          label="Carga (kg)"
+                          value={setForm.weight_kg}
+                          onChange={(value) => setSetForm((current) => ({ ...current, weight_kg: value }))}
+                          step={2.5}
+                          suffix="±2,5"
+                        />
                       ) : isDistance && isDuration ? (
-                        <div className="space-y-1">
-                          <label htmlFor="session-distance-b" className="sr-only">Distância (m)</label>
-                          <Input
-                            id="session-distance-b"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            value={setForm.distance_m}
-                            onChange={(event) => setSetForm((current) => ({ ...current, distance_m: event.target.value }))}
-                            placeholder="m"
-                            className="h-11 text-center text-base font-semibold tabular-nums"
-                          />
-                        </div>
-                      ) : isBand ? (
-                        <div className="flex h-11 items-center text-xs text-muted-foreground">
-                          {setForm.band_level
-                            ? WORKOUT_BAND_LEVELS.find((b) => b.value === setForm.band_level)?.label
-                            : '—'}
-                        </div>
-                      ) : (
-                        <div className="h-11" />
-                      )}
-
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="h-11 w-11 justify-self-end rounded-xl"
-                        disabled={!canAdd}
-                        aria-label={`Registrar série ${nextSetLabel}`}
-                        onClick={handleAddSet}
-                      >
-                        {addSet.isPending ? <Clock3 className="h-4 w-4 animate-pulse" /> : <Check className="h-5 w-5" />}
-                      </Button>
+                        <StepperInput
+                          id="session-distance-b"
+                          label="Distância (m)"
+                          value={setForm.distance_m}
+                          onChange={(value) => setSetForm((current) => ({ ...current, distance_m: value }))}
+                          step={1}
+                        />
+                      ) : null}
                     </div>
 
-                    {isRir ? (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-medium text-muted-foreground">RIR <span className="font-normal">(opcional)</span></p>
-                        <div className="flex flex-wrap gap-1.5" role="group" aria-label="RIR da série">
-                          {WORKOUT_RIR_OPTIONS.map((value) => {
-                            const active = setForm.rir !== '' && Number(setForm.rir) === value;
-                            const label = value >= WORKOUT_RIR_MAX_CHIP ? `${WORKOUT_RIR_MAX_CHIP}+` : `${value}`;
-                            return (
-                              <button
-                                key={value}
-                                type="button"
-                                aria-pressed={active}
-                                onClick={() => setSetForm((current) => ({
-                                  ...current,
-                                  rir: current.rir !== '' && Number(current.rir) === value ? '' : String(value),
-                                }))}
-                                className={cn(
-                                  'min-h-10 min-w-10 rounded-full border px-3 py-1.5 text-xs font-medium tabular-nums transition-colors',
-                                  active
-                                    ? 'border-primary/50 bg-primary/15 text-foreground'
-                                    : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
-                                )}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                    {showBandInline ? (
+                      <BandPicker
+                        value={setForm.band_level}
+                        onChange={(value) => setSetForm((current) => ({ ...current, band_level: value }))}
+                      />
                     ) : null}
 
-                    {isBand ? (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-medium text-muted-foreground">Elástico</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {WORKOUT_BAND_LEVELS.map((band) => {
-                            const active = setForm.band_level === band.value;
-                            return (
-                              <button
-                                key={band.value}
-                                type="button"
-                                onClick={() => setSetForm((current) => ({
-                                  ...current,
-                                  band_level: current.band_level === band.value ? '' : band.value,
-                                }))}
-                                className={cn(
-                                  'min-h-10 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                                  active
-                                    ? 'border-primary/50 bg-primary/15 text-foreground'
-                                    : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
-                                )}
-                              >
-                                {band.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {/* Optional details: technical quality + short per-set note (all tracking types) */}
-                    <div className="space-y-2">
+                    <div className="rounded-xl border border-border/60 bg-background/25">
                       <button
                         type="button"
                         onClick={() => setShowDetails((value) => !value)}
                         aria-expanded={showDetails}
-                        className="flex min-h-9 items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                       >
-                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showDetails && 'rotate-180')} />
-                        Detalhes {(setForm.technical_quality || setForm.note) ? '·' : '(opcional)'}
-                        {setForm.technical_quality ? <span className="text-foreground">{formatTechnicalQuality(setForm.technical_quality)}</span> : null}
+                        <span className="flex items-center gap-2">
+                          Mais
+                          {moreHasValue ? <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-label="Opções preenchidas" /> : null}
+                        </span>
+                        <ChevronDown className={cn('h-4 w-4 transition-transform', showDetails && 'rotate-180')} />
                       </button>
+
                       {showDetails ? (
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Qualidade técnica">
-                            {WORKOUT_TECHNICAL_QUALITIES.map((option) => {
-                              const active = setForm.technical_quality === option.value;
-                              return (
-                                <button
-                                  key={option.value}
-                                  type="button"
-                                  aria-pressed={active}
-                                  onClick={() => setSetForm((current) => ({
-                                    ...current,
-                                    technical_quality: current.technical_quality === option.value ? '' : option.value,
-                                  }))}
-                                  className={cn(
-                                    'min-h-10 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                                    active
-                                      ? 'border-primary/50 bg-primary/15 text-foreground'
-                                      : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
-                                  )}
-                                >
-                                  {option.label}
-                                </button>
-                              );
-                            })}
+                        <div className="space-y-4 border-t border-border/60 px-3 py-3">
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-medium text-muted-foreground">Tipo da série</p>
+                            <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Tipo da série">
+                              {[
+                                { value: 'work', label: 'Trabalho' },
+                                { value: 'warmup', label: 'Aquecimento' },
+                              ].map((option) => {
+                                const active = setForm.set_role === option.value;
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => setSetForm((current) => ({ ...current, set_role: option.value }))}
+                                    className={cn(
+                                      'flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors',
+                                      active
+                                        ? 'border-primary/45 bg-primary/12 text-foreground'
+                                        : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
+                                    )}
+                                  >
+                                    {option.value === 'warmup' ? <Flame className="h-3.5 w-3.5" aria-hidden /> : null}
+                                    {option.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <label htmlFor="session-set-note" className="sr-only">Nota da série</label>
+
+                          {isRir ? (
+                            <div className="space-y-1.5">
+                              <p className="text-[11px] font-medium text-muted-foreground">RIR <span className="font-normal">(opcional)</span></p>
+                              <div className="flex flex-wrap gap-1.5" role="group" aria-label="RIR da série">
+                                {WORKOUT_RIR_OPTIONS.map((value) => {
+                                  const active = setForm.rir !== '' && Number(setForm.rir) === value;
+                                  const label = value >= WORKOUT_RIR_MAX_CHIP ? `${WORKOUT_RIR_MAX_CHIP}+` : `${value}`;
+                                  return (
+                                    <button
+                                      key={value}
+                                      type="button"
+                                      aria-pressed={active}
+                                      onClick={() => setSetForm((current) => ({
+                                        ...current,
+                                        rir: current.rir !== '' && Number(current.rir) === value ? '' : String(value),
+                                      }))}
+                                      className={cn(
+                                        'min-h-10 min-w-10 rounded-full border px-3 py-1.5 text-xs font-medium tabular-nums transition-colors',
+                                        active
+                                          ? 'border-primary/50 bg-primary/15 text-foreground'
+                                          : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
+                                      )}
+                                    >
+                                      {label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {isBand && !showBandInline ? (
+                            <BandPicker
+                              value={setForm.band_level}
+                              onChange={(value) => setSetForm((current) => ({ ...current, band_level: value }))}
+                            />
+                          ) : null}
+
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-medium text-muted-foreground">Qualidade técnica <span className="font-normal">(opcional)</span></p>
+                            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Qualidade técnica">
+                              {WORKOUT_TECHNICAL_QUALITIES.map((option) => {
+                                const active = setForm.technical_quality === option.value;
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => setSetForm((current) => ({
+                                      ...current,
+                                      technical_quality: current.technical_quality === option.value ? '' : option.value,
+                                    }))}
+                                    className={cn(
+                                      'min-h-10 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                      active
+                                        ? 'border-primary/50 bg-primary/15 text-foreground'
+                                        : 'border-border/70 bg-background/40 text-muted-foreground hover:text-foreground',
+                                    )}
+                                  >
+                                    {option.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label htmlFor="session-set-note" className="text-[11px] font-medium text-muted-foreground">Nota <span className="font-normal">(opcional)</span></label>
                             <Input
                               id="session-set-note"
                               type="text"
@@ -785,28 +823,28 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                               onChange={(event) => setSetForm((current) => ({ ...current, note: event.target.value }))}
                               placeholder="Nota rápida (lado, parede, dor...)"
                               maxLength={140}
-                              className="h-10 text-sm"
+                              className="h-11 text-sm"
                             />
                           </div>
                         </div>
                       ) : null}
                     </div>
+
+                    <Button
+                      type="button"
+                      className="h-14 w-full rounded-xl text-base"
+                      disabled={!canAdd}
+                      onClick={handleAddSet}
+                    >
+                      {addSet.isPending ? (
+                        'Registrando...'
+                      ) : (
+                        <><Plus className="mr-1 h-5 w-5" /> Registrar {isWarmup ? 'aquecimento' : 'série'} {nextSetLabel}</>
+                      )}
+                    </Button>
                   </div>
                 </div>
               </div>
-
-              <Button
-                type="button"
-                className="mt-3 h-12 w-full rounded-xl text-base"
-                disabled={!canAdd}
-                onClick={handleAddSet}
-              >
-                {addSet.isPending ? (
-                  'Registrando...'
-                ) : (
-                  <><Plus className="mr-2 h-5 w-5" /> Registrar {isWarmup ? 'aquecimento' : 'série'} {nextSetLabel}</>
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -825,6 +863,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
         <CardContent className="space-y-3 p-4">
           <Button
             type="button"
+            variant={totalWorkSets ? 'secondary' : 'outline'}
             className="h-12 w-full rounded-xl"
             disabled={!totalWorkSets || finishSession.isPending}
             onClick={() => {

@@ -26,7 +26,7 @@ function buildProgram() {
     position: 0,
     estimated_duration_minutes: 45,
     notes: '',
-    exercise_count: 1,
+    exercise_count: 2,
     exercises: [
       {
         id: 'day-ex-1',
@@ -37,7 +37,7 @@ function buildProgram() {
         rep_min: 5,
         rep_max: 8,
         target_duration_seconds: null,
-        rest_seconds: 2,
+        rest_seconds: 90,
         purpose: 'strength',
         target_rir_min: 1,
         target_rir_max: 2,
@@ -45,6 +45,24 @@ function buildProgram() {
         exercise_name: 'Supino reto',
         exercise_category: 'strength',
         tracking_type: 'weight_reps',
+      },
+      {
+        id: 'day-ex-2',
+        workout_day_id: 'day-push',
+        exercise_id: 'exercise-pull-up',
+        position: 1,
+        target_sets: 1,
+        rep_min: 5,
+        rep_max: 8,
+        target_duration_seconds: null,
+        rest_seconds: 90,
+        purpose: 'strength',
+        target_rir_min: null,
+        target_rir_max: null,
+        notes: '',
+        exercise_name: 'Barra fixa',
+        exercise_category: 'calisthenics',
+        tracking_type: 'reps',
       },
     ],
   };
@@ -103,6 +121,7 @@ async function mockPraxisApi(page) {
             set_number: index + 1,
             weight_kg: set.weight_kg,
             reps: set.reps,
+            band_level: set.band_level,
             set_role: 'work',
           }));
       }
@@ -177,7 +196,7 @@ async function mockPraxisApi(page) {
         started_at: new Date().toISOString(),
         completed_at: null,
         duration_seconds: null,
-        exercise_count: 1,
+        exercise_count: 2,
         exercises: [
           {
             id: `session-ex-${state.sessionSeq}`,
@@ -190,13 +209,32 @@ async function mockPraxisApi(page) {
             rep_min: 5,
             rep_max: 8,
             target_duration_seconds: null,
-            rest_seconds: 2,
+            rest_seconds: 90,
             purpose: 'strength',
             target_rir_min: 1,
             target_rir_max: 2,
             notes: '',
             sets: [],
             previous_sets: previousWorkSets('exercise-bench'),
+          },
+          {
+            id: `session-ex-band-${state.sessionSeq}`,
+            session_id: id,
+            exercise_id: 'exercise-pull-up',
+            exercise_name_snapshot: 'Barra fixa',
+            tracking_type: 'reps',
+            position: 1,
+            target_sets: 1,
+            rep_min: 5,
+            rep_max: 8,
+            target_duration_seconds: null,
+            rest_seconds: 90,
+            purpose: 'strength',
+            target_rir_min: null,
+            target_rir_max: null,
+            notes: '',
+            sets: [],
+            previous_sets: previousWorkSets('exercise-pull-up'),
           },
         ],
       };
@@ -214,7 +252,7 @@ async function mockPraxisApi(page) {
     const setsMatch = path.match(/^\/api\/workouts\/sessions\/[^/]+\/sets$/);
     if (setsMatch && method === 'POST') {
       const payload = request.postDataJSON();
-      const exercise = state.session.exercises[0];
+      const exercise = state.session.exercises.find((item) => item.id === payload.session_exercise_id);
       exercise.sets.push({
         id: `set-${exercise.sets.length + 1}`,
         session_id: state.session.id,
@@ -276,7 +314,7 @@ async function mockPraxisApi(page) {
   return state;
 }
 
-test('treinos v1.1: aquecimento + 2 séries de trabalho com RIR/qualidade, finaliza, prefill e histórico em 390px', async ({ page }) => {
+test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico em 390px', async ({ page }) => {
   await mockPraxisApi(page);
   await page.goto('/treinos');
 
@@ -287,31 +325,52 @@ test('treinos v1.1: aquecimento + 2 séries de trabalho com RIR/qualidade, final
 
   await page.getByRole('button', { name: /Começar treino/i }).click();
   await expect(page.getByRole('heading', { name: 'Supino reto' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Navegação principal' })).toHaveCount(0);
+  await expect(page.getByRole('complementary')).toHaveCount(0);
+  await expect(page.locator('canvas[data-praxis-particles]')).toHaveCount(0);
 
   // 1 aquecimento — não conta como série de trabalho e não dispara descanso.
+  await page.getByRole('button', { name: 'Mais', exact: true }).click();
   await page.getByRole('button', { name: 'Aquecimento', exact: true }).click();
-  await page.getByLabel('Repetições').fill('5');
-  await page.getByLabel('Carga (kg)').fill('40');
+  await page.getByRole('button', { name: 'Aumentar repetições', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Repetições', exact: true })).toHaveValue('1');
+  await page.getByRole('button', { name: 'Aumentar carga (kg)', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true })).toHaveValue('2.5');
+  await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('5');
+  await page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true }).fill('40');
   await page.getByRole('button', { name: /Registrar aquecimento A1/i }).click();
   await expect(page.getByText('40 kg', { exact: true })).toBeVisible();
 
   // Série de trabalho 1 — com RIR e qualidade técnica.
-  await page.getByLabel('Repetições').fill('6');
-  await page.getByLabel('Carga (kg)').fill('60');
+  await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('6');
+  await page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true }).fill('60');
+  await page.getByRole('button', { name: 'Mais', exact: true }).click();
   await page.getByRole('group', { name: 'RIR da série' }).getByRole('button', { name: '2', exact: true }).click();
-  await page.getByRole('button', { name: /Detalhes/i }).click();
   await page.getByRole('group', { name: 'Qualidade técnica' }).getByRole('button', { name: 'Limpa', exact: true }).click();
-  // O rótulo cobre o botão de ícone e o botão largo — qualquer um dispara o registro.
-  await page.getByRole('button', { name: /Registrar série 1/i }).first().click();
+  await page.getByRole('button', { name: /Registrar série 1/i }).click();
   await expect(page.getByText('RIR 2', { exact: true })).toBeVisible();
   await expect(page.getByText('Limpa', { exact: true })).toBeVisible();
+  await expect(page.getByText('Descanso', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '−15s', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '+15s', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pular', exact: true })).toBeVisible();
 
   // Série de trabalho 2.
-  await page.getByLabel('Repetições').fill('5');
-  await page.getByLabel('Carga (kg)').fill('60');
-  await page.getByRole('button', { name: /Registrar série 2/i }).first().click();
+  await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('5');
+  await page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true }).fill('60');
+  await page.getByRole('button', { name: /Registrar série 2/i }).click();
 
-  // Progresso é só-trabalho: 2/2 planejadas = 100%, com o aquecimento contado à parte.
+  // Reps + elástico: fica em Mais no primeiro uso e reaparece sozinho depois de registrado.
+  await page.getByRole('button', { name: /Próximo/i }).click();
+  await expect(page.getByRole('heading', { name: 'Barra fixa' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Elástico da série' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mais', exact: true }).click();
+  await page.getByRole('group', { name: 'Elástico da série' }).getByRole('button', { name: 'Médio', exact: true }).click();
+  await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('6');
+  await page.getByRole('button', { name: /Registrar série 1/i }).click();
+  await expect(page.getByRole('group', { name: 'Elástico da série' })).toBeVisible();
+
+  // Progresso é só-trabalho: 3/3 planejadas = 100%, com o aquecimento contado à parte.
   await expect(page.getByText('100% do planejado')).toBeVisible();
   await expect(page.getByText(/1 aquec\./)).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -334,5 +393,8 @@ test('treinos v1.1: aquecimento + 2 séries de trabalho com RIR/qualidade, final
   await page.getByRole('button', { name: /Concluir descanso/i }).click();
   await page.getByRole('button', { name: /Começar treino/i }).click();
   await expect(page.getByText('60 kg · 6 reps · 60 kg · 5 reps')).toBeVisible();
+  await page.getByRole('button', { name: /Próximo/i }).click();
+  await expect(page.getByRole('group', { name: 'Elástico da série' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Elástico da série' }).getByRole('button', { name: 'Médio', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expectNoHorizontalOverflow(page);
 });

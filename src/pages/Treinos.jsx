@@ -17,6 +17,7 @@ import {
   PraxisEmptyState,
   PraxisListSkeleton,
 } from '@/components/layout/PraxisPage';
+import { useWorkoutSessionMode } from '@/components/layout/AppLayout';
 import WorkoutProgramDialog from '@/components/workouts/WorkoutProgramDialog';
 import WorkoutProgramEditor from '@/components/workouts/WorkoutProgramEditor';
 import WorkoutSessionView from '@/components/workouts/WorkoutSessionView';
@@ -39,6 +40,7 @@ export default function Treinos() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [programDialogOpen, setProgramDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  useWorkoutSessionMode(Boolean(activeSessionId));
 
   const { data: summary, isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'summary'],
@@ -111,7 +113,7 @@ export default function Treinos() {
         kicker="Corpo"
         kickerIcon={Dumbbell}
         title="Treinos"
-        description="Monta teu programa, executa série por série e carrega o histórico pra próxima sessão."
+        description="Teu treino de hoje, sem ruído."
       />
 
       {isLoading ? <PraxisListSkeleton rows={4} /> : null}
@@ -202,8 +204,10 @@ export default function Treinos() {
               <TodayWorkout
                 program={program}
                 currentDay={currentDay}
+                activeSession={activeSession}
                 totalCompleted={summary?.total_completed || 0}
                 onStart={(dayId) => startSession.mutate(dayId)}
+                onContinue={() => setActiveSessionId(activeSession?.id)}
                 starting={startSession.isPending}
                 onAdvanceRest={() => advanceRest.mutate({ programId: program.id, dayId: currentDay.id })}
                 advancingRest={advanceRest.isPending}
@@ -223,8 +227,10 @@ export default function Treinos() {
 function TodayWorkout({
   program,
   currentDay,
+  activeSession,
   totalCompleted,
   onStart,
+  onContinue,
   starting,
   onAdvanceRest,
   advancingRest,
@@ -244,6 +250,10 @@ function TodayWorkout({
   const days = program.days || [];
   const currentIndex = days.findIndex((day) => day.id === currentDay.id);
   const cycleProgress = days.length ? Math.round(((currentIndex + 1) / days.length) * 100) : 0;
+  const exerciseCount = currentDay.exercises?.length || 0;
+  const dayMeta = currentDay.day_type === 'rest'
+    ? 'Dia de recuperação'
+    : `${exerciseCount} ex${currentDay.estimated_duration_minutes ? ` · ~${currentDay.estimated_duration_minutes} min` : ''}`;
 
   return (
     <div className="space-y-5">
@@ -256,7 +266,7 @@ function TodayWorkout({
                   {currentDay.day_type === 'rest' ? 'Hoje é descanso' : 'Próximo treino'}
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">{currentDay.name}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{workoutDayShortLabel(currentDay)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{dayMeta}</p>
               </div>
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                 {currentDay.day_type === 'rest' ? <RotateCcw className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
@@ -264,7 +274,13 @@ function TodayWorkout({
             </div>
 
             {currentDay.notes ? (
-              <p className="mt-4 rounded-xl bg-background/45 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">{currentDay.notes}</p>
+              <details className="group mt-3 rounded-xl bg-background/35 px-3 py-2">
+                <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-muted-foreground marker:content-none">
+                  <span>Nota</span>
+                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden />
+                </summary>
+                <p className="pb-1 pt-1.5 text-xs leading-relaxed text-muted-foreground">{currentDay.notes}</p>
+              </details>
             ) : null}
 
             {currentDay.day_type === 'rest' ? (
@@ -273,9 +289,14 @@ function TodayWorkout({
                 {advancingRest ? 'Avançando...' : 'Concluir descanso'}
               </Button>
             ) : currentDay.exercises?.length ? (
-              <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={() => onStart(currentDay.id)} disabled={starting}>
+              <Button
+                type="button"
+                className="mt-5 h-12 w-full rounded-xl text-base"
+                onClick={() => (activeSession ? onContinue() : onStart(currentDay.id))}
+                disabled={!activeSession && starting}
+              >
                 <Play className="mr-2 h-5 w-5 fill-current" />
-                {starting ? 'Começando...' : 'Começar treino'}
+                {activeSession ? 'Continuar treino' : starting ? 'Começando...' : 'Começar treino'}
               </Button>
             ) : (
               <Button type="button" variant="outline" className="mt-5 h-12 w-full rounded-xl" onClick={onOpenProgram}>
@@ -298,22 +319,19 @@ function TodayWorkout({
         <Card className="border-border/80 bg-card/35 shadow-none">
           <CardContent className="p-0">
             <div className="flex items-center justify-between border-b border-border/70 px-4 py-3.5 sm:px-5">
-              <div>
-                <p className="text-sm font-semibold">Exercícios de hoje</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Na ordem do treino.</p>
-              </div>
+              <p className="text-sm font-semibold">Exercícios de hoje</p>
               <span className="text-xs text-muted-foreground">{currentDay.exercises.length}</span>
             </div>
             <div className="divide-y divide-border/60">
               {currentDay.exercises.map((exercise, index) => (
-                <div key={exercise.id} className="flex items-center gap-3 px-4 py-3.5 sm:px-5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary/55 text-xs font-semibold tabular-nums text-muted-foreground">
+                <div key={exercise.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary/55 text-xs font-semibold tabular-nums text-muted-foreground">
                     {index + 1}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{exercise.exercise_name}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      <span>{formatWorkoutTarget(exercise)}</span>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>{formatWorkoutTarget(exercise).replace(/^(\d+) séries? · /, '$1×')}</span>
                       <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {formatSeconds(exercise.rest_seconds)}</span>
                     </div>
                   </div>
@@ -325,38 +343,46 @@ function TodayWorkout({
         </Card>
       ) : null}
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">Teu ciclo</p>
-          <Button type="button" variant="ghost" size="sm" className="h-8 rounded-full text-xs" onClick={onOpenProgram}>Editar</Button>
-        </div>
-        <div className="space-y-1.5">
-          {days.map((day, index) => {
-            const isCurrent = day.id === currentDay.id;
-            return (
-              <div
-                key={day.id}
-                className={cn(
-                  'flex items-center gap-3 rounded-xl border px-3.5 py-3',
-                  isCurrent ? 'border-primary/40 bg-primary/8' : 'border-border/60 bg-card/25',
-                )}
-              >
-                <div className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums',
-                  isCurrent ? 'bg-primary/15 text-primary' : 'bg-secondary/45 text-muted-foreground',
-                )}>
-                  {day.day_type === 'rest' ? <RotateCcw className="h-3.5 w-3.5" /> : index + 1}
+      <details className="group rounded-xl border border-border/60 bg-card/25">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold marker:content-none">
+          <span>Teu ciclo</span>
+          <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+            {days.length} dias
+            <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" aria-hidden />
+          </span>
+        </summary>
+        <div className="space-y-2 border-t border-border/60 px-3 pb-3 pt-3">
+          <div className="flex justify-end">
+            <Button type="button" variant="ghost" size="sm" className="h-8 rounded-full text-xs" onClick={onOpenProgram}>Editar ciclo</Button>
+          </div>
+          <div className="space-y-1.5">
+            {days.map((day, index) => {
+              const isCurrent = day.id === currentDay.id;
+              return (
+                <div
+                  key={day.id}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl border px-3.5 py-3',
+                    isCurrent ? 'border-primary/40 bg-primary/8' : 'border-border/60 bg-card/25',
+                  )}
+                >
+                  <div className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums',
+                    isCurrent ? 'bg-primary/15 text-primary' : 'bg-secondary/45 text-muted-foreground',
+                  )}>
+                    {day.day_type === 'rest' ? <RotateCcw className="h-3.5 w-3.5" /> : index + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{day.name}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{workoutDayShortLabel(day)}</p>
+                  </div>
+                  {isCurrent ? <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Agora</span> : null}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{day.name}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{workoutDayShortLabel(day)}</p>
-                </div>
-                {isCurrent ? <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Agora</span> : null}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 }
