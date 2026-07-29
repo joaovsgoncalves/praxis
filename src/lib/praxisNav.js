@@ -30,7 +30,7 @@ export const secondaryNavItems = [
   { path: '/treinos', label: 'Treinos', icon: Dumbbell },
   { path: '/nutricao', label: 'Nutrição', icon: UtensilsCrossed },
   // /capturas fica acessível por banner/links do Falar — fora do menu (João 2026-07-16)
-  { path: '/metas', label: 'Metas', icon: Target, requiresActiveGoals: true },
+  { path: '/metas', label: 'Metas', icon: Target },
   { path: '/conquistas', label: 'Conquistas', icon: Trophy, requiresUnlockedAchievements: true },
   { path: '/historico', label: 'Histórico', icon: BarChart3 },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
@@ -38,11 +38,9 @@ export const secondaryNavItems = [
 
 export function filterSecondaryNav(items, ctx) {
   const {
-    activeGoalCount = 0,
     unlockedAchievementCount = 0,
   } = ctx;
   return items.filter((item) => {
-    if (item.requiresActiveGoals) return activeGoalCount > 0;
     if (item.requiresUnlockedAchievements) return unlockedAchievementCount > 0;
     return true;
   });

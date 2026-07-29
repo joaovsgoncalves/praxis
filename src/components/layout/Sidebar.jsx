@@ -113,22 +113,15 @@ function NavLinkRow({ item, isActive, onClose, density = 'primary' }) {
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
 
-  const { data: goals = [] } = useQuery({
-    queryKey: ['allGoals'],
-    queryFn: () => praxisApi.goals.list(),
-    staleTime: 60_000,
-  });
   const { data: gamificationNav } = useQuery({
     queryKey: ['gamification'],
     queryFn: () => praxisApi.gamification.get(),
     staleTime: 120_000,
   });
 
-  const activeGoalCount = goals.filter((g) => g.status === 'active').length;
   const unlockedAchievementCount = (gamificationNav?.achievements || []).filter((a) => a.unlocked).length;
 
   const secondary = filterSecondaryNav(secondaryNavItems, {
-    activeGoalCount,
     unlockedAchievementCount,
   });
 
