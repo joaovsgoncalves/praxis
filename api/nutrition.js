@@ -8,7 +8,32 @@ import {
 } from './nutritionOpenFoodFacts.js';
 import { seedBrazilianFoods } from './nutritionSeedBr.js';
 
-export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner', 'other'];
+/** Slots canônicos do diário (ordem de exibição). */
+export const MEAL_SLOTS = [
+  'breakfast',
+  'snack_morning',
+  'lunch',
+  'snack_afternoon',
+  'dinner',
+];
+
+/** Legado ainda presente em logs antigos — normalizado na leitura/escrita. */
+export const MEAL_SLOTS_LEGACY = ['snack', 'other'];
+
+/** Todos os valores aceitos no POST/PATCH antes da normalização. */
+export const MEAL_SLOTS_ACCEPTED = [...MEAL_SLOTS, ...MEAL_SLOTS_LEGACY];
+
+/**
+ * Normaliza slot de refeição.
+ * - snack (legado) → snack_morning
+ * - other (legado) → snack_afternoon
+ */
+export function normalizeMealSlot(slot) {
+  if (slot === 'snack') return 'snack_morning';
+  if (slot === 'other') return 'snack_afternoon';
+  if (MEAL_SLOTS.includes(slot)) return slot;
+  return 'snack_afternoon';
+}
 
 export const NUTRITION_GOALS = ['lose', 'maintain', 'gain'];
 export const NUTRITION_ACTIVITIES = ['sedentary', 'light', 'moderate', 'active', 'very'];
@@ -627,7 +652,7 @@ export function createLog(db, body = {}, { today } = {}) {
     throw err;
   }
   const dateStr = String(date).slice(0, 10);
-  const meal_slot = MEAL_SLOTS.includes(body.meal_slot) ? body.meal_slot : 'other';
+  const meal_slot = normalizeMealSlot(body.meal_slot);
 
   let snapshot;
   if (body.food_item_id) {
@@ -702,9 +727,9 @@ export function updateLog(db, id, body = {}) {
         ? String(body.date).slice(0, 10)
         : existing.date,
     meal_slot:
-      body.meal_slot !== undefined && MEAL_SLOTS.includes(body.meal_slot)
-        ? body.meal_slot
-        : existing.meal_slot,
+      body.meal_slot !== undefined
+        ? normalizeMealSlot(body.meal_slot)
+        : normalizeMealSlot(existing.meal_slot),
     food_item_id: foodId || null,
     meal_id: body.meal_id !== undefined ? body.meal_id : existing.meal_id,
     name_snapshot: existing.name_snapshot,
@@ -832,19 +857,22 @@ export function sumTotals(logs = []) {
 function emptyBySlot() {
   return {
     breakfast: [],
+    snack_morning: [],
     lunch: [],
-    snack: [],
+    snack_afternoon: [],
     dinner: [],
-    other: [],
   };
 }
 
 export function buildDayPayload(db, date) {
-  const logs = listLogsByDate(db, date);
+  const logs = listLogsByDate(db, date).map((log) => ({
+    ...log,
+    meal_slot: normalizeMealSlot(log.meal_slot),
+  }));
   const profile = getNutritionProfile(db);
   const by_slot = emptyBySlot();
   for (const log of logs) {
-    const slot = MEAL_SLOTS.includes(log.meal_slot) ? log.meal_slot : 'other';
+    const slot = normalizeMealSlot(log.meal_slot);
     by_slot[slot].push(log);
   }
   return {
@@ -1153,7 +1181,7 @@ export function createLogsFromMeal(db, body = {}, { today } = {}) {
     throw err;
   }
   const date = body.date || today;
-  const meal_slot = MEAL_SLOTS.includes(body.meal_slot) ? body.meal_slot : 'other';
+  const meal_slot = normalizeMealSlot(body.meal_slot);
   const scale = Math.max(0.1, Number(body.servings) || 1);
   const created = [];
   const run = db.transaction(() => {
@@ -1196,10 +1224,13 @@ export function ensureNutritionSeed(db) {
 // ==================== parse-text (fase 8 — base p/ futuro) ====================
 
 const SLOT_HINTS = [
-  { slot: 'breakfast', re: /\b(caf[eé]|manh[aã]|breakfast)\b/i },
+  { slot: 'snack_morning', re: /\b(lanche\s+da\s+manh[aã]|lanche\s+manh[aã]|snack\s*morn)/i },
+  { slot: 'snack_afternoon', re: /\b(lanche\s+da\s+tarde|lanche\s+tarde|pr[eé][\s-]?treino|pos[\s-]?treino|snack\s*aft)/i },
+  { slot: 'breakfast', re: /\b(caf[eé]|caf[eé]\s+da\s+manh[aã]|breakfast)\b/i },
   { slot: 'lunch', re: /\b(almo[cç]o|almocei|lunch)\b/i },
-  { slot: 'snack', re: /\b(lanche|lanchei|snack)\b/i },
   { slot: 'dinner', re: /\b(jantar|jantei|dinner|ceia)\b/i },
+  // genérico por último
+  { slot: 'snack_afternoon', re: /\b(lanche|lanchei|snack)\b/i },
 ];
 
 function normalizeForMatch(s) {
@@ -1300,9 +1331,9 @@ export function parseNutritionText(db, { text, meal_slot, limitPerPhrase = 5 } =
     err.status = 400;
     throw err;
   }
-  const slot = meal_slot && MEAL_SLOTS.includes(meal_slot)
-    ? meal_slot
-    : detectMealSlot(raw) || 'other';
+  const slot = meal_slot
+    ? normalizeMealSlot(meal_slot)
+    : normalizeMealSlot(detectMealSlot(raw) || 'snack_afternoon');
 
   const foods = listFoods(db, { status: 'active', limit: 200 });
   const phrases = tokenizeFoodPhrases(raw);
@@ -1383,7 +1414,7 @@ export function createLogsFromParsed(db, body = {}, { today } = {}) {
     throw err;
   }
   const date = body.date || today;
-  const defaultSlot = MEAL_SLOTS.includes(body.meal_slot) ? body.meal_slot : 'other';
+  const defaultSlot = normalizeMealSlot(body.meal_slot || 'snack_afternoon');
   const created = [];
   const run = db.transaction(() => {
     for (const it of items) {
@@ -1393,7 +1424,7 @@ export function createLogsFromParsed(db, body = {}, { today } = {}) {
           db,
           {
             date,
-            meal_slot: MEAL_SLOTS.includes(it.meal_slot) ? it.meal_slot : defaultSlot,
+            meal_slot: it.meal_slot != null ? normalizeMealSlot(it.meal_slot) : defaultSlot,
             food_item_id: it.food_item_id,
             servings: it.servings,
             grams: it.grams,

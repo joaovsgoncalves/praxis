@@ -69,11 +69,11 @@ function formatDateLabel(iso) {
 
 function defaultSlotForHour() {
   const h = new Date().getHours();
-  if (h < 11) return 'breakfast';
+  if (h < 10) return 'breakfast';
+  if (h < 12) return 'snack_morning';
   if (h < 15) return 'lunch';
-  if (h < 18) return 'snack';
-  if (h < 22) return 'dinner';
-  return 'other';
+  if (h < 18) return 'snack_afternoon';
+  return 'dinner';
 }
 
 function parseServings(v) {

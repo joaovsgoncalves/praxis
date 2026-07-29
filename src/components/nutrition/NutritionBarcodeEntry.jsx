@@ -28,7 +28,7 @@ import { toast } from 'sonner';
  */
 export default function NutritionBarcodeEntry({
   date,
-  defaultSlot = 'other',
+  defaultSlot = 'snack_afternoon',
   onLogged,
   showTrigger = true,
   open: openProp,
@@ -138,7 +138,7 @@ export default function NutritionBarcodeEntry({
           variant="outline"
           className="rounded-full"
           onClick={() => {
-            setSlot(defaultSlot || 'other');
+            setSlot(defaultSlot || 'snack_afternoon');
             setOpen(true);
           }}
         >
@@ -150,7 +150,7 @@ export default function NutritionBarcodeEntry({
       <Dialog
         open={open}
         onOpenChange={(o) => {
-          if (o) setSlot(defaultSlot || 'other');
+          if (o) setSlot(defaultSlot || 'snack_afternoon');
           setOpen(o);
           if (!o) reset();
         }}

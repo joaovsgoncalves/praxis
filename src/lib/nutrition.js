@@ -1,14 +1,35 @@
 /** Nutrição — labels e helpers de UI (fase 0–1) */
 
-export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner', 'other'];
+/** Ordem canônica do diário (UI + seletor). */
+export const MEAL_SLOTS = [
+  'breakfast',
+  'snack_morning',
+  'lunch',
+  'snack_afternoon',
+  'dinner',
+];
+
+/** Aceitos na API/UI; legado mapeado por normalizeMealSlot. */
+export const MEAL_SLOTS_LEGACY = ['snack', 'other'];
 
 export const MEAL_SLOT_LABELS = {
   breakfast: 'Café',
+  snack_morning: 'Lanche da manhã',
   lunch: 'Almoço',
-  snack: 'Lanche',
+  snack_afternoon: 'Lanche da tarde',
   dinner: 'Jantar',
-  other: 'Outro',
+  // legado (só se algum log antigo ainda aparecer cru)
+  snack: 'Lanche da manhã',
+  other: 'Lanche da tarde',
 };
+
+/** snack → manhã; other → tarde (pré/lanche flexível). */
+export function normalizeMealSlot(slot) {
+  if (slot === 'snack') return 'snack_morning';
+  if (slot === 'other') return 'snack_afternoon';
+  if (MEAL_SLOTS.includes(slot)) return slot;
+  return 'snack_afternoon';
+}
 
 export const GOAL_LABELS = {
   lose: 'Emagrecer',

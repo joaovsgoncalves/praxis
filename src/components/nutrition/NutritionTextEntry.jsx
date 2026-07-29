@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
  */
 export default function NutritionTextEntry({
   date,
-  defaultSlot = 'other',
+  defaultSlot = 'snack_afternoon',
   onLogged,
   showTrigger = true,
   open: openProp,
@@ -116,7 +116,7 @@ export default function NutritionTextEntry({
           variant="outline"
           className="rounded-full"
           onClick={() => {
-            setSlot(defaultSlot || 'other');
+            setSlot(defaultSlot || 'snack_afternoon');
             setOpen(true);
           }}
         >
@@ -128,7 +128,7 @@ export default function NutritionTextEntry({
       <Dialog
         open={open}
         onOpenChange={(o) => {
-          if (o) setSlot(defaultSlot || 'other');
+          if (o) setSlot(defaultSlot || 'snack_afternoon');
           setOpen(o);
           if (!o) reset();
         }}
