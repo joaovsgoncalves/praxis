@@ -50,10 +50,11 @@ export default function ParticleBackground() {
     const countFor = () => {
       const { w, h } = cssSize();
       const area = w * h;
-      // denser on phone so gaps between cards still show motion
-      const base = Math.round(area / 12000);
-      const n = Math.max(48, Math.min(90, base));
-      return calm ? Math.max(28, Math.round(n * 0.55)) : n;
+      // density dialed down 2026-08-06 — was too loud over content cards.
+      // 22000 px² per particle (was 12000) → ~40% fewer on a 1366×768.
+      const base = Math.round(area / 22000);
+      const n = Math.max(28, Math.min(60, base));
+      return calm ? Math.max(18, Math.round(n * 0.55)) : n;
     };
 
     const spawn = (fromBottom) => {
@@ -100,9 +101,11 @@ export default function ParticleBackground() {
         // fade in / out
         const env = t < 0.12 ? t / 0.12 : t > 0.7 ? (1 - t) / 0.3 : 1;
         const tw = 0.75 + Math.sin(p.phase * 1.7) * 0.25;
-        const alpha = Math.min(0.95, Math.max(0.2, env * tw * (calm ? 0.55 : 0.82)));
+        // 2026-08-06 dial-down: opacity 0.82 → 0.55, halo 5.2× → 2.8×.
+        // Still visible, doesn't paint over task text.
+        const alpha = Math.min(0.9, Math.max(0.15, env * tw * (calm ? 0.4 : 0.55)));
         const radius = p.r * (1 - t * 0.2);
-        const halo = radius * (calm ? 3.8 : 5.2);
+        const halo = radius * (calm ? 2.4 : 2.8);
 
         // soft glow
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, halo);
@@ -156,7 +159,7 @@ export default function ParticleBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-0 opacity-90"
+      className="pointer-events-none fixed inset-0 z-0 opacity-80"
       aria-hidden
     />
   );
