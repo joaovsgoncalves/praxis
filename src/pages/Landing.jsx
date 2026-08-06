@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   AudioLines,
@@ -11,6 +11,7 @@ import {
   CircleDot,
   Dumbbell,
   Leaf,
+  LogOut,
   Mic,
   MoonStar,
   MoveRight,
@@ -22,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { PraxisLivePreview, PraxisVoiceFlowDemo } from '@/components/landing/PraxisLivePreview';
 import PraxisBrand from '@/components/brand/PraxisBrand';
+import { useAuth } from '@/lib/AuthContext';
 
 const flowSteps = [
   {
@@ -109,9 +111,25 @@ function SectionLabel({ children }) {
 }
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const { isAuthenticated, user, logout } = useAuth();
+
+  const handleSignOut = async () => {
+    await logout();
+    window.location.href = '/';
+  };
+
   const scrollToHowItWorks = () => {
     document.getElementById('como-funciona')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const firstName = (user?.display_name || user?.username || '').split(' ')[0] || 'de volta';
+  const heroTitle = isAuthenticated
+    ? { line1: `Bem-vindo de volta, ${firstName}.`, line2: 'Seu dia está esperando.' }
+    : { line1: 'Pare de planejar a vida.', line2: 'Comece a executá-la.' };
+  const heroSubtitle = isAuthenticated
+    ? 'Abra o Praxis e vá direto pro próximo passo. Sua rotina, hábitos, foco e revisão continuam exatamente onde você parou.'
+    : 'Fale o que precisa fazer. A PraxIA organiza seu dia em tarefas, hábitos, foco e revisão — sem formulários, planilhas ou dez minutos escolhendo categorias.';
 
   return (
     <div className="landing-page min-h-screen overflow-x-hidden bg-background text-foreground selection:bg-domain-gold/30 selection:text-white">
@@ -125,9 +143,34 @@ export default function Landing() {
             <a className="transition-colors hover:text-foreground" href="#recursos">Recursos</a>
             <a className="transition-colors hover:text-foreground" href="#filosofia">Por que Praxis</a>
           </nav>
-          <Button asChild variant="outline" className="h-9 rounded-full border-white/10 bg-white/[0.035] px-4 text-xs hover:bg-white/[0.07]">
-            <Link to="/entrar">Entrar</Link>
-          </Button>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2">
+              <Button
+                asChild
+                size="sm"
+                className="h-9 rounded-full bg-domain-gold px-4 text-xs font-semibold text-black hover:bg-domain-gold/90"
+              >
+                <Link to="/">
+                  Abrir app
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSignOut}
+                variant="ghost"
+                size="sm"
+                className="h-9 rounded-full px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+              >
+                <LogOut className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Sair
+              </Button>
+            </div>
+          ) : (
+            <Button asChild variant="outline" className="h-9 rounded-full border-white/10 bg-white/[0.035] px-4 text-xs hover:bg-white/[0.07]">
+              <Link to="/entrar">Entrar</Link>
+            </Button>
+          )}
         </div>
       </header>
 
@@ -150,21 +193,30 @@ export default function Landing() {
               </div>
 
               <h1 className="praxis-title text-[clamp(3.15rem,8vw,6.6rem)] font-bold leading-[0.92] tracking-[-0.075em]">
-                Pare de planejar a vida.
-                <span className="mt-2 block bg-[linear-gradient(100deg,hsl(var(--domain-gold)),hsl(42_92%_72%),hsl(var(--domain-gold)))] bg-clip-text text-transparent">Comece a executá-la.</span>
+                {heroTitle.line1}
+                <span className="mt-2 block bg-[linear-gradient(100deg,hsl(var(--domain-gold)),hsl(42_92%_72%),hsl(var(--domain-gold)))] bg-clip-text text-transparent">{heroTitle.line2}</span>
               </h1>
 
               <p className="mt-7 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg sm:leading-8">
-                Fale o que precisa fazer. A <span className="font-medium text-foreground/90">PraxIA</span> organiza seu dia em tarefas, hábitos, foco e revisão — sem formulários, planilhas ou dez minutos escolhendo categorias.
+                {heroSubtitle}
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button asChild size="lg" className="group h-12 rounded-full bg-domain-gold px-6 text-sm font-semibold text-black shadow-[0_14px_45px_hsl(var(--domain-gold)/0.20)] hover:bg-domain-gold/90">
-                  <Link to="/entrar">
-                    Entrar no Praxis
-                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                  </Link>
-                </Button>
+                {isAuthenticated ? (
+                  <Button asChild size="lg" className="group h-12 rounded-full bg-domain-gold px-6 text-sm font-semibold text-black shadow-[0_14px_45px_hsl(var(--domain-gold)/0.20)] hover:bg-domain-gold/90">
+                    <Link to="/">
+                      Abrir o app
+                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild size="lg" className="group h-12 rounded-full bg-domain-gold px-6 text-sm font-semibold text-black shadow-[0_14px_45px_hsl(var(--domain-gold)/0.20)] hover:bg-domain-gold/90">
+                    <Link to="/entrar">
+                      Entrar no Praxis
+                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </Link>
+                  </Button>
+                )}
                 <Button type="button" onClick={scrollToHowItWorks} size="lg" variant="ghost" className="group h-12 rounded-full px-5 text-sm text-muted-foreground hover:bg-white/[0.04] hover:text-foreground">
                   Ver como funciona
                   <ChevronDown className="ml-2 h-4 w-4 transition-transform group-hover:translate-y-0.5" aria-hidden />
@@ -363,12 +415,21 @@ export default function Landing() {
               <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-muted-foreground sm:text-lg">
                 Abra o Praxis, fale o que está na cabeça e comece pelo próximo passo que realmente importa.
               </p>
-              <Button asChild size="lg" className="group mt-9 h-12 rounded-full bg-domain-gold px-7 text-sm font-semibold text-black shadow-[0_14px_45px_hsl(var(--domain-gold)/0.18)] hover:bg-domain-gold/90">
-                <Link to="/entrar">
-                  Entrar no Praxis
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                </Link>
-              </Button>
+              {isAuthenticated ? (
+                <Button asChild size="lg" className="group mt-9 h-12 rounded-full bg-domain-gold px-7 text-sm font-semibold text-black shadow-[0_14px_45px_hsl(var(--domain-gold)/0.18)] hover:bg-domain-gold/90">
+                  <Link to="/">
+                    Abrir o app
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild size="lg" className="group mt-9 h-12 rounded-full bg-domain-gold px-7 text-sm font-semibold text-black shadow-[0_14px_45px_hsl(var(--domain-gold)/0.18)] hover:bg-domain-gold/90">
+                  <Link to="/entrar">
+                    Entrar no Praxis
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </section>

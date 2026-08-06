@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { praxisApi } from '@/api/praxisClient';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 import { primaryNavItems, secondaryNavItems, filterSecondaryNav } from '@/lib/praxisNav';
 import PraxisBrand from '@/components/brand/PraxisBrand';
 
@@ -112,6 +113,13 @@ function NavLinkRow({ item, isActive, onClose, density = 'primary' }) {
 
 export default function Sidebar({ open, onClose }) {
   const location = useLocation();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    onClose?.();
+    await logout();
+    window.location.href = '/';
+  };
 
   const { data: gamificationNav } = useQuery({
     queryKey: ['gamification'],
@@ -197,6 +205,19 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         <SidebarGamificationBar />
+
+        <div className="border-t border-sidebar-border/70 px-4 py-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-sidebar-foreground/55 transition-colors hover:bg-white/[0.035] hover:text-sidebar-foreground"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/55 group-hover:text-sidebar-foreground/85">
+              <LogOut className="h-[17px] w-[17px]" aria-hidden />
+            </span>
+            <span className="truncate">Sair da conta</span>
+          </button>
+        </div>
       </aside>
     </>
   );
