@@ -10,6 +10,7 @@ import Dashboard from '@/pages/Dashboard';
 import HabitsTasks from '@/pages/HabitsTasks';
 import Ideas from '@/pages/Ideas';
 import Compras from '@/pages/Compras';
+import Financas from '@/pages/Financas';
 import Nutricao from '@/pages/Nutricao';
 import Treinos from '@/pages/Treinos';
 import Focus from '@/pages/Focus';
@@ -95,6 +96,7 @@ const AuthenticatedApp = () => {
         <Route path="/habitos-tarefas" element={<HabitsTasks />} />
         <Route path="/ideias" element={<Ideas />} />
         <Route path="/compras" element={<Compras />} />
+        <Route path="/financas" element={<Financas />} />
         <Route path="/treinos" element={<Treinos />} />
         <Route path="/nutricao" element={<Nutricao />} />
         <Route path="/foco" element={<Focus />} />

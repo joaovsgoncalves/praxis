@@ -9,6 +9,7 @@ import TodayHabits from '@/components/dashboard/TodayHabits';
 import WellnessWidget from '@/components/dashboard/WellnessWidget';
 import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import NutritionTodayCard from '@/components/nutrition/NutritionTodayCard';
+import TodayFinanceCard from '@/components/finance/TodayFinanceCard';
 import TodayCalendar from '@/components/dashboard/TodayCalendar';
 import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
 import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
@@ -371,6 +372,7 @@ export default function Dashboard() {
           />
           <div className="space-y-3 sm:space-y-4">
             <NutritionTodayCard />
+            <TodayFinanceCard />
             <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
             <TodayCalendar />
           </div>

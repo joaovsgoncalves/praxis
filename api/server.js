@@ -33,6 +33,8 @@ import { initCaptureQueueSchema } from './captureQueue.js';
 import { initPurchaseSchema } from './purchaseList.js';
 import { initWorkoutSchema, registerWorkoutRoutes } from './workouts.js';
 import { initNutritionSchema } from './nutrition.js';
+import { initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
+import { createFinanceRouter } from './routes/finance.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
   try {
@@ -133,6 +135,8 @@ initCaptureQueueSchema(db);
 initPurchaseSchema(db);
 initNutritionSchema(db);
 initWorkoutSchema(db);
+initFinanceSchema(db);
+seedFinanceIfEmpty(db);
 ensureDefaultUser(db);
 
 registerAuthRoutes(app, db, { secureCookie: COOKIE_SECURE });
@@ -186,6 +190,7 @@ const routeCtx = {
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
 registerOpsRoutes(app, { apiDir: __dirname });
 app.use('/api/purchases', createPurchasesRouter({ db }));
+app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
 app.use('/api/nutrition', createNutritionRouter({ db, getLocalDateString }));
 registerWorkoutRoutes(app, db);
 registerCaptureRoutes(app, { db, apiDir: __dirname });

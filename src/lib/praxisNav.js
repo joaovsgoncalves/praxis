@@ -12,6 +12,7 @@ import {
   Settings,
   UtensilsCrossed,
   Dumbbell,
+  Wallet,
 } from 'lucide-react';
 
 /** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
@@ -27,6 +28,7 @@ export const secondaryNavItems = [
   { path: '/ideias', label: 'Ideias', icon: Lightbulb },
   { path: '/foco', label: 'Modo Foco', icon: Timer },
   { path: '/compras', label: 'Compras', icon: ShoppingBag },
+  { path: '/financas', label: 'Finanças', icon: Wallet },
   { path: '/treinos', label: 'Treinos', icon: Dumbbell },
   { path: '/nutricao', label: 'Nutrição', icon: UtensilsCrossed },
   // /capturas fica acessível por banner/links do Falar — fora do menu (João 2026-07-16)

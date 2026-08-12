@@ -9,9 +9,10 @@ import { initCaptureQueueSchema } from '../captureQueue.js';
 import { initNutritionSchema } from '../nutrition.js';
 import { initPurchaseSchema } from '../purchaseList.js';
 import { initWorkoutSchema } from '../workouts.js';
+import { initFinanceSchema } from '../finance.js';
 
 /**
- * @param {{ withCaptureQueue?: boolean, withNutrition?: boolean, withPurchases?: boolean, withWorkouts?: boolean }} [options]
+ * @param {{ withCaptureQueue?: boolean, withNutrition?: boolean, withPurchases?: boolean, withWorkouts?: boolean, withFinance?: boolean }} [options]
  */
 export function createTestDb(options = {}) {
   const db = new Database(':memory:');
@@ -20,6 +21,7 @@ export function createTestDb(options = {}) {
   if (options.withNutrition) initNutritionSchema(db);
   if (options.withPurchases) initPurchaseSchema(db);
   if (options.withWorkouts) initWorkoutSchema(db);
+  if (options.withFinance) initFinanceSchema(db);
   return db;
 }
 
