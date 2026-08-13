@@ -31,6 +31,16 @@ import {
   buildWeightTrend,
   lookupBarcode,
 } from '../nutrition.js';
+import {
+  listRegimenItems,
+  getRegimenItem,
+  createRegimenItem,
+  updateRegimenItem,
+  deleteRegimenItem,
+  buildRegimenDay,
+  setRegimenTaken,
+  toggleRegimenTaken,
+} from '../nutritionRegimen.js';
 
 /**
  * Nutrition router — mounted at /api/nutrition.
@@ -127,6 +137,90 @@ export function createNutritionRouter({ db, getLocalDateString }) {
       return res.status(404).json({ error: 'registro de peso não encontrado' });
     }
     res.status(204).end();
+  });
+
+  // rotina: suplementos + medicação (não entra em kcal)
+  router.get('/regimen', (req, res) => {
+    try {
+      const raw =
+        req.query.date != null && String(req.query.date).trim() !== ''
+          ? String(req.query.date).trim().slice(0, 10)
+          : getLocalDateString();
+      res.json(buildRegimenDay(db, raw));
+    } catch (err) {
+      const code = err?.status || 400;
+      res.status(code).json({ error: err?.message || 'não deu pra carregar a rotina' });
+    }
+  });
+
+  router.get('/regimen/items', (req, res) => {
+    const status = req.query.status || 'active';
+    res.json(listRegimenItems(db, { status }));
+  });
+
+  router.get('/regimen/items/:id', (req, res) => {
+    const row = getRegimenItem(db, req.params.id);
+    if (!row) return res.status(404).json({ error: 'item não encontrado' });
+    res.json(row);
+  });
+
+  router.post('/regimen/items', (req, res) => {
+    try {
+      const row = createRegimenItem(db, req.body || {});
+      res.status(201).json(row);
+    } catch (err) {
+      const code = err?.status || 400;
+      res.status(code).json({ error: err?.message || 'não deu pra criar o item' });
+    }
+  });
+
+  router.patch('/regimen/items/:id', (req, res) => {
+    try {
+      const row = updateRegimenItem(db, req.params.id, req.body || {});
+      if (!row) return res.status(404).json({ error: 'item não encontrado' });
+      res.json(row);
+    } catch (err) {
+      const code = err?.status || 400;
+      res.status(code).json({ error: err?.message || 'não deu pra atualizar o item' });
+    }
+  });
+
+  router.delete('/regimen/items/:id', (req, res) => {
+    const hard = req.query.hard === '1' || req.query.hard === 'true';
+    if (!deleteRegimenItem(db, req.params.id, { hard })) {
+      return res.status(404).json({ error: 'item não encontrado' });
+    }
+    res.status(204).end();
+  });
+
+  router.post('/regimen/items/:id/toggle', (req, res) => {
+    try {
+      const date = req.body?.date || req.query.date || getLocalDateString();
+      const day = toggleRegimenTaken(db, req.params.id, {
+        date,
+        today: getLocalDateString(),
+      });
+      res.json(day);
+    } catch (err) {
+      const code = err?.status || 400;
+      res.status(code).json({ error: err?.message || 'não deu pra marcar' });
+    }
+  });
+
+  router.put('/regimen/items/:id/log', (req, res) => {
+    try {
+      const date = req.body?.date || getLocalDateString();
+      const day = setRegimenTaken(db, req.params.id, {
+        date,
+        taken: req.body?.taken,
+        note: req.body?.note,
+        today: getLocalDateString(),
+      });
+      res.json(day);
+    } catch (err) {
+      const code = err?.status || 400;
+      res.status(code).json({ error: err?.message || 'não deu pra registrar' });
+    }
   });
 
   // foods catalog (fase 2)

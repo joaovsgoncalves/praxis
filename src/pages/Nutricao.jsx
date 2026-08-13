@@ -14,6 +14,8 @@ import MealsCatalog from '@/components/nutrition/MealsCatalog';
 import DayDiary from '@/components/nutrition/DayDiary';
 import NutritionHistory from '@/components/nutrition/NutritionHistory';
 import WeightTracker from '@/components/nutrition/WeightTracker';
+import RegimenDay from '@/components/nutrition/RegimenDay';
+import RegimenCatalog from '@/components/nutrition/RegimenCatalog';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatKcal, GOAL_LABELS } from '@/lib/nutrition';
 import { fortalezaDateKey } from '@/lib/dates';
@@ -31,6 +33,7 @@ const PRIMARY_TABS = [
 const MAIS_PANELS = [
   { id: 'alimentos', label: 'Alimentos' },
   { id: 'refeicoes', label: 'Refeições' },
+  { id: 'rotina', label: 'Rotina' },
   { id: 'meta', label: 'Meta' },
 ];
 
@@ -101,7 +104,7 @@ export default function Nutricao() {
       <PageHero
         kicker="Ferramentas"
         title="Nutrição"
-        description="Loga a refeição em poucos toques — diário, peso e catálogo."
+        description="Loga a refeição em poucos toques — diário, rotina e peso."
       />
 
       {showOnboarding ? (
@@ -171,6 +174,7 @@ export default function Nutricao() {
             {tab === 'diario' ? (
               <>
                 <WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} />
+                <RegimenDay date={diaryDate || today} />
                 {loadingDay && !day ? (
                   <PraxisListSkeleton rows={3} />
                 ) : (
@@ -213,6 +217,7 @@ export default function Nutricao() {
 
                 {maisPanel === 'alimentos' ? <FoodCatalog /> : null}
                 {maisPanel === 'refeicoes' ? <MealsCatalog /> : null}
+                {maisPanel === 'rotina' ? <RegimenCatalog /> : null}
                 {maisPanel === 'meta' ? (
                   loadingProfile ? (
                     <PraxisListSkeleton rows={2} />

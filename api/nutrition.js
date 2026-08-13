@@ -7,6 +7,7 @@ import {
   fetchOpenFoodFactsProduct,
 } from './nutritionOpenFoodFacts.js';
 import { seedBrazilianFoods } from './nutritionSeedBr.js';
+import { initRegimenSchema } from './nutritionRegimen.js';
 
 /** Slots canônicos do diário (ordem de exibição). */
 export const MEAL_SLOTS = [
@@ -179,6 +180,13 @@ export function initNutritionSchema(db) {
     seedBrazilianFoods(db);
   } catch (err) {
     console.error('nutrition seed BR failed', err);
+  }
+
+  // rotina de suplementos/medicação (fora do diário de kcal)
+  try {
+    initRegimenSchema(db);
+  } catch (err) {
+    console.error('nutrition regimen schema failed', err);
   }
 }
 

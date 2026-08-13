@@ -101,7 +101,43 @@ export const nutritionApiModule = (request) => ({
       },
       log: (data) =>
         request('/api/nutrition/weight', { method: 'POST', body: JSON.stringify(data) }),
+      upsert: (data) =>
+        request('/api/nutrition/weight', { method: 'POST', body: JSON.stringify(data) }),
+      trend: (params = {}) => {
+        const q = new URLSearchParams();
+        if (params.days) q.set('days', String(params.days));
+        const qs = q.toString();
+        return request(`/api/nutrition/weight/trend${qs ? `?${qs}` : ''}`);
+      },
       delete: (id) => request(`/api/nutrition/weight/${id}`, { method: 'DELETE' }),
+    },
+    regimen: {
+      day: (date) => {
+        const q = date ? `?date=${encodeURIComponent(date)}` : '';
+        return request(`/api/nutrition/regimen${q}`);
+      },
+      items: (params = {}) => {
+        const q = new URLSearchParams();
+        if (params.status) q.set('status', params.status);
+        const qs = q.toString();
+        return request(`/api/nutrition/regimen/items${qs ? `?${qs}` : ''}`);
+      },
+      create: (data) =>
+        request('/api/nutrition/regimen/items', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/nutrition/regimen/items/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }),
+      delete: (id, { hard = false } = {}) =>
+        request(`/api/nutrition/regimen/items/${id}${hard ? '?hard=1' : ''}`, {
+          method: 'DELETE',
+        }),
+      toggle: (id, data = {}) =>
+        request(`/api/nutrition/regimen/items/${id}/toggle`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
     },
   },
 });

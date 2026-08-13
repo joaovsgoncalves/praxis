@@ -86,6 +86,33 @@ export function isNutritionShowOnToday(settings) {
   return true;
 }
 
+export const REGIMEN_KIND_LABELS = {
+  supplement: 'Suplemento',
+  medication: 'Remédio',
+};
+
+export const REGIMEN_TIMING_LABELS = {
+  morning: 'Manhã',
+  pre_workout: 'Pré-treino',
+  post_workout: 'Pós-treino',
+  night: 'Noite',
+  anytime: 'Qualquer hora',
+};
+
+export const REGIMEN_FREQUENCY_LABELS = {
+  daily: 'Todo dia',
+  training_day: 'Dia de treino',
+  as_needed: 'Se precisar',
+};
+
+export const REGIMEN_TIMING_ORDER = [
+  'morning',
+  'pre_workout',
+  'post_workout',
+  'night',
+  'anytime',
+];
+
 /** kcal teóricas de macros (4/4/9) — aviso se divergir da meta kcal */
 export function macrosImpliedKcal({ protein_g, carbs_g, fat_g }) {
   return Math.round(
