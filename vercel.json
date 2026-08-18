@@ -8,7 +8,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "http://76.13.227.227:18556/api/$1" },
+    { "source": "/api/(.*)", "destination": "https://openclaw-nbqk.srv1571554.hstgr.cloud/praxis-api/api/$1" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
 }

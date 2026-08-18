@@ -215,8 +215,10 @@ registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY
 app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString }));
 app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ db }));
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🔥 Praxis API running on port ${PORT}`);
+const HOST = process.env.HOST || '127.0.0.1';
+
+app.listen(PORT, HOST, () => {
+  console.log(`🔥 Praxis API running on ${HOST}:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
   setImmediate(() => runCalendarMaintenance());
 });
