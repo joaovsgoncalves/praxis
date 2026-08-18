@@ -73,9 +73,15 @@ export default function Treinos() {
       setActiveSessionId(session.id);
       refresh();
     },
-    onError: (mutationError) => {
+    onError: (mutationError, requestedDayId) => {
       if (mutationError?.status === 409 && mutationError?.body?.session?.id) {
-        setActiveSessionId(mutationError.body.session.id);
+        if (mutationError.body.session.workout_day_id === requestedDayId) {
+          setActiveSessionId(mutationError.body.session.id);
+          return;
+        }
+        toast.error('Treino em andamento', {
+          description: 'Termina ou abandona o treino em andamento antes de começar outro.',
+        });
         return;
       }
       toast.error('Não deu pra começar o treino', { description: mutationError?.message || 'Tenta novamente.' });
@@ -215,7 +221,16 @@ export default function Treinos() {
               />
             ) : null}
 
-            {tab === 'programa' ? <WorkoutProgramEditor program={program} programs={programs} /> : null}
+            {tab === 'programa' ? (
+              <WorkoutProgramEditor
+                program={program}
+                programs={programs}
+                activeSession={activeSession}
+                onStart={(dayId) => startSession.mutate(dayId)}
+                onContinue={() => setActiveSessionId(activeSession?.id)}
+                starting={startSession.isPending}
+              />
+            ) : null}
             {tab === 'historico' ? <WorkoutHistory /> : null}
           </div>
         </>
@@ -248,6 +263,7 @@ function TodayWorkout({
   }
 
   const days = program.days || [];
+  const isSessionActiveForCurrentDay = Boolean(activeSession && activeSession.workout_day_id === currentDay.id);
   const currentIndex = days.findIndex((day) => day.id === currentDay.id);
   const cycleProgress = days.length ? Math.round(((currentIndex + 1) / days.length) * 100) : 0;
   const exerciseCount = currentDay.exercises?.length || 0;
@@ -289,15 +305,17 @@ function TodayWorkout({
                 {advancingRest ? 'Avançando...' : 'Concluir descanso'}
               </Button>
             ) : currentDay.exercises?.length ? (
-              <Button
-                type="button"
-                className="mt-5 h-12 w-full rounded-xl text-base"
-                onClick={() => (activeSession ? onContinue() : onStart(currentDay.id))}
-                disabled={!activeSession && starting}
-              >
-                <Play className="mr-2 h-5 w-5 fill-current" />
-                {activeSession ? 'Continuar treino' : starting ? 'Começando...' : 'Começar treino'}
-              </Button>
+              !isSessionActiveForCurrentDay ? (
+                <Button
+                  type="button"
+                  className="mt-5 h-12 w-full rounded-xl text-base"
+                  onClick={() => onStart(currentDay.id)}
+                  disabled={starting}
+                >
+                  <Play className="mr-2 h-5 w-5 fill-current" />
+                  {starting ? 'Começando...' : 'Começar treino'}
+                </Button>
+              ) : null
             ) : (
               <Button type="button" variant="outline" className="mt-5 h-12 w-full rounded-xl" onClick={onOpenProgram}>
                 <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
@@ -335,7 +353,6 @@ function TodayWorkout({
                       <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {formatSeconds(exercise.rest_seconds)}</span>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                 </div>
               ))}
             </div>
@@ -358,11 +375,14 @@ function TodayWorkout({
           <div className="space-y-1.5">
             {days.map((day, index) => {
               const isCurrent = day.id === currentDay.id;
+              const isSessionActive = Boolean(activeSession && activeSession.workout_day_id === day.id);
+              const isRest = day.day_type === 'rest';
+
               return (
                 <div
                   key={day.id}
                   className={cn(
-                    'flex items-center gap-3 rounded-xl border px-3.5 py-3',
+                    'flex items-center gap-3 rounded-xl border px-3.5 py-2.5',
                     isCurrent ? 'border-primary/40 bg-primary/8' : 'border-border/60 bg-card/25',
                   )}
                 >
@@ -370,13 +390,27 @@ function TodayWorkout({
                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums',
                     isCurrent ? 'bg-primary/15 text-primary' : 'bg-secondary/45 text-muted-foreground',
                   )}>
-                    {day.day_type === 'rest' ? <RotateCcw className="h-3.5 w-3.5" /> : index + 1}
+                    {isRest ? <RotateCcw className="h-3.5 w-3.5" /> : index + 1}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{day.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium">{day.name}</p>
+                      {isCurrent ? <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-primary">Próximo</span> : null}
+                    </div>
                     <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{workoutDayShortLabel(day)}</p>
                   </div>
-                  {isCurrent ? <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Agora</span> : null}
+                  {isRest ? null : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isSessionActive ? 'default' : 'outline'}
+                      className="h-8 shrink-0 rounded-full px-3 text-xs"
+                      onClick={() => (isSessionActive ? onContinue() : onStart(day.id))}
+                      disabled={!isSessionActive && starting}
+                    >
+                      {isSessionActive ? 'Continuar' : 'Começar'}
+                    </Button>
+                  )}
                 </div>
               );
             })}

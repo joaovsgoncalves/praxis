@@ -135,6 +135,25 @@ export function formatClock(seconds) {
   return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+export function formatRestDuration(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
+export function formatSessionElapsed(seconds) {
+  const total = Number(seconds);
+  if (!Number.isFinite(total) || total <= 0) return '< 1 min';
+  if (total < 60) return '< 1 min';
+  const totalMinutes = Math.floor(total / 60);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const restMinutes = totalMinutes % 60;
+  if (hours >= 24) return `${hours}h`;
+  return restMinutes > 0 ? `${hours}h ${restMinutes}min` : `${hours}h`;
+}
+
 export function formatWorkoutTarget(item = {}) {
   const sets = Number(item.target_sets) || 0;
   const tracking = item.tracking_type || 'reps';

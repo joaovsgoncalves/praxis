@@ -25,6 +25,8 @@ import { toast } from 'sonner';
 import {
   formatClock,
   formatPurpose,
+  formatRestDuration,
+  formatSessionElapsed,
   formatSeconds,
   formatSetResult,
   formatSetRir,
@@ -277,12 +279,18 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     queryClient.invalidateQueries({ queryKey: ['workouts', 'history'] });
   };
 
+  const exerciseRestSeconds = Number(currentExercise?.rest_seconds) > 0 ? Number(currentExercise.rest_seconds) : 90;
+
   const startRest = (seconds, exerciseId) => {
-    const duration = Number(seconds) || 0;
-    if (duration <= 0) return;
+    const duration = Number(seconds) > 0 ? Number(seconds) : 90;
     const payload = { endsAt: Date.now() + duration * 1000, exerciseId };
     localStorage.setItem(localRestKey(sessionId), JSON.stringify(payload));
     setRestTimer(payload);
+  };
+
+  const handleStartManualRest = () => {
+    if (restRemaining > 0) return;
+    startRest(exerciseRestSeconds, currentExercise?.id);
   };
 
   const adjustRest = (deltaSeconds) => {
@@ -464,7 +472,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
           </Button>
           <div className="min-w-0 flex-1 text-center">
             <p className="truncate text-sm font-semibold">{session.workout_day_name_snapshot}</p>
-            <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{formatClock(elapsedSeconds)} em andamento</p>
+            <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{formatSessionElapsed(elapsedSeconds)} em andamento</p>
           </div>
           <div className="w-10" aria-hidden />
         </div>
@@ -540,12 +548,34 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                       : `${formatWorkoutTarget(currentExercise)} · ${formatSeconds(currentExercise.rest_seconds)} de descanso`}
                     {!isSkill && targetRirLabel ? <span className="text-muted-foreground/80"> · {targetRirLabel}</span> : null}
                   </p>
-                  {currentExercise.notes ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{currentExercise.notes}</p> : null}
+                  {currentExercise.notes ? (
+                    <details className="group mt-2.5 rounded-lg bg-background/30 px-3 py-2">
+                      <summary className="flex min-h-6 cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-muted-foreground marker:content-none">
+                        <span>Nota</span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
+                      </summary>
+                      <p className="pb-1 pt-1.5 text-xs leading-relaxed text-muted-foreground">{currentExercise.notes}</p>
+                    </details>
+                  ) : null}
                 </div>
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <Dumbbell className="h-5 w-5" />
                 </div>
               </div>
+              {restRemaining <= 0 ? (
+                <div className="mt-4 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-11 rounded-xl border-border/80 px-4 text-xs font-medium tabular-nums transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+                    onClick={handleStartManualRest}
+                  >
+                    <Pause className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                    Descansar {formatRestDuration(exerciseRestSeconds)}
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             {currentExercise.previous_sets?.length ? (

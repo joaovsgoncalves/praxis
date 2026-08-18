@@ -10,6 +10,7 @@ import {
   Dumbbell,
   MoreHorizontal,
   Pencil,
+  Play,
   Plus,
   RotateCcw,
   Trash2,
@@ -38,7 +39,14 @@ function workoutExerciseAsCatalog(exercise) {
   };
 }
 
-export default function WorkoutProgramEditor({ program, programs = [] }) {
+export default function WorkoutProgramEditor({
+  program,
+  programs = [],
+  activeSession = null,
+  onStart,
+  onContinue,
+  starting = false,
+}) {
   const queryClient = useQueryClient();
   const [selectedDayId, setSelectedDayId] = useState(null);
   const [programDialog, setProgramDialog] = useState({ open: false, initial: null });
@@ -381,20 +389,36 @@ export default function WorkoutProgramEditor({ program, programs = [] }) {
         <Card className="border-border/80 bg-card/35 shadow-none">
           <CardContent className="p-0">
             <div className="border-b border-border/70 px-4 py-4 sm:px-5">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base font-semibold">{selectedDay.name}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Treino selecionado</p>
+                  <h3 className="mt-1 text-base font-semibold leading-tight">{selectedDay.name}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">{workoutDayShortLabel(selectedDay)}</p>
                 </div>
                 {selectedDay.day_type === 'training' ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="shrink-0 rounded-full"
-                    onClick={() => setPicker({ open: true, day: selectedDay })}
-                  >
-                    <Plus className="mr-1.5 h-4 w-4" /> Exercício
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onStart ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="shrink-0 rounded-full"
+                        onClick={() => (activeSession?.workout_day_id === selectedDay.id ? onContinue?.() : onStart(selectedDay.id))}
+                        disabled={activeSession?.workout_day_id !== selectedDay.id && (starting || !selectedDay.exercises?.length)}
+                      >
+                        <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                        {activeSession?.workout_day_id === selectedDay.id ? 'Continuar treino' : starting ? 'Começando...' : 'Começar este treino'}
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 rounded-full"
+                      onClick={() => setPicker({ open: true, day: selectedDay })}
+                    >
+                      <Plus className="mr-1.5 h-4 w-4" /> Exercício
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             </div>

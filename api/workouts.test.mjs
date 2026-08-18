@@ -1,3 +1,4 @@
+import { formatRestDuration, formatSessionElapsed } from "../src/lib/workouts.js";
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import express from 'express';
@@ -264,5 +265,119 @@ describe('workout routes', () => {
     assert.ok(second.exercises[0].previous_sets.every((s) => s.set_role !== 'warmup'));
 
     await request(`/api/workouts/sessions/${second.id}/abandon`, { method: 'POST', body: {} });
+  });
+  test("active session collisions: resumes same day, abandons empty session for another day, protects session with work sets", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Ciclo PPL Teste" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Pull 1", day_type: "training" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Push 1", day_type: "training" },
+    });
+    const pullDay = program.days[0];
+    const pushDay = program.days[1];
+
+    const exercise = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Remada curvada", category: "strength", tracking_type: "weight_reps" },
+    });
+    await request("/api/workouts/days/" + pullDay.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: exercise.id, target_sets: 3, rep_min: 8, rep_max: 10, rest_seconds: 90 },
+    });
+    await request("/api/workouts/days/" + pushDay.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: exercise.id, target_sets: 3, rep_min: 8, rep_max: 10, rest_seconds: 90 },
+    });
+
+    // 1. Start Pull 1 session (empty: 0 sets)
+    const pullSession = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: pullDay.id },
+    });
+    assert.equal(pullSession.status, "active");
+    assert.equal(pullSession.workout_day_id, pullDay.id);
+
+    // 2. Starting same day again returns 409 + existing session
+    const sameDayRes = await fetch(server.base + "/api/workouts/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workout_day_id: pullDay.id }),
+    });
+    assert.equal(sameDayRes.status, 409);
+    const sameDayBody = await sameDayRes.json();
+    assert.equal(sameDayBody.session.id, pullSession.id);
+
+    // 3. Starting Push 1 while Pull 1 is empty abandons Pull 1 and starts Push 1 (201)
+    const pushSession = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: pushDay.id },
+    });
+    assert.equal(pushSession.status, "active");
+    assert.equal(pushSession.workout_day_id, pushDay.id);
+    assert.notEqual(pushSession.id, pullSession.id);
+
+    const pullSessionAfter = await request("/api/workouts/sessions/" + pullSession.id);
+    assert.equal(pullSessionAfter.status, "abandoned");
+
+    const summary = await request("/api/workouts/summary");
+    assert.equal(summary.active_session.id, pushSession.id);
+
+    // 4. Log a work set in Push 1 session
+    await request("/api/workouts/sessions/" + pushSession.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: pushSession.exercises[0].id,
+        reps: 10,
+        weight_kg: 50,
+        set_role: "work",
+      },
+    });
+
+    // 5. Trying to start Pull 1 while Push 1 has work sets returns 409 and protects Push 1
+    const diffDayWithSetsRes = await fetch(server.base + "/api/workouts/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workout_day_id: pullDay.id }),
+    });
+    assert.equal(diffDayWithSetsRes.status, 409);
+    const diffDayBody = await diffDayWithSetsRes.json();
+    assert.equal(diffDayBody.session.id, pushSession.id);
+
+    const pushSessionAfter = await request("/api/workouts/sessions/" + pushSession.id);
+    assert.equal(pushSessionAfter.status, "active");
+    assert.equal(pushSessionAfter.completed_work_sets, 1);
+
+    // Clean up
+    await request("/api/workouts/sessions/" + pushSession.id + "/abandon", { method: "POST", body: {} });
+  });
+});
+
+describe("workout format helpers", () => {
+  test("formatRestDuration formats seconds to MM:SS or M:SS without leading 0 for single-digit minutes", () => {
+    assert.equal(formatRestDuration(120), "2:00");
+    assert.equal(formatRestDuration(90), "1:30");
+    assert.equal(formatRestDuration(60), "1:00");
+    assert.equal(formatRestDuration(45), "0:45");
+    assert.equal(formatRestDuration(0), "0:00");
+    assert.equal(formatRestDuration(null), "0:00");
+  });
+
+  test("formatSessionElapsed displays humanized short format and never looks like a rest countdown", () => {
+    assert.equal(formatSessionElapsed(0), "< 1 min");
+    assert.equal(formatSessionElapsed(30), "< 1 min");
+    assert.equal(formatSessionElapsed(60), "1 min");
+    assert.equal(formatSessionElapsed(125), "2 min");
+    assert.equal(formatSessionElapsed(2500), "41 min");
+    assert.equal(formatSessionElapsed(3600), "1h");
+    assert.equal(formatSessionElapsed(4500), "1h 15min");
+    assert.equal(formatSessionElapsed(95063), "26h");
   });
 });

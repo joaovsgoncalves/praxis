@@ -972,10 +972,22 @@ export function registerWorkoutRoutes(app, db) {
     if (day.day_type === 'rest') return res.status(400).json({ error: 'Esse é um dia de descanso.' });
 
     const existingActive = db.prepare(`
-      SELECT id FROM workout_sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1
+      SELECT * FROM workout_sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1
     `).get();
     if (existingActive) {
-      return res.status(409).json({ error: 'Já existe um treino em andamento.', session: getSessionDetail(db, existingActive.id) });
+      if (existingActive.workout_day_id === day.id) {
+        return res.status(409).json({ error: 'Já existe um treino em andamento.', session: getSessionDetail(db, existingActive.id) });
+      }
+      const workSetsCount = db.prepare(`
+        SELECT COUNT(*) AS count FROM workout_session_sets
+        WHERE session_id = ? AND (set_role IS NULL OR set_role != 'warmup')
+      `).get(existingActive.id)?.count || 0;
+      if (workSetsCount > 0) {
+        return res.status(409).json({
+          error: 'Já existe um treino em andamento com séries registradas. Termina ou abandona o treino antes de começar outro.',
+          session: getSessionDetail(db, existingActive.id),
+        });
+      }
     }
 
     const dayExercises = exerciseRowsForDay(db, day.id);
@@ -992,6 +1004,19 @@ export function registerWorkoutRoutes(app, db) {
     `);
 
     const tx = db.transaction(() => {
+      if (existingActive) {
+        const completedAt = startedAt;
+        const startedMs = Date.parse(existingActive.started_at);
+        const durationSeconds = Number.isFinite(startedMs)
+          ? Math.max(0, Math.round((Date.parse(completedAt) - startedMs) / 1000))
+          : null;
+        db.prepare(`
+          UPDATE workout_sessions
+          SET status = 'abandoned', completed_at = ?, duration_seconds = ?, updated_at = datetime('now')
+          WHERE id = ?
+        `).run(completedAt, durationSeconds, existingActive.id);
+      }
+
       db.prepare(`
         INSERT INTO workout_sessions (
           id, workout_program_id, workout_day_id, program_name_snapshot,

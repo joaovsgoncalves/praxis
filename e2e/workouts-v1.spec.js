@@ -184,59 +184,41 @@ async function mockPraxisApi(page) {
     }
 
     if (path === '/api/workouts/sessions' && method === 'POST') {
+      const payload = request.postDataJSON() || {};
+      const requestedDayId = payload.workout_day_id || 'day-push';
+      const day = state.program.days.find((d) => d.id === requestedDayId) || state.program.days[0];
       state.sessionSeq += 1;
       const id = `session-${state.sessionSeq}`;
       state.session = {
         id,
         workout_program_id: state.program.id,
-        workout_day_id: 'day-push',
+        workout_day_id: day.id,
         program_name_snapshot: state.program.name,
-        workout_day_name_snapshot: 'Push Força',
+        workout_day_name_snapshot: day.name,
         status: 'active',
         started_at: new Date().toISOString(),
         completed_at: null,
         duration_seconds: null,
-        exercise_count: 2,
-        exercises: [
-          {
-            id: `session-ex-${state.sessionSeq}`,
-            session_id: id,
-            exercise_id: 'exercise-bench',
-            exercise_name_snapshot: 'Supino reto',
-            tracking_type: 'weight_reps',
-            position: 0,
-            target_sets: 2,
-            rep_min: 5,
-            rep_max: 8,
-            target_duration_seconds: null,
-            rest_seconds: 90,
-            purpose: 'strength',
-            target_rir_min: 1,
-            target_rir_max: 2,
-            notes: '',
-            sets: [],
-            previous_sets: previousWorkSets('exercise-bench'),
-          },
-          {
-            id: `session-ex-band-${state.sessionSeq}`,
-            session_id: id,
-            exercise_id: 'exercise-pull-up',
-            exercise_name_snapshot: 'Barra fixa',
-            tracking_type: 'reps',
-            position: 1,
-            target_sets: 1,
-            rep_min: 5,
-            rep_max: 8,
-            target_duration_seconds: null,
-            rest_seconds: 90,
-            purpose: 'strength',
-            target_rir_min: null,
-            target_rir_max: null,
-            notes: '',
-            sets: [],
-            previous_sets: previousWorkSets('exercise-pull-up'),
-          },
-        ],
+        exercise_count: day.exercises?.length || 0,
+        exercises: (day.exercises || []).map((ex, index) => ({
+          id: `session-ex-${index}-${state.sessionSeq}`,
+          session_id: id,
+          exercise_id: ex.exercise_id,
+          exercise_name_snapshot: ex.exercise_name,
+          tracking_type: ex.tracking_type,
+          position: ex.position,
+          target_sets: ex.target_sets,
+          rep_min: ex.rep_min,
+          rep_max: ex.rep_max,
+          target_duration_seconds: ex.target_duration_seconds,
+          rest_seconds: ex.rest_seconds,
+          purpose: ex.purpose,
+          target_rir_min: ex.target_rir_min,
+          target_rir_max: ex.target_rir_max,
+          notes: ex.notes,
+          sets: [],
+          previous_sets: previousWorkSets(ex.exercise_id),
+        })),
       };
       return json(route, withCounts(state.session), 201);
     }
