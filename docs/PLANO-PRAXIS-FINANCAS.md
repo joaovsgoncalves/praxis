@@ -380,7 +380,8 @@ Auth igual ao resto: cookie sessão **ou** `Authorization: Bearer FORJA_API_KEY`
 | GET/POST | `/api/finance/balances` | query `account_id` |
 | GET/POST/PATCH | `/api/finance/debts` | |
 | POST | `/api/finance/debts/:id/pay` | body `{amount, paid_on, account_id, method, note}` |
-| GET/POST/PATCH | `/api/finance/subscriptions` | query `lane` |
+| GET/POST/PATCH/DELETE | `/api/finance/subscriptions` | query `lane` · DELETE `/:id` some da lista |
+| GET/POST/PATCH/DELETE | `/api/finance/installments` | compras parceladas; **não** entra em `cards_total` |
 | GET | `/api/finance/transactions` | `from,to,account_id,category,q,limit` |
 | POST/PATCH | `/api/finance/transactions` | correção manual |
 | GET | `/api/finance/insights` | totais 7d/30d, por categoria, por instituição |

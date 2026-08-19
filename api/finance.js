@@ -11,6 +11,7 @@ export const APR_LABELS = ['high', 'medium', 'low', 'none'];
 export const SUB_LANES = ['work', 'personal'];
 export const SUB_CADENCES = ['monthly', 'yearly', 'installment', 'service'];
 export const SUB_STATUSES = ['active', 'keep', 'cancel', 'cancelled', 'installment'];
+export const INST_STATUSES = ['open', 'done'];
 export const TX_DIRECTIONS = ['inflow', 'outflow', 'internal'];
 export const GOAL_STATUSES = ['active', 'done', 'paused'];
 export const FINANCE_CATEGORIES = [
@@ -180,6 +181,23 @@ export function initFinanceSchema(db) {
       due_date TEXT,
       debt_id TEXT,
       status TEXT DEFAULT 'active',
+      created_at TEXT,
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS finance_installments (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      account_id TEXT,
+      monthly REAL DEFAULT 0,
+      remaining REAL DEFAULT 0,
+      paid_n INTEGER DEFAULT 0,
+      total_n INTEGER DEFAULT 0,
+      last_due TEXT,
+      status TEXT DEFAULT 'open',
+      source TEXT DEFAULT 'pierre',
+      locked INTEGER DEFAULT 0,
+      note TEXT DEFAULT '',
       created_at TEXT,
       updated_at TEXT
     );
@@ -974,6 +992,108 @@ export function updateSubscription(db, id, body = {}) {
   return listSubscriptions(db).find((s) => s.id === id);
 }
 
+export function deleteSubscription(db, id) {
+  const existing = listSubscriptions(db).find((s) => s.id === id);
+  if (!existing) return null;
+  db.prepare('UPDATE finance_transactions SET subscription_id = NULL WHERE subscription_id = ?').run(id);
+  db.prepare('DELETE FROM finance_subscriptions WHERE id = ?').run(id);
+  return existing;
+}
+
+export function listInstallments(db, { status } = {}) {
+  let q = 'SELECT * FROM finance_installments WHERE 1=1';
+  const params = [];
+  if (status && status !== 'all') {
+    q += ' AND status = ?';
+    params.push(status);
+  }
+  q += ' ORDER BY remaining DESC, monthly DESC';
+  return db.prepare(q).all(...params).map((row) => ({
+    ...row,
+    monthly: money(row.monthly),
+    remaining: money(row.remaining),
+    locked: Number(row.locked) === 1,
+  }));
+}
+
+export function createInstallment(db, body) {
+  const title = String(body.title || '').trim();
+  if (!title) {
+    const err = new Error('title required');
+    err.status = 400;
+    throw err;
+  }
+  const id = body.id || randomUUID();
+  const now = nowIso();
+  db.prepare(`
+    INSERT INTO finance_installments
+      (id, title, account_id, monthly, remaining, paid_n, total_n, last_due,
+       status, source, locked, note, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    title,
+    body.account_id || null,
+    money(body.monthly),
+    money(body.remaining),
+    Number.isFinite(Number(body.paid_n)) ? Number(body.paid_n) : 0,
+    Number.isFinite(Number(body.total_n)) ? Number(body.total_n) : 0,
+    isValidDateString(body.last_due) ? body.last_due : null,
+    pick(body.status, INST_STATUSES, 'open'),
+    pick(body.source, SOURCES, 'pierre'),
+    body.locked ? 1 : 0,
+    String(body.note || ''),
+    now,
+    now,
+  );
+  return listInstallments(db).find((row) => row.id === id);
+}
+
+export function updateInstallment(db, id, body = {}) {
+  const existing = db.prepare('SELECT * FROM finance_installments WHERE id = ?').get(id);
+  if (!existing) return null;
+  db.prepare(`
+    UPDATE finance_installments SET
+      title = COALESCE(?, title),
+      account_id = COALESCE(?, account_id),
+      monthly = ?,
+      remaining = ?,
+      paid_n = ?,
+      total_n = ?,
+      last_due = ?,
+      status = ?,
+      source = ?,
+      locked = ?,
+      note = COALESCE(?, note),
+      updated_at = ?
+    WHERE id = ?
+  `).run(
+    body.title !== undefined ? String(body.title).trim() : null,
+    body.account_id !== undefined ? body.account_id : null,
+    body.monthly !== undefined ? money(body.monthly) : existing.monthly,
+    body.remaining !== undefined ? money(body.remaining) : existing.remaining,
+    body.paid_n !== undefined ? Number(body.paid_n) : existing.paid_n,
+    body.total_n !== undefined ? Number(body.total_n) : existing.total_n,
+    body.last_due !== undefined
+      ? (isValidDateString(body.last_due) ? body.last_due : null)
+      : existing.last_due,
+    body.status !== undefined ? pick(body.status, INST_STATUSES, existing.status) : existing.status,
+    body.source !== undefined ? pick(body.source, SOURCES, existing.source) : existing.source,
+    body.locked !== undefined ? (body.locked ? 1 : 0) : existing.locked,
+    body.note !== undefined ? String(body.note) : null,
+    nowIso(),
+    id,
+  );
+  return listInstallments(db).find((row) => row.id === id);
+}
+
+export function deleteInstallment(db, id) {
+  const existing = listInstallments(db).find((row) => row.id === id);
+  if (!existing) return null;
+  db.prepare('DELETE FROM finance_installments WHERE id = ?').run(id);
+  return existing;
+}
+
 export function listGoals(db) {
   return db.prepare('SELECT * FROM finance_goals ORDER BY due_date IS NULL, due_date ASC, title ASC').all()
     .map((g) => ({
@@ -1172,6 +1292,15 @@ export function getOverview(db, { today } = {}) {
   const workMonth = money(liveSubs.filter((s) => s.lane === 'work').reduce((s, x) => s + x.amount, 0));
   const personalMonth = money(liveSubs.filter((s) => s.lane === 'personal').reduce((s, x) => s + x.amount, 0));
 
+  const openInst = listInstallments(db, { status: 'open' });
+  const installmentsRemaining = money(openInst.reduce((s, x) => s + Number(x.remaining || 0), 0));
+  const installmentsMonth = money(openInst.reduce((s, x) => s + Number(x.monthly || 0), 0));
+  const lastInstDue = openInst
+    .map((x) => x.last_due)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
+
   const nextDue = openDebts
     .filter((d) => d.due_date)
     .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0] || null;
@@ -1191,6 +1320,10 @@ export function getOverview(db, { today } = {}) {
     subscriptions_month: money(workMonth + personalMonth),
     work_month: workMonth,
     personal_month: personalMonth,
+    installments_remaining: installmentsRemaining,
+    installments_month: installmentsMonth,
+    installments_n: openInst.length,
+    installments_last: lastInstDue,
     next_due: nextDue
       ? { id: nextDue.id, title: nextDue.title, amount: nextDue.balance, due_date: nextDue.due_date }
       : null,

@@ -38,6 +38,17 @@ export const financeApiModule = (request) => ({
         request('/api/finance/subscriptions', { method: 'POST', body: JSON.stringify(data) }),
       update: (id, data) =>
         request(`/api/finance/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      remove: (id) =>
+        request(`/api/finance/subscriptions/${id}`, { method: 'DELETE' }),
+    },
+    installments: {
+      list: (params = {}) => request(`/api/finance/installments${qs(params)}`),
+      create: (data) =>
+        request('/api/finance/installments', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/finance/installments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      remove: (id) =>
+        request(`/api/finance/installments/${id}`, { method: 'DELETE' }),
     },
     transactions: {
       list: (params = {}) => request(`/api/finance/transactions${qs(params)}`),

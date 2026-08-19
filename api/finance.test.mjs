@@ -127,3 +127,47 @@ test('Nubank survives as a debt even without Pierre', async (t) => {
   const debts = await requestJson(server.base, '/api/finance/debts');
   assert.ok(debts.some((d) => d.id === 'debt-nubank' && d.balance === 3227));
 });
+
+test('delete subscription removes it from the list', async (t) => {
+  const { server } = await mountFinance(t);
+  const created = await requestJson(server.base, '/api/finance/subscriptions', {
+    method: 'POST',
+    body: { id: 'sub-temp-kill', name: 'Temp', lane: 'personal', amount: 10, status: 'cancelled' },
+  });
+  assert.equal(created.id, 'sub-temp-kill');
+  const deleted = await requestJson(server.base, '/api/finance/subscriptions/sub-temp-kill', {
+    method: 'DELETE',
+  });
+  assert.equal(deleted.ok, true);
+  const list = await requestJson(server.base, '/api/finance/subscriptions');
+  assert.equal(list.some((s) => s.id === 'sub-temp-kill'), false);
+  const missing = await fetch(`${server.base}/api/finance/subscriptions/nope`, { method: 'DELETE' });
+  assert.equal(missing.status, 404);
+});
+
+test('installments stay out of card totals', async (t) => {
+  const { server } = await mountFinance(t);
+  const before = await requestJson(server.base, '/api/finance/overview');
+  await requestJson(server.base, '/api/finance/installments', {
+    method: 'POST',
+    body: {
+      id: 'inst-test-bot',
+      title: 'Bot Conversa',
+      account_id: 'acc-mp',
+      monthly: 265.33,
+      remaining: 795.99,
+      paid_n: 6,
+      total_n: 9,
+      source: 'pierre',
+    },
+  });
+  const after = await requestJson(server.base, '/api/finance/overview');
+  assert.equal(after.cards_total, before.cards_total);
+  assert.equal(after.installments_n, 1);
+  assert.equal(after.installments_remaining, 795.99);
+  assert.equal(after.installments_month, 265.33);
+  const gone = await requestJson(server.base, '/api/finance/installments/inst-test-bot', {
+    method: 'DELETE',
+  });
+  assert.equal(gone.ok, true);
+});

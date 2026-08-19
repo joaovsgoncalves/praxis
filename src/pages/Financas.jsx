@@ -54,11 +54,22 @@ function TabChips({ tab, onChange }) {
   );
 }
 
-function SourceChip({ label }) {
-  if (!label) return null;
+const SOURCE_CHIP_LABELS = {
+  joao: 'joão',
+  pierre: 'pierre',
+  oficial: 'oficial',
+  seed: 'seed',
+  agent: 'agente',
+  projecao: 'projeção',
+  projeção: 'projeção',
+};
+
+function SourceChip({ label, source }) {
+  const text = label || SOURCE_CHIP_LABELS[source] || source;
+  if (!text) return null;
   return (
     <Badge variant="outline" className="border-white/10 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-      {label}
+      {text}
     </Badge>
   );
 }
@@ -89,6 +100,11 @@ export default function Financas() {
   const { data: subscriptions = [] } = useQuery({
     queryKey: ['finance', 'subscriptions'],
     queryFn: () => praxisApi.finance.subscriptions.list(),
+  });
+
+  const { data: installments = [] } = useQuery({
+    queryKey: ['finance', 'installments'],
+    queryFn: () => praxisApi.finance.installments.list({ status: 'open' }),
   });
 
   const { data: transactions = [] } = useQuery({
@@ -137,12 +153,13 @@ export default function Financas() {
     onError: (err) => toast.error(err.message || 'Não deu para atualizar'),
   });
 
-  const subMutation = useMutation({
-    mutationFn: ({ id, data }) => praxisApi.finance.subscriptions.update(id, data),
+  const deleteSubMutation = useMutation({
+    mutationFn: (id) => praxisApi.finance.subscriptions.remove(id),
     onSuccess: () => {
-      toast.success('Assinatura atualizada');
+      toast.success('Tirei da lista');
       invalidateFinance(queryClient);
     },
+    onError: (err) => toast.error(err.message || 'Não deu para apagar'),
   });
 
   const operationalId = overview?.accounts?.find((a) => a.is_operational)?.id || 'acc-inter';
@@ -155,8 +172,9 @@ export default function Financas() {
     () => (overview?.debts || []).filter((d) => d.status === 'clean'),
     [overview],
   );
-  const workSubs = subscriptions.filter((s) => s.lane === 'work');
-  const personalSubs = subscriptions.filter((s) => s.lane === 'personal');
+  const liveSubs = subscriptions.filter((s) => s.status !== 'cancelled' && s.status !== 'cancel' && s.status !== 'installment');
+  const workSubs = liveSubs.filter((s) => s.lane === 'work');
+  const personalSubs = liveSubs.filter((s) => s.lane === 'personal');
   const visibleTx = txCategory
     ? transactions.filter((t) => t.category === txCategory)
     : transactions;
@@ -240,12 +258,25 @@ export default function Financas() {
       </Card>
 
       <StatGrid>
-        <StatTile label="Caixa (Inter)" value={formatBrl(overview.caixa)} tone="amber" />
-        <StatTile label="Livre depois das reservas" value={formatBrl(overview.livre)} />
+        <StatTile
+          label="Caixa (Inter)"
+          value={formatBrl(overview.caixa)}
+          tone="amber"
+        />
         <StatTile label="Cartões abertos" value={formatBrl(overview.cards_total)} />
         <StatTile
           label="Assinaturas / mês"
           value={formatBrl(overview.subscriptions_month)}
+        />
+        <StatTile
+          label={(overview.installments_n || 0) > 0 ? 'Parcelas / mês' : 'Próximo vencimento'}
+          value={
+            (overview.installments_n || 0) > 0
+              ? formatBrl(overview.installments_month || 0)
+              : overview.next_due
+                ? `${formatDay(overview.next_due.due_date)} · ${formatBrl(overview.next_due.amount)}`
+                : '—'
+          }
         />
       </StatGrid>
 
@@ -288,7 +319,10 @@ export default function Financas() {
                   className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium">{acc.name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{acc.name}</p>
+                      <SourceChip source={acc.available_source} />
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {acc.is_operational ? 'Conta do dia' : acc.institution}
                       {acc.available_as_of ? ` · ${formatDay(acc.available_as_of)}` : ''}
@@ -299,6 +333,30 @@ export default function Financas() {
               ))}
             </div>
           </section>
+
+          {(overview.installments_n || 0) > 0 ? (
+            <section className="space-y-3">
+              <SectionHeading title="Compras parceladas" kicker="Já está no cartão — não soma de novo" />
+              <Card className="border-white/10 bg-white/[0.03]">
+                <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ainda resta</p>
+                    <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_remaining)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Pesa por mês</p>
+                    <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_month)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Última</p>
+                    <p className="text-xl font-semibold tabular-nums">
+                      {overview.installments_last ? formatDay(overview.installments_last) : '—'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          ) : null}
         </div>
       ) : null}
 
@@ -324,6 +382,7 @@ export default function Financas() {
                         {APR_LABELS[debt.apr_label]}
                       </Badge>
                     ) : null}
+                    <SourceChip source={debt.source} />
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {debt.due_date ? `Vence ${formatDay(debt.due_date)}` : 'Sem data'}
@@ -344,6 +403,70 @@ export default function Financas() {
               Já limpo: {cleanDebts.map((d) => d.title).join(', ')}.
             </p>
           ) : null}
+        </div>
+      ) : null}
+
+      {tab === 'parcelas' ? (
+        <div className="space-y-4">
+          <SectionHeading
+            title="Já comprado, ainda cai"
+            kicker={`${overview.installments_n || 0} em andamento · Pierre 12/08`}
+          />
+          <p className="text-sm text-muted-foreground">
+            Isso já está dentro da fatura do cartão. Não soma em cima dos R$ 10,5 mil.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card className="border-white/10 bg-white/[0.03]">
+              <CardContent className="space-y-1 p-4">
+                <p className="text-xs text-muted-foreground">Ainda resta</p>
+                <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_remaining)}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-white/10 bg-white/[0.03]">
+              <CardContent className="space-y-1 p-4">
+                <p className="text-xs text-muted-foreground">Pesa / mês</p>
+                <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_month)}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-white/10 bg-white/[0.03]">
+              <CardContent className="space-y-1 p-4">
+                <p className="text-xs text-muted-foreground">Última parcela</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {overview.installments_last ? formatDay(overview.installments_last) : '—'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+          {!installments.length ? (
+            <PraxisEmptyState
+              title="Sem parcela em andamento"
+              description="Quando o Pierre ou um print entrar, a lista aparece aqui."
+            />
+          ) : (
+            <div className="space-y-2">
+              {installments.map((inst) => {
+                const acc = overview.accounts.find((a) => a.id === inst.account_id);
+                return (
+                  <div
+                    key={inst.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-medium">{inst.title}</p>
+                      <SourceChip source={inst.source} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {inst.paid_n}/{inst.total_n}x · {formatBrl(inst.monthly)}/mês
+                      {acc ? ` · ${acc.name}` : ''}
+                    </p>
+                    </div>
+                    <p className="shrink-0 tabular-nums font-semibold">{formatBrl(inst.remaining)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -368,17 +491,16 @@ export default function Financas() {
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="tabular-nums font-semibold">{formatBrl(sub.amount)}</p>
-                    {sub.status !== 'cancelled' ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-9 rounded-full text-xs"
-                        onClick={() => subMutation.mutate({ id: sub.id, data: { status: 'cancelled' } })}
-                      >
-                        Cancelei
-                      </Button>
-                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 rounded-full text-xs text-muted-foreground"
+                      disabled={deleteSubMutation.isPending}
+                      onClick={() => deleteSubMutation.mutate(sub.id)}
+                    >
+                      Apagar
+                    </Button>
                   </div>
                 </div>
               ))}

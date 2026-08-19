@@ -4,7 +4,10 @@ import {
   createBalance,
   createDebt,
   createGoal,
+  createInstallment,
   createSubscription,
+  deleteInstallment,
+  deleteSubscription,
   createTransaction,
   getInsights,
   getOverview,
@@ -14,6 +17,7 @@ import {
   listBalances,
   listDebts,
   listGoals,
+  listInstallments,
   listSubscriptions,
   listTransactions,
   payDebt,
@@ -22,6 +26,7 @@ import {
   updateAccount,
   updateDebt,
   updateGoal,
+  updateInstallment,
   updateSettings,
   updateSubscription,
   updateTransaction,
@@ -131,6 +136,36 @@ export function createFinanceRouter({ db, getLocalDateString }) {
     const row = updateSubscription(db, req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
+  });
+
+  router.delete('/subscriptions/:id', (req, res) => {
+    const row = deleteSubscription(db, req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, id: row.id });
+  });
+
+  router.get('/installments', (req, res) => {
+    res.json(listInstallments(db, { status: req.query.status }));
+  });
+
+  router.post('/installments', (req, res) => {
+    try {
+      res.status(201).json(createInstallment(db, req.body || {}));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.patch('/installments/:id', (req, res) => {
+    const row = updateInstallment(db, req.params.id, req.body || {});
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json(row);
+  });
+
+  router.delete('/installments/:id', (req, res) => {
+    const row = deleteInstallment(db, req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, id: row.id });
   });
 
   router.get('/transactions', (req, res) => {

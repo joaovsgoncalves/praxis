@@ -29,6 +29,7 @@ export const LANE_LABELS = {
 export const FINANCE_TABS = [
   { id: 'agora', label: 'Agora' },
   { id: 'dividas', label: 'Dívidas' },
+  { id: 'parcelas', label: 'Parcelas' },
   { id: 'assinaturas', label: 'Assinaturas' },
   { id: 'extrato', label: 'Extrato' },
   { id: 'graficos', label: 'Gráficos' },
