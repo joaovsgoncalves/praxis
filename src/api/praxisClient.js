@@ -312,6 +312,34 @@ export const praxisApi = {
         request('/api/nutrition/weight', { method: 'POST', body: JSON.stringify(data) }),
       delete: (id) => request(`/api/nutrition/weight/${id}`, { method: 'DELETE' }),
     },
+    regimen: {
+      day: (date) => {
+        const q = date ? `?date=${encodeURIComponent(date)}` : '';
+        return request(`/api/nutrition/regimen${q}`);
+      },
+      items: (params = {}) => {
+        const q = new URLSearchParams();
+        if (params.status) q.set('status', params.status);
+        const qs = q.toString();
+        return request(`/api/nutrition/regimen/items${qs ? `?${qs}` : ''}`);
+      },
+      create: (data) =>
+        request('/api/nutrition/regimen/items', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/nutrition/regimen/items/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }),
+      delete: (id, { hard = false } = {}) =>
+        request(`/api/nutrition/regimen/items/${id}${hard ? '?hard=1' : ''}`, {
+          method: 'DELETE',
+        }),
+      toggle: (id, data = {}) =>
+        request(`/api/nutrition/regimen/items/${id}/toggle`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+    },
     copyDay: (data = {}) =>
       request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
     seed: () => request('/api/nutrition/seed', { method: 'POST', body: '{}' }),
