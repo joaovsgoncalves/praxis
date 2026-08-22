@@ -1,7 +1,7 @@
 # Plano / PRD — Treinos V4 (absorção openGym → Praxis)
 
 **Data:** 2026-08-22  
-**Status:** fases 0–14 implementadas no branch `agent/treinos-v4-all` (QA A.N.A. por fase). Fase 15 = merge/ship.  
+**Status:** fases 0–15 no `main`. Prod `dopraxis.vercel.app/treinos`. Heatmap: API viva; UI com fallback do histórico.  
 **Produto:** módulo **Treinos** na Praxis (`/treinos`) — evolução V1–V3, não app paralelo  
 **URL canônica:** `https://dopraxis.vercel.app/treinos`  
 **Referência visual/funcional:** Reel IG `DcVfUp6Cvs6` · [openGym](https://gitea.com/DuarteSantos/openGym) (AGPL-3.0) · dataset [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (MIT metadata + mídia © Gym visual)  

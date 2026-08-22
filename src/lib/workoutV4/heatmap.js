@@ -111,6 +111,25 @@ export function formatHeatmapTooltip(dayOrDate, workSets, sessions, totalSets) {
  * @param {Object} [options={}] Options ({ today, locale })
  * @returns {Object} { year, weeks, monthLabels, totalSessions, totalWorkSets, totalSets, activeDaysCount, maxWorkSetsInDay }
  */
+export function sessionsToHeatmapDays(sessions = []) {
+  const map = new Map();
+  for (const session of sessions) {
+    if (!session || session.status && session.status !== "completed") continue;
+    const date = String(session.started_at || session.completed_at || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const cur = map.get(date) || { date, sessions: 0, sets: 0, work_sets: 0 };
+    cur.sessions += 1;
+    const sets = Number(session.completed_sets || 0);
+    const work = Number(
+      session.completed_work_sets != null ? session.completed_work_sets : sets,
+    );
+    cur.sets += Number.isFinite(sets) ? sets : 0;
+    cur.work_sets += Number.isFinite(work) ? work : 0;
+    map.set(date, cur);
+  }
+  return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function buildYearHeatmapGrid(year, daysData = [], options = {}) {
   const yearNum = Number(year) || new Date().getUTCFullYear();
   const todayIso = options.today

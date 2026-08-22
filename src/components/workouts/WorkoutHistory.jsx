@@ -6,7 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PraxisEmptyState, PraxisListSkeleton } from "@/components/layout/PraxisPage";
 import { cn } from "@/lib/utils";
-import { format1rm } from "@/lib/workoutV4";
+import {
+  format1rm,
+  sessionsToHeatmapDays,
+} from "@/lib/workoutV4";
 import {
   formatSessionDuration,
   formatSetResult,
@@ -79,6 +82,7 @@ export default function WorkoutHistory() {
       <WorkoutHeatmap
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
+        fallbackDays={sessionsToHeatmapDays(sessions)}
       />
 
       {/* Filter banner if a specific day is clicked */}

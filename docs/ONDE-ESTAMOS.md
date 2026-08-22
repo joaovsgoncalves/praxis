@@ -1,13 +1,15 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-07-24 · evidência de código/prod, não só memória de chat  
+**Atualizado:** 2026-08-22 · evidência git/prod  
 **URL que abre:** https://dopraxis.vercel.app  
-**Marca/canônico (DNS ainda morto):** `dopraxis.app` / `www` — **não resolve** na internet até compra/DNS  
-**Repo:** `joaovsgoncalves1-jpg/praxis` · **HEAD:** `ca7ff9a` (2026-07-22)  
-**Prod Vercel:** `dpl_7ZtYZNMXfEfQ4mWy1f3ruzM16DrG` Ready · criado 2026-07-22 21:11 UTC  
-**API:** `praxis-api` active · `GET /api/health` 200 · webAuth on · porta 18556  
-**Backup:** last `2026-07-24T03:15:01Z` (`praxis.db`) · cron `15 3 * * *` + health `*/5`  
-**Smoke:** `npm run smoke:prod` **completo OK** em 2026-07-24 (login, weekly, avoidance, backup-meta, nutrition, E2E task/recurrence/capture)
+**Repo:** `joaovsgoncalves1-jpg/praxis` · **HEAD:** ver `git log -1` (não este parágrafo)  
+**API:** `praxis-api` · `GET /api/health` 200 · porta 18556  
+
+## Treinos V4 (ago/2026)
+
+No ar em `/treinos`: catálogo 1324 + customs, Biblioteca, GIF CDN (Gym visual), Mapa Balanço/Fadiga/Força, heatmap no Histórico, 1RM, superset, treino livre. Smoke: `scripts/smoke-praxis-treinos.sh`.  
+
+Uso: mapa só fica esperto depois de séries em exercício do catálogo (custom sem alias não pinta).  
 
 ---
 

@@ -84,6 +84,10 @@ if [[ -f "$SCRIPT_DIR/smoke-praxis-nutrition.sh" ]]; then
   bash "$SCRIPT_DIR/smoke-praxis-nutrition.sh" || fail "smoke nutrition"
 fi
 
+if [[ -f "$SCRIPT_DIR/smoke-praxis-treinos.sh" ]]; then
+  bash "$SCRIPT_DIR/smoke-praxis-treinos.sh" || fail "smoke treinos"
+fi
+
 if [[ "${PRAXIS_SMOKE_E2E:-1}" == "1" ]]; then
   bash "$SCRIPT_DIR/smoke-praxis-e2e.sh"
 fi

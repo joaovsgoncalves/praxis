@@ -22,7 +22,7 @@ const BUCKET_BG_CLASSES = [
   "bg-primary border border-primary/90 text-primary-foreground shadow-sm shadow-primary/25",
 ];
 
-export default function WorkoutHeatmap({ selectedDate, onSelectDate }) {
+export default function WorkoutHeatmap({ selectedDate, onSelectDate, fallbackDays = [] }) {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
 
@@ -32,7 +32,9 @@ export default function WorkoutHeatmap({ selectedDate, onSelectDate }) {
     staleTime: 30_000,
   });
 
-  const daysData = heatmapData?.days || [];
+  const daysData = (heatmapData?.days && heatmapData.days.length)
+    ? heatmapData.days
+    : fallbackDays;
 
   const grid = useMemo(() => {
     return buildYearHeatmapGrid(year, daysData);
