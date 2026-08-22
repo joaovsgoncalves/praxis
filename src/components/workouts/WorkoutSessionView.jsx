@@ -25,6 +25,9 @@ import {
   getWorkSets,
   getWarmupSets,
   EMPTY_SET_FORM,
+  estimate1rm,
+  bestEstimated1rm,
+  format1rm,
 } from '@/lib/workoutV4';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -288,6 +291,15 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     queryClient.invalidateQueries({ queryKey: ['workouts', 'summary'] });
     queryClient.invalidateQueries({ queryKey: ['workouts', 'history'] });
   };
+
+  const exerciseBest1rm = useMemo(() => {
+    if (!currentExercise) return null;
+    const allSets = [
+      ...(currentExercise.sets || []),
+      ...(currentExercise.previous_sets || []),
+    ];
+    return bestEstimated1rm(allSets);
+  }, [currentExercise]);
 
   const exerciseRestSeconds = Number(currentExercise?.rest_seconds) > 0 ? Number(currentExercise.rest_seconds) : 90;
 
@@ -576,6 +588,11 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                         {purposeLabel}
                       </span>
                     ) : null}
+                    {exerciseBest1rm ? (
+                      <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary tabular-nums">
+                        1RM est. {format1rm(exerciseBest1rm)}
+                      </span>
+                    ) : null}
                   </div>
                   <h2 className="mt-2 text-xl font-semibold leading-tight tracking-tight">{currentExercise.exercise_name_snapshot}</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
@@ -647,7 +664,11 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                     const meta = setLabels.get(set.id) || { label: `${set.set_number}`, warmup: isWarmupSet(set) };
                     const rirLabel = formatSetRir(set.rir);
                     const qualityLabel = formatTechnicalQuality(set.technical_quality);
+                    const set1rm = !meta.warmup
+                      ? (set.estimated_1rm || estimate1rm(set.weight_kg, set.reps))
+                      : null;
                     const extras = [];
+                    if (set1rm) extras.push(`1RM ~${format1rm(set1rm)}`);
                     if (rirLabel) extras.push(rirLabel);
                     if (qualityLabel) extras.push(qualityLabel);
                     return (

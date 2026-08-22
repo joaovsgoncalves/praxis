@@ -1099,3 +1099,154 @@ describe("Treinos V4 Fase 5 — Session exercise media enrichment", () => {
     assert.equal(session.status, "completed");
   });
 });
+
+describe("Treinos V4 Fase 8 — 1RM API and stats", () => {
+  let db;
+  let server;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("GET /api/workouts/exercises/:id/stats returns 404 for unknown or inactive exercise", async () => {
+    const request = (p, opts) => requestJson(server.base, p, opts);
+    await assert.rejects(
+      () => request("/api/workouts/exercises/non-existent-id/stats"),
+      /404.*Exercício não encontrado./
+    );
+  });
+
+  test("GET /api/workouts/exercises/:id/stats returns null stats for unused exercise", async () => {
+    const request = (p, opts) => requestJson(server.base, p, opts);
+
+    const exercise = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Desenvolvimento Halteres",
+        category: "strength",
+        tracking_type: "weight_reps",
+      },
+    });
+
+    const stats = await request("/api/workouts/exercises/" + exercise.id + "/stats");
+    assert.equal(stats.exercise_id, exercise.id);
+    assert.equal(stats.best_1rm, null);
+    assert.equal(stats.best_weight, null);
+    assert.equal(stats.best_reps, null);
+    assert.equal(stats.last_performed_at, null);
+    assert.equal(stats.total_work_sets, 0);
+    assert.equal(stats.total_sessions, 0);
+  });
+
+  test("Session detail includes estimated_1rm on sets and exercise stats reflect history", async () => {
+    const request = (p, opts) => requestJson(server.base, p, opts);
+
+    // 1. Setup program and day with Supino Reto
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Força A/B" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Treino A" },
+    });
+    const day = program.days[0];
+
+    const exercise = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Supino Reto Barra",
+        category: "strength",
+        tracking_type: "weight_reps",
+      },
+    });
+
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: exercise.id, target_sets: 3 },
+    });
+
+    // 2. Start session
+    let session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: day.id },
+    });
+    const sessionExerciseId = session.exercises[0].id;
+
+    // Set 1: Warmup 50kg x 12 reps -> Epley would be 70kg, but warmup estimated_1rm must be null
+    let res1 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 50,
+        reps: 12,
+        set_role: "warmup",
+      },
+    });
+    assert.equal(res1.exercises[0].sets[0].estimated_1rm, null);
+
+    // Set 2: Work 80kg x 8 reps -> 80 * (1 + 8/30) = 101.3
+    let res2 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 80,
+        reps: 8,
+        set_role: "work",
+      },
+    });
+    assert.equal(res2.exercises[0].sets[1].estimated_1rm, 101.3);
+    assert.equal(res2.exercises[0].best_1rm, 101.3);
+
+    // Set 3: Work 90kg x 5 reps -> 90 * (1 + 5/30) = 105
+    let res3 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 90,
+        reps: 5,
+        set_role: "work",
+      },
+    });
+    assert.equal(res3.exercises[0].sets[2].estimated_1rm, 105);
+    assert.equal(res3.exercises[0].best_1rm, 105);
+
+    // Set 4: Heavy warmup 120kg x 5 reps (140 1RM) -> Warmup MUST be excluded from best 1RM
+    let res4 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 120,
+        reps: 5,
+        set_role: "warmup",
+      },
+    });
+    assert.equal(res4.exercises[0].sets[3].estimated_1rm, null);
+    assert.equal(res4.exercises[0].best_1rm, 105); // Still 105 from work sets
+
+    // 3. Complete session
+    await request("/api/workouts/sessions/" + session.id + "/finish", {
+      method: "POST",
+      body: {},
+    });
+
+    // 4. Query stats endpoint
+    const stats = await request("/api/workouts/exercises/" + exercise.id + "/stats");
+    assert.equal(stats.exercise_id, exercise.id);
+    assert.equal(stats.best_1rm, 105); // 90kg x 5 reps
+    assert.equal(stats.best_weight, 90); // 120kg warmup is excluded from work metrics
+    assert.equal(stats.best_reps, 8); // 8 reps (warmup 12 reps excluded)
+    assert.ok(stats.last_performed_at);
+    assert.equal(stats.total_work_sets, 2);
+    assert.equal(stats.total_sessions, 1);
+  });
+});

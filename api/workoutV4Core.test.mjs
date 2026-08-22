@@ -28,6 +28,9 @@ import {
   getLastWarmupSet as apiGetLastWarmupSet,
   cascadeWeightToUnfilledSlots as apiCascadeWeightToUnfilledSlots,
   computeSetPrefill as apiComputeSetPrefill,
+  estimate1rm as apiEstimate1rm,
+  bestEstimated1rm as apiBestEstimated1rm,
+  format1rm as apiFormat1rm,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -58,6 +61,9 @@ import {
   getLastWarmupSet as frontGetLastWarmupSet,
   cascadeWeightToUnfilledSlots as frontCascadeWeightToUnfilledSlots,
   computeSetPrefill as frontComputeSetPrefill,
+  estimate1rm as frontEstimate1rm,
+  bestEstimated1rm as frontBestEstimated1rm,
+  format1rm as frontFormat1rm,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -851,6 +857,120 @@ describe('workoutV4Core — Fase 7 set prefill & weight cascade', () => {
       ]);
 
       assert.deepEqual(cascadeFn(null, 80), []);
+    }
+  });
+});
+
+describe('workoutV4Core — Fase 8 1RM Epley calculation', () => {
+  test('estimate1rm: reps === 1 returns exact weight', () => {
+    for (const estFn of [apiEstimate1rm, frontEstimate1rm]) {
+      assert.equal(estFn(100, 1), 100);
+      assert.equal(estFn(82.5, 1), 82.5);
+      assert.equal(estFn(60, 1), 60);
+      assert.equal(estFn("75.5", "1"), 75.5);
+    }
+  });
+
+  test('estimate1rm: calculates Epley formula weight * (1 + reps/30) rounded to 1 decimal', () => {
+    for (const estFn of [apiEstimate1rm, frontEstimate1rm]) {
+      // 100 * (1 + 10/30) = 133.333... -> 133.3
+      assert.equal(estFn(100, 10), 133.3);
+
+      // 80 * (1 + 8/30) = 101.333... -> 101.3
+      assert.equal(estFn(80, 8), 101.3);
+
+      // 60 * (1 + 12/30) = 60 * 1.4 = 84
+      assert.equal(estFn(60, 12), 84);
+
+      // 50 * (1 + 5/30) = 58.333... -> 58.3
+      assert.equal(estFn(50, 5), 58.3);
+
+      // 100 * (1 + 6/30) = 120
+      assert.equal(estFn(100, 6), 120);
+
+      // 100 * (1 + 30/30) = 200
+      assert.equal(estFn(100, 30), 200);
+
+      // String inputs
+      assert.equal(estFn("80", "8"), 101.3);
+      assert.equal(estFn("100", "10"), 133.3);
+    }
+  });
+
+  test('estimate1rm: handles edge cases and invalid values safely', () => {
+    for (const estFn of [apiEstimate1rm, frontEstimate1rm]) {
+      assert.equal(estFn(null, 10), null);
+      assert.equal(estFn(undefined, 10), null);
+      assert.equal(estFn(100, null), null);
+      assert.equal(estFn(100, undefined), null);
+      assert.equal(estFn("", 10), null);
+      assert.equal(estFn(100, ""), null);
+
+      // Zero or negative weight
+      assert.equal(estFn(0, 10), null);
+      assert.equal(estFn(-50, 10), null);
+
+      // Zero or negative reps
+      assert.equal(estFn(100, 0), null);
+      assert.equal(estFn(100, -5), null);
+
+      // Non-numeric
+      assert.equal(estFn("abc", 10), null);
+      assert.equal(estFn(100, "xyz"), null);
+      assert.equal(estFn(NaN, 10), null);
+      assert.equal(estFn(100, NaN), null);
+    }
+  });
+
+  test('bestEstimated1rm: finds maximum 1RM over work sets', () => {
+    for (const bestFn of [apiBestEstimated1rm, frontBestEstimated1rm]) {
+      const sets = [
+        { id: "s1", weight_kg: 80, reps: 8, set_role: "work" }, // 101.3
+        { id: "s2", weight_kg: 85, reps: 6, set_role: "work" }, // 85 * 1.2 = 102
+        { id: "s3", weight_kg: 90, reps: 3, set_role: "work" }, // 90 * 1.1 = 99
+      ];
+      assert.equal(bestFn(sets), 102);
+    }
+  });
+
+  test('bestEstimated1rm: CRITICAL — warmup sets are strictly excluded', () => {
+    for (const bestFn of [apiBestEstimated1rm, frontBestEstimated1rm]) {
+      // Warmup is heavier and has higher estimated 1RM than work set
+      const sets = [
+        { id: "w1", weight_kg: 100, reps: 10, set_role: "warmup" }, // 133.3 (warmup)
+        { id: "k1", weight_kg: 80, reps: 5, set_role: "work" },     // 93.3 (work)
+      ];
+      assert.equal(bestFn(sets), 93.3);
+
+      // Warmup only returns null
+      const warmupOnly = [
+        { id: "w1", weight_kg: 100, reps: 10, set_role: "warmup" },
+        { id: "w2", weight_kg: 120, reps: 5, set_role: "warmup" },
+      ];
+      assert.equal(bestFn(warmupOnly), null);
+    }
+  });
+
+  test('bestEstimated1rm: handles empty or invalid sets array', () => {
+    for (const bestFn of [apiBestEstimated1rm, frontBestEstimated1rm]) {
+      assert.equal(bestFn([]), null);
+      assert.equal(bestFn(null), null);
+      assert.equal(bestFn(undefined), null);
+      assert.equal(bestFn([{ id: "s1", reps: 10 }]), null); // No weight
+      assert.equal(bestFn([{ id: "s1", weight_kg: 0, reps: 10 }]), null); // 0 weight
+    }
+  });
+
+  test('format1rm: formats number with 1 decimal in pt-BR locale', () => {
+    for (const formatFn of [apiFormat1rm, frontFormat1rm]) {
+      assert.equal(formatFn(101.3), "101,3 kg");
+      assert.equal(formatFn(100), "100 kg");
+      assert.equal(formatFn(82.5), "82,5 kg");
+      assert.equal(formatFn(null), null);
+      assert.equal(formatFn(undefined), null);
+      assert.equal(formatFn(0), null);
+      assert.equal(formatFn(-5), null);
+      assert.equal(formatFn(""), null);
     }
   });
 });

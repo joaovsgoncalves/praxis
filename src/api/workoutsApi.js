@@ -13,6 +13,7 @@ export const workoutsApiModule = (request) => ({
       update: (id, data) =>
         request(`/api/workouts/exercises/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
       delete: (id) => request(`/api/workouts/exercises/${id}`, { method: 'DELETE' }),
+      stats: (id) => request(`/api/workouts/exercises/${id}/stats`),
     },
     programs: {
       list: () => request('/api/workouts/programs'),

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { praxisApi } from '@/api/praxisClient';
 import {
   Dumbbell,
   ExternalLink,
@@ -23,6 +25,7 @@ import {
   MEDIA_ATTRIBUTION,
   MUSCLE_LABEL_PT,
   thumbUrl,
+  format1rm,
 } from '@/lib/workoutV4';
 import {
   TRACKING_LABELS,
@@ -154,6 +157,13 @@ export default function ExerciseDetailSheet({
 }) {
   const [imgError, setImgError] = useState(false);
 
+  const { data: stats } = useQuery({
+    queryKey: ['workouts', 'exercises', exercise?.id, 'stats'],
+    queryFn: () => praxisApi.workouts.exercises.stats(exercise.id),
+    enabled: Boolean(open && exercise?.id),
+    staleTime: 30_000,
+  });
+
   if (!exercise) return null;
 
   const imageUrl = !imgError ? thumbUrl(exercise) : null;
@@ -276,6 +286,46 @@ export default function ExerciseDetailSheet({
               </p>
             </div>
           </div>
+
+          {/* Personal Bests / 1RM Stats */}
+          {stats && (stats.best_1rm || stats.best_weight) ? (
+            <div className="space-y-2 rounded-xl border border-primary/40 bg-primary/10 p-3.5">
+              <div className="flex items-center justify-between text-xs font-semibold text-primary">
+                <span className="flex items-center gap-1.5">
+                  <Flame className="h-3.5 w-3.5" aria-hidden />
+                  <span>Melhores marcas registradas</span>
+                </span>
+                {stats.last_performed_at ? (
+                  <span className="text-[10px] font-normal text-muted-foreground">
+                    Último: {new Date(stats.last_performed_at).toLocaleDateString('pt-BR')}
+                  </span>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {stats.best_1rm ? (
+                  <div className="rounded-lg border border-primary/20 bg-background/60 p-2.5 text-center">
+                    <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                      1RM Estimado
+                    </span>
+                    <span className="text-base font-bold tabular-nums text-foreground">
+                      {format1rm(stats.best_1rm)}
+                    </span>
+                  </div>
+                ) : null}
+                {stats.best_weight ? (
+                  <div className="rounded-lg border border-primary/20 bg-background/60 p-2.5 text-center">
+                    <span className="block text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                      Carga Máxima
+                    </span>
+                    <span className="text-base font-bold tabular-nums text-foreground">
+                      {stats.best_weight.toLocaleString('pt-BR')} kg
+                      {stats.best_reps ? <span className="text-xs font-normal text-muted-foreground ml-1">({stats.best_reps} reps)</span> : null}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {/* Secondary Muscles */}
           {secondaryMuscles.length > 0 ? (

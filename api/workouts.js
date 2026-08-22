@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { detectPersonalRecord } from './lib/workoutV4Core.js';
+import { detectPersonalRecord, estimate1rm, bestEstimated1rm } from './lib/workoutV4Core.js';
 
 export const WORKOUT_TRACKING_TYPES = [
   'reps',
@@ -455,7 +455,12 @@ function getPreviousSets(db, sessionExercise, session) {
     WHERE session_exercise_id = ?
       AND (set_role IS NULL OR set_role != 'warmup')
     ORDER BY set_number ASC, completed_at ASC
-  `).all(previousExercise.id);
+  `).all(previousExercise.id).map((set) => ({
+    ...set,
+    estimated_1rm: (set.weight_kg != null && Number(set.weight_kg) > 0 && set.reps != null && Number(set.reps) >= 1)
+      ? estimate1rm(set.weight_kg, set.reps)
+      : null,
+  }));
 }
 
 function getSessionDetail(db, sessionId) {
@@ -472,15 +477,30 @@ function getSessionDetail(db, sessionId) {
     LEFT JOIN workout_exercises e ON e.id = se.exercise_id
     WHERE se.session_id = ?
     ORDER BY se.position ASC
-  `).all(sessionId).map((exercise) => ({
-    ...exercise,
-    sets: db.prepare(`
+  `).all(sessionId).map((exercise) => {
+    const rawSets = db.prepare(`
       SELECT * FROM workout_session_sets
       WHERE session_exercise_id = ?
       ORDER BY set_number ASC, completed_at ASC
-    `).all(exercise.id),
-    previous_sets: getPreviousSets(db, exercise, session),
-  }));
+    `).all(exercise.id);
+
+    const sets = rawSets.map((set) => ({
+      ...set,
+      estimated_1rm: (set.set_role !== 'warmup' && set.weight_kg != null && Number(set.weight_kg) > 0 && set.reps != null && Number(set.reps) >= 1)
+        ? estimate1rm(set.weight_kg, set.reps)
+        : null,
+    }));
+
+    const previousSets = getPreviousSets(db, exercise, session);
+    const best1rm = bestEstimated1rm(sets);
+
+    return {
+      ...exercise,
+      sets,
+      previous_sets: previousSets,
+      best_1rm: best1rm,
+    };
+  });
   return { ...session, exercises };
 }
 
@@ -968,6 +988,64 @@ export function registerWorkoutRoutes(app, db) {
     `).get(req.params.id);
     if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
     res.json(exercise);
+  }));
+
+  app.get('/api/workouts/exercises/:id/stats', handle((req, res) => {
+    const exercise = db.prepare(`
+      SELECT id, name, tracking_type
+      FROM workout_exercises
+      WHERE id = ? AND status = 'active'
+    `).get(req.params.id);
+    if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
+
+    const workSets = db.prepare(`
+      SELECT ss.id, ss.weight_kg, ss.reps, ss.duration_seconds, ss.distance_m, ss.completed_at, ss.set_role, s.id AS session_id, s.started_at
+      FROM workout_session_sets ss
+      JOIN workout_session_exercises se ON se.id = ss.session_exercise_id
+      JOIN workout_sessions s ON s.id = ss.session_id
+      WHERE se.exercise_id = ?
+        AND (ss.set_role IS NULL OR ss.set_role != 'warmup')
+      ORDER BY ss.completed_at ASC
+    `).all(exercise.id);
+
+    let bestWeight = null;
+    let bestReps = null;
+    let lastPerformedAt = null;
+    const sessionIds = new Set();
+
+    for (const s of workSets) {
+      if (s.session_id) sessionIds.add(s.session_id);
+      const w = s.weight_kg != null ? Number(s.weight_kg) : null;
+      if (w !== null && Number.isFinite(w) && w > 0) {
+        if (bestWeight === null || w > bestWeight) {
+          bestWeight = w;
+        }
+      }
+      const r = s.reps != null ? Number(s.reps) : null;
+      if (r !== null && Number.isFinite(r) && r > 0) {
+        if (bestReps === null || r > bestReps) {
+          bestReps = r;
+        }
+      }
+      const timestamp = s.completed_at || s.started_at;
+      if (timestamp) {
+        if (!lastPerformedAt || timestamp > lastPerformedAt) {
+          lastPerformedAt = timestamp;
+        }
+      }
+    }
+
+    const best1rm = bestEstimated1rm(workSets);
+
+    res.json({
+      exercise_id: exercise.id,
+      best_1rm: best1rm,
+      best_weight: bestWeight,
+      best_reps: bestReps,
+      last_performed_at: lastPerformedAt,
+      total_work_sets: workSets.length,
+      total_sessions: sessionIds.size,
+    });
   }));
 
   app.post('/api/workouts/exercises', handle((req, res) => {

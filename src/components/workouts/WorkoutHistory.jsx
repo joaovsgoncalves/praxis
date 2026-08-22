@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
+import { format1rm } from '@/lib/workoutV4';
 import {
   formatSessionDuration,
   formatSetResult,
@@ -157,6 +158,9 @@ export default function WorkoutHistory() {
                                     {label}.
                                   </span>
                                   <span className="tabular-nums">{formatSetResult(set, exercise.tracking_type)}</span>
+                                  {!warmup && set.estimated_1rm ? (
+                                    <span className="tabular-nums text-muted-foreground/80">1RM ~{format1rm(set.estimated_1rm)}</span>
+                                  ) : null}
                                   {warmup ? <span className="uppercase tracking-wide text-muted-foreground/70">aquec.</span> : null}
                                   {rir ? <span className="tabular-nums">{rir}</span> : null}
                                   {quality ? <span>{quality}</span> : null}
