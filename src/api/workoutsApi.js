@@ -7,6 +7,7 @@ export const workoutsApiModule = (request) => ({
         const q = new URLSearchParams(params).toString();
         return request(`/api/workouts/exercises${q ? `?${q}` : ''}`);
       },
+      get: (id) => request(`/api/workouts/exercises/${id}`),
       create: (data) =>
         request('/api/workouts/exercises', { method: 'POST', body: JSON.stringify(data) }),
       update: (id, data) =>

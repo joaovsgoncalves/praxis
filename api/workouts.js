@@ -865,22 +865,99 @@ export function registerWorkoutRoutes(app, db) {
 
   app.get('/api/workouts/exercises', handle((req, res) => {
     const q = text(req.query?.q);
+    const bodyPart = text(req.query?.body_part);
+    const equipment = text(req.query?.equipment);
+    const equipmentKey = text(req.query?.equipment_key);
+    const targetMuscle = text(req.query?.target_muscle);
+    const source = text(req.query?.source).toLowerCase();
+    const hasMeta = req.query?.meta === '1' || req.query?.meta === 'true' || req.query?.meta === 'object' || req.query?.format === 'object';
+
     const limit = safeLimit(req.query?.limit, 50, 200);
-    let sql = `
+    let offset = 0;
+    if (req.query?.offset !== undefined && req.query?.offset !== '') {
+      offset = Math.max(0, intOrNull(req.query.offset) ?? 0);
+    } else if (req.query?.page !== undefined && req.query?.page !== '') {
+      const page = Math.max(1, intOrNull(req.query.page) ?? 1);
+      offset = (page - 1) * limit;
+    }
+
+    let whereClause = "WHERE e.status = 'active'";
+    const params = [];
+
+    if (q) {
+      whereClause += ` AND (
+        LOWER(e.name) LIKE LOWER(?)
+        OR LOWER(COALESCE(e.muscle_group, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(e.equipment, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(e.equipment_key, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(e.target_muscle, '')) LIKE LOWER(?)
+        OR LOWER(COALESCE(e.body_part, '')) LIKE LOWER(?)
+      )`;
+      const needle = `%${q}%`;
+      params.push(needle, needle, needle, needle, needle, needle);
+    }
+
+    if (bodyPart) {
+      whereClause += " AND LOWER(COALESCE(e.body_part, '')) = LOWER(?)";
+      params.push(bodyPart);
+    }
+
+    if (equipmentKey) {
+      whereClause += " AND LOWER(COALESCE(e.equipment_key, '')) = LOWER(?)";
+      params.push(equipmentKey);
+    } else if (equipment) {
+      whereClause += " AND (LOWER(COALESCE(e.equipment, '')) = LOWER(?) OR LOWER(COALESCE(e.equipment_key, '')) = LOWER(?))";
+      params.push(equipment, equipment);
+    }
+
+    if (targetMuscle) {
+      whereClause += " AND LOWER(COALESCE(e.target_muscle, '')) = LOWER(?)";
+      params.push(targetMuscle);
+    }
+
+    if (source === 'catalog') {
+      whereClause += " AND (e.source = 'catalog' OR (e.source IS NULL AND e.is_custom = 0))";
+    } else if (source === 'custom') {
+      whereClause += " AND (e.source = 'custom' OR (e.source IS NULL AND e.is_custom = 1))";
+    }
+
+    const countSql = `SELECT COUNT(*) AS total FROM workout_exercises e ${whereClause}`;
+    const totalRow = db.prepare(countSql).get(...params);
+    const total = Number(totalRow?.total || 0);
+
+    const itemsSql = `
       SELECT e.*,
         (SELECT COUNT(*) FROM workout_day_exercises wde WHERE wde.exercise_id = e.id) AS usage_count
       FROM workout_exercises e
-      WHERE e.status = 'active'
+      ${whereClause}
+      ORDER BY usage_count DESC, e.updated_at DESC, e.name ASC
+      LIMIT ? OFFSET ?
     `;
-    const params = [];
-    if (q) {
-      sql += ' AND (LOWER(e.name) LIKE LOWER(?) OR LOWER(e.muscle_group) LIKE LOWER(?) OR LOWER(e.equipment) LIKE LOWER(?))';
-      const needle = `%${q}%`;
-      params.push(needle, needle, needle);
+    const items = db.prepare(itemsSql).all(...params, limit, offset);
+
+    res.setHeader('X-Total-Count', String(total));
+
+    if (hasMeta) {
+      return res.json({
+        items,
+        total,
+        limit,
+        offset,
+      });
     }
-    sql += ' ORDER BY usage_count DESC, e.updated_at DESC, e.name ASC LIMIT ?';
-    params.push(limit);
-    res.json(db.prepare(sql).all(...params));
+
+    return res.json(items);
+  }));
+
+  app.get('/api/workouts/exercises/:id', handle((req, res) => {
+    const exercise = db.prepare(`
+      SELECT e.*,
+        (SELECT COUNT(*) FROM workout_day_exercises wde WHERE wde.exercise_id = e.id) AS usage_count
+      FROM workout_exercises e
+      WHERE e.id = ? AND e.status = 'active'
+    `).get(req.params.id);
+    if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
+    res.json(exercise);
   }));
 
   app.post('/api/workouts/exercises', handle((req, res) => {

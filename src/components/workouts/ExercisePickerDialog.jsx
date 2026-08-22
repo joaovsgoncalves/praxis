@@ -59,7 +59,10 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
     },
   });
 
-  const visibleExercises = useMemo(() => exercises.filter((exercise) => exercise?.status !== 'archived'), [exercises]);
+  const visibleExercises = useMemo(() => {
+    const list = Array.isArray(exercises) ? exercises : (exercises?.items || []);
+    return list.filter((exercise) => exercise?.status !== 'archived');
+  }, [exercises]);
 
   const handleCreate = (event) => {
     event.preventDefault();

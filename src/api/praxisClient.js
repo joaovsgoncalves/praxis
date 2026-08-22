@@ -375,10 +375,21 @@ export const praxisApi = {
       list: (params = {}) => {
         const query = new URLSearchParams();
         if (params.q) query.set('q', params.q);
-        if (params.limit) query.set('limit', String(params.limit));
+        if (params.limit !== undefined && params.limit !== null) query.set('limit', String(params.limit));
+        if (params.offset !== undefined && params.offset !== null) query.set('offset', String(params.offset));
+        if (params.page !== undefined && params.page !== null) query.set('page', String(params.page));
+        if (params.body_part) query.set('body_part', params.body_part);
+        if (params.equipment) query.set('equipment', params.equipment);
+        if (params.equipment_key) query.set('equipment_key', params.equipment_key);
+        if (params.target_muscle) query.set('target_muscle', params.target_muscle);
+        if (params.source) query.set('source', params.source);
+        if (params.meta !== undefined && params.meta !== null && params.meta !== false) {
+          query.set('meta', params.meta === true ? '1' : String(params.meta));
+        }
         const qs = query.toString();
         return request(`/api/workouts/exercises${qs ? `?${qs}` : ''}`);
       },
+      get: (id) => request(`/api/workouts/exercises/${id}`),
       create: (data) => request('/api/workouts/exercises', { method: 'POST', body: JSON.stringify(data) }),
       update: (id, data) => request(`/api/workouts/exercises/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
       delete: (id) => request(`/api/workouts/exercises/${id}`, { method: 'DELETE' }),

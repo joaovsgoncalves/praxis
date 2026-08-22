@@ -667,3 +667,147 @@ describe("Treinos V4 Fase 2 exercise catalog seed", () => {
     assert.equal(program.days[0].exercises[0].exercise_name, "barbell bent arm pullover");
   });
 });
+
+describe("Treinos V4 Fase 3 exercise catalog API and filters", () => {
+  let db;
+  let server;
+  let customEx;
+  let catalogExercises;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // 1. Seed 1 custom exercise
+    customEx = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Flexão Diamante Custom",
+        category: "calisthenics",
+        tracking_type: "reps",
+        muscle_group: "tríceps",
+        equipment: "body weight",
+        body_part: "arms",
+        target_muscle: "triceps",
+      },
+    });
+
+    // 2. Seed 3 catalog exercises from fixture
+    const fixtureData = JSON.parse(
+      fs.readFileSync(new URL("./test-support/fixtures/catalog-sample.json", import.meta.url), "utf8"),
+    );
+    seedExerciseCatalog({
+      db,
+      dataset: fixtureData,
+      apply: true,
+      dryRun: false,
+    });
+
+    const allExercises = await request("/api/workouts/exercises?limit=100");
+    catalogExercises = allExercises.filter((e) => e.source === "catalog");
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("GET /api/workouts/exercises filters by source (catalog vs custom vs all)", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const catalogOnly = await request("/api/workouts/exercises?source=catalog");
+    assert.equal(catalogOnly.length, 3);
+    assert.ok(catalogOnly.every((e) => e.source === "catalog" && e.is_custom === 0));
+
+    const customOnly = await request("/api/workouts/exercises?source=custom");
+    assert.equal(customOnly.length, 1);
+    assert.equal(customOnly[0].id, customEx.id);
+    assert.equal(customOnly[0].source, "custom");
+    assert.equal(customOnly[0].is_custom, 1);
+
+    const all = await request("/api/workouts/exercises?source=all");
+    assert.equal(all.length, 4);
+  });
+
+  test("GET /api/workouts/exercises filters by body_part, equipment, target_muscle and query q", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // Filter body_part
+    const waistList = await request("/api/workouts/exercises?body_part=waist");
+    assert.equal(waistList.length, 1);
+    assert.equal(waistList[0].name, "3/4 sit-up");
+
+    // Filter equipment
+    const barbellList = await request("/api/workouts/exercises?equipment=barbell");
+    assert.equal(barbellList.length, 1);
+    assert.equal(barbellList[0].name, "barbell bent arm pullover");
+
+    // Filter equipment_key
+    const eqKeyList = await request("/api/workouts/exercises?equipment_key=barbell");
+    assert.equal(eqKeyList.length, 1);
+    assert.equal(eqKeyList[0].name, "barbell bent arm pullover");
+
+    // Filter target_muscle
+    const absList = await request("/api/workouts/exercises?target_muscle=abs");
+    assert.equal(absList.length, 1);
+    assert.equal(absList[0].name, "3/4 sit-up");
+
+    // Search query q matches name or catalog attributes
+    const qList = await request("/api/workouts/exercises?q=pullover");
+    assert.equal(qList.length, 1);
+    assert.equal(qList[0].name, "barbell bent arm pullover");
+
+    // Combined filters
+    const combined = await request("/api/workouts/exercises?source=catalog&body_part=back&equipment=barbell");
+    assert.equal(combined.length, 1);
+    assert.equal(combined[0].name, "barbell bent arm pullover");
+  });
+
+  test("GET /api/workouts/exercises supports pagination with offset/limit and meta envelope", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const pagedMeta = await request("/api/workouts/exercises?limit=2&offset=1&meta=1");
+    assert.ok(pagedMeta && !Array.isArray(pagedMeta));
+    assert.equal(pagedMeta.total, 4);
+    assert.equal(pagedMeta.limit, 2);
+    assert.equal(pagedMeta.offset, 1);
+    assert.equal(pagedMeta.items.length, 2);
+
+    const page2Meta = await request("/api/workouts/exercises?limit=2&page=2&meta=true");
+    assert.equal(page2Meta.total, 4);
+    assert.equal(page2Meta.limit, 2);
+    assert.equal(page2Meta.offset, 2);
+    assert.equal(page2Meta.items.length, 2);
+  });
+
+  test("GET /api/workouts/exercises/:id returns full row including catalog fields and 404 in PT", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const catalogEx = catalogExercises.find((e) => e.catalog_external_id === "1316");
+    assert.ok(catalogEx);
+
+    const detail = await request("/api/workouts/exercises/" + catalogEx.id);
+    assert.equal(detail.id, catalogEx.id);
+    assert.equal(detail.name, "barbell bent arm pullover");
+    assert.equal(detail.catalog_external_id, "1316");
+    assert.equal(detail.source, "catalog");
+    assert.equal(detail.body_part, "back");
+    assert.equal(detail.target_muscle, "lats");
+    assert.equal(detail.media_id, "j599l3T");
+    assert.equal(detail.thumb_path, "images/1316-j599l3T.jpg");
+    assert.equal(detail.gif_path, "videos/1316-j599l3T.gif");
+    assert.equal(detail.attribution, "© Gym visual — https://gymvisual.com/");
+    assert.ok(detail.instructions_json);
+
+    // 404 test with PT error message
+    await assert.rejects(
+      () => request("/api/workouts/exercises/non-existent-id"),
+      /404.*Exercício não encontrado./,
+    );
+  });
+});
