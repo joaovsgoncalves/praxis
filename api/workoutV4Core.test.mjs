@@ -17,6 +17,10 @@ import {
   thumbUrl as apiThumbUrl,
   gifUrl as apiGifUrl,
   isTreinosV4Enabled as apiIsTreinosV4Enabled,
+  isWarmupSet as apiIsWarmupSet,
+  isWakeLockSupported as apiIsWakeLockSupported,
+  detectPersonalRecord as apiDetectPersonalRecord,
+  formatPrToastDescription as apiFormatPrToastDescription,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -36,6 +40,10 @@ import {
   thumbUrl as frontThumbUrl,
   gifUrl as frontGifUrl,
   isTreinosV4Enabled as frontIsTreinosV4Enabled,
+  isWarmupSet as frontIsWarmupSet,
+  isWakeLockSupported as frontIsWakeLockSupported,
+  detectPersonalRecord as frontDetectPersonalRecord,
+  formatPrToastDescription as frontFormatPrToastDescription,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -394,5 +402,190 @@ describe('workoutV4Core — feature flags & backward compatibility', () => {
 
   test('src/lib/workouts.js preserves legacy workout helpers alongside V4 path', () => {
     assert.equal(formatRestDuration(90), '1:30');
+  });
+});
+
+describe('workoutV4Core — Fase 6 PR detection and wake lock', () => {
+  test('detectPersonalRecord: warmup sets never count as PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', weight_kg: 50, reps: 10, set_role: 'work' },
+      ];
+      // Warmup heavier than previous work set
+      const warmupSet = { weight_kg: 80, reps: 5, set_role: 'warmup' };
+      const res = detectFn(warmupSet, history);
+      assert.equal(res.is_pr, false);
+      assert.equal(res.pr_type, null);
+    }
+  });
+
+  test('detectPersonalRecord: first completed work set establishes baseline (not a PR)', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const firstSet = { weight_kg: 50, reps: 10, set_role: 'work' };
+      const res = detectFn(firstSet, []);
+      assert.equal(res.is_pr, false);
+      assert.equal(res.pr_type, null);
+    }
+  });
+
+  test('detectPersonalRecord: higher weight breaks personal record', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', weight_kg: 50, reps: 10, set_role: 'work' },
+        { id: 's2', weight_kg: 55, reps: 8, set_role: 'work' },
+      ];
+      const heavierSet = { weight_kg: 60, reps: 6, set_role: 'work' };
+      const res = detectFn(heavierSet, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'weight');
+      assert.ok(res.reason?.includes('55'));
+    }
+  });
+
+  test('detectPersonalRecord: same weight with higher reps breaks personal record', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', weight_kg: 60, reps: 6, set_role: 'work' },
+        { id: 's2', weight_kg: 50, reps: 12, set_role: 'work' },
+      ];
+      const moreRepsSet = { weight_kg: 60, reps: 10, set_role: 'work' };
+      const res = detectFn(moreRepsSet, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'reps');
+      assert.ok(res.reason?.includes('6'));
+    }
+  });
+
+  test('detectPersonalRecord: weaker weight or lower reps does not break PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', weight_kg: 60, reps: 10, set_role: 'work' },
+      ];
+      // Lighter weight
+      assert.equal(detectFn({ weight_kg: 50, reps: 8, set_role: 'work' }, history).is_pr, false);
+      // Same weight, fewer reps
+      assert.equal(detectFn({ weight_kg: 60, reps: 8, set_role: 'work' }, history).is_pr, false);
+      // Same weight, same reps
+      assert.equal(detectFn({ weight_kg: 60, reps: 10, set_role: 'work' }, history).is_pr, false);
+    }
+  });
+
+  test('detectPersonalRecord: bodyweight reps increase breaks PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', reps: 12, set_role: 'work' },
+        { id: 's2', reps: 10, set_role: 'work' },
+      ];
+      const moreReps = { reps: 15, set_role: 'work' };
+      const res = detectFn(moreReps, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'reps');
+
+      const fewerReps = { reps: 11, set_role: 'work' };
+      assert.equal(detectFn(fewerReps, history).is_pr, false);
+    }
+  });
+
+  test('detectPersonalRecord: duration increase breaks PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', duration_seconds: 60, set_role: 'work' },
+      ];
+      const longer = { duration_seconds: 75, set_role: 'work' };
+      const res = detectFn(longer, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'duration');
+
+      const shorter = { duration_seconds: 50, set_role: 'work' };
+      assert.equal(detectFn(shorter, history).is_pr, false);
+    }
+  });
+
+  test('detectPersonalRecord: distance increase breaks PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', distance_m: 500, set_role: 'work' },
+      ];
+      const further = { distance_m: 600, set_role: 'work' };
+      const res = detectFn(further, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'distance');
+
+      const shorter = { distance_m: 400, set_role: 'work' };
+      assert.equal(detectFn(shorter, history).is_pr, false);
+    }
+  });
+
+  test('detectPersonalRecord: same distance faster time breaks duration PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', distance_m: 500, duration_seconds: 120, set_role: 'work' },
+      ];
+      const faster = { distance_m: 500, duration_seconds: 100, set_role: 'work' };
+      const res = detectFn(faster, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'duration');
+
+      const slower = { distance_m: 500, duration_seconds: 130, set_role: 'work' };
+      assert.equal(detectFn(slower, history).is_pr, false);
+    }
+  });
+
+  test('detectPersonalRecord: previous warmup sets in history are ignored when evaluating work PR', () => {
+    for (const detectFn of [apiDetectPersonalRecord, frontDetectPersonalRecord]) {
+      const history = [
+        { id: 's1', weight_kg: 80, reps: 5, set_role: 'warmup' },
+        { id: 's2', weight_kg: 60, reps: 8, set_role: 'work' },
+      ];
+      // Candidate work set of 70kg is higher than max work (60kg), even though warmup was 80kg
+      const workSet = { weight_kg: 70, reps: 6, set_role: 'work' };
+      const res = detectFn(workSet, history);
+      assert.equal(res.is_pr, true);
+      assert.equal(res.pr_type, 'weight');
+    }
+  });
+
+  test('formatPrToastDescription formats user-friendly Portuguese toast descriptions', () => {
+    for (const formatFn of [apiFormatPrToastDescription, frontFormatPrToastDescription]) {
+      const ex = { exercise_name_snapshot: 'Supino Reto' };
+
+      assert.equal(
+        formatFn({ pr_type: 'weight', weight_kg: 80, reps: 8 }, ex),
+        'Supino Reto: 80 kg (8 reps)'
+      );
+
+      assert.equal(
+        formatFn({ pr_type: 'reps', reps: 12 }, { name: 'Barra Fixa' }),
+        'Barra Fixa: 12 reps'
+      );
+
+      assert.equal(
+        formatFn({ pr_type: 'reps', reps: 10, weight_kg: 60 }, { name: 'Agachamento' }),
+        'Agachamento: 10 reps com 60 kg'
+      );
+
+      assert.equal(
+        formatFn({ pr_type: 'duration', duration_seconds: 60 }, { name: 'Prancha' }),
+        'Prancha: 60s'
+      );
+
+      assert.equal(
+        formatFn({ pr_type: 'distance', distance_m: 1000 }, { name: 'Corrida' }),
+        'Corrida: 1000 m'
+      );
+    }
+  });
+
+  test('isWakeLockSupported detects screen wake lock support accurately', () => {
+    for (const checkFn of [apiIsWakeLockSupported, frontIsWakeLockSupported]) {
+      const mockSupported = { wakeLock: { request: () => Promise.resolve({}) } };
+      assert.equal(checkFn(mockSupported), true);
+
+      const mockUnsupported = {};
+      assert.equal(checkFn(mockUnsupported), false);
+
+      assert.equal(checkFn(null), false);
+      assert.equal(checkFn(undefined), false);
+    }
   });
 });

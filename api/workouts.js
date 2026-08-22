@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { detectPersonalRecord } from './lib/workoutV4Core.js';
 
 export const WORKOUT_TRACKING_TYPES = [
   'reps',
@@ -237,6 +238,8 @@ export function initWorkoutSchema(db) {
     ['workout_session_sets', "set_role TEXT NOT NULL DEFAULT 'work'"],
     ['workout_session_sets', 'rir INTEGER'],
     ['workout_session_sets', 'technical_quality TEXT'],
+    ['workout_session_sets', 'is_pr INTEGER DEFAULT 0'],
+    ['workout_session_sets', 'pr_type TEXT'],
     ['workout_exercises', 'catalog_external_id TEXT'],
     ['workout_exercises', "source TEXT DEFAULT 'custom'"],
     ['workout_exercises', 'body_part TEXT'],
@@ -1284,6 +1287,18 @@ export function registerWorkoutRoutes(app, db) {
     if (!validateSetForTracking(sessionExercise.tracking_type, payload)) {
       return res.status(400).json({ error: 'Preencha o resultado principal desta série.' });
     }
+    const previousHistoricalSets = db.prepare(`
+      SELECT ss.id, ss.weight_kg, ss.reps, ss.duration_seconds, ss.distance_m, ss.set_role
+      FROM workout_session_sets ss
+      JOIN workout_session_exercises se ON se.id = ss.session_exercise_id
+      WHERE se.exercise_id = ?
+        AND (ss.set_role IS NULL OR ss.set_role != 'warmup')
+    `).all(sessionExercise.exercise_id);
+
+    const prResult = detectPersonalRecord(payload, previousHistoricalSets);
+    const isPr = prResult.is_pr ? 1 : 0;
+    const prType = prResult.pr_type || null;
+
     const nextSet = db.prepare(`
       SELECT COALESCE(MAX(set_number), 0) + 1 AS next_number
       FROM workout_session_sets WHERE session_exercise_id = ?
@@ -1292,8 +1307,9 @@ export function registerWorkoutRoutes(app, db) {
     db.prepare(`
       INSERT INTO workout_session_sets (
         id, session_id, session_exercise_id, set_number, weight_kg, reps,
-        duration_seconds, distance_m, band_level, set_role, rir, technical_quality, notes, completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        duration_seconds, distance_m, band_level, set_role, rir, technical_quality, notes, completed_at,
+        is_pr, pr_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       session.id,
@@ -1309,8 +1325,16 @@ export function registerWorkoutRoutes(app, db) {
       payload.technical_quality,
       payload.notes,
       new Date().toISOString(),
+      isPr,
+      prType,
     );
-    res.status(201).json(getSessionDetail(db, session.id));
+    const detail = getSessionDetail(db, session.id);
+    res.status(201).json({
+      ...detail,
+      last_logged_set_id: id,
+      is_pr: Boolean(isPr),
+      pr_type: prType,
+    });
   }));
 
   app.patch('/api/workouts/sets/:id', handle((req, res) => {
@@ -1333,10 +1357,24 @@ export function registerWorkoutRoutes(app, db) {
     if (!validateSetForTracking(existing.tracking_type, payload)) {
       return res.status(400).json({ error: 'Preencha o resultado principal desta série.' });
     }
+    const previousHistoricalSets = db.prepare(`
+      SELECT ss.id, ss.weight_kg, ss.reps, ss.duration_seconds, ss.distance_m, ss.set_role
+      FROM workout_session_sets ss
+      JOIN workout_session_exercises se ON se.id = ss.session_exercise_id
+      WHERE se.exercise_id = (SELECT exercise_id FROM workout_session_exercises WHERE id = ?)
+        AND ss.id != ?
+        AND (ss.set_role IS NULL OR ss.set_role != 'warmup')
+    `).all(existing.session_exercise_id, existing.id);
+
+    const prResult = detectPersonalRecord(payload, previousHistoricalSets);
+    const isPr = prResult.is_pr ? 1 : 0;
+    const prType = prResult.pr_type || null;
+
     db.prepare(`
       UPDATE workout_session_sets
       SET weight_kg = ?, reps = ?, duration_seconds = ?, distance_m = ?, band_level = ?,
-          set_role = ?, rir = ?, technical_quality = ?, notes = ?, updated_at = datetime('now')
+          set_role = ?, rir = ?, technical_quality = ?, notes = ?, is_pr = ?, pr_type = ?,
+          updated_at = datetime('now')
       WHERE id = ?
     `).run(
       payload.weight_kg,
@@ -1348,6 +1386,8 @@ export function registerWorkoutRoutes(app, db) {
       payload.rir,
       payload.technical_quality,
       payload.notes,
+      isPr,
+      prType,
       existing.id,
     );
     res.json(getSessionDetail(db, existing.session_id));

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import ExerciseMedia from '@/components/workouts/ExerciseMedia';
+import { useSessionWakeLock, formatPrToastDescription } from '@/lib/workoutV4';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -208,6 +209,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const [setForm, setSetForm] = useState(EMPTY_SET_FORM);
   const [showDetails, setShowDetails] = useState(false);
   const [restTimer, setRestTimer] = useState(() => loadRestTimer(sessionId));
+  const toastedPrSetIds = useRef(new Set());
 
   const { data: session, isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'session', sessionId],
@@ -215,6 +217,8 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     enabled: Boolean(sessionId),
     refetchOnWindowFocus: true,
   });
+
+  useSessionWakeLock(session?.status === 'active');
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -314,9 +318,23 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
       if (variables?.set_role !== 'warmup') {
         startRest(currentExercise?.rest_seconds, currentExercise?.id);
       }
-      const updatedExercise = updated.exercises.find((exercise) => exercise.id === currentExercise?.id);
+      const updatedExercise = updated.exercises?.find((exercise) => exercise.id === currentExercise?.id);
       setSetForm(initialSetForm(updatedExercise));
       setShowDetails(false);
+
+      // PR detection & toast (guarded once per set id)
+      const newSets = updatedExercise?.sets || [];
+      const loggedSet = newSets[newSets.length - 1];
+      if (
+        loggedSet &&
+        (loggedSet.is_pr === 1 || loggedSet.is_pr === true || (updated?.is_pr && updated?.last_logged_set_id === loggedSet.id))
+      ) {
+        if (!toastedPrSetIds.current.has(loggedSet.id)) {
+          toastedPrSetIds.current.add(loggedSet.id);
+          const description = formatPrToastDescription(loggedSet, currentExercise || updatedExercise);
+          toast.success('Novo PR!', { description });
+        }
+      }
     },
     onError: (mutationError) => toast.error('Não deu pra registrar a série', { description: mutationError?.message || 'Confere os campos e tenta de novo.' }),
   });
@@ -660,9 +678,14 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                        {(meta.warmup || extras.length || set.notes) ? (
+                        {(meta.warmup || extras.length || set.notes || set.is_pr) ? (
                           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-8 text-[11px] text-muted-foreground">
                             {meta.warmup ? <span className="font-medium uppercase tracking-wide text-muted-foreground/80">Aquecimento</span> : null}
+                            {!meta.warmup && (set.is_pr === 1 || set.is_pr === true) ? (
+                              <span className="rounded border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                                PR
+                              </span>
+                            ) : null}
                             {extras.map((chip) => <span key={chip} className="tabular-nums">{chip}</span>)}
                             {set.notes ? <span className="italic text-muted-foreground/80">“{set.notes}”</span> : null}
                           </div>

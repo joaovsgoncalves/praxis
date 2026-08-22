@@ -945,4 +945,157 @@ describe("Treinos V4 Fase 5 — Session exercise media enrichment", () => {
     assert.equal(session.exercises[0].thumb_path, "images/0001-2gPfomN.jpg");
     assert.equal(session.exercises[0].gif_path, "videos/0001-2gPfomN.gif");
   });
+
+  test("Treinos V4 Fase 6: personal record (PR) detection, warmup exclusion, and schema", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // 1. Schema check
+    const columns = db.prepare("PRAGMA table_info(workout_session_sets)").all();
+    const colNames = columns.map((c) => c.name);
+    assert.ok(colNames.includes("is_pr"), "workout_session_sets must include is_pr column");
+    assert.ok(colNames.includes("pr_type"), "workout_session_sets must include pr_type column");
+
+    // 2. Setup program, day, and exercise
+    const prExercise = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Supino Reto PR Test",
+        category: "strength",
+        tracking_type: "weight_reps",
+      },
+    });
+
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Programa PR Test" },
+    });
+
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Peito PR", day_type: "training" },
+    });
+    const trainingDay = program.days[0];
+
+    await request("/api/workouts/days/" + trainingDay.id + "/exercises", {
+      method: "POST",
+      body: {
+        exercise_id: prExercise.id,
+        target_sets: 4,
+        rep_min: 6,
+        rep_max: 10,
+      },
+    });
+
+    // 3. Start session
+    let session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: trainingDay.id },
+    });
+    assert.equal(session.status, "active");
+    const sessionExerciseId = session.exercises[0].id;
+
+    // Set 1 (Work): 50 kg x 8 reps -> Baseline (NOT PR)
+    let res1 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 50,
+        reps: 8,
+        set_role: "work",
+      },
+    });
+    assert.equal(res1.is_pr, false);
+    assert.equal(res1.exercises[0].sets[0].is_pr, 0);
+
+    // Set 2 (Work): 45 kg x 8 reps -> Weaker weight (NOT PR)
+    let res2 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 45,
+        reps: 8,
+        set_role: "work",
+      },
+    });
+    assert.equal(res2.is_pr, false);
+    assert.equal(res2.exercises[0].sets[1].is_pr, 0);
+
+    // Set 3 (Work): 60 kg x 6 reps -> Heavier weight (PR weight!)
+    let res3 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 60,
+        reps: 6,
+        set_role: "work",
+      },
+    });
+    assert.equal(res3.is_pr, true);
+    assert.equal(res3.pr_type, "weight");
+    assert.equal(res3.exercises[0].sets[2].is_pr, 1);
+    assert.equal(res3.exercises[0].sets[2].pr_type, "weight");
+
+    // Set 4 (Work): 60 kg x 10 reps -> Same weight, higher reps (PR reps!)
+    let res4 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 60,
+        reps: 10,
+        set_role: "work",
+      },
+    });
+    assert.equal(res4.is_pr, true);
+    assert.equal(res4.pr_type, "reps");
+    assert.equal(res4.exercises[0].sets[3].is_pr, 1);
+    assert.equal(res4.exercises[0].sets[3].pr_type, "reps");
+
+    // Set 5 (Warmup): 70 kg x 5 reps -> Warmup is NEVER PR
+    let res5 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 70,
+        reps: 5,
+        set_role: "warmup",
+      },
+    });
+    assert.equal(res5.is_pr, false);
+    assert.equal(res5.pr_type, null);
+    assert.equal(res5.exercises[0].sets[4].is_pr, 0);
+
+    // Set 6 (Work): 65 kg x 5 reps -> Work set heavier than previous work max (60kg), warmup 70kg ignored -> PR weight!
+    let res6 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 65,
+        reps: 5,
+        set_role: "work",
+      },
+    });
+    assert.equal(res6.is_pr, true);
+    assert.equal(res6.pr_type, "weight");
+    assert.equal(res6.exercises[0].sets[5].is_pr, 1);
+
+    // Set 7 (Work): 65 kg x 5 reps -> Same weight, same reps -> NOT PR
+    let res7 = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionExerciseId,
+        weight_kg: 65,
+        reps: 5,
+        set_role: "work",
+      },
+    });
+    assert.equal(res7.is_pr, false);
+    assert.equal(res7.exercises[0].sets[6].is_pr, 0);
+
+    // 4. Finish session successfully
+    session = await request("/api/workouts/sessions/" + session.id + "/finish", {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(session.status, "completed");
+  });
 });
