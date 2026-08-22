@@ -1,0 +1,269 @@
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+import {
+  MUSCLES as API_MUSCLES,
+  MUSCLE_LABEL_PT as API_MUSCLE_LABEL_PT,
+  aliasMuscle as apiAliasMuscle,
+  CDN_IMG_BASE as API_CDN_IMG_BASE,
+  CDN_GIF_BASE as API_CDN_GIF_BASE,
+  MEDIA_ATTRIBUTION as API_MEDIA_ATTRIBUTION,
+  thumbUrl as apiThumbUrl,
+  gifUrl as apiGifUrl,
+  isTreinosV4Enabled as apiIsTreinosV4Enabled,
+} from './lib/workoutV4Core.js';
+
+import {
+  MUSCLES as FRONT_MUSCLES,
+  MUSCLE_LABEL_PT as FRONT_MUSCLE_LABEL_PT,
+  aliasMuscle as frontAliasMuscle,
+  CDN_IMG_BASE as FRONT_CDN_IMG_BASE,
+  CDN_GIF_BASE as FRONT_CDN_GIF_BASE,
+  MEDIA_ATTRIBUTION as FRONT_MEDIA_ATTRIBUTION,
+  thumbUrl as frontThumbUrl,
+  gifUrl as frontGifUrl,
+  isTreinosV4Enabled as frontIsTreinosV4Enabled,
+} from '../src/lib/workoutV4/index.js';
+import { formatRestDuration } from '../src/lib/workouts.js';
+
+describe('workoutV4Core — muscles & vocabulary', () => {
+  test('exports exact 18 canonical muscles in head-to-toe order', () => {
+    const expected = [
+      'trapezius',
+      'deltoids',
+      'chest',
+      'upper-back',
+      'serratus',
+      'biceps',
+      'triceps',
+      'forearm',
+      'abs',
+      'obliques',
+      'lower-back',
+      'gluteal',
+      'quadriceps',
+      'hamstring',
+      'adductors',
+      'hip-flexors',
+      'calves',
+      'tibialis',
+    ];
+
+    assert.equal(API_MUSCLES.length, 18);
+    assert.deepEqual(API_MUSCLES, expected);
+    assert.deepEqual(FRONT_MUSCLES, expected);
+  });
+
+  test('every canonical muscle has a non-empty Portuguese label', () => {
+    for (const muscle of API_MUSCLES) {
+      const apiLabel = API_MUSCLE_LABEL_PT[muscle];
+      const frontLabel = FRONT_MUSCLE_LABEL_PT[muscle];
+      assert.equal(typeof apiLabel, 'string');
+      assert.ok(apiLabel.trim().length > 0, `Missing API label for ${muscle}`);
+      assert.equal(apiLabel, frontLabel);
+    }
+  });
+
+  test('aliasMuscle handles exact canonical IDs and case/trim variations', () => {
+    for (const aliasFn of [apiAliasMuscle, frontAliasMuscle]) {
+      assert.equal(aliasFn('chest'), 'chest');
+      assert.equal(aliasFn('CHEST'), 'chest');
+      assert.equal(aliasFn('  upper-back  '), 'upper-back');
+      assert.equal(aliasFn('upper_back'), 'upper-back');
+      assert.equal(aliasFn('upper back'), 'upper-back');
+    }
+  });
+
+  test('aliasMuscle maps all common dataset target/secondary muscle spellings', () => {
+    for (const aliasFn of [apiAliasMuscle, frontAliasMuscle]) {
+      // Chest & variations
+      assert.equal(aliasFn('pecs'), 'chest');
+      assert.equal(aliasFn('pectorals'), 'chest');
+      assert.equal(aliasFn('upper chest'), 'chest');
+
+      // Shoulders / Deltoids
+      assert.equal(aliasFn('delts'), 'deltoids');
+      assert.equal(aliasFn('shoulders'), 'deltoids');
+      assert.equal(aliasFn('rear deltoids'), 'deltoids');
+      assert.equal(aliasFn('rotator cuff'), 'deltoids');
+
+      // Back & Lats
+      assert.equal(aliasFn('lats'), 'upper-back');
+      assert.equal(aliasFn('latissimus dorsi'), 'upper-back');
+      assert.equal(aliasFn('rhomboids'), 'upper-back');
+      assert.equal(aliasFn('back'), 'upper-back');
+
+      // Traps & Neck
+      assert.equal(aliasFn('traps'), 'trapezius');
+      assert.equal(aliasFn('trapezius'), 'trapezius');
+      assert.equal(aliasFn('neck'), 'trapezius');
+      assert.equal(aliasFn('levator scapulae'), 'trapezius');
+      assert.equal(aliasFn('sternocleidomastoid'), 'trapezius');
+
+      // Serratus
+      assert.equal(aliasFn('serratus'), 'serratus');
+      assert.equal(aliasFn('serratus anterior'), 'serratus');
+
+      // Arms
+      assert.equal(aliasFn('biceps'), 'biceps');
+      assert.equal(aliasFn('brachialis'), 'biceps');
+      assert.equal(aliasFn('triceps'), 'triceps');
+      assert.equal(aliasFn('forearms'), 'forearm');
+      assert.equal(aliasFn('forearm'), 'forearm');
+      assert.equal(aliasFn('lower arms'), 'forearm');
+      assert.equal(aliasFn('wrists'), 'forearm');
+      assert.equal(aliasFn('wrist flexors'), 'forearm');
+      assert.equal(aliasFn('wrist extensors'), 'forearm');
+      assert.equal(aliasFn('grip muscles'), 'forearm');
+      assert.equal(aliasFn('hands'), 'forearm');
+
+      // Core / Abs / Obliques / Lower Back
+      assert.equal(aliasFn('abs'), 'abs');
+      assert.equal(aliasFn('abdominals'), 'abs');
+      assert.equal(aliasFn('core'), 'abs');
+      assert.equal(aliasFn('lower abs'), 'abs');
+      assert.equal(aliasFn('waist'), 'abs');
+      assert.equal(aliasFn('obliques'), 'obliques');
+      assert.equal(aliasFn('lower back'), 'lower-back');
+      assert.equal(aliasFn('spine'), 'lower-back');
+
+      // Lower body
+      assert.equal(aliasFn('glutes'), 'gluteal');
+      assert.equal(aliasFn('gluteal'), 'gluteal');
+      assert.equal(aliasFn('abductors'), 'gluteal');
+      assert.equal(aliasFn('quads'), 'quadriceps');
+      assert.equal(aliasFn('quadriceps'), 'quadriceps');
+      assert.equal(aliasFn('hamstrings'), 'hamstring');
+      assert.equal(aliasFn('hamstring'), 'hamstring');
+      assert.equal(aliasFn('adductors'), 'adductors');
+      assert.equal(aliasFn('groin'), 'adductors');
+      assert.equal(aliasFn('inner thighs'), 'adductors');
+      assert.equal(aliasFn('hip flexors'), 'hip-flexors');
+      assert.equal(aliasFn('hip-flexors'), 'hip-flexors');
+      assert.equal(aliasFn('calves'), 'calves');
+      assert.equal(aliasFn('soleus'), 'calves');
+      assert.equal(aliasFn('lower legs'), 'calves');
+      assert.equal(aliasFn('ankles'), 'calves');
+      assert.equal(aliasFn('ankle stabilizers'), 'calves');
+      assert.equal(aliasFn('feet'), 'calves');
+      assert.equal(aliasFn('tibialis'), 'tibialis');
+      assert.equal(aliasFn('shins'), 'tibialis');
+    }
+  });
+
+  test('aliasMuscle returns null for unknown or non-muscle terms', () => {
+    for (const aliasFn of [apiAliasMuscle, frontAliasMuscle]) {
+      assert.equal(aliasFn(null), null);
+      assert.equal(aliasFn(undefined), null);
+      assert.equal(aliasFn(''), null);
+      assert.equal(aliasFn('   '), null);
+      assert.equal(aliasFn('cardiovascular system'), null);
+      assert.equal(aliasFn('cardio'), null);
+      assert.equal(aliasFn('unknown_muscle_xyz'), null);
+    }
+  });
+});
+
+describe('workoutV4Core — media URLs & attribution', () => {
+  test('constants define jsDelivr CDN bases and Gym visual attribution', () => {
+    assert.equal(
+      API_CDN_IMG_BASE,
+      'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/',
+    );
+    assert.equal(
+      API_CDN_GIF_BASE,
+      'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/',
+    );
+    assert.equal(
+      API_MEDIA_ATTRIBUTION,
+      '© Gym visual — https://gymvisual.com/',
+    );
+
+    assert.equal(FRONT_CDN_IMG_BASE, API_CDN_IMG_BASE);
+    assert.equal(FRONT_CDN_GIF_BASE, API_CDN_GIF_BASE);
+    assert.equal(FRONT_MEDIA_ATTRIBUTION, API_MEDIA_ATTRIBUTION);
+  });
+
+  test('thumbUrl builds full CDN URL from exercise object or string path', () => {
+    for (const thumbFn of [apiThumbUrl, frontThumbUrl]) {
+      assert.equal(
+        thumbFn({ thumb_path: 'images/0001-2gPfomN.jpg' }),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/0001-2gPfomN.jpg',
+      );
+      assert.equal(
+        thumbFn({ image: 'images/0001-2gPfomN.jpg' }),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/0001-2gPfomN.jpg',
+      );
+      assert.equal(
+        thumbFn({ thumb_path: '0001-2gPfomN.jpg' }),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/0001-2gPfomN.jpg',
+      );
+      assert.equal(
+        thumbFn('images/0001-2gPfomN.jpg'),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/0001-2gPfomN.jpg',
+      );
+      assert.equal(
+        thumbFn('/images/0001-2gPfomN.jpg'),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/0001-2gPfomN.jpg',
+      );
+      assert.equal(
+        thumbFn('https://example.com/custom-thumb.jpg'),
+        'https://example.com/custom-thumb.jpg',
+      );
+      assert.equal(thumbFn(null), null);
+      assert.equal(thumbFn({}), null);
+      assert.equal(thumbFn(''), null);
+    }
+  });
+
+  test('gifUrl builds full CDN URL from exercise object or string path', () => {
+    for (const gifFn of [apiGifUrl, frontGifUrl]) {
+      assert.equal(
+        gifFn({ gif_path: 'videos/0001-2gPfomN.gif' }),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0001-2gPfomN.gif',
+      );
+      assert.equal(
+        gifFn({ gif_url: 'videos/0001-2gPfomN.gif' }),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0001-2gPfomN.gif',
+      );
+      assert.equal(
+        gifFn({ gif_path: '0001-2gPfomN.gif' }),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0001-2gPfomN.gif',
+      );
+      assert.equal(
+        gifFn('videos/0001-2gPfomN.gif'),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0001-2gPfomN.gif',
+      );
+      assert.equal(
+        gifFn('/videos/0001-2gPfomN.gif'),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/0001-2gPfomN.gif',
+      );
+      assert.equal(
+        gifFn('https://example.com/custom-video.gif'),
+        'https://example.com/custom-video.gif',
+      );
+      assert.equal(gifFn(null), null);
+      assert.equal(gifFn({}), null);
+      assert.equal(gifFn(''), null);
+    }
+  });
+});
+
+describe('workoutV4Core — feature flags & backward compatibility', () => {
+  test('isTreinosV4Enabled evaluates boolean and string flags correctly', () => {
+    assert.equal(apiIsTreinosV4Enabled({ VITE_TREINOS_V4: '1' }), true);
+    assert.equal(apiIsTreinosV4Enabled({ VITE_TREINOS_V4: 'true' }), true);
+    assert.equal(apiIsTreinosV4Enabled({ VITE_TREINOS_V4: true }), true);
+    assert.equal(apiIsTreinosV4Enabled({ VITE_TREINOS_V4: '0' }), false);
+    assert.equal(apiIsTreinosV4Enabled({ VITE_TREINOS_V4: 'false' }), false);
+    assert.equal(apiIsTreinosV4Enabled({ VITE_TREINOS_V4: false }), false);
+    assert.equal(apiIsTreinosV4Enabled({}), false);
+    assert.equal(apiIsTreinosV4Enabled(undefined), false);
+
+    // Front helper default unset is false
+    assert.equal(frontIsTreinosV4Enabled(), false);
+  });
+
+  test('src/lib/workouts.js preserves legacy workout helpers alongside V4 path', () => {
+    assert.equal(formatRestDuration(90), '1:30');
+  });
+});
