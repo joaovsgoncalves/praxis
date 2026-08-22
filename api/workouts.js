@@ -277,7 +277,7 @@ export function initWorkoutSchema(db) {
   try {
     const pending = db.prepare(`
       SELECT id, name FROM workout_exercises
-      WHERE source = 'catalog' AND (name_pt IS NULL OR trim(name_pt) = '')
+      WHERE source = 'catalog'
     `).all();
     if (pending.length) {
       const upd = db.prepare('UPDATE workout_exercises SET name_pt = ? WHERE id = ?');

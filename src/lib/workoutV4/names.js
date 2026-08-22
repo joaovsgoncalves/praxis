@@ -4,6 +4,14 @@
  */
 
 const PHRASES = [
+  ['barbell close-grip bench press', 'supino pegada fechada com barra'],
+  ['barbell decline bench press', 'supino declinado com barra'],
+  ['barbell incline bench press', 'supino inclinado com barra'],
+  ['barbell guillotine bench press', 'supino guilhotina com barra'],
+  ['dumbbell incline bench press', 'supino inclinado com halteres'],
+  ['dumbbell decline bench press', 'supino declinado com halteres'],
+  ['dumbbell close-grip bench press', 'supino pegada fechada com halteres'],
+  ['band bench press', 'supino com elástico'],
   ['barbell bench press', 'supino reto com barra'],
   ['dumbbell bench press', 'supino reto com halteres'],
   ['incline bench press', 'supino inclinado'],
