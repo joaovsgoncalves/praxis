@@ -38,7 +38,15 @@ export const workoutsApiModule = (request) => ({
       },
       get: (id) => request(`/api/workouts/sessions/${id}`),
       start: (data) =>
-        request('/api/workouts/sessions', { method: 'POST', body: JSON.stringify(data) }),
+        request('/api/workouts/sessions', {
+          method: 'POST',
+          body: JSON.stringify(typeof data === 'string' ? { workout_day_id: data } : (data || {})),
+        }),
+      addExercise: (sessionId, data) =>
+        request(`/api/workouts/sessions/${sessionId}/exercises`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
       save: (id, data) =>
         request(`/api/workouts/sessions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
       finish: (id, data = {}) =>

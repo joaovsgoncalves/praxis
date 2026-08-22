@@ -141,6 +141,7 @@ export function initWorkoutSchema(db) {
       target_rir_min INTEGER,
       target_rir_max INTEGER,
       notes TEXT DEFAULT '',
+      superset_group TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (workout_day_id) REFERENCES workout_days(id),
@@ -154,6 +155,7 @@ export function initWorkoutSchema(db) {
       program_name_snapshot TEXT DEFAULT '',
       workout_day_name_snapshot TEXT NOT NULL,
       status TEXT DEFAULT 'active',
+      kind TEXT DEFAULT 'program',
       started_at TEXT NOT NULL,
       completed_at TEXT,
       duration_seconds INTEGER,
@@ -181,6 +183,7 @@ export function initWorkoutSchema(db) {
       target_rir_min INTEGER,
       target_rir_max INTEGER,
       notes TEXT DEFAULT '',
+      superset_group TEXT,
       FOREIGN KEY (session_id) REFERENCES workout_sessions(id),
       FOREIGN KEY (workout_day_exercise_id) REFERENCES workout_day_exercises(id),
       FOREIGN KEY (exercise_id) REFERENCES workout_exercises(id)
@@ -252,6 +255,9 @@ export function initWorkoutSchema(db) {
     ['workout_exercises', 'instructions_json TEXT'],
     ['workout_exercises', 'equipment_key TEXT'],
     ['workout_exercises', 'is_bodyweight_default INTEGER DEFAULT 0'],
+    ['workout_day_exercises', 'superset_group TEXT'],
+    ['workout_session_exercises', 'superset_group TEXT'],
+    ['workout_sessions', "kind TEXT DEFAULT 'program'"],
   ];
   for (const [table, definition] of idempotentColumns) {
     try {
@@ -366,6 +372,7 @@ function exerciseRowsForDay(db, dayId) {
       wde.target_rir_min,
       wde.target_rir_max,
       wde.notes,
+      wde.superset_group,
       e.name AS exercise_name,
       e.category AS exercise_category,
       e.muscle_group AS muscle_group,
@@ -548,6 +555,7 @@ function normalizeDayExerciseBody(body = {}, existing = null) {
     target_rir_min: rirMin,
     target_rir_max: rirMax,
     notes: body.notes !== undefined ? text(body.notes) : existing?.notes || '',
+    superset_group: body.superset_group !== undefined ? (text(body.superset_group) || null) : (existing?.superset_group ?? null),
   };
 }
 
@@ -1233,8 +1241,8 @@ export function registerWorkoutRoutes(app, db) {
     db.prepare(`
       INSERT INTO workout_day_exercises (
         id, workout_day_id, exercise_id, position, target_sets, rep_min, rep_max,
-        target_duration_seconds, rest_seconds, purpose, target_rir_min, target_rir_max, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        target_duration_seconds, rest_seconds, purpose, target_rir_min, target_rir_max, notes, superset_group
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       day.id,
@@ -1249,6 +1257,7 @@ export function registerWorkoutRoutes(app, db) {
       config.target_rir_min,
       config.target_rir_max,
       config.notes,
+      config.superset_group,
     );
     res.status(201).json(getProgram(db, day.program_id));
   }));
@@ -1266,7 +1275,7 @@ export function registerWorkoutRoutes(app, db) {
     db.prepare(`
       UPDATE workout_day_exercises
       SET target_sets = ?, rep_min = ?, rep_max = ?, target_duration_seconds = ?, rest_seconds = ?,
-          purpose = ?, target_rir_min = ?, target_rir_max = ?, notes = ?, updated_at = datetime('now')
+          purpose = ?, target_rir_min = ?, target_rir_max = ?, notes = ?, superset_group = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       config.target_sets,
@@ -1278,6 +1287,7 @@ export function registerWorkoutRoutes(app, db) {
       config.target_rir_min,
       config.target_rir_max,
       config.notes,
+      config.superset_group,
       existing.id,
     );
     const day = db.prepare('SELECT * FROM workout_days WHERE id = ?').get(existing.workout_day_id);
@@ -1333,20 +1343,25 @@ export function registerWorkoutRoutes(app, db) {
   }));
 
   app.post('/api/workouts/sessions', handle((req, res) => {
-    const day = db.prepare(`
-      SELECT d.*, p.name AS program_name
-      FROM workout_days d
-      JOIN workout_programs p ON p.id = d.program_id
-      WHERE d.id = ?
-    `).get(req.body?.workout_day_id);
-    if (!day) return res.status(404).json({ error: 'Treino não encontrado.' });
-    if (day.day_type === 'rest') return res.status(400).json({ error: 'Esse é um dia de descanso.' });
+    const isFreestyle = req.body?.freestyle === true || req.body?.kind === 'freestyle' || (!req.body?.workout_day_id && req.body?.workout_day_id !== 0);
+
+    let day = null;
+    if (!isFreestyle) {
+      day = db.prepare(`
+        SELECT d.*, p.name AS program_name
+        FROM workout_days d
+        JOIN workout_programs p ON p.id = d.program_id
+        WHERE d.id = ?
+      `).get(req.body?.workout_day_id);
+      if (!day) return res.status(404).json({ error: 'Treino não encontrado.' });
+      if (day.day_type === 'rest') return res.status(400).json({ error: 'Esse é um dia de descanso.' });
+    }
 
     const existingActive = db.prepare(`
       SELECT * FROM workout_sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1
     `).get();
     if (existingActive) {
-      if (existingActive.workout_day_id === day.id) {
+      if (!isFreestyle && day && existingActive.workout_day_id === day.id) {
         return res.status(409).json({ error: 'Já existe um treino em andamento.', session: getSessionDetail(db, existingActive.id) });
       }
       const workSetsCount = db.prepare(`
@@ -1361,17 +1376,14 @@ export function registerWorkoutRoutes(app, db) {
       }
     }
 
-    const dayExercises = exerciseRowsForDay(db, day.id);
-    if (!dayExercises.length) return res.status(400).json({ error: 'Adicione pelo menos um exercício antes de começar.' });
-
     const sessionId = randomUUID();
     const startedAt = new Date().toISOString();
     const insertSessionExercise = db.prepare(`
       INSERT INTO workout_session_exercises (
         id, session_id, workout_day_exercise_id, exercise_id, exercise_name_snapshot,
         tracking_type, position, target_sets, rep_min, rep_max, target_duration_seconds,
-        rest_seconds, purpose, target_rir_min, target_rir_max, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        rest_seconds, purpose, target_rir_min, target_rir_max, notes, superset_group
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const tx = db.transaction(() => {
@@ -1388,36 +1400,188 @@ export function registerWorkoutRoutes(app, db) {
         `).run(completedAt, durationSeconds, existingActive.id);
       }
 
-      db.prepare(`
-        INSERT INTO workout_sessions (
-          id, workout_program_id, workout_day_id, program_name_snapshot,
-          workout_day_name_snapshot, status, started_at
-        ) VALUES (?, ?, ?, ?, ?, 'active', ?)
-      `).run(sessionId, day.program_id, day.id, day.program_name, day.name, startedAt);
+      if (isFreestyle) {
+        const sessionName = text(req.body?.name, 'Treino Livre');
+        db.prepare(`
+          INSERT INTO workout_sessions (
+            id, workout_program_id, workout_day_id, program_name_snapshot,
+            workout_day_name_snapshot, status, started_at, kind
+          ) VALUES (?, NULL, NULL, '', ?, 'active', ?, 'freestyle')
+        `).run(sessionId, sessionName, startedAt);
 
-      for (const item of dayExercises) {
-        insertSessionExercise.run(
-          randomUUID(),
-          sessionId,
-          item.id,
-          item.exercise_id,
-          item.exercise_name,
-          item.tracking_type,
-          item.position,
-          item.target_sets,
-          item.rep_min,
-          item.rep_max,
-          item.target_duration_seconds,
-          item.rest_seconds,
-          item.purpose ?? 'strength',
-          item.target_rir_min ?? null,
-          item.target_rir_max ?? null,
-          item.notes,
-        );
+        if (Array.isArray(req.body?.exercises)) {
+          req.body.exercises.forEach((item, index) => {
+            const exId = item.exercise_id || item.id;
+            const exObj = db.prepare('SELECT * FROM workout_exercises WHERE id = ?').get(exId);
+            if (exObj) {
+              insertSessionExercise.run(
+                randomUUID(),
+                sessionId,
+                null,
+                exObj.id,
+                exObj.name,
+                exObj.tracking_type || 'reps',
+                index,
+                intOrNull(item.target_sets, { min: 1, max: 20 }) ?? 3,
+                intOrNull(item.rep_min, { min: 0, max: 10000 }),
+                intOrNull(item.rep_max, { min: 0, max: 10000 }),
+                intOrNull(item.target_duration_seconds, { min: 1, max: 86400 }),
+                intOrNull(item.rest_seconds, { min: 0, max: 3600 }) ?? 90,
+                normalizePurpose(item.purpose, { purpose: 'strength' }),
+                intOrNull(item.target_rir_min, { min: 0, max: 10 }),
+                intOrNull(item.target_rir_max, { min: 0, max: 10 }),
+                text(item.notes),
+                text(item.superset_group) || null,
+              );
+            }
+          });
+        }
+      } else {
+        const dayExercises = exerciseRowsForDay(db, day.id);
+        if (!dayExercises.length) {
+          const err = new Error('Adicione pelo menos um exercício antes de começar.');
+          err.status = 400;
+          throw err;
+        }
+
+        db.prepare(`
+          INSERT INTO workout_sessions (
+            id, workout_program_id, workout_day_id, program_name_snapshot,
+            workout_day_name_snapshot, status, started_at, kind
+          ) VALUES (?, ?, ?, ?, ?, 'active', ?, 'program')
+        `).run(sessionId, day.program_id, day.id, day.program_name, day.name, startedAt);
+
+        for (const item of dayExercises) {
+          insertSessionExercise.run(
+            randomUUID(),
+            sessionId,
+            item.id,
+            item.exercise_id,
+            item.exercise_name,
+            item.tracking_type,
+            item.position,
+            item.target_sets,
+            item.rep_min,
+            item.rep_max,
+            item.target_duration_seconds,
+            item.rest_seconds,
+            item.purpose ?? 'strength',
+            item.target_rir_min ?? null,
+            item.target_rir_max ?? null,
+            item.notes,
+            item.superset_group ?? null,
+          );
+        }
       }
     });
-    tx();
+
+    try {
+      tx();
+    } catch (e) {
+      if (e?.status === 400) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+
     res.status(201).json(getSessionDetail(db, sessionId));
+  }));
+
+  app.post('/api/workouts/sessions/:id/exercises', handle((req, res) => {
+    const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Sessão não encontrada.' });
+    if (session.status !== 'active') return res.status(400).json({ error: 'Essa sessão já foi encerrada.' });
+
+    const exerciseId = req.body?.exercise_id || req.body?.id;
+    const exercise = db.prepare("SELECT * FROM workout_exercises WHERE id = ? AND status = 'active'").get(exerciseId);
+    if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
+
+    const posRow = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM workout_session_exercises WHERE session_id = ?').get(session.id);
+    const position = Number(posRow?.next_pos || 0);
+
+    const targetSets = intOrNull(req.body?.target_sets, { min: 1, max: 20 }) ?? 3;
+    let repMin = intOrNull(req.body?.rep_min, { min: 0, max: 10000 });
+    let repMax = intOrNull(req.body?.rep_max, { min: 0, max: 10000 });
+    if (repMin !== null && repMax !== null && repMax < repMin) {
+      [repMin, repMax] = [repMax, repMin];
+    }
+    let rirMin = intOrNull(req.body?.target_rir_min, { min: 0, max: 10 });
+    let rirMax = intOrNull(req.body?.target_rir_max, { min: 0, max: 10 });
+    if (rirMin !== null && rirMax !== null && rirMax < rirMin) {
+      [rirMin, rirMax] = [rirMax, rirMin];
+    }
+    const targetDuration = intOrNull(req.body?.target_duration_seconds, { min: 1, max: 86400 });
+    const restSeconds = intOrNull(req.body?.rest_seconds, { min: 0, max: 3600 }) ?? 90;
+    const purpose = normalizePurpose(req.body?.purpose, { purpose: 'strength' });
+    const supersetGroup = req.body?.superset_group !== undefined ? (text(req.body.superset_group) || null) : null;
+    const notes = text(req.body?.notes);
+
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO workout_session_exercises (
+        id, session_id, workout_day_exercise_id, exercise_id, exercise_name_snapshot,
+        tracking_type, position, target_sets, rep_min, rep_max, target_duration_seconds,
+        rest_seconds, purpose, target_rir_min, target_rir_max, notes, superset_group
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      session.id,
+      req.body?.workout_day_exercise_id || null,
+      exercise.id,
+      exercise.name,
+      exercise.tracking_type || 'reps',
+      position,
+      targetSets,
+      repMin,
+      repMax,
+      targetDuration,
+      restSeconds,
+      purpose,
+      rirMin,
+      rirMax,
+      notes,
+      supersetGroup,
+    );
+
+    res.status(201).json(getSessionDetail(db, session.id));
+  }));
+
+  app.patch('/api/workouts/session-exercises/:id', handle((req, res) => {
+    const existing = db.prepare('SELECT * FROM workout_session_exercises WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Exercício da sessão não encontrado.' });
+    const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(existing.session_id);
+    if (session?.status !== 'active') return res.status(400).json({ error: 'Essa sessão já foi encerrada.' });
+
+    const targetSets = req.body?.target_sets !== undefined
+      ? (intOrNull(req.body.target_sets, { min: 1, max: 20 }) ?? existing.target_sets)
+      : existing.target_sets;
+    const restSeconds = req.body?.rest_seconds !== undefined
+      ? (intOrNull(req.body.rest_seconds, { min: 0, max: 3600 }) ?? existing.rest_seconds)
+      : existing.rest_seconds;
+    const supersetGroup = req.body?.superset_group !== undefined
+      ? (text(req.body.superset_group) || null)
+      : existing.superset_group;
+    const notes = req.body?.notes !== undefined ? text(req.body.notes) : existing.notes;
+
+    db.prepare(`
+      UPDATE workout_session_exercises
+      SET target_sets = ?, rest_seconds = ?, superset_group = ?, notes = ?
+      WHERE id = ?
+    `).run(targetSets, restSeconds, supersetGroup, notes, existing.id);
+
+    res.json(getSessionDetail(db, existing.session_id));
+  }));
+
+  app.delete('/api/workouts/session-exercises/:id', handle((req, res) => {
+    const existing = db.prepare('SELECT * FROM workout_session_exercises WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Exercício da sessão não encontrado.' });
+    const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(existing.session_id);
+    if (session?.status !== 'active') return res.status(400).json({ error: 'Essa sessão já foi encerrada.' });
+
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM workout_session_sets WHERE session_exercise_id = ?').run(existing.id);
+      db.prepare('DELETE FROM workout_session_exercises WHERE id = ?').run(existing.id);
+    });
+    tx();
+    res.json(getSessionDetail(db, existing.session_id));
   }));
 
   app.get('/api/workouts/sessions/:id', handle((req, res) => {

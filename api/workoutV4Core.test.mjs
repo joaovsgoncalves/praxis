@@ -39,6 +39,9 @@ import {
   getHeatmapIntensityBin as apiGetHeatmapIntensityBin,
   formatHeatmapTooltip as apiFormatHeatmapTooltip,
   buildYearHeatmapGrid as apiBuildYearHeatmapGrid,
+  shouldSkipAutoRest as apiShouldSkipAutoRest,
+  isFreestyleSession as apiIsFreestyleSession,
+  getSupersetPairIndices as apiGetSupersetPairIndices,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -80,6 +83,9 @@ import {
   getHeatmapIntensityBin as frontGetHeatmapIntensityBin,
   formatHeatmapTooltip as frontFormatHeatmapTooltip,
   buildYearHeatmapGrid as frontBuildYearHeatmapGrid,
+  shouldSkipAutoRest as frontShouldSkipAutoRest,
+  isFreestyleSession as frontIsFreestyleSession,
+  getSupersetPairIndices as frontGetSupersetPairIndices,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -1663,6 +1669,89 @@ describe("workoutV4Core — Fase 11 Year Heatmap", () => {
       assert.ok(feb29, "Leap year must contain Feb 29");
       assert.equal(feb29.inYear, true);
       assert.equal(feb29.bin, 0);
+    }
+  });
+});
+
+describe("workoutV4Core — Fase 12 Superset & Freestyle helpers", () => {
+  test("shouldSkipAutoRest: skips auto rest when next exercise shares identical superset_group", () => {
+    for (const skipFn of [apiShouldSkipAutoRest, frontShouldSkipAutoRest]) {
+      const exercises = [
+        { id: "e1", exercise_name_snapshot: "Supino Reto", superset_group: "SS_A" },
+        { id: "e2", exercise_name_snapshot: "Remada Curvada", superset_group: "SS_A" },
+        { id: "e3", exercise_name_snapshot: "Desenvolvimento", superset_group: null },
+      ];
+
+      // e1 -> e2 has same group: skip rest
+      assert.equal(skipFn(exercises, 0), true);
+
+      // e2 -> e3 has different group (SS_A -> null): do NOT skip rest
+      assert.equal(skipFn(exercises, 1), false);
+
+      // e3 is last with no group: do NOT skip rest
+      assert.equal(skipFn(exercises, 2), false);
+    }
+  });
+
+  test("shouldSkipAutoRest: does NOT skip rest when next exercise has different superset_group", () => {
+    for (const skipFn of [apiShouldSkipAutoRest, frontShouldSkipAutoRest]) {
+      const exercises = [
+        { id: "e1", exercise_name_snapshot: "Rosca Direta", superset_group: "SS_1" },
+        { id: "e2", exercise_name_snapshot: "Tríceps Testa", superset_group: "SS_2" },
+      ];
+      assert.equal(skipFn(exercises, 0), false);
+      assert.equal(skipFn(exercises, 1), false);
+    }
+  });
+
+  test("shouldSkipAutoRest: does NOT skip rest when current exercise has null or empty superset_group", () => {
+    for (const skipFn of [apiShouldSkipAutoRest, frontShouldSkipAutoRest]) {
+      const exercises = [
+        { id: "e1", exercise_name_snapshot: "Agachamento", superset_group: null },
+        { id: "e2", exercise_name_snapshot: "Leg Press", superset_group: "" },
+        { id: "e3", exercise_name_snapshot: "Extensora", superset_group: "   " },
+      ];
+      assert.equal(skipFn(exercises, 0), false);
+      assert.equal(skipFn(exercises, 1), false);
+      assert.equal(skipFn(exercises, 2), false);
+    }
+  });
+
+  test("shouldSkipAutoRest: handles edge cases and invalid inputs gracefully", () => {
+    for (const skipFn of [apiShouldSkipAutoRest, frontShouldSkipAutoRest]) {
+      assert.equal(skipFn(null, 0), false);
+      assert.equal(skipFn([], 0), false);
+      assert.equal(skipFn([{ superset_group: "A" }], 0), false); // only 1 exercise, no next
+      assert.equal(skipFn([{ superset_group: "A" }, { superset_group: "A" }], -1), false);
+      assert.equal(skipFn([{ superset_group: "A" }, { superset_group: "A" }], 5), false);
+    }
+  });
+
+  test("isFreestyleSession: accurately detects freestyle sessions", () => {
+    for (const isFreeFn of [apiIsFreestyleSession, frontIsFreestyleSession]) {
+      assert.equal(isFreeFn({ kind: "freestyle", workout_program_id: null }), true);
+      assert.equal(isFreeFn({ kind: "freestyle", workout_program_id: "p1" }), true);
+      assert.equal(isFreeFn({ kind: null, workout_program_id: null, workout_day_id: null }), true);
+      assert.equal(isFreeFn({ kind: "program", workout_program_id: "p1", workout_day_id: "d1" }), false);
+      assert.equal(isFreeFn(null), false);
+    }
+  });
+
+  test("getSupersetPairIndices: returns matching indices for grouped exercises", () => {
+    for (const getIndicesFn of [apiGetSupersetPairIndices, frontGetSupersetPairIndices]) {
+      const exercises = [
+        { id: "e1", superset_group: "A" },
+        { id: "e2", superset_group: "A" },
+        { id: "e3", superset_group: "B" },
+        { id: "e4", superset_group: null },
+      ];
+
+      assert.deepEqual(getIndicesFn(exercises, 0), [0, 1]);
+      assert.deepEqual(getIndicesFn(exercises, 1), [0, 1]);
+      assert.deepEqual(getIndicesFn(exercises, 2), [2]);
+      assert.deepEqual(getIndicesFn(exercises, 3), [3]);
+      assert.deepEqual(getIndicesFn(exercises, -1), []);
+      assert.deepEqual(getIndicesFn(null, 0), []);
     }
   });
 });

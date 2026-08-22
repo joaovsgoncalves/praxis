@@ -22,6 +22,7 @@ function defaultsFor(exercise, initial) {
     target_rir_min: initial?.target_rir_min ?? '',
     target_rir_max: initial?.target_rir_max ?? '',
     notes: initial?.notes || '',
+    superset_group: initial?.superset_group ?? '',
   };
 }
 
@@ -58,6 +59,7 @@ export default function WorkoutExerciseConfigDialog({
       target_rir_min: form.target_rir_min !== '' ? Number(form.target_rir_min) : null,
       target_rir_max: form.target_rir_max !== '' ? Number(form.target_rir_max) : null,
       notes: form.notes.trim(),
+      superset_group: form.superset_group ? form.superset_group.trim() : (initial?.superset_group ?? null),
     });
   };
 

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import ExerciseMedia from '@/components/workouts/ExerciseMedia';
+import ExercisePickerDialog from '@/components/workouts/ExercisePickerDialog';
 import {
   useSessionWakeLock,
   formatPrToastDescription,
@@ -28,6 +29,7 @@ import {
   estimate1rm,
   bestEstimated1rm,
   format1rm,
+  shouldSkipAutoRest,
 } from '@/lib/workoutV4';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -190,6 +192,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [restTimer, setRestTimer] = useState(() => loadRestTimer(sessionId));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const toastedPrSetIds = useRef(new Set());
   const lastExerciseIdRef = useRef(null);
   const lastSetsCountRef = useRef(null);
@@ -327,13 +330,34 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     setRestTimer(next);
   };
 
+  const addSessionExercise = useMutation({
+    mutationFn: (payload) => praxisApi.workouts.sessions.addExercise(sessionId, payload),
+    onSuccess: (updated) => {
+      updateSessionCache(updated);
+      setPickerOpen(false);
+      if (updated?.exercises?.length) {
+        setCurrentIndex(updated.exercises.length - 1);
+      }
+      toast.success("Exercício adicionado");
+    },
+    onError: (mutationError) => toast.error("Não deu pra adicionar o exercício", { description: mutationError?.message }),
+  });
+
   const addSet = useMutation({
     mutationFn: (payload) => praxisApi.workouts.sessions.addSet(sessionId, payload),
     onSuccess: (updated, variables) => {
       updateSessionCache(updated);
       // Warmups don't trigger the rest timer — only working sets do.
       if (variables?.set_role !== 'warmup') {
-        startRest(currentExercise?.rest_seconds, currentExercise?.id);
+        const skipRest = shouldSkipAutoRest(updated.exercises || session.exercises, currentIndex);
+        if (skipRest) {
+          toast('Superset: direto pro próximo exercício', { duration: 2500 });
+          if (currentIndex < (updated.exercises?.length || session.exercises.length) - 1) {
+            goToExercise(currentIndex + 1);
+          }
+        } else {
+          startRest(currentExercise?.rest_seconds, currentExercise?.id);
+        }
       }
       const updatedExercise = updated.exercises?.find((exercise) => exercise.id === currentExercise?.id);
       if (updatedExercise) {
@@ -551,7 +575,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
         </Card>
       ) : null}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 praxis-hide-scrollbar praxis-scroll-x" aria-label="Exercícios da sessão">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 praxis-hide-scrollbar praxis-scroll-x" aria-label="Exercícios da sessão">
         {session.exercises.map((exercise, index) => {
           const done = workSetsOf(exercise).length >= Number(exercise.target_sets || 1);
           return (
@@ -567,11 +591,38 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
               )}
             >
               {done ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+              {exercise.superset_group ? <span className="text-[10px] font-semibold text-primary">SS</span> : null}
               {index + 1}. {exercise.exercise_name_snapshot}
             </button>
           );
         })}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 shrink-0 rounded-full border-dashed px-3 text-xs"
+          onClick={() => setPickerOpen(true)}
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" /> Exercício
+        </Button>
       </div>
+
+      {session.exercises.length === 0 ? (
+        <Card className="border-dashed border-border/80 bg-card/30">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Dumbbell className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-base font-semibold">Sessão livre iniciada</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Adiciona os exercícios que você vai executar hoje.
+            </p>
+            <Button type="button" className="mt-5 rounded-full" onClick={() => setPickerOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Adicionar primeiro exercício
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {currentExercise ? (
         <Card className="overflow-hidden border-border/80 bg-card/45 shadow-none">
@@ -579,10 +630,15 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
             <div className="border-b border-border/70 px-5 py-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
                       {currentIndex + 1} de {session.exercises.length}
                     </p>
+                    {currentExercise.superset_group ? (
+                      <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                        Superset
+                      </span>
+                    ) : null}
                     {purposeLabel ? (
                       <span className="rounded-full border border-border/70 bg-secondary/30 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                         {purposeLabel}
@@ -988,6 +1044,12 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
         <Clock3 className="h-3.5 w-3.5" />
         <span>O treino continua salvo mesmo se você fechar a Praxis.</span>
       </div>
+
+      <ExercisePickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={(exercise) => addSessionExercise.mutate({ exercise_id: exercise.id })}
+      />
     </div>
   );
 }

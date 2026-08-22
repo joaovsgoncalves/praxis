@@ -14,6 +14,8 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Link2,
+  Unlink,
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Button } from '@/components/ui/button';
@@ -205,6 +207,35 @@ export default function WorkoutProgramEditor({
     const copy = [...items];
     [copy[index], copy[nextIndex]] = [copy[nextIndex], copy[index]];
     return copy.map((item) => item.id);
+  };
+
+  const handlePairSuperset = async (index) => {
+    if (!selectedDay?.exercises || index >= selectedDay.exercises.length - 1) return;
+    const currentEx = selectedDay.exercises[index];
+    const nextEx = selectedDay.exercises[index + 1];
+    const groupId = "SS_" + Math.random().toString(36).slice(2, 8);
+    try {
+      await praxisApi.workouts.dayExercises.update(currentEx.id, { superset_group: groupId });
+      await praxisApi.workouts.dayExercises.update(nextEx.id, { superset_group: groupId });
+      refresh();
+      toast.success("Superset criado", { description: `${currentEx.exercise_name} + ${nextEx.exercise_name} agrupados em par.` });
+    } catch (err) {
+      toast.error("Não deu pra criar o superset", { description: err?.message });
+    }
+  };
+
+  const handleUnpairSuperset = async (group) => {
+    if (!selectedDay?.exercises || !group) return;
+    const paired = selectedDay.exercises.filter((ex) => ex.superset_group === group);
+    try {
+      for (const ex of paired) {
+        await praxisApi.workouts.dayExercises.update(ex.id, { superset_group: null });
+      }
+      refresh();
+      toast("Superset desfeito");
+    } catch (err) {
+      toast.error("Não deu pra desfazer o superset", { description: err?.message });
+    }
   };
 
   const confirmDeleteProgram = () => {
@@ -448,7 +479,14 @@ export default function WorkoutProgramEditor({
                         initial: exercise,
                       })}
                     >
-                      <p className="truncate text-sm font-semibold">{exercise.exercise_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold">{exercise.exercise_name}</p>
+                        {exercise.superset_group ? (
+                          <Badge variant="outline" className="h-5 shrink-0 border-primary/40 bg-primary/10 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                            Superset
+                          </Badge>
+                        ) : null}
+                      </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>{formatWorkoutTarget(exercise)}</span>
                         <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {formatSeconds(exercise.rest_seconds)} descanso</span>
@@ -498,6 +536,16 @@ export default function WorkoutProgramEditor({
                           })}>
                             <Pencil className="mr-2 h-4 w-4" /> Configurar
                           </DropdownMenuItem>
+                          {!exercise.superset_group && index < selectedDay.exercises.length - 1 ? (
+                            <DropdownMenuItem onClick={() => handlePairSuperset(index)}>
+                              <Link2 className="mr-2 h-4 w-4" /> Criar Superset com próximo
+                            </DropdownMenuItem>
+                          ) : null}
+                          {exercise.superset_group ? (
+                            <DropdownMenuItem onClick={() => handleUnpairSuperset(exercise.superset_group)}>
+                              <Unlink className="mr-2 h-4 w-4" /> Desfazer Superset
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => {

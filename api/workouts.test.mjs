@@ -1745,3 +1745,209 @@ describe("Treinos V4 Fase 11 — Heatmap ano API", () => {
     assert.deepEqual(emptyYear.days, []);
   });
 });
+
+describe("Treinos V4 Fase 12 — Superset & Freestyle session", () => {
+  let db;
+  let server;
+  let request;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+    request = (path, opts) => requestJson(server.base, path, opts);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("Schema columns exist for Fase 12 (superset_group on day and session exercises, kind on sessions)", () => {
+    const dayExCols = db.prepare("PRAGMA table_info(workout_day_exercises)").all().map((c) => c.name);
+    assert.ok(dayExCols.includes("superset_group"), "workout_day_exercises must include superset_group");
+
+    const sessionExCols = db.prepare("PRAGMA table_info(workout_session_exercises)").all().map((c) => c.name);
+    assert.ok(sessionExCols.includes("superset_group"), "workout_session_exercises must include superset_group");
+
+    const sessionCols = db.prepare("PRAGMA table_info(workout_sessions)").all().map((c) => c.name);
+    assert.ok(sessionCols.includes("kind"), "workout_sessions must include kind");
+  });
+
+  test("Superset pair on program day: create pair, start session, verify superset_group copied", async () => {
+    // 1. Create program + day
+    const program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Superset Test Program" },
+    });
+    const day = (await request(`/api/workouts/programs/${program.id}/days`, {
+      method: "POST",
+      body: { name: "Upper SS", day_type: "training" },
+    })).days[0];
+
+    // 2. Create 2 exercises
+    const ex1 = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Rosca Biceps SS", category: "strength", tracking_type: "reps" },
+    });
+    const ex2 = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Triceps Corda SS", category: "strength", tracking_type: "reps" },
+    });
+
+    // 3. Add both to day with superset_group
+    const groupId = "SS_ARM_1";
+    let updatedProgram = await request(`/api/workouts/days/${day.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: ex1.id, target_sets: 3, superset_group: groupId },
+    });
+    updatedProgram = await request(`/api/workouts/days/${day.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: ex2.id, target_sets: 3 },
+    });
+
+    const dayEx1 = updatedProgram.days[0].exercises[0];
+    const dayEx2 = updatedProgram.days[0].exercises[1];
+    assert.equal(dayEx1.superset_group, groupId);
+    assert.equal(dayEx2.superset_group, null);
+
+    // Update second exercise to join the superset pair
+    updatedProgram = await request(`/api/workouts/day-exercises/${dayEx2.id}`, {
+      method: "PATCH",
+      body: { superset_group: groupId },
+    });
+    assert.equal(updatedProgram.days[0].exercises[1].superset_group, groupId);
+
+    // 4. Start session from day
+    const session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: day.id },
+    });
+    assert.equal(session.status, "active");
+    assert.equal(session.kind, "program");
+    assert.equal(session.exercises.length, 2);
+    assert.equal(session.exercises[0].superset_group, groupId);
+    assert.equal(session.exercises[1].superset_group, groupId);
+
+    // Abandon session for clean state
+    await request(`/api/workouts/sessions/${session.id}/abandon`, { method: "POST", body: {} });
+  });
+
+  test("Freestyle session: start without workout_day_id, add exercises ad-hoc, log set, and finish", async () => {
+    // 1. Start freestyle session
+    const freestyle = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Treino Livre de Sabado" },
+    });
+    assert.equal(freestyle.status, "active");
+    assert.equal(freestyle.kind, "freestyle");
+    assert.equal(freestyle.workout_day_name_snapshot, "Treino Livre de Sabado");
+    assert.equal(freestyle.exercises.length, 0);
+
+    // 2. Create catalog/custom exercise to add
+    const ex = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Elevacao Lateral Freestyle", category: "strength", tracking_type: "weight_reps" },
+    });
+
+    // 3. Add exercise ad-hoc to active freestyle session
+    const withEx = await request(`/api/workouts/sessions/${freestyle.id}/exercises`, {
+      method: "POST",
+      body: {
+        exercise_id: ex.id,
+        target_sets: 4,
+        rep_min: 12,
+        rep_max: 15,
+        rest_seconds: 60,
+      },
+    });
+    assert.equal(withEx.exercises.length, 1);
+    assert.equal(withEx.exercises[0].exercise_name_snapshot, "Elevacao Lateral Freestyle");
+    assert.equal(withEx.exercises[0].target_sets, 4);
+    assert.equal(withEx.exercises[0].rep_min, 12);
+    assert.equal(withEx.exercises[0].rest_seconds, 60);
+
+    // 4. Update session exercise (PATCH /api/workouts/session-exercises/:id)
+    const seId = withEx.exercises[0].id;
+    const patched = await request(`/api/workouts/session-exercises/${seId}`, {
+      method: "PATCH",
+      body: { rest_seconds: 45, superset_group: "SS_FREE" },
+    });
+    assert.equal(patched.exercises[0].rest_seconds, 45);
+    assert.equal(patched.exercises[0].superset_group, "SS_FREE");
+
+    // 5. Log a work set in the freestyle session
+    const withSet = await request(`/api/workouts/sessions/${freestyle.id}/sets`, {
+      method: "POST",
+      body: {
+        session_exercise_id: seId,
+        weight_kg: 14,
+        reps: 12,
+        set_role: "work",
+      },
+    });
+    assert.equal(withSet.exercises[0].sets.length, 1);
+    assert.equal(withSet.exercises[0].sets[0].weight_kg, 14);
+
+    // 6. Finish freestyle session
+    const finished = await request(`/api/workouts/sessions/${freestyle.id}/finish`, {
+      method: "POST",
+      body: { notes: "Treino rapido muito bom" },
+    });
+    assert.equal(finished.status, "completed");
+    assert.equal(finished.kind, "freestyle");
+    assert.equal(finished.notes, "Treino rapido muito bom");
+  });
+
+  test("Freestyle session creation with freestyle=true flag and collision handling", async () => {
+    // 1. Start freestyle session via { freestyle: true }
+    const s1 = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { freestyle: true },
+    });
+    assert.equal(s1.status, "active");
+    assert.equal(s1.kind, "freestyle");
+    assert.equal(s1.workout_day_name_snapshot, "Treino Livre");
+
+    // 2. Starting another session when previous active session has 0 work sets auto-abandons it
+    const s2 = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Outro Treino Livre" },
+    });
+    assert.equal(s2.status, "active");
+    assert.equal(s2.id !== s1.id, true);
+
+    const prevAbandoned = await request(`/api/workouts/sessions/${s1.id}`);
+    assert.equal(prevAbandoned.status, "abandoned");
+
+    // Clean up
+    await request(`/api/workouts/sessions/${s2.id}/abandon`, { method: "POST", body: {} });
+  });
+
+  test("Session exercise deletion removes exercise and its sets from active session", async () => {
+    const session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle" },
+    });
+    const ex = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Excluir Ex Test", category: "strength", tracking_type: "reps" },
+    });
+    const withEx = await request(`/api/workouts/sessions/${session.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: ex.id },
+    });
+    const seId = withEx.exercises[0].id;
+
+    // Delete session exercise
+    const afterDelete = await request(`/api/workouts/session-exercises/${seId}`, {
+      method: "DELETE",
+    });
+    assert.equal(afterDelete.exercises.length, 0);
+
+    // Abandon session
+    await request(`/api/workouts/sessions/${session.id}/abandon`, { method: "POST", body: {} });
+  });
+});

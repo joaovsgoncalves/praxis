@@ -203,6 +203,7 @@ export default function Treinos() {
                   onAdvanceRest={() => advanceRest.mutate({ programId: program.id, dayId: currentDay.id })}
                   advancingRest={advanceRest.isPending}
                   onOpenProgram={() => setTab('programa')}
+                  onStartFreestyle={() => startSession.mutate({ kind: 'freestyle', name: 'Treino Livre' })}
                 />
               ) : (
                 <>
@@ -211,9 +212,14 @@ export default function Treinos() {
                     title="Monta teu primeiro programa"
                     description="Cria o ciclo, adiciona os dias e define exercícios, séries, repetições e descanso."
                     action={(
-                      <Button type="button" className="rounded-full" onClick={() => setProgramDialogOpen(true)}>
-                        <Plus className="mr-1.5 h-4 w-4" /> Criar programa
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button type="button" className="rounded-full" onClick={() => setProgramDialogOpen(true)}>
+                          <Plus className="mr-1.5 h-4 w-4" /> Criar programa
+                        </Button>
+                        <Button type="button" variant="outline" className="rounded-full" onClick={() => startSession.mutate({ kind: 'freestyle', name: 'Treino Livre' })} disabled={startSession.isPending}>
+                          <Play className="mr-1.5 h-4 w-4 fill-current" /> Treino livre
+                        </Button>
+                      </div>
                     )}
                   />
                   <WorkoutProgramDialog
@@ -291,6 +297,7 @@ function TodayWorkout({
   onAdvanceRest,
   advancingRest,
   onOpenProgram,
+  onStartFreestyle,
 }) {
   if (!currentDay) {
     return (
@@ -347,20 +354,40 @@ function TodayWorkout({
               </Button>
             ) : currentDay.exercises?.length ? (
               !isSessionActiveForCurrentDay ? (
-                <Button
-                  type="button"
-                  className="mt-5 h-12 w-full rounded-xl text-base"
-                  onClick={() => onStart(currentDay.id)}
-                  disabled={starting}
-                >
-                  <Play className="mr-2 h-5 w-5 fill-current" />
-                  {starting ? 'Começando...' : 'Começar treino'}
-                </Button>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    className="h-12 flex-1 rounded-xl text-base"
+                    onClick={() => onStart(currentDay.id)}
+                    disabled={starting}
+                  >
+                    <Play className="mr-2 h-5 w-5 fill-current" />
+                    {starting ? 'Começando...' : 'Começar treino'}
+                  </Button>
+                  {onStartFreestyle ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 rounded-xl text-sm"
+                      onClick={onStartFreestyle}
+                      disabled={starting}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Treino livre
+                    </Button>
+                  ) : null}
+                </div>
               ) : null
             ) : (
-              <Button type="button" variant="outline" className="mt-5 h-12 w-full rounded-xl" onClick={onOpenProgram}>
-                <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
-              </Button>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                <Button type="button" variant="outline" className="h-12 flex-1 rounded-xl" onClick={onOpenProgram}>
+                  <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
+                </Button>
+                {onStartFreestyle ? (
+                  <Button type="button" variant="secondary" className="h-12 rounded-xl text-sm" onClick={onStartFreestyle} disabled={starting}>
+                    <Play className="mr-2 h-4 w-4 fill-current" /> Treino livre
+                  </Button>
+                ) : null}
+              </div>
             )}
           </div>
 

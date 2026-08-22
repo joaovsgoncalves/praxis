@@ -1431,3 +1431,45 @@ export function buildYearHeatmapGrid(year, daysData = [], options = {}) {
     maxWorkSetsInDay,
   };
 }
+
+// ==========================================
+// Treinos V4 Fase 12 — Superset & Freestyle Helpers
+// ==========================================
+
+export function shouldSkipAutoRest(exercises = [], currentIndex = 0) {
+  if (!Array.isArray(exercises) || currentIndex < 0 || currentIndex >= exercises.length - 1) {
+    return false;
+  }
+  const currentGroup = exercises[currentIndex]?.superset_group;
+  if (!currentGroup || typeof currentGroup !== "string" || !currentGroup.trim()) {
+    return false;
+  }
+  const nextGroup = exercises[currentIndex + 1]?.superset_group;
+  if (!nextGroup || typeof nextGroup !== "string" || !nextGroup.trim()) {
+    return false;
+  }
+  return currentGroup.trim() === nextGroup.trim();
+}
+
+export function isFreestyleSession(session) {
+  if (!session) return false;
+  if (session.kind === "freestyle") return true;
+  return !session.workout_program_id && !session.workout_day_id;
+}
+
+export function getSupersetPairIndices(exercises = [], targetIndex = 0) {
+  if (!Array.isArray(exercises) || targetIndex < 0 || targetIndex >= exercises.length) {
+    return [];
+  }
+  const targetGroup = exercises[targetIndex]?.superset_group;
+  if (!targetGroup || typeof targetGroup !== "string" || !targetGroup.trim()) {
+    return [targetIndex];
+  }
+  const indices = [];
+  exercises.forEach((ex, idx) => {
+    if (ex?.superset_group && String(ex.superset_group).trim() === targetGroup.trim()) {
+      indices.push(idx);
+    }
+  });
+  return indices;
+}
