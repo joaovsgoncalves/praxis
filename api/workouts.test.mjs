@@ -1951,3 +1951,158 @@ describe("Treinos V4 Fase 12 — Superset & Freestyle session", () => {
     await request(`/api/workouts/sessions/${session.id}/abandon`, { method: "POST", body: {} });
   });
 });
+
+describe("Treinos V4 Fase 13 — Agent Read API (agent-snapshot)", () => {
+  let db;
+  let server;
+  let request;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+    request = (p, opts) => requestJson(server.base, p, opts);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("GET /api/workouts/agent-snapshot returns 200 with clean default shape on empty database", async () => {
+    const snapshot = await request("/api/workouts/agent-snapshot");
+
+    assert.ok(snapshot, "Snapshot should return an object");
+    assert.equal(typeof snapshot.generated_at, "string");
+    assert.ok(Number.isFinite(Date.parse(snapshot.generated_at)), "generated_at must be valid ISO timestamp");
+    assert.equal(snapshot.active_session, null);
+    assert.deepEqual(snapshot.last_sessions, []);
+    assert.equal(typeof snapshot.notes, "string");
+    assert.equal(snapshot.notes, "");
+
+    // Muscle map balance
+    assert.ok(snapshot.muscle_map_balance);
+    assert.equal(snapshot.muscle_map_balance.mode, "balance");
+    assert.equal(snapshot.muscle_map_balance.days, 14);
+    assert.equal(Array.isArray(snapshot.muscle_map_balance.muscles), true);
+    assert.equal(snapshot.muscle_map_balance.muscles.length, 18);
+    assert.ok(snapshot.muscle_map_balance.window?.from);
+    assert.ok(snapshot.muscle_map_balance.window?.to);
+    assert.ok(snapshot.muscle_map_balance.ranked);
+  });
+
+  test("GET /api/workouts/agent-snapshot populates active_session, max 5 last_sessions, muscle_map_balance, and notes", async () => {
+    // 1. Create program + day + exercises
+    const program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Agent Test Program" },
+    });
+    const day = (await request(`/api/workouts/programs/${program.id}/days`, {
+      method: "POST",
+      body: { name: "Dia Agente", day_type: "training" },
+    })).days[0];
+
+    const benchEx = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Supino Agente", category: "strength", tracking_type: "weight_reps", target_muscle: "chest" },
+    });
+
+    await request(`/api/workouts/days/${day.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: benchEx.id, target_sets: 3 },
+    });
+
+    // 2. Insert 7 completed sessions to test the max 5 limit and notes
+    for (let i = 1; i <= 7; i++) {
+      const sessId = `session-agent-${i}`;
+      const dateStr = `2026-08-${String(10 + i).padStart(2, "0")}T10:00:00.000Z`;
+      const noteText = i === 7 ? "Último treino concluído com sucesso" : `Treino dia ${i}`;
+      db.prepare(`
+        INSERT INTO workout_sessions (
+          id, workout_program_id, workout_day_id, program_name_snapshot,
+          workout_day_name_snapshot, status, started_at, completed_at, duration_seconds, notes
+        ) VALUES (?, ?, ?, ?, ?, 'completed', ?, ?, 2400, ?)
+      `).run(sessId, program.id, day.id, program.name, day.name, dateStr, dateStr, noteText);
+
+      const seId = `se-agent-${i}`;
+      db.prepare(`
+        INSERT INTO workout_session_exercises (
+          id, session_id, exercise_id, exercise_name_snapshot, tracking_type, position
+        ) VALUES (?, ?, ?, 'Supino Agente', 'weight_reps', 0)
+      `).run(seId, sessId, benchEx.id);
+
+      db.prepare(`
+        INSERT INTO workout_session_sets (
+          id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+        ) VALUES (?, ?, ?, 1, 80, 8, 'work', ?)
+      `).run(`set-agent-${i}`, sessId, seId, dateStr);
+    }
+
+    // 3. Start an active session with a note
+    const active = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Treino Em Andamento" },
+    });
+    await request(`/api/workouts/sessions/${active.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: benchEx.id, notes: "Sentindo ombro leve" },
+    });
+    // Set notes on active session
+    db.prepare("UPDATE workout_sessions SET notes = ? WHERE id = ?").run("Foco em peitoral hoje", active.id);
+
+    // 4. Query snapshot with ?days=7
+    const snapshot7 = await request("/api/workouts/agent-snapshot?days=7");
+
+    assert.ok(snapshot7);
+    assert.equal(typeof snapshot7.generated_at, "string");
+
+    // Active session details
+    assert.ok(snapshot7.active_session);
+    assert.equal(snapshot7.active_session.id, active.id);
+    assert.equal(snapshot7.active_session.status, "active");
+    assert.equal(snapshot7.active_session.notes, "Foco em peitoral hoje");
+    assert.equal(snapshot7.active_session.exercises.length, 1);
+
+    // last_sessions must cap at exactly 5
+    assert.equal(snapshot7.last_sessions.length, 5);
+    assert.equal(snapshot7.last_sessions[0].id, "session-agent-7");
+    assert.equal(snapshot7.last_sessions[0].status, "completed");
+    assert.equal(snapshot7.last_sessions[0].completed_work_sets, 1);
+    assert.equal(snapshot7.last_sessions[4].id, "session-agent-3");
+
+    // muscle_map_balance with custom days=7
+    assert.equal(snapshot7.muscle_map_balance.mode, "balance");
+    assert.equal(snapshot7.muscle_map_balance.days, 7);
+    assert.equal(snapshot7.muscle_map_balance.muscles.length, 18);
+    const chestMuscle = snapshot7.muscle_map_balance.muscles.find((m) => m.id === "chest");
+    assert.ok(chestMuscle);
+
+    // Notes at top-level reflects active session
+    assert.equal(snapshot7.notes, "Foco em peitoral hoje");
+
+    // 5. Abandon active session and verify notes fallback to latest completed session
+    await request(`/api/workouts/sessions/${active.id}/abandon`, { method: "POST", body: {} });
+
+    const snapshotAfterAbandon = await request("/api/workouts/agent-snapshot");
+    assert.equal(snapshotAfterAbandon.active_session, null);
+    assert.equal(snapshotAfterAbandon.last_sessions.length, 5);
+    assert.equal(snapshotAfterAbandon.notes, "Último treino concluído com sucesso");
+    assert.equal(snapshotAfterAbandon.muscle_map_balance.days, 14); // default 14
+  });
+
+  test("GET /api/workouts/agent-snapshot is strictly read-only and does not mutate tables", async () => {
+    const countSessionsBefore = db.prepare("SELECT COUNT(*) AS c FROM workout_sessions").get().c;
+    const countSetsBefore = db.prepare("SELECT COUNT(*) AS c FROM workout_session_sets").get().c;
+
+    await request("/api/workouts/agent-snapshot");
+    await request("/api/workouts/agent-snapshot?days=30");
+
+    const countSessionsAfter = db.prepare("SELECT COUNT(*) AS c FROM workout_sessions").get().c;
+    const countSetsAfter = db.prepare("SELECT COUNT(*) AS c FROM workout_session_sets").get().c;
+
+    assert.equal(countSessionsBefore, countSessionsAfter);
+    assert.equal(countSetsBefore, countSetsAfter);
+  });
+});

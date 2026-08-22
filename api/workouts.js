@@ -682,6 +682,66 @@ export function registerWorkoutRoutes(app, db) {
   };
 
   
+  app.get('/api/workouts/agent-snapshot', handle((req, res) => {
+    const days = intOrNull(req.query?.days, { min: 1, max: 365 }) || 14;
+    const now = new Date();
+
+    const active = db.prepare(`
+      SELECT id FROM workout_sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1
+    `).get();
+    const activeSession = active ? getSessionDetail(db, active.id) : null;
+
+    const lastSessions = db.prepare(`
+      SELECT
+        s.*,
+        (SELECT COUNT(*) FROM workout_session_exercises se WHERE se.session_id = s.id) AS exercise_count,
+        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id) AS completed_sets,
+        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id AND (ss.set_role IS NULL OR ss.set_role != 'warmup')) AS completed_work_sets,
+        (SELECT COUNT(*) FROM workout_session_sets ss WHERE ss.session_id = s.id AND ss.set_role = 'warmup') AS completed_warmup_sets
+      FROM workout_sessions s
+      WHERE s.status = 'completed'
+      ORDER BY s.started_at DESC
+      LIMIT 5
+    `).all();
+
+    const rows = db.prepare(`
+      SELECT
+        ss.id,
+        ss.set_role,
+        ss.completed_at,
+        ss.weight_kg,
+        ss.reps,
+        s.id AS session_id,
+        s.status AS session_status,
+        s.started_at AS session_started_at,
+        s.completed_at AS session_completed_at,
+        se.exercise_id,
+        se.exercise_name_snapshot,
+        e.target_muscle,
+        e.muscle_group,
+        e.body_part,
+        e.secondary_muscles_json
+      FROM workout_session_sets ss
+      JOIN workout_session_exercises se ON se.id = ss.session_exercise_id
+      JOIN workout_sessions s ON s.id = ss.session_id
+      LEFT JOIN workout_exercises e ON e.id = se.exercise_id
+      WHERE s.status = 'completed'
+        AND (ss.set_role IS NULL OR ss.set_role != 'warmup')
+      ORDER BY COALESCE(s.completed_at, s.started_at, ss.completed_at) ASC
+    `).all();
+
+    const muscleMapBalance = computeBalanceMap(rows, { days, now, mode: 'balance' });
+    const notes = activeSession?.notes || (lastSessions.length > 0 ? (lastSessions[0].notes || '') : '');
+
+    res.json({
+      generated_at: now.toISOString(),
+      active_session: activeSession,
+      last_sessions: lastSessions,
+      muscle_map_balance: muscleMapBalance,
+      notes: text(notes),
+    });
+  }));
+
   app.get('/api/workouts/heatmap', handle((req, res) => {
     let yearNum;
     if (req.query?.year !== undefined && req.query?.year !== '') {
