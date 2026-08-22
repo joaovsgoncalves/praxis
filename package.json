@@ -22,7 +22,9 @@
     "ship:api": "bash scripts/ship-praxis-api.sh",
     "check:api-drift": "bash scripts/check-api-drift.sh",
     "prepush:check": "npm run lint && npm run build",
-    "deploy:prod": "bash scripts/deploy-praxis-front.sh"
+    "deploy:prod": "bash scripts/deploy-praxis-front.sh",
+    "seed:exercise-catalog": "node scripts/seed-exercise-catalog.mjs",
+    "seed:exercise-catalog:apply": "node scripts/seed-exercise-catalog.mjs --apply"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

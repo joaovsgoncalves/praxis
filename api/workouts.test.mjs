@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import { seedExerciseCatalog } from "../scripts/seed-exercise-catalog.mjs";
 import Database from 'better-sqlite3';
 import { formatRestDuration, formatSessionElapsed } from "../src/lib/workouts.js";
 import assert from 'node:assert/strict';
@@ -575,5 +577,93 @@ describe('Treinos V4 Fase 1 schema and catalog exercise migration', () => {
     assert.equal(patched.catalog_external_id, '0001');
     assert.equal(patched.source, 'catalog');
     assert.equal(patched.is_custom, 0);
+  });
+});
+
+describe("Treinos V4 Fase 2 exercise catalog seed", () => {
+  let db;
+  let server;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("seeding catalog exercises preserves existing custom exercises and enables program linking", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // 1. Create a custom user exercise
+    const customEx = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Tríceps Banco Customizado",
+        category: "calisthenics",
+        tracking_type: "reps",
+        muscle_group: "tríceps",
+      },
+    });
+    assert.equal(customEx.is_custom, 1);
+    assert.equal(customEx.source, "custom");
+
+    // 2. Load fixture and apply seed
+    const fixtureData = JSON.parse(
+      fs.readFileSync(new URL("./test-support/fixtures/catalog-sample.json", import.meta.url), "utf8"),
+    );
+    const seedResult = seedExerciseCatalog({
+      db,
+      dataset: fixtureData,
+      apply: true,
+      dryRun: false,
+    });
+
+    assert.equal(seedResult.inserted, 3);
+    assert.equal(seedResult.customPreserved, 1);
+    assert.equal(seedResult.totalInDb, 4);
+
+    // 3. Custom exercise remains untouched and can be retrieved
+    const exercises = await request("/api/workouts/exercises?limit=100");
+    assert.equal(exercises.length, 4);
+    const foundCustom = exercises.find((e) => e.id === customEx.id);
+    assert.ok(foundCustom);
+    assert.equal(foundCustom.is_custom, 1);
+    assert.equal(foundCustom.source, "custom");
+
+    // 4. Catalog exercises are queryable and can be added to a program day
+    const catalogBench = exercises.find((e) => e.catalog_external_id === "1316");
+    assert.ok(catalogBench);
+    assert.equal(catalogBench.is_custom, 0);
+    assert.equal(catalogBench.source, "catalog");
+
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Programa V4 Catálogo" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Treino A", day_type: "training" },
+    });
+    const day = program.days[0];
+
+    program = await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: {
+        exercise_id: catalogBench.id,
+        target_sets: 4,
+        rep_min: 6,
+        rep_max: 8,
+        rest_seconds: 120,
+      },
+    });
+    assert.equal(program.days[0].exercises.length, 1);
+    assert.equal(program.days[0].exercises[0].exercise_id, catalogBench.id);
+    assert.equal(program.days[0].exercises[0].exercise_name, "barbell bent arm pullover");
   });
 });
