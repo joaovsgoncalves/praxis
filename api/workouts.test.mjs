@@ -1,8 +1,9 @@
+import Database from 'better-sqlite3';
 import { formatRestDuration, formatSessionElapsed } from "../src/lib/workouts.js";
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import express from 'express';
-import { registerWorkoutRoutes } from './workouts.js';
+import { registerWorkoutRoutes, initWorkoutSchema } from './workouts.js';
 import { createTestDb, startTestServer, requestJson } from './test-support/helpers.mjs';
 
 describe('workout routes', () => {
@@ -379,5 +380,200 @@ describe("workout format helpers", () => {
     assert.equal(formatSessionElapsed(3600), "1h");
     assert.equal(formatSessionElapsed(4500), "1h 15min");
     assert.equal(formatSessionElapsed(95063), "26h");
+  });
+});
+
+
+describe('Treinos V4 Fase 1 schema and catalog exercise migration', () => {
+  let db;
+  let server;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test('PRAGMA table_info(workout_exercises) includes all catalog columns and indexes exist', () => {
+    const columns = db.prepare("PRAGMA table_info(workout_exercises)").all().map((c) => c.name);
+    const expectedColumns = [
+      'id',
+      'name',
+      'category',
+      'muscle_group',
+      'equipment',
+      'tracking_type',
+      'instructions',
+      'is_custom',
+      'catalog_external_id',
+      'source',
+      'body_part',
+      'target_muscle',
+      'secondary_muscles_json',
+      'media_id',
+      'thumb_path',
+      'gif_path',
+      'attribution',
+      'instructions_json',
+      'equipment_key',
+      'is_bodyweight_default',
+      'status',
+      'created_at',
+      'updated_at',
+    ];
+
+    for (const col of expectedColumns) {
+      assert.ok(columns.includes(col), `Missing column ${col} in workout_exercises`);
+    }
+
+    const indexes = db.prepare("PRAGMA index_list('workout_exercises')").all().map((i) => i.name);
+    assert.ok(indexes.includes('idx_workout_exercises_catalog_external_id'));
+    assert.ok(indexes.includes('idx_workout_exercises_body_part'));
+    assert.ok(indexes.includes('idx_workout_exercises_target_muscle'));
+  });
+
+  test('idempotent migration applies cleanly to legacy pre-V4 database and sets correct defaults', () => {
+    const legacyDb = new Database(':memory:');
+    legacyDb.exec(`
+      CREATE TABLE workout_exercises (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT DEFAULT 'strength',
+        muscle_group TEXT DEFAULT '',
+        equipment TEXT DEFAULT '',
+        tracking_type TEXT DEFAULT 'reps',
+        instructions TEXT DEFAULT '',
+        is_custom INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'active',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT INTO workout_exercises (id, name, category, muscle_group)
+      VALUES ('legacy-1', 'Flexão clássica', 'calisthenics', 'chest');
+    `);
+
+    initWorkoutSchema(legacyDb);
+    initWorkoutSchema(legacyDb);
+
+    const cols = legacyDb.prepare("PRAGMA table_info(workout_exercises)").all().map((c) => c.name);
+    assert.ok(cols.includes('catalog_external_id'));
+    assert.ok(cols.includes('source'));
+    assert.ok(cols.includes('body_part'));
+    assert.ok(cols.includes('target_muscle'));
+    assert.ok(cols.includes('secondary_muscles_json'));
+    assert.ok(cols.includes('media_id'));
+    assert.ok(cols.includes('thumb_path'));
+    assert.ok(cols.includes('gif_path'));
+    assert.ok(cols.includes('attribution'));
+    assert.ok(cols.includes('instructions_json'));
+    assert.ok(cols.includes('equipment_key'));
+    assert.ok(cols.includes('is_bodyweight_default'));
+
+    const legacyRow = legacyDb.prepare('SELECT * FROM workout_exercises WHERE id = ?').get('legacy-1');
+    assert.equal(legacyRow.name, 'Flexão clássica');
+    assert.equal(legacyRow.is_custom, 1);
+    assert.equal(legacyRow.source, 'custom');
+    assert.equal(legacyRow.is_bodyweight_default, 0);
+    assert.equal(legacyRow.catalog_external_id, null);
+    assert.equal(legacyRow.target_muscle, null);
+
+    legacyDb.close();
+  });
+
+  test('create classic custom exercise retains custom defaults and works through program/day flow', async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const created = await request('/api/workouts/exercises', {
+      method: 'POST',
+      body: {
+        name: 'Flexão diamante personalizada',
+        category: 'calisthenics',
+        tracking_type: 'reps',
+        muscle_group: 'tríceps',
+      },
+    });
+
+    assert.equal(created.name, 'Flexão diamante personalizada');
+    assert.equal(created.is_custom, 1);
+    assert.equal(created.source, 'custom');
+    assert.equal(created.catalog_external_id, null);
+    assert.equal(created.body_part, null);
+    assert.equal(created.target_muscle, null);
+    assert.equal(created.secondary_muscles_json, null);
+    assert.equal(created.media_id, null);
+    assert.equal(created.thumb_path, null);
+    assert.equal(created.gif_path, null);
+    assert.equal(created.attribution, null);
+    assert.equal(created.instructions_json, null);
+    assert.equal(created.equipment_key, null);
+    assert.equal(created.is_bodyweight_default, 0);
+  });
+
+  test('create and update catalog exercise round-trips all metadata fields correctly', async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const catalogPayload = {
+      name: 'Barbell Bench Press',
+      category: 'strength',
+      source: 'catalog',
+      catalog_external_id: '0001',
+      body_part: 'chest',
+      target_muscle: 'pectorals',
+      secondary_muscles_json: ['deltoids', 'triceps'],
+      media_id: '2gPfomN',
+      thumb_path: 'images/0001-2gPfomN.jpg',
+      gif_path: 'videos/0001-2gPfomN.gif',
+      attribution: '© Gym visual — https://gymvisual.com/',
+      instructions_json: {
+        en: ['Lie down on bench.', 'Lower bar to chest.', 'Press back up.'],
+      },
+      equipment_key: 'barbell',
+      is_bodyweight_default: 0,
+    };
+
+    const created = await request('/api/workouts/exercises', {
+      method: 'POST',
+      body: catalogPayload,
+    });
+
+    assert.equal(created.name, 'Barbell Bench Press');
+    assert.equal(created.source, 'catalog');
+    assert.equal(created.is_custom, 0);
+    assert.equal(created.catalog_external_id, '0001');
+    assert.equal(created.body_part, 'chest');
+    assert.equal(created.target_muscle, 'pectorals');
+    assert.equal(created.secondary_muscles_json, JSON.stringify(['deltoids', 'triceps']));
+    assert.equal(created.media_id, '2gPfomN');
+    assert.equal(created.thumb_path, 'images/0001-2gPfomN.jpg');
+    assert.equal(created.gif_path, 'videos/0001-2gPfomN.gif');
+    assert.equal(created.attribution, '© Gym visual — https://gymvisual.com/');
+    assert.equal(
+      created.instructions_json,
+      JSON.stringify({ en: ['Lie down on bench.', 'Lower bar to chest.', 'Press back up.'] }),
+    );
+    assert.equal(created.equipment_key, 'barbell');
+    assert.equal(created.is_bodyweight_default, 0);
+
+    // Update via PATCH
+    const patched = await request(`/api/workouts/exercises/${created.id}`, {
+      method: 'PATCH',
+      body: {
+        target_muscle: 'chest',
+        is_bodyweight_default: 1,
+      },
+    });
+
+    assert.equal(patched.target_muscle, 'chest');
+    assert.equal(patched.is_bodyweight_default, 1);
+    assert.equal(patched.catalog_external_id, '0001');
+    assert.equal(patched.source, 'catalog');
+    assert.equal(patched.is_custom, 0);
   });
 });

@@ -86,6 +86,18 @@ export function initWorkoutSchema(db) {
       tracking_type TEXT DEFAULT 'reps',
       instructions TEXT DEFAULT '',
       is_custom INTEGER DEFAULT 1,
+      catalog_external_id TEXT,
+      source TEXT DEFAULT 'custom',
+      body_part TEXT,
+      target_muscle TEXT,
+      secondary_muscles_json TEXT,
+      media_id TEXT,
+      thumb_path TEXT,
+      gif_path TEXT,
+      attribution TEXT,
+      instructions_json TEXT,
+      equipment_key TEXT,
+      is_bodyweight_default INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -225,6 +237,18 @@ export function initWorkoutSchema(db) {
     ['workout_session_sets', "set_role TEXT NOT NULL DEFAULT 'work'"],
     ['workout_session_sets', 'rir INTEGER'],
     ['workout_session_sets', 'technical_quality TEXT'],
+    ['workout_exercises', 'catalog_external_id TEXT'],
+    ['workout_exercises', "source TEXT DEFAULT 'custom'"],
+    ['workout_exercises', 'body_part TEXT'],
+    ['workout_exercises', 'target_muscle TEXT'],
+    ['workout_exercises', 'secondary_muscles_json TEXT'],
+    ['workout_exercises', 'media_id TEXT'],
+    ['workout_exercises', 'thumb_path TEXT'],
+    ['workout_exercises', 'gif_path TEXT'],
+    ['workout_exercises', 'attribution TEXT'],
+    ['workout_exercises', 'instructions_json TEXT'],
+    ['workout_exercises', 'equipment_key TEXT'],
+    ['workout_exercises', 'is_bodyweight_default INTEGER DEFAULT 0'],
   ];
   for (const [table, definition] of idempotentColumns) {
     try {
@@ -233,6 +257,12 @@ export function initWorkoutSchema(db) {
       /* column already exists */
     }
   }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_workout_exercises_catalog_external_id ON workout_exercises(catalog_external_id);
+    CREATE INDEX IF NOT EXISTS idx_workout_exercises_body_part ON workout_exercises(body_part);
+    CREATE INDEX IF NOT EXISTS idx_workout_exercises_target_muscle ON workout_exercises(target_muscle);
+  `);
 }
 
 function normalizeExerciseBody(body = {}, existing = null) {
@@ -244,6 +274,56 @@ function normalizeExerciseBody(body = {}, existing = null) {
     ? body.tracking_type
     : existing?.tracking_type || 'reps';
 
+  const source = body.source !== undefined
+    ? (text(body.source) || 'custom')
+    : (existing?.source || 'custom');
+
+  let isCustom = existing?.is_custom !== undefined ? boolInt(existing.is_custom, 1) : 1;
+  if (body.is_custom !== undefined) {
+    isCustom = boolInt(body.is_custom, 1);
+  } else if (body.source !== undefined) {
+    isCustom = source === 'catalog' ? 0 : 1;
+  }
+
+  let secondaryMusclesJson = existing?.secondary_muscles_json ?? null;
+  if (body.secondary_muscles_json !== undefined) {
+    if (typeof body.secondary_muscles_json === 'string') {
+      secondaryMusclesJson = text(body.secondary_muscles_json) || null;
+    } else if (body.secondary_muscles_json === null) {
+      secondaryMusclesJson = null;
+    } else {
+      secondaryMusclesJson = JSON.stringify(body.secondary_muscles_json);
+    }
+  } else if (body.secondary_muscles !== undefined) {
+    if (typeof body.secondary_muscles === 'string') {
+      secondaryMusclesJson = text(body.secondary_muscles) || null;
+    } else if (body.secondary_muscles === null) {
+      secondaryMusclesJson = null;
+    } else {
+      secondaryMusclesJson = JSON.stringify(body.secondary_muscles);
+    }
+  }
+
+  let instructionsJson = existing?.instructions_json ?? null;
+  if (body.instructions_json !== undefined) {
+    if (typeof body.instructions_json === 'string') {
+      instructionsJson = text(body.instructions_json) || null;
+    } else if (body.instructions_json === null) {
+      instructionsJson = null;
+    } else {
+      instructionsJson = JSON.stringify(body.instructions_json);
+    }
+  } else if (body.instruction_steps !== undefined || body.instructions_steps !== undefined) {
+    const rawSteps = body.instruction_steps !== undefined ? body.instruction_steps : body.instructions_steps;
+    if (typeof rawSteps === 'string') {
+      instructionsJson = text(rawSteps) || null;
+    } else if (rawSteps === null) {
+      instructionsJson = null;
+    } else {
+      instructionsJson = JSON.stringify(rawSteps);
+    }
+  }
+
   return {
     name,
     category,
@@ -251,6 +331,19 @@ function normalizeExerciseBody(body = {}, existing = null) {
     equipment: body.equipment !== undefined ? text(body.equipment) : existing?.equipment || '',
     tracking_type: trackingType,
     instructions: body.instructions !== undefined ? text(body.instructions) : existing?.instructions || '',
+    is_custom: isCustom,
+    catalog_external_id: body.catalog_external_id !== undefined ? (text(body.catalog_external_id) || null) : (existing?.catalog_external_id ?? null),
+    source,
+    body_part: body.body_part !== undefined ? (text(body.body_part) || null) : (existing?.body_part ?? null),
+    target_muscle: body.target_muscle !== undefined ? (text(body.target_muscle) || null) : (existing?.target_muscle ?? null),
+    secondary_muscles_json: secondaryMusclesJson,
+    media_id: body.media_id !== undefined ? (text(body.media_id) || null) : (existing?.media_id ?? null),
+    thumb_path: body.thumb_path !== undefined ? (text(body.thumb_path) || null) : (existing?.thumb_path ?? null),
+    gif_path: body.gif_path !== undefined ? (text(body.gif_path) || null) : (existing?.gif_path ?? null),
+    attribution: body.attribution !== undefined ? (text(body.attribution) || null) : (existing?.attribution ?? null),
+    instructions_json: instructionsJson,
+    equipment_key: body.equipment_key !== undefined ? (text(body.equipment_key) || null) : (existing?.equipment_key ?? null),
+    is_bodyweight_default: body.is_bodyweight_default !== undefined ? boolInt(body.is_bodyweight_default, 0) : (existing?.is_bodyweight_default ?? 0),
   };
 }
 
@@ -800,8 +893,11 @@ export function registerWorkoutRoutes(app, db) {
     const id = randomUUID();
     db.prepare(`
       INSERT INTO workout_exercises (
-        id, name, category, muscle_group, equipment, tracking_type, instructions, is_custom
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        id, name, category, muscle_group, equipment, tracking_type, instructions,
+        is_custom, catalog_external_id, source, body_part, target_muscle,
+        secondary_muscles_json, media_id, thumb_path, gif_path, attribution,
+        instructions_json, equipment_key, is_bodyweight_default
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       payload.name,
@@ -810,6 +906,19 @@ export function registerWorkoutRoutes(app, db) {
       payload.equipment,
       payload.tracking_type,
       payload.instructions,
+      payload.is_custom,
+      payload.catalog_external_id,
+      payload.source,
+      payload.body_part,
+      payload.target_muscle,
+      payload.secondary_muscles_json,
+      payload.media_id,
+      payload.thumb_path,
+      payload.gif_path,
+      payload.attribution,
+      payload.instructions_json,
+      payload.equipment_key,
+      payload.is_bodyweight_default,
     );
     res.status(201).json(db.prepare('SELECT * FROM workout_exercises WHERE id = ?').get(id));
   }));
@@ -821,7 +930,10 @@ export function registerWorkoutRoutes(app, db) {
     if (!payload.name) return res.status(400).json({ error: 'Dê um nome ao exercício.' });
     db.prepare(`
       UPDATE workout_exercises
-      SET name = ?, category = ?, muscle_group = ?, equipment = ?, tracking_type = ?, instructions = ?, updated_at = datetime('now')
+      SET name = ?, category = ?, muscle_group = ?, equipment = ?, tracking_type = ?, instructions = ?,
+          is_custom = ?, catalog_external_id = ?, source = ?, body_part = ?, target_muscle = ?,
+          secondary_muscles_json = ?, media_id = ?, thumb_path = ?, gif_path = ?, attribution = ?,
+          instructions_json = ?, equipment_key = ?, is_bodyweight_default = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       payload.name,
@@ -830,6 +942,19 @@ export function registerWorkoutRoutes(app, db) {
       payload.equipment,
       payload.tracking_type,
       payload.instructions,
+      payload.is_custom,
+      payload.catalog_external_id,
+      payload.source,
+      payload.body_part,
+      payload.target_muscle,
+      payload.secondary_muscles_json,
+      payload.media_id,
+      payload.thumb_path,
+      payload.gif_path,
+      payload.attribution,
+      payload.instructions_json,
+      payload.equipment_key,
+      payload.is_bodyweight_default,
       existing.id,
     );
     res.json(db.prepare('SELECT * FROM workout_exercises WHERE id = ?').get(existing.id));
