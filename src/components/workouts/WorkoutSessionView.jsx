@@ -19,8 +19,8 @@ import {
 import { praxisApi } from '@/api/praxisClient';
 import ExerciseMedia from '@/components/workouts/ExerciseMedia';
 import ExercisePickerDialog from '@/components/workouts/ExercisePickerDialog';
+import { useSessionWakeLock } from '@/lib/workoutV4/wakeLock';
 import {
-  useSessionWakeLock,
   formatPrToastDescription,
   computeSetPrefill,
   getWorkSets,

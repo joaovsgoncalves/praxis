@@ -1,22 +1,7 @@
 import { useEffect, useRef } from "react";
+import { isWakeLockSupported } from "./wakeLockSupport.js";
 
-/**
- * Screen Wake Lock helpers for Praxis Treinos V4 (Fase 6).
- *
- * Keeps screen awake during active workout sessions and re-acquires
- * lock upon tab visibility restoration.
- */
-
-export function isWakeLockSupported(navigatorOverride) {
-  const nav =
-    navigatorOverride !== undefined
-      ? navigatorOverride
-      : typeof navigator !== "undefined"
-        ? navigator
-        : undefined;
-
-  return Boolean(nav && "wakeLock" in nav && typeof nav.wakeLock?.request === "function");
-}
+export { isWakeLockSupported };
 
 /**
  * React hook to acquire and maintain Screen Wake Lock while session is active.

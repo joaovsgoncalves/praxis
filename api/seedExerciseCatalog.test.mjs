@@ -289,12 +289,13 @@ describe("seed-exercise-catalog — database integration & idempotency tests", (
     if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
 
     // 1. Dry run via CLI
+    const repoRoot = path.join(__dirname, "..");
     const dryRunRes = spawnSync("node", [
       "scripts/seed-exercise-catalog.mjs",
       "--dry-run",
       "--source=" + fixturePath,
       "--db=" + tempDbPath,
-    ], { encoding: "utf8" });
+    ], { encoding: "utf8", cwd: repoRoot });
 
     assert.equal(dryRunRes.status, 0);
     assert.match(dryRunRes.stdout, /Praxis Treinos V4/);
@@ -306,7 +307,7 @@ describe("seed-exercise-catalog — database integration & idempotency tests", (
       "--apply",
       "--source=" + fixturePath,
       "--db=" + tempDbPath,
-    ], { encoding: "utf8" });
+    ], { encoding: "utf8", cwd: repoRoot });
 
     assert.equal(applyRes.status, 0);
     assert.match(applyRes.stdout, /Inserted:\s+3 catalog exercises/);

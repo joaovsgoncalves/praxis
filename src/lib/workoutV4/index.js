@@ -5,7 +5,7 @@
 export * from "./featureFlags.js";
 export * from "./muscles.js";
 export * from "./media.js";
-export * from "./wakeLock.js";
+export { isWakeLockSupported } from "./wakeLockSupport.js";
 export * from "./pr.js";
 export * from "./prefill.js";
 export * from "./oneRm.js";
