@@ -18,7 +18,14 @@ import {
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import ExerciseMedia from '@/components/workouts/ExerciseMedia';
-import { useSessionWakeLock, formatPrToastDescription } from '@/lib/workoutV4';
+import {
+  useSessionWakeLock,
+  formatPrToastDescription,
+  computeSetPrefill,
+  getWorkSets,
+  getWarmupSets,
+  EMPTY_SET_FORM,
+} from '@/lib/workoutV4';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -65,42 +72,12 @@ function loadRestTimer(sessionId) {
   }
 }
 
-const EMPTY_SET_FORM = {
-  weight_kg: '',
-  reps: '',
-  duration_seconds: '',
-  distance_m: '',
-  band_level: '',
-  set_role: 'work',
-  rir: '',
-  technical_quality: '',
-  note: '',
-};
-
 function workSetsOf(exercise) {
-  return (exercise?.sets || []).filter((set) => !isWarmupSet(set));
+  return getWorkSets(exercise?.sets);
 }
 
 function warmupSetsOf(exercise) {
-  return (exercise?.sets || []).filter((set) => isWarmupSet(set));
-}
-
-/** Prefill the next working set from the same slot of the last session (warmups excluded upstream). */
-function initialSetForm(exercise, role = 'work') {
-  const previousList = exercise?.previous_sets || [];
-  const workDone = workSetsOf(exercise).length;
-  const previous = role === 'warmup'
-    ? null
-    : previousList[workDone] || previousList[previousList.length - 1] || null;
-  return {
-    ...EMPTY_SET_FORM,
-    weight_kg: previous?.weight_kg ?? '',
-    reps: previous?.reps ?? '',
-    duration_seconds: previous?.duration_seconds ?? exercise?.target_duration_seconds ?? '',
-    distance_m: previous?.distance_m ?? '',
-    band_level: previous?.band_level ?? '',
-    set_role: role,
-  };
+  return getWarmupSets(exercise?.sets);
 }
 
 function hasPrimaryResult(form, trackingType) {
@@ -207,9 +184,12 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const [now, setNow] = useState(Date.now());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [setForm, setSetForm] = useState(EMPTY_SET_FORM);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [restTimer, setRestTimer] = useState(() => loadRestTimer(sessionId));
   const toastedPrSetIds = useRef(new Set());
+  const lastExerciseIdRef = useRef(null);
+  const lastSetsCountRef = useRef(null);
 
   const { data: session, isLoading, isError, error } = useQuery({
     queryKey: ['workouts', 'session', sessionId],
@@ -241,9 +221,34 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const currentExercise = session?.exercises?.[currentIndex] || null;
 
   useEffect(() => {
-    if (currentExercise) setSetForm(initialSetForm(currentExercise));
-    setShowDetails(false);
+    if (!currentExercise) return;
+    const exerciseId = currentExercise.id;
+    const setsCount = currentExercise.sets?.length ?? 0;
+    const isExerciseChanged = exerciseId !== lastExerciseIdRef.current;
+    const isSetsCountChanged = setsCount !== lastSetsCountRef.current;
+
+    if (isExerciseChanged || isSetsCountChanged) {
+      lastExerciseIdRef.current = exerciseId;
+      lastSetsCountRef.current = setsCount;
+      setSetForm(computeSetPrefill(currentExercise, 'work'));
+      setIsFormDirty(false);
+      setShowDetails(false);
+    }
   }, [currentExercise?.id, currentExercise?.sets?.length]);
+
+  const updateFormField = (field, value) => {
+    setIsFormDirty(true);
+    setSetForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleRoleChange = (role) => {
+    setSetForm((current) => {
+      if (!isFormDirty) {
+        return computeSetPrefill(currentExercise, role);
+      }
+      return { ...current, set_role: role };
+    });
+  };
 
   const elapsedSeconds = useMemo(() => {
     if (!session?.started_at) return 0;
@@ -319,7 +324,12 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
         startRest(currentExercise?.rest_seconds, currentExercise?.id);
       }
       const updatedExercise = updated.exercises?.find((exercise) => exercise.id === currentExercise?.id);
-      setSetForm(initialSetForm(updatedExercise));
+      if (updatedExercise) {
+        lastExerciseIdRef.current = updatedExercise.id;
+        lastSetsCountRef.current = updatedExercise.sets?.length ?? 0;
+        setSetForm(computeSetPrefill(updatedExercise, 'work'));
+      }
+      setIsFormDirty(false);
       setShowDetails(false);
 
       // PR detection & toast (guarded once per set id)
@@ -343,6 +353,13 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     mutationFn: (setId) => praxisApi.workouts.sessions.deleteSet(setId),
     onSuccess: (updated) => {
       updateSessionCache(updated);
+      const updatedExercise = updated.exercises?.find((exercise) => exercise.id === currentExercise?.id);
+      if (updatedExercise) {
+        lastExerciseIdRef.current = updatedExercise.id;
+        lastSetsCountRef.current = updatedExercise.sets?.length ?? 0;
+        setSetForm(computeSetPrefill(updatedExercise, 'work'));
+      }
+      setIsFormDirty(false);
       toast('Série removida');
     },
     onError: (mutationError) => toast.error('Não deu pra remover', { description: mutationError?.message }),
@@ -708,7 +725,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                           id="session-reps"
                           label="Repetições"
                           value={setForm.reps}
-                          onChange={(value) => setSetForm((current) => ({ ...current, reps: value }))}
+                          onChange={(value) => updateFormField('reps', value)}
                           step={1}
                           inputMode="numeric"
                         />
@@ -717,7 +734,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                           id="session-duration"
                           label="Tempo (s)"
                           value={setForm.duration_seconds}
-                          onChange={(value) => setSetForm((current) => ({ ...current, duration_seconds: value }))}
+                          onChange={(value) => updateFormField('duration_seconds', value)}
                           step={5}
                           inputMode="numeric"
                           suffix="±5s"
@@ -727,7 +744,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                           id="session-distance"
                           label="Distância (m)"
                           value={setForm.distance_m}
-                          onChange={(value) => setSetForm((current) => ({ ...current, distance_m: value }))}
+                          onChange={(value) => updateFormField('distance_m', value)}
                           step={1}
                         />
                       )}
@@ -737,7 +754,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                           id="session-weight"
                           label="Carga (kg)"
                           value={setForm.weight_kg}
-                          onChange={(value) => setSetForm((current) => ({ ...current, weight_kg: value }))}
+                          onChange={(value) => updateFormField('weight_kg', value)}
                           step={2.5}
                           suffix="±2,5"
                         />
@@ -746,7 +763,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                           id="session-distance-b"
                           label="Distância (m)"
                           value={setForm.distance_m}
-                          onChange={(value) => setSetForm((current) => ({ ...current, distance_m: value }))}
+                          onChange={(value) => updateFormField('distance_m', value)}
                           step={1}
                         />
                       ) : null}
@@ -755,7 +772,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                     {showBandInline ? (
                       <BandPicker
                         value={setForm.band_level}
-                        onChange={(value) => setSetForm((current) => ({ ...current, band_level: value }))}
+                        onChange={(value) => updateFormField('band_level', value)}
                       />
                     ) : null}
 
@@ -788,7 +805,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                                     key={option.value}
                                     type="button"
                                     aria-pressed={active}
-                                    onClick={() => setSetForm((current) => ({ ...current, set_role: option.value }))}
+                                    onClick={() => handleRoleChange(option.value)}
                                     className={cn(
                                       'flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors',
                                       active
@@ -816,10 +833,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                                       key={value}
                                       type="button"
                                       aria-pressed={active}
-                                      onClick={() => setSetForm((current) => ({
-                                        ...current,
-                                        rir: current.rir !== '' && Number(current.rir) === value ? '' : String(value),
-                                      }))}
+                                      onClick={() => updateFormField('rir', setForm.rir !== '' && Number(setForm.rir) === value ? '' : String(value))}
                                       className={cn(
                                         'min-h-10 min-w-10 rounded-full border px-3 py-1.5 text-xs font-medium tabular-nums transition-colors',
                                         active
@@ -838,7 +852,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                           {isBand && !showBandInline ? (
                             <BandPicker
                               value={setForm.band_level}
-                              onChange={(value) => setSetForm((current) => ({ ...current, band_level: value }))}
+                              onChange={(value) => updateFormField('band_level', value)}
                             />
                           ) : null}
 
@@ -852,10 +866,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                                     key={option.value}
                                     type="button"
                                     aria-pressed={active}
-                                    onClick={() => setSetForm((current) => ({
-                                      ...current,
-                                      technical_quality: current.technical_quality === option.value ? '' : option.value,
-                                    }))}
+                                    onClick={() => updateFormField('technical_quality', setForm.technical_quality === option.value ? '' : option.value)}
                                     className={cn(
                                       'min-h-10 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                                       active
@@ -876,7 +887,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                               id="session-set-note"
                               type="text"
                               value={setForm.note}
-                              onChange={(event) => setSetForm((current) => ({ ...current, note: event.target.value }))}
+                              onChange={(event) => updateFormField('note', event.target.value)}
                               placeholder="Nota rápida (lado, parede, dor...)"
                               maxLength={140}
                               className="h-11 text-sm"

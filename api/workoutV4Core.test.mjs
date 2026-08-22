@@ -21,6 +21,13 @@ import {
   isWakeLockSupported as apiIsWakeLockSupported,
   detectPersonalRecord as apiDetectPersonalRecord,
   formatPrToastDescription as apiFormatPrToastDescription,
+  EMPTY_SET_FORM as API_EMPTY_SET_FORM,
+  getWorkSets as apiGetWorkSets,
+  getWarmupSets as apiGetWarmupSets,
+  getLastWorkSet as apiGetLastWorkSet,
+  getLastWarmupSet as apiGetLastWarmupSet,
+  cascadeWeightToUnfilledSlots as apiCascadeWeightToUnfilledSlots,
+  computeSetPrefill as apiComputeSetPrefill,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -44,6 +51,13 @@ import {
   isWakeLockSupported as frontIsWakeLockSupported,
   detectPersonalRecord as frontDetectPersonalRecord,
   formatPrToastDescription as frontFormatPrToastDescription,
+  EMPTY_SET_FORM as FRONT_EMPTY_SET_FORM,
+  getWorkSets as frontGetWorkSets,
+  getWarmupSets as frontGetWarmupSets,
+  getLastWorkSet as frontGetLastWorkSet,
+  getLastWarmupSet as frontGetLastWarmupSet,
+  cascadeWeightToUnfilledSlots as frontCascadeWeightToUnfilledSlots,
+  computeSetPrefill as frontComputeSetPrefill,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -586,6 +600,257 @@ describe('workoutV4Core — Fase 6 PR detection and wake lock', () => {
 
       assert.equal(checkFn(null), false);
       assert.equal(checkFn(undefined), false);
+    }
+  });
+});
+
+describe('workoutV4Core — Fase 7 set prefill & weight cascade', () => {
+  test('EMPTY_SET_FORM has expected structure and matches between api and front', () => {
+    const expected = {
+      weight_kg: '',
+      reps: '',
+      duration_seconds: '',
+      distance_m: '',
+      band_level: '',
+      set_role: 'work',
+      rir: '',
+      technical_quality: '',
+      note: '',
+    };
+    assert.deepEqual(API_EMPTY_SET_FORM, expected);
+    assert.deepEqual(FRONT_EMPTY_SET_FORM, expected);
+  });
+
+  test('getWorkSets and getWarmupSets separate roles accurately', () => {
+    for (const [getWork, getWarmup] of [
+      [apiGetWorkSets, apiGetWarmupSets],
+      [frontGetWorkSets, frontGetWarmupSets],
+    ]) {
+      const sets = [
+        { id: 's1', set_role: 'warmup', weight_kg: 40 },
+        { id: 's2', set_role: 'work', weight_kg: 80 },
+        { id: 's3', set_role: null, weight_kg: 85 }, // legacy null role behaves as work
+        { id: 's4', set_role: 'warmup', weight_kg: 50 },
+      ];
+
+      const work = getWork(sets);
+      assert.equal(work.length, 2);
+      assert.deepEqual(work.map((s) => s.id), ['s2', 's3']);
+
+      const warmups = getWarmup(sets);
+      assert.equal(warmups.length, 2);
+      assert.deepEqual(warmups.map((s) => s.id), ['s1', 's4']);
+
+      assert.deepEqual(getWork(null), []);
+      assert.deepEqual(getWarmup(null), []);
+    }
+  });
+
+  test('getLastWorkSet and getLastWarmupSet retrieve latest completed sets', () => {
+    for (const [lastWorkFn, lastWarmupFn] of [
+      [apiGetLastWorkSet, apiGetLastWarmupSet],
+      [frontGetLastWorkSet, frontGetLastWarmupSet],
+    ]) {
+      const sets = [
+        { id: 'w1', set_role: 'warmup', weight_kg: 40 },
+        { id: 'k1', set_role: 'work', weight_kg: 80 },
+        { id: 'w2', set_role: 'warmup', weight_kg: 60 },
+        { id: 'k2', set_role: 'work', weight_kg: 85 },
+      ];
+
+      assert.equal(lastWorkFn(sets)?.id, 'k2');
+      assert.equal(lastWarmupFn(sets)?.id, 'w2');
+      assert.equal(lastWorkFn([]), null);
+      assert.equal(lastWarmupFn([]), null);
+    }
+  });
+
+  test('computeSetPrefill: returns empty form with target defaults when no history exists', () => {
+    for (const prefillFn of [apiComputeSetPrefill, frontComputeSetPrefill]) {
+      const exercise = {
+        id: 'ex-1',
+        target_duration_seconds: 45,
+        sets: [],
+        previous_sets: [],
+      };
+
+      const res = prefillFn(exercise, 'work');
+      assert.equal(res.weight_kg, '');
+      assert.equal(res.reps, '');
+      assert.equal(res.duration_seconds, 45);
+      assert.equal(res.distance_m, '');
+      assert.equal(res.band_level, '');
+      assert.equal(res.set_role, 'work');
+      assert.equal(res.rir, '');
+      assert.equal(res.note, '');
+    }
+  });
+
+  test('computeSetPrefill: prefills from previous session work sets when current session has no work sets', () => {
+    for (const prefillFn of [apiComputeSetPrefill, frontComputeSetPrefill]) {
+      const exercise = {
+        id: 'ex-1',
+        sets: [],
+        previous_sets: [
+          { weight_kg: 80, reps: 10, rir: 2, band_level: 'medium', set_role: 'work' },
+          { weight_kg: 85, reps: 8, rir: 1, band_level: 'medium', set_role: 'work' },
+        ],
+      };
+
+      const res = prefillFn(exercise, 'work');
+      assert.equal(res.weight_kg, 80);
+      assert.equal(res.reps, 10);
+      assert.equal(res.rir, '2');
+      assert.equal(res.band_level, 'medium');
+      assert.equal(res.set_role, 'work');
+    }
+  });
+
+  test('computeSetPrefill: CRITICAL — warmup sets in current session NEVER prefill work sets', () => {
+    for (const prefillFn of [apiComputeSetPrefill, frontComputeSetPrefill]) {
+      const exerciseWithWarmupOnly = {
+        id: 'ex-1',
+        sets: [
+          { id: 's1', set_role: 'warmup', weight_kg: 40, reps: 15, rir: 4 },
+          { id: 's2', set_role: 'warmup', weight_kg: 60, reps: 10, rir: 3 },
+        ],
+        previous_sets: [],
+      };
+
+      // Work set should be empty — must not take 60kg or 10 reps from warmup
+      const workPrefill = prefillFn(exerciseWithWarmupOnly, 'work');
+      assert.equal(workPrefill.weight_kg, '');
+      assert.equal(workPrefill.reps, '');
+      assert.equal(workPrefill.rir, '');
+      assert.equal(workPrefill.set_role, 'work');
+
+      // With previous session work sets, work prefill should pull from previous session work set
+      const exerciseWithWarmupAndPrevWork = {
+        id: 'ex-1',
+        sets: [
+          { id: 's1', set_role: 'warmup', weight_kg: 50, reps: 12 },
+        ],
+        previous_sets: [
+          { weight_kg: 100, reps: 6, rir: 1, set_role: 'work' },
+        ],
+      };
+
+      const workWithPrev = prefillFn(exerciseWithWarmupAndPrevWork, 'work');
+      assert.equal(workWithPrev.weight_kg, 100);
+      assert.equal(workWithPrev.reps, 6);
+      assert.equal(workWithPrev.rir, '1');
+    }
+  });
+
+  test('computeSetPrefill: CRITICAL — warmup sets in previous session history NEVER prefill work sets', () => {
+    for (const prefillFn of [apiComputeSetPrefill, frontComputeSetPrefill]) {
+      const exercise = {
+        id: 'ex-1',
+        sets: [],
+        previous_sets: [
+          { id: 'prev-w', set_role: 'warmup', weight_kg: 40, reps: 20 },
+          { id: 'prev-k', set_role: 'work', weight_kg: 90, reps: 8, rir: 2 },
+        ],
+      };
+
+      const res = prefillFn(exercise, 'work');
+      assert.equal(res.weight_kg, 90);
+      assert.equal(res.reps, 8);
+      assert.equal(res.rir, '2');
+      assert.equal(res.set_role, 'work');
+
+      // Only warmups in previous session -> empty work prefill
+      const exerciseWarmupsOnlyInPrev = {
+        id: 'ex-1',
+        sets: [],
+        previous_sets: [
+          { id: 'prev-w1', set_role: 'warmup', weight_kg: 40, reps: 20 },
+          { id: 'prev-w2', set_role: 'warmup', weight_kg: 50, reps: 15 },
+        ],
+      };
+
+      const emptyRes = prefillFn(exerciseWarmupsOnlyInPrev, 'work');
+      assert.equal(emptyRes.weight_kg, '');
+      assert.equal(emptyRes.reps, '');
+    }
+  });
+
+  test('computeSetPrefill: weight cascade propagates current session work set load to next sets', () => {
+    for (const prefillFn of [apiComputeSetPrefill, frontComputeSetPrefill]) {
+      // Step 1: User completes work set 1 with 80kg, 10 reps, RIR 2
+      const exerciseAfterSet1 = {
+        id: 'ex-1',
+        target_sets: 3,
+        sets: [
+          { id: 'set-1', set_role: 'work', weight_kg: 80, reps: 10, rir: 2 },
+        ],
+        previous_sets: [
+          { weight_kg: 75, reps: 10, set_role: 'work' },
+          { weight_kg: 75, reps: 10, set_role: 'work' },
+        ],
+      };
+
+      const set2Prefill = prefillFn(exerciseAfterSet1, 'work');
+      assert.equal(set2Prefill.weight_kg, 80);
+      assert.equal(set2Prefill.reps, 10);
+      assert.equal(set2Prefill.rir, '2');
+
+      // Step 2: User increases weight to 85kg on work set 2
+      const exerciseAfterSet2 = {
+        id: 'ex-1',
+        target_sets: 3,
+        sets: [
+          { id: 'set-1', set_role: 'work', weight_kg: 80, reps: 10, rir: 2 },
+          { id: 'set-2', set_role: 'work', weight_kg: 85, reps: 8, rir: 1 },
+        ],
+        previous_sets: exerciseAfterSet1.previous_sets,
+      };
+
+      const set3Prefill = prefillFn(exerciseAfterSet2, 'work');
+      assert.equal(set3Prefill.weight_kg, 85);
+      assert.equal(set3Prefill.reps, 8);
+      assert.equal(set3Prefill.rir, '1');
+    }
+  });
+
+  test('computeSetPrefill: warmup role targets prefill from previous warmup or stay clean', () => {
+    for (const prefillFn of [apiComputeSetPrefill, frontComputeSetPrefill]) {
+      const exerciseWithWarmup = {
+        id: 'ex-1',
+        sets: [
+          { id: 'w1', set_role: 'warmup', weight_kg: 40, reps: 15 },
+          { id: 'k1', set_role: 'work', weight_kg: 90, reps: 8 },
+        ],
+        previous_sets: [],
+      };
+
+      const warmupPrefill = prefillFn(exerciseWithWarmup, 'warmup');
+      assert.equal(warmupPrefill.weight_kg, 40);
+      assert.equal(warmupPrefill.reps, 15);
+      assert.equal(warmupPrefill.set_role, 'warmup');
+      assert.equal(warmupPrefill.rir, ''); // RIR is empty on warmups
+    }
+  });
+
+  test('cascadeWeightToUnfilledSlots computes remaining slot suggestions', () => {
+    for (const cascadeFn of [apiCascadeWeightToUnfilledSlots, frontCascadeWeightToUnfilledSlots]) {
+      const exercise = {
+        target_sets: 4,
+        sets: [
+          { id: 's1', set_role: 'warmup', weight_kg: 40 },
+          { id: 's2', set_role: 'work', weight_kg: 80 },
+        ],
+      };
+
+      const slots = cascadeFn(exercise, 80);
+      assert.equal(slots.length, 3); // target 4 - 1 work done = 3 remaining
+      assert.deepEqual(slots, [
+        { slot_index: 1, suggested_weight_kg: 80 },
+        { slot_index: 2, suggested_weight_kg: 80 },
+        { slot_index: 3, suggested_weight_kg: 80 },
+      ]);
+
+      assert.deepEqual(cascadeFn(null, 80), []);
     }
   });
 });
