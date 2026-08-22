@@ -1,0 +1,352 @@
+import React, { useState } from 'react';
+import {
+  Dumbbell,
+  ExternalLink,
+  Flame,
+  Layers,
+  ListOrdered,
+  Plus,
+  Target,
+  Wrench,
+} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  aliasMuscle,
+  MEDIA_ATTRIBUTION,
+  MUSCLE_LABEL_PT,
+  thumbUrl,
+} from '@/lib/workoutV4';
+import {
+  TRACKING_LABELS,
+  WORKOUT_CATEGORY_LABELS,
+} from '@/lib/workouts';
+import { cn } from '@/lib/utils';
+
+export const BODY_PART_LABEL_PT = {
+  chest: 'Peitoral',
+  back: 'Costas',
+  'upper arms': 'Braços',
+  shoulders: 'Ombros',
+  'upper legs': 'Pernas',
+  waist: 'Abdômen',
+  'lower legs': 'Panturrilhas',
+  'lower arms': 'Antebraço',
+  cardio: 'Cardio',
+  neck: 'Pescoço',
+};
+
+export const EQUIPMENT_LABEL_PT = {
+  'body weight': 'Peso corporal',
+  dumbbell: 'Halteres',
+  barbell: 'Barra',
+  cable: 'Polia / Cabo',
+  'leverage machine': 'Máquina',
+  band: 'Elástico',
+  'smith machine': 'Smith',
+  kettlebell: 'Kettlebell',
+  weighted: 'Com carga',
+  'stability ball': 'Bola suíça',
+  'medicine ball': 'Medicine ball',
+  'ez barbell': 'Barra W / EZ',
+  roller: 'Rolo de liberação',
+  'wheel roller': 'Roda abdominal',
+  assisted: 'Assistido',
+  'trap bar': 'Barra hexagonal',
+  rope: 'Corda',
+  'bosu ball': 'Bosu',
+};
+
+export function formatBodyPart(bodyPart) {
+  if (!bodyPart || typeof bodyPart !== 'string') return null;
+  const key = bodyPart.trim().toLowerCase();
+  return BODY_PART_LABEL_PT[key] || bodyPart;
+}
+
+export function formatEquipment(equipment) {
+  if (!equipment || typeof equipment !== 'string') return null;
+  const key = equipment.trim().toLowerCase();
+  return EQUIPMENT_LABEL_PT[key] || equipment;
+}
+
+export function formatMuscleName(muscle) {
+  if (!muscle || typeof muscle !== 'string') return null;
+  const canonical = aliasMuscle(muscle);
+  if (canonical && MUSCLE_LABEL_PT[canonical]) {
+    return MUSCLE_LABEL_PT[canonical];
+  }
+  return muscle;
+}
+
+export function extractInstructionSteps(exercise) {
+  if (!exercise) return [];
+
+  if (exercise.instructions_json) {
+    try {
+      const parsed =
+        typeof exercise.instructions_json === 'string'
+          ? JSON.parse(exercise.instructions_json)
+          : exercise.instructions_json;
+
+      if (parsed) {
+        if (Array.isArray(parsed.pt) && parsed.pt.length > 0) {
+          return parsed.pt;
+        }
+        if (Array.isArray(parsed.en) && parsed.en.length > 0) {
+          return parsed.en;
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Fall through to plain text
+    }
+  }
+
+  if (exercise.instructions && typeof exercise.instructions === 'string') {
+    const raw = exercise.instructions.trim();
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // Fall through
+      }
+    }
+    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length > 0) return lines;
+  }
+
+  return [];
+}
+
+export function extractSecondaryMuscles(exercise) {
+  if (!exercise) return [];
+  const raw = exercise.secondary_muscles_json || exercise.secondary_muscles;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+export default function ExerciseDetailSheet({
+  open,
+  onOpenChange,
+  exercise,
+  onAddToDay,
+  canAddToDay = false,
+  currentDayName = null,
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  if (!exercise) return null;
+
+  const imageUrl = !imgError ? thumbUrl(exercise) : null;
+  const isCatalog = exercise.source === 'catalog' || (!exercise.is_custom && exercise.catalog_external_id);
+  const targetMuscleDisplay =
+    formatMuscleName(exercise.target_muscle) ||
+    formatMuscleName(exercise.muscle_group) ||
+    exercise.target_muscle ||
+    exercise.muscle_group ||
+    'Geral';
+  const bodyPartDisplay = formatBodyPart(exercise.body_part);
+  const equipmentDisplay = formatEquipment(exercise.equipment || exercise.equipment_key) || exercise.equipment || 'Livre';
+  const secondaryMuscles = extractSecondaryMuscles(exercise);
+  const steps = extractInstructionSteps(exercise);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[calc(100%-1.25rem)] max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-0 gap-0 border border-border/80 bg-background/98 shadow-2xl">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 border-b border-border/70 bg-background/95 px-5 pb-3.5 pt-5 backdrop-blur">
+          <DialogHeader className="pr-7 text-left">
+            <div className="flex flex-wrap items-center gap-1.5 pb-1">
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] uppercase tracking-wider font-semibold',
+                  isCatalog
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border bg-secondary/50 text-muted-foreground',
+                )}
+              >
+                {isCatalog ? 'Catálogo' : 'Personalizado'}
+              </Badge>
+              {exercise.category ? (
+                <Badge variant="secondary" className="text-[10px] font-medium">
+                  {WORKOUT_CATEGORY_LABELS[exercise.category] || exercise.category}
+                </Badge>
+              ) : null}
+              {exercise.tracking_type ? (
+                <Badge variant="secondary" className="text-[10px] font-medium">
+                  {TRACKING_LABELS[exercise.tracking_type] || exercise.tracking_type}
+                </Badge>
+              ) : null}
+            </div>
+            <DialogTitle className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              {exercise.name}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {targetMuscleDisplay} · {equipmentDisplay}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        {/* Scrollable Content Body */}
+        <div className="space-y-5 p-5">
+          {/* Media Frame */}
+          <div className="group relative overflow-hidden rounded-2xl border border-border/70 bg-secondary/20 flex flex-col items-center justify-center min-h-[200px] sm:min-h-[230px]">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={exercise.name}
+                loading="lazy"
+                onError={() => setImgError(true)}
+                className="max-h-56 sm:max-h-64 w-auto object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground gap-2.5">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border/70 bg-card/40 text-primary/80">
+                  <Dumbbell className="h-7 w-7" aria-hidden />
+                </div>
+                <span className="text-xs font-medium">Exercício sem prévia de mídia</span>
+              </div>
+            )}
+
+            {/* Attribution Footer */}
+            <div className="w-full border-t border-border/60 bg-background/60 px-3.5 py-1.5 text-center">
+              <a
+                href="https://gymvisual.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/80 transition-colors hover:text-primary"
+              >
+                <span>{MEDIA_ATTRIBUTION}</span>
+                <ExternalLink className="h-2.5 w-2.5" aria-hidden />
+              </a>
+            </div>
+          </div>
+
+          {/* Anatomy & Target Grid */}
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div className="rounded-xl border border-border/70 bg-card/30 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                <Target className="h-3.5 w-3.5" aria-hidden />
+                <span>Alvo principal</span>
+              </div>
+              <p className="mt-1.5 text-sm font-semibold text-foreground">
+                {targetMuscleDisplay}
+              </p>
+            </div>
+
+            {bodyPartDisplay ? (
+              <div className="rounded-xl border border-border/70 bg-card/30 p-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Flame className="h-3.5 w-3.5" aria-hidden />
+                  <span>Região</span>
+                </div>
+                <p className="mt-1.5 text-sm font-semibold text-foreground">
+                  {bodyPartDisplay}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="rounded-xl border border-border/70 bg-card/30 p-3 col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <Wrench className="h-3.5 w-3.5" aria-hidden />
+                <span>Equipamento</span>
+              </div>
+              <p className="mt-1.5 text-sm font-semibold text-foreground">
+                {equipmentDisplay}
+              </p>
+            </div>
+          </div>
+
+          {/* Secondary Muscles */}
+          {secondaryMuscles.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card/20 p-3.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <Layers className="h-3.5 w-3.5 text-primary" aria-hidden />
+                <span>Músculos secundários / sinergistas</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {secondaryMuscles.map((muscleItem, idx) => (
+                  <Badge
+                    key={idx}
+                    variant="outline"
+                    className="border-border/80 bg-background/50 text-xs font-normal"
+                  >
+                    {formatMuscleName(muscleItem) || muscleItem}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Execution Steps */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <ListOrdered className="h-4 w-4 text-primary" aria-hidden />
+                <span>Instruções de execução</span>
+              </h3>
+              {steps.length > 0 ? (
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {steps.length} {steps.length === 1 ? 'passo' : 'passos'}
+                </span>
+              ) : null}
+            </div>
+
+            {steps.length > 0 ? (
+              <div className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card/25 overflow-hidden">
+                {steps.map((step, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 text-xs sm:text-sm leading-relaxed">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold tabular-nums text-primary">
+                      {idx + 1}
+                    </span>
+                    <p className="text-muted-foreground">{step}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/70 p-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Instruções detalhadas não cadastradas para este exercício.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sticky Action Footer */}
+        <div className="sticky bottom-0 z-10 border-t border-border/70 bg-background/95 p-4 backdrop-blur">
+          <Button
+            type="button"
+            className="h-12 w-full rounded-xl text-sm font-semibold shadow-md"
+            onClick={() => onAddToDay?.(exercise)}
+          >
+            <Plus className="mr-2 h-4 w-4" aria-hidden />
+            {canAddToDay && currentDayName
+              ? `Adicionar a ${currentDayName}`
+              : 'Adicionar ao dia'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

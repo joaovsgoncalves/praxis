@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { WORKOUT_CATEGORIES, WORKOUT_TRACKING_TYPES, TRACKING_LABELS, WORKOUT_CATEGORY_LABELS } from '@/lib/workouts';
+import { thumbUrl } from '@/lib/workoutV4';
 
 const EMPTY_CUSTOM = {
   name: '',
@@ -194,30 +195,37 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
                   {[0, 1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-secondary/50" />)}
                 </div>
               ) : visibleExercises.length ? (
-                visibleExercises.map((exercise) => (
-                  <button
-                    key={exercise.id}
-                    type="button"
-                    onClick={() => {
-                      onSelect?.(exercise);
-                      onOpenChange(false);
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/35 px-4 py-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Sparkles className="h-4 w-4" aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{exercise.name}</p>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {WORKOUT_CATEGORY_LABELS[exercise.category] || 'Exercício'} · {TRACKING_LABELS[exercise.tracking_type] || 'Repetições'}
-                      </p>
-                    </div>
-                    {Number(exercise.usage_count) > 0 ? (
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{exercise.usage_count}× usado</span>
-                    ) : null}
-                  </button>
-                ))
+                visibleExercises.map((exercise) => {
+                  const img = thumbUrl(exercise);
+                  return (
+                    <button
+                      key={exercise.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect?.(exercise);
+                        onOpenChange(false);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/35 px-4 py-3 text-left transition-colors hover:border-primary/35 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary overflow-hidden border border-border/50">
+                        {img ? (
+                          <img src={img} alt={exercise.name} loading="lazy" className="h-full w-full object-contain p-0.5" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" aria-hidden />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{exercise.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {WORKOUT_CATEGORY_LABELS[exercise.category] || 'Exercício'} · {TRACKING_LABELS[exercise.tracking_type] || 'Repetições'}
+                        </p>
+                      </div>
+                      {Number(exercise.usage_count) > 0 ? (
+                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{exercise.usage_count}× usado</span>
+                      ) : null}
+                    </button>
+                  );
+                })
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/70 px-5 py-8 text-center">
                   <p className="text-sm font-semibold">Nada encontrado</p>

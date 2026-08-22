@@ -47,6 +47,40 @@ export const MUSCLE_LABEL_PT = {
   'tibialis': 'Tibial',
 };
 
+export const BODY_PART_LABEL_PT = {
+  'chest': 'Peitoral',
+  'back': 'Costas',
+  'upper arms': 'Braços',
+  'shoulders': 'Ombros',
+  'upper legs': 'Pernas',
+  'waist': 'Abdômen',
+  'lower legs': 'Panturrilhas',
+  'lower arms': 'Antebraço',
+  'cardio': 'Cardio',
+  'neck': 'Pescoço',
+};
+
+export const EQUIPMENT_LABEL_PT = {
+  'body weight': 'Peso corporal',
+  'dumbbell': 'Halteres',
+  'barbell': 'Barra',
+  'cable': 'Polia / Cabo',
+  'leverage machine': 'Máquina',
+  'band': 'Elástico',
+  'smith machine': 'Smith',
+  'kettlebell': 'Kettlebell',
+  'weighted': 'Com carga',
+  'stability ball': 'Bola suíça',
+  'medicine ball': 'Medicine ball',
+  'ez barbell': 'Barra W / EZ',
+  'roller': 'Rolo de liberação',
+  'wheel roller': 'Roda abdominal',
+  'assisted': 'Assistido',
+  'trap bar': 'Barra hexagonal',
+  'rope': 'Corda',
+  'bosu ball': 'Bosu',
+};
+
 const MUSCLE_ALIAS_MAP = {
   // trapezius
   'trapezius': 'trapezius',
@@ -220,4 +254,84 @@ export function aliasMuscle(raw) {
   }
 
   return null;
+}
+
+export function formatBodyPart(bodyPart) {
+  if (!bodyPart || typeof bodyPart !== 'string') return null;
+  const key = bodyPart.trim().toLowerCase();
+  return BODY_PART_LABEL_PT[key] || bodyPart;
+}
+
+export function formatEquipment(equipment) {
+  if (!equipment || typeof equipment !== 'string') return null;
+  const key = equipment.trim().toLowerCase();
+  return EQUIPMENT_LABEL_PT[key] || equipment;
+}
+
+export function formatMuscleName(muscle) {
+  if (!muscle || typeof muscle !== 'string') return null;
+  const canonical = aliasMuscle(muscle);
+  if (canonical && MUSCLE_LABEL_PT[canonical]) {
+    return MUSCLE_LABEL_PT[canonical];
+  }
+  return muscle;
+}
+
+export function extractInstructionSteps(exercise) {
+  if (!exercise) return [];
+
+  if (exercise.instructions_json) {
+    try {
+      const parsed =
+        typeof exercise.instructions_json === 'string'
+          ? JSON.parse(exercise.instructions_json)
+          : exercise.instructions_json;
+
+      if (parsed) {
+        if (Array.isArray(parsed.pt) && parsed.pt.length > 0) {
+          return parsed.pt;
+        }
+        if (Array.isArray(parsed.en) && parsed.en.length > 0) {
+          return parsed.en;
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Fall through to plain text parsing
+    }
+  }
+
+  if (exercise.instructions && typeof exercise.instructions === 'string') {
+    const raw = exercise.instructions.trim();
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // Fall through
+      }
+    }
+    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length > 0) return lines;
+  }
+
+  return [];
+}
+
+export function extractSecondaryMuscles(exercise) {
+  if (!exercise) return [];
+  const raw = exercise.secondary_muscles_json || exercise.secondary_muscles;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
 }

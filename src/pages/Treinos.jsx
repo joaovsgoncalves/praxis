@@ -22,6 +22,7 @@ import WorkoutProgramDialog from '@/components/workouts/WorkoutProgramDialog';
 import WorkoutProgramEditor from '@/components/workouts/WorkoutProgramEditor';
 import WorkoutSessionView from '@/components/workouts/WorkoutSessionView';
 import WorkoutHistory from '@/components/workouts/WorkoutHistory';
+import WorkoutLibrary from '@/components/workouts/WorkoutLibrary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -31,6 +32,7 @@ import { formatSeconds, formatWorkoutTarget, workoutDayShortLabel } from '@/lib/
 
 const TABS = [
   { id: 'hoje', label: 'Hoje', icon: Play },
+  { id: 'biblioteca', label: 'Biblioteca', icon: Dumbbell },
   { id: 'programa', label: 'Programa', icon: ListChecks },
   { id: 'historico', label: 'Histórico', icon: History },
 ];
@@ -133,28 +135,7 @@ export default function Treinos() {
         />
       ) : null}
 
-      {!isLoading && !isError && !program ? (
-        <>
-          <PraxisEmptyState
-            icon={Dumbbell}
-            title="Monta teu primeiro programa"
-            description="Cria o ciclo, adiciona os dias e define exercícios, séries, repetições e descanso."
-            action={(
-              <Button type="button" className="rounded-full" onClick={() => setProgramDialogOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" /> Criar programa
-              </Button>
-            )}
-          />
-          <WorkoutProgramDialog
-            open={programDialogOpen}
-            onOpenChange={setProgramDialogOpen}
-            onSubmit={(data) => createProgram.mutate(data)}
-            busy={createProgram.isPending}
-          />
-        </>
-      ) : null}
-
-      {program ? (
+      {!isLoading && (!isError || summary) ? (
         <>
           {activeSession ? (
             <Card className="border-primary/35 bg-primary/10 shadow-none">
@@ -177,7 +158,7 @@ export default function Treinos() {
           ) : null}
 
           <div
-            className="grid grid-cols-3 gap-1 rounded-full bg-secondary/40 p-1"
+            className="grid grid-cols-4 gap-1 rounded-full bg-secondary/40 p-1"
             role="tablist"
             aria-label="Seções de treinos"
           >
@@ -191,15 +172,15 @@ export default function Treinos() {
                   aria-selected={tab === item.id}
                   onClick={() => setTab(item.id)}
                   className={cn(
-                    'flex min-h-11 items-center justify-center gap-1.5 rounded-full px-2 py-2 text-xs font-medium transition-colors sm:text-sm',
+                    'flex min-h-10 items-center justify-center gap-1 rounded-full px-1.5 py-1.5 text-[11px] font-medium transition-colors sm:min-h-11 sm:gap-1.5 sm:px-2 sm:py-2 sm:text-sm',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     tab === item.id
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-background text-foreground shadow-sm font-semibold'
                       : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" aria-hidden />
-                  {item.label}
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">{item.label}</span>
                 </button>
               );
             })}
@@ -207,30 +188,80 @@ export default function Treinos() {
 
           <div role="tabpanel" className="space-y-5">
             {tab === 'hoje' ? (
-              <TodayWorkout
-                program={program}
-                currentDay={currentDay}
-                activeSession={activeSession}
-                totalCompleted={summary?.total_completed || 0}
-                onStart={(dayId) => startSession.mutate(dayId)}
-                onContinue={() => setActiveSessionId(activeSession?.id)}
-                starting={startSession.isPending}
-                onAdvanceRest={() => advanceRest.mutate({ programId: program.id, dayId: currentDay.id })}
-                advancingRest={advanceRest.isPending}
+              program ? (
+                <TodayWorkout
+                  program={program}
+                  currentDay={currentDay}
+                  activeSession={activeSession}
+                  totalCompleted={summary?.total_completed || 0}
+                  onStart={(dayId) => startSession.mutate(dayId)}
+                  onContinue={() => setActiveSessionId(activeSession?.id)}
+                  starting={startSession.isPending}
+                  onAdvanceRest={() => advanceRest.mutate({ programId: program.id, dayId: currentDay.id })}
+                  advancingRest={advanceRest.isPending}
+                  onOpenProgram={() => setTab('programa')}
+                />
+              ) : (
+                <>
+                  <PraxisEmptyState
+                    icon={Dumbbell}
+                    title="Monta teu primeiro programa"
+                    description="Cria o ciclo, adiciona os dias e define exercícios, séries, repetições e descanso."
+                    action={(
+                      <Button type="button" className="rounded-full" onClick={() => setProgramDialogOpen(true)}>
+                        <Plus className="mr-1.5 h-4 w-4" /> Criar programa
+                      </Button>
+                    )}
+                  />
+                  <WorkoutProgramDialog
+                    open={programDialogOpen}
+                    onOpenChange={setProgramDialogOpen}
+                    onSubmit={(data) => createProgram.mutate(data)}
+                    busy={createProgram.isPending}
+                  />
+                </>
+              )
+            ) : null}
+
+            {tab === 'biblioteca' ? (
+              <WorkoutLibrary
+                summary={summary}
                 onOpenProgram={() => setTab('programa')}
               />
             ) : null}
 
             {tab === 'programa' ? (
-              <WorkoutProgramEditor
-                program={program}
-                programs={programs}
-                activeSession={activeSession}
-                onStart={(dayId) => startSession.mutate(dayId)}
-                onContinue={() => setActiveSessionId(activeSession?.id)}
-                starting={startSession.isPending}
-              />
+              program ? (
+                <WorkoutProgramEditor
+                  program={program}
+                  programs={programs}
+                  activeSession={activeSession}
+                  onStart={(dayId) => startSession.mutate(dayId)}
+                  onContinue={() => setActiveSessionId(activeSession?.id)}
+                  starting={startSession.isPending}
+                />
+              ) : (
+                <>
+                  <PraxisEmptyState
+                    icon={ListChecks}
+                    title="Nenhum programa configurado"
+                    description="Cria o ciclo, adiciona os dias e define teus exercícios."
+                    action={(
+                      <Button type="button" className="rounded-full" onClick={() => setProgramDialogOpen(true)}>
+                        <Plus className="mr-1.5 h-4 w-4" /> Criar programa
+                      </Button>
+                    )}
+                  />
+                  <WorkoutProgramDialog
+                    open={programDialogOpen}
+                    onOpenChange={setProgramDialogOpen}
+                    onSubmit={(data) => createProgram.mutate(data)}
+                    busy={createProgram.isPending}
+                  />
+                </>
+              )
             ) : null}
+
             {tab === 'historico' ? <WorkoutHistory /> : null}
           </div>
         </>

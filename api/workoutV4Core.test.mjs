@@ -3,7 +3,14 @@ import { describe, test } from 'node:test';
 import {
   MUSCLES as API_MUSCLES,
   MUSCLE_LABEL_PT as API_MUSCLE_LABEL_PT,
+  BODY_PART_LABEL_PT as API_BODY_PART_LABEL_PT,
+  EQUIPMENT_LABEL_PT as API_EQUIPMENT_LABEL_PT,
   aliasMuscle as apiAliasMuscle,
+  formatBodyPart as apiFormatBodyPart,
+  formatEquipment as apiFormatEquipment,
+  formatMuscleName as apiFormatMuscleName,
+  extractInstructionSteps as apiExtractInstructionSteps,
+  extractSecondaryMuscles as apiExtractSecondaryMuscles,
   CDN_IMG_BASE as API_CDN_IMG_BASE,
   CDN_GIF_BASE as API_CDN_GIF_BASE,
   MEDIA_ATTRIBUTION as API_MEDIA_ATTRIBUTION,
@@ -15,7 +22,14 @@ import {
 import {
   MUSCLES as FRONT_MUSCLES,
   MUSCLE_LABEL_PT as FRONT_MUSCLE_LABEL_PT,
+  BODY_PART_LABEL_PT as FRONT_BODY_PART_LABEL_PT,
+  EQUIPMENT_LABEL_PT as FRONT_EQUIPMENT_LABEL_PT,
   aliasMuscle as frontAliasMuscle,
+  formatBodyPart as frontFormatBodyPart,
+  formatEquipment as frontFormatEquipment,
+  formatMuscleName as frontFormatMuscleName,
+  extractInstructionSteps as frontExtractInstructionSteps,
+  extractSecondaryMuscles as frontExtractSecondaryMuscles,
   CDN_IMG_BASE as FRONT_CDN_IMG_BASE,
   CDN_GIF_BASE as FRONT_CDN_GIF_BASE,
   MEDIA_ATTRIBUTION as FRONT_MEDIA_ATTRIBUTION,
@@ -244,6 +258,80 @@ describe('workoutV4Core — media URLs & attribution', () => {
       assert.equal(gifFn(null), null);
       assert.equal(gifFn({}), null);
       assert.equal(gifFn(''), null);
+    }
+  });
+});
+
+describe('Treinos V4 Fase 4 — Biblioteca UI helpers & formatting', () => {
+  test('formatBodyPart translates canonical and raw body parts to PT', () => {
+    for (const fn of [apiFormatBodyPart, frontFormatBodyPart]) {
+      assert.equal(fn('chest'), 'Peitoral');
+      assert.equal(fn('back'), 'Costas');
+      assert.equal(fn('upper arms'), 'Braços');
+      assert.equal(fn('shoulders'), 'Ombros');
+      assert.equal(fn('upper legs'), 'Pernas');
+      assert.equal(fn('waist'), 'Abdômen');
+      assert.equal(fn('lower legs'), 'Panturrilhas');
+      assert.equal(fn('lower arms'), 'Antebraço');
+      assert.equal(fn('cardio'), 'Cardio');
+      assert.equal(fn(null), null);
+      assert.equal(fn(''), null);
+      assert.equal(fn('custom_part'), 'custom_part');
+    }
+  });
+
+  test('formatEquipment translates equipment keys to PT', () => {
+    for (const fn of [apiFormatEquipment, frontFormatEquipment]) {
+      assert.equal(fn('body weight'), 'Peso corporal');
+      assert.equal(fn('dumbbell'), 'Halteres');
+      assert.equal(fn('barbell'), 'Barra');
+      assert.equal(fn('cable'), 'Polia / Cabo');
+      assert.equal(fn('leverage machine'), 'Máquina');
+      assert.equal(fn('band'), 'Elástico');
+      assert.equal(fn('smith machine'), 'Smith');
+      assert.equal(fn('kettlebell'), 'Kettlebell');
+      assert.equal(fn(null), null);
+    }
+  });
+
+  test('formatMuscleName returns translated canonical PT name or raw string', () => {
+    for (const fn of [apiFormatMuscleName, frontFormatMuscleName]) {
+      assert.equal(fn('pectorals'), 'Peitoral');
+      assert.equal(fn('lats'), 'Dorsal');
+      assert.equal(fn('biceps'), 'Bíceps');
+      assert.equal(fn('quads'), 'Quadríceps');
+      assert.equal(fn('abs'), 'Abdômen');
+      assert.equal(fn('delts'), 'Deltoides');
+      assert.equal(fn(null), null);
+    }
+  });
+
+  test('extractInstructionSteps handles EN/PT step arrays and string JSON', () => {
+    for (const fn of [apiExtractInstructionSteps, frontExtractInstructionSteps]) {
+      const enSteps = ['Lie flat on bench', 'Lower bar to mid chest', 'Press up to lock out'];
+      assert.deepEqual(fn({ instructions_json: JSON.stringify({ en: enSteps }) }), enSteps);
+      assert.deepEqual(fn({ instructions_json: { en: enSteps } }), enSteps);
+
+      const ptSteps = ['Deite no banco', 'Desça a barra'];
+      assert.deepEqual(fn({ instructions_json: { en: enSteps, pt: ptSteps } }), ptSteps);
+
+      const arrayJson = ['Passo 1', 'Passo 2'];
+      assert.deepEqual(fn({ instructions_json: JSON.stringify(arrayJson) }), arrayJson);
+
+      const plainText = 'Passo 1\nPasso 2';
+      assert.deepEqual(fn({ instructions: plainText }), ['Passo 1', 'Passo 2']);
+
+      assert.deepEqual(fn(null), []);
+      assert.deepEqual(fn({}), []);
+    }
+  });
+
+  test('extractSecondaryMuscles parses JSON arrays, objects, and lists', () => {
+    for (const fn of [apiExtractSecondaryMuscles, frontExtractSecondaryMuscles]) {
+      assert.deepEqual(fn({ secondary_muscles_json: '["triceps", "deltoids"]' }), ['triceps', 'deltoids']);
+      assert.deepEqual(fn({ secondary_muscles: ['triceps', 'deltoids'] }), ['triceps', 'deltoids']);
+      assert.deepEqual(fn({ secondary_muscles_json: 'triceps, deltoids' }), ['triceps', 'deltoids']);
+      assert.deepEqual(fn(null), []);
     }
   });
 });
