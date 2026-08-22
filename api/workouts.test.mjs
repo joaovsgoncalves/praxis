@@ -1420,3 +1420,161 @@ describe("Treinos V4 Fase 8 — 1RM API and stats", () => {
   });
 
 });
+
+describe("Treinos V4 Fase 10 — Muscle Map Fatigue & Strength API", () => {
+  let db;
+  let server;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("GET /api/workouts/muscle-map supports fatigue, strength, and invalid mode error validation", async () => {
+    const request = (p, opts) => requestJson(server.base, p, opts);
+
+    // 1. Invalid mode returns 400 in Portuguese
+    await assert.rejects(
+      () => request("/api/workouts/muscle-map?mode=invalido"),
+      /400.*Modo inválido/,
+    );
+
+    // 2. Setup program with Bench Press (chest) and Leg Press (quadriceps)
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Fase 10 Program" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Dia Full" },
+    });
+    const day = program.days[0];
+
+    const bench = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Supino Fase 10",
+        category: "strength",
+        body_part: "chest",
+        target_muscle: "chest",
+        secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+      },
+    });
+
+    const squat = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Agachamento Fase 10",
+        category: "strength",
+        body_part: "upper legs",
+        target_muscle: "quadriceps",
+        secondary_muscles_json: JSON.stringify(["gluteal"]),
+      },
+    });
+
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: bench.id, target_sets: 2 },
+    });
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: squat.id, target_sets: 1 },
+    });
+
+    // Start and complete session with Bench (80kg x 10 = 106.7kg 1RM) and Squat (120kg x 10 = 160kg 1RM)
+    const session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: day.id },
+    });
+
+    const benchSessionEx = session.exercises.find((e) => e.exercise_id === bench.id);
+    const squatSessionEx = session.exercises.find((e) => e.exercise_id === squat.id);
+
+    // Bench: 2 work sets (80kg x 10 reps -> 1RM = 106.7)
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: benchSessionEx.id,
+        weight_kg: 80,
+        reps: 10,
+        set_role: "work",
+      },
+    });
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: benchSessionEx.id,
+        weight_kg: 80,
+        reps: 10,
+        set_role: "work",
+      },
+    });
+
+    // Squat: 1 work set (120kg x 10 reps -> 1RM = 160.0)
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: squatSessionEx.id,
+        weight_kg: 120,
+        reps: 10,
+        set_role: "work",
+      },
+    });
+
+    await request("/api/workouts/sessions/" + session.id + "/finish", {
+      method: "POST",
+      body: {},
+    });
+
+    // 3. Query Mode: Balance
+    const balanceMap = await request("/api/workouts/muscle-map?mode=balance&days=14");
+    assert.equal(balanceMap.mode, "balance");
+    const balChest = balanceMap.muscles.find((m) => m.id === "chest");
+    const balQuads = balanceMap.muscles.find((m) => m.id === "quadriceps");
+    // Bench had 2 sets, Squat had 1 set -> Chest maxRaw = 2.0 (score 1.0), Quads = 1.0 (score 0.5)
+    assert.equal(balChest.raw, 2.0);
+    assert.equal(balChest.score, 1.0);
+    assert.equal(balChest.unit, "sets");
+    assert.equal(balQuads.raw, 1.0);
+    assert.equal(balQuads.score, 0.5);
+    assert.equal(balQuads.unit, "sets");
+    assert.equal(balanceMap.ranked.most[0], "chest");
+
+    // 4. Query Mode: Fatigue
+    const fatigueMap = await request("/api/workouts/muscle-map?mode=fatigue&days=14");
+    assert.equal(fatigueMap.mode, "fatigue");
+    const fatChest = fatigueMap.muscles.find((m) => m.id === "chest");
+    const fatQuads = fatigueMap.muscles.find((m) => m.id === "quadriceps");
+    assert.equal(fatChest.unit, "sets");
+    assert.equal(fatChest.score, 1.0);
+    assert.ok(fatChest.raw > 0);
+    assert.ok(fatQuads.raw > 0);
+
+    // 5. Query Mode: Strength (1RM)
+    const strengthMap = await request("/api/workouts/muscle-map?mode=strength&days=14");
+    assert.equal(strengthMap.mode, "strength");
+    const strChest = strengthMap.muscles.find((m) => m.id === "chest");
+    const strQuads = strengthMap.muscles.find((m) => m.id === "quadriceps");
+
+    // Squat (160kg) > Bench (106.7kg) -> Quads is #1 with score 1.0, Chest is #2 with score 0.67
+    assert.equal(strQuads.raw, 160.0);
+    assert.equal(strQuads.score, 1.0);
+    assert.equal(strQuads.unit, "kg");
+
+    assert.equal(strChest.raw, 106.7);
+    assert.equal(strChest.score, 0.67);
+    assert.equal(strChest.unit, "kg");
+
+    // In strength mode, quads ranks higher than chest, reversing the balance ranking!
+    assert.equal(strengthMap.ranked.most[0], "quadriceps");
+    assert.equal(strengthMap.ranked.most[1], "chest");
+  });
+});

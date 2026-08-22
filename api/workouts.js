@@ -675,7 +675,11 @@ export function registerWorkoutRoutes(app, db) {
 
   
   app.get('/api/workouts/muscle-map', handle((req, res) => {
-    const mode = text(req.query?.mode, 'balance').toLowerCase();
+    const rawMode = req.query?.mode != null ? String(req.query.mode).trim().toLowerCase() : 'balance';
+    if (rawMode && !['balance', 'fatigue', 'strength'].includes(rawMode)) {
+      return res.status(400).json({ error: 'Modo inválido. Escolha entre "balance", "fatigue" ou "strength".' });
+    }
+    const mode = rawMode || 'balance';
     const days = intOrNull(req.query?.days, { min: 1, max: 365 }) || 14;
     const now = new Date();
 

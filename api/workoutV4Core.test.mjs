@@ -32,6 +32,7 @@ import {
   bestEstimated1rm as apiBestEstimated1rm,
   format1rm as apiFormat1rm,
   computeBalanceMap as apiComputeBalanceMap,
+  computeMuscleMap as apiComputeMuscleMap,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -66,6 +67,7 @@ import {
   bestEstimated1rm as frontBestEstimated1rm,
   format1rm as frontFormat1rm,
   computeBalanceMap as frontComputeBalanceMap,
+  computeMuscleMap as frontComputeMuscleMap,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -1244,6 +1246,259 @@ describe("workoutV4Core — Fase 9 Muscle Map Balance", () => {
 
       assert.equal(back.raw, 1.0);
       assert.equal(abs.raw, 1.0);
+    }
+  });
+});
+
+describe("workoutV4Core — Fase 10 Muscle Map Fatigue & Strength", () => {
+  test("computeMuscleMap: fatigue mode applies exponential decay (halfLife = 7 days)", () => {
+    for (const computeFn of [apiComputeMuscleMap, frontComputeMuscleMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // Set 1: Today (0 days ago) -> decay = 1.0
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-22T20:00:00.000Z",
+          target_muscle: "chest",
+        },
+        // Set 2: Exactly 7 days ago (1 halfLife) -> decay = 0.5
+        {
+          id: "s2",
+          set_role: "work",
+          completed_at: "2026-08-15T20:00:00.000Z",
+          target_muscle: "upper-back",
+        },
+        // Set 3: Exactly 14 days ago (2 halfLifes) -> decay = 0.25
+        {
+          id: "s3",
+          set_role: "work",
+          completed_at: "2026-08-08T20:00:00.000Z",
+          target_muscle: "quadriceps",
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now, mode: "fatigue" });
+      assert.equal(res.mode, "fatigue");
+      assert.equal(res.days, 14);
+
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const back = res.muscles.find((m) => m.id === "upper-back");
+      const quads = res.muscles.find((m) => m.id === "quadriceps");
+      const biceps = res.muscles.find((m) => m.id === "biceps");
+
+      // Chest (0 days ago): 1.0 * (0.5 ** 0) = 1.0
+      assert.equal(chest.raw, 1.0);
+      assert.equal(chest.score, 1.0); // maxRaw = 1.0
+
+      // Upper back (7 days ago): 1.0 * (0.5 ** 1) = 0.5
+      assert.equal(back.raw, 0.5);
+      assert.equal(back.score, 0.5); // 0.5 / 1.0 = 0.5
+
+      // Quadriceps (14 days ago): 1.0 * (0.5 ** 2) = 0.25 -> rounded to 0.3 or 0.25
+      // Math.round(0.25 * 10) / 10 = 0.3
+      assert.equal(quads.raw, 0.3);
+      assert.equal(quads.score, 0.3);
+
+      assert.equal(biceps.raw, 0.0);
+      assert.equal(biceps.score, 0.0);
+
+      // Ranked most fadigado: chest > upper-back > quadriceps
+      assert.deepEqual(res.ranked.most, ["chest", "upper-back", "quadriceps"]);
+    }
+  });
+
+  test("computeMuscleMap: fatigue mode decays secondary muscles proportionately", () => {
+    for (const computeFn of [apiComputeMuscleMap, frontComputeMuscleMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // Bench Press 7 days ago -> primary chest 1.0 * 0.5 = 0.5, secondaries triceps/deltoids 0.4 * 0.5 = 0.2
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-15T20:00:00.000Z",
+          target_muscle: "chest",
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now, mode: "fatigue" });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const triceps = res.muscles.find((m) => m.id === "triceps");
+      const delts = res.muscles.find((m) => m.id === "deltoids");
+
+      assert.equal(chest.raw, 0.5);
+      assert.equal(chest.score, 1.0); // maxRaw = 0.5 -> 0.5 / 0.5 = 1.0
+      assert.equal(triceps.raw, 0.2);
+      assert.equal(triceps.score, 0.4); // 0.2 / 0.5 = 0.4
+      assert.equal(delts.raw, 0.2);
+      assert.equal(delts.score, 0.4);
+    }
+  });
+
+  test("computeMuscleMap: fatigue mode respects custom halfLife parameter", () => {
+    for (const computeFn of [apiComputeMuscleMap, frontComputeMuscleMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // 4 days ago with halfLife = 4 days -> decay = 0.5
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-18T20:00:00.000Z",
+          target_muscle: "chest",
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now, mode: "fatigue", halfLife: 4 });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      assert.equal(chest.raw, 0.5);
+    }
+  });
+
+  test("computeMuscleMap: strength mode computes best estimated 1RM per muscle and ranks primary target", () => {
+    for (const computeFn of [apiComputeMuscleMap, frontComputeMuscleMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // Bench press set 1: 80kg x 8 reps -> 1RM = 80 * (1 + 8/30) = 101.3
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "chest",
+          weight_kg: 80,
+          reps: 8,
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+        // Bench press set 2: 100kg x 10 reps -> 1RM = 100 * (1 + 10/30) = 133.3
+        {
+          id: "s2",
+          set_role: "work",
+          completed_at: "2026-08-20T10:05:00.000Z",
+          target_muscle: "chest",
+          weight_kg: 100,
+          reps: 10,
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+        // Bench press set 3: 90kg x 5 reps -> 1RM = 90 * (1 + 5/30) = 105.0
+        {
+          id: "s3",
+          set_role: "work",
+          completed_at: "2026-08-20T10:10:00.000Z",
+          target_muscle: "chest",
+          weight_kg: 90,
+          reps: 5,
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now, mode: "strength" });
+      assert.equal(res.mode, "strength");
+      assert.equal(res.days, 14);
+
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const triceps = res.muscles.find((m) => m.id === "triceps");
+      const delts = res.muscles.find((m) => m.id === "deltoids");
+      const legs = res.muscles.find((m) => m.id === "quadriceps");
+
+      // Chest best 1RM: 133.3 kg
+      assert.equal(chest.raw, 133.3);
+      assert.equal(chest.score, 1.0);
+      assert.equal(chest.unit, "kg");
+
+      // Primary only for strength clarity (as specified in TASK.md)
+      assert.equal(triceps.raw, 0);
+      assert.equal(triceps.score, 0);
+      assert.equal(delts.raw, 0);
+      assert.equal(delts.score, 0);
+      assert.equal(legs.raw, 0);
+      assert.equal(legs.score, 0);
+
+      // Ranked most: chest is #1
+      assert.deepEqual(res.ranked.most, ["chest"]);
+    }
+  });
+
+  test("computeMuscleMap: strength mode normalizes scores across multiple muscles", () => {
+    for (const computeFn of [apiComputeMuscleMap, frontComputeMuscleMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // Chest (Bench Press): 100kg x 10 reps -> 1RM = 133.3 kg
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "chest",
+          weight_kg: 100,
+          reps: 10,
+        },
+        // Quadriceps (Squat / Leg Press): 200kg x 10 reps -> 1RM = 200 * (1 + 10/30) = 266.7 kg
+        {
+          id: "s2",
+          set_role: "work",
+          completed_at: "2026-08-21T10:00:00.000Z",
+          target_muscle: "quadriceps",
+          weight_kg: 200,
+          reps: 10,
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now, mode: "strength" });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const quads = res.muscles.find((m) => m.id === "quadriceps");
+
+      // Max 1RM is quadriceps (266.7 kg) -> score = 1.0
+      assert.equal(quads.raw, 266.7);
+      assert.equal(quads.score, 1.0);
+      assert.equal(quads.unit, "kg");
+
+      // Chest: 133.3 / 266.7 = 0.50
+      assert.equal(chest.raw, 133.3);
+      assert.equal(chest.score, 0.5);
+      assert.equal(chest.unit, "kg");
+
+      assert.deepEqual(res.ranked.most, ["quadriceps", "chest"]);
+    }
+  });
+
+  test("computeMuscleMap: strength mode skips bodyweight sets without kg and warmup sets", () => {
+    for (const computeFn of [apiComputeMuscleMap, frontComputeMuscleMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // Bodyweight pullups (no kg)
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "upper-back",
+          weight_kg: null,
+          reps: 12,
+        },
+        // Bodyweight pushups with 0 kg
+        {
+          id: "s2",
+          set_role: "work",
+          completed_at: "2026-08-20T10:05:00.000Z",
+          target_muscle: "chest",
+          weight_kg: 0,
+          reps: 20,
+        },
+        // Warmup heavy squat: 150kg x 5 reps -> MUST be skipped
+        {
+          id: "s3",
+          set_role: "warmup",
+          completed_at: "2026-08-20T10:10:00.000Z",
+          target_muscle: "quadriceps",
+          weight_kg: 150,
+          reps: 5,
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now, mode: "strength" });
+      for (const m of res.muscles) {
+        assert.equal(m.raw, 0);
+        assert.equal(m.score, 0);
+      }
+      assert.deepEqual(res.ranked.most, []);
     }
   });
 });

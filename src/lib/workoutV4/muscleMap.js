@@ -1,35 +1,43 @@
 /**
- * Praxis Treinos V4 — Muscle Map Balance (Fase 9)
+ * Praxis Treinos V4 — Muscle Map (Fase 9 & Fase 10: Balance, Fatigue, Strength)
  *
- * Computes work-set volume aggregated by canonical muscle over a time window.
+ * Computes muscle metrics over a time window for 3 distinct modes:
+ * - "balance": completed work-set volume (primary 1.0, secondary 0.4). unit = "sets"
+ * - "fatigue": exponential decay by age days with halfLife = 7 days. unit = "sets"
+ * - "strength": best estimated 1RM (Epley) from work sets targeting each muscle. unit = "kg"
  */
 import {
   MUSCLES,
   MUSCLE_LABEL_PT,
   aliasMuscle,
   extractSecondaryMuscles,
-} from './muscles.js';
-import { isWarmupSet } from './pr.js';
+} from "./muscles.js";
+import { isWarmupSet } from "./pr.js";
+import { estimate1rm } from "./oneRm.js";
 
 /**
- * Aggregates work-set volume by canonical muscle over a time window.
+ * Computes muscle map payload for a given mode ("balance" | "fatigue" | "strength").
  *
  * @param {Array<Object>} setsWithExerciseMeta List of completed set records with exercise metadata.
- * @param {Object} [options] Configuration options ({ days, now, mode }).
- * @returns {Object} Muscle balance map payload.
+ * @param {Object} [options] Configuration options ({ days, now, mode, halfLife }).
+ * @returns {Object} Muscle map payload.
  */
-export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
+export function computeMuscleMap(setsWithExerciseMeta = [], options = {}) {
   const {
     days = 14,
     now = new Date(),
-    mode = 'balance',
+    mode = "balance",
+    halfLife = 7,
   } = options || {};
 
+  const validMode = (mode || "balance").toLowerCase();
   const numDays = Math.max(1, Number(days) || 14);
+  const halfLifeDays = Math.max(0.1, Number(halfLife) || 7);
+
   const nowMs =
-    typeof now === 'number'
+    typeof now === "number"
       ? now
-      : typeof now === 'string'
+      : typeof now === "string"
         ? new Date(now).getTime()
         : now instanceof Date
           ? now.getTime()
@@ -50,12 +58,12 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
       if (!set) continue;
 
       // Exclude warmup sets
-      if (set.set_role === 'warmup' || isWarmupSet(set)) {
+      if (set.set_role === "warmup" || isWarmupSet(set)) {
         continue;
       }
 
       // Exclude abandoned or incomplete sessions if session status is provided
-      if (set.session_status && set.session_status !== 'completed') {
+      if (set.session_status && set.session_status !== "completed") {
         continue;
       }
 
@@ -68,8 +76,9 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
         set.created_at ||
         null;
 
+      let setMs = null;
       if (setDateStr) {
-        const setMs = new Date(setDateStr).getTime();
+        setMs = new Date(setDateStr).getTime();
         if (Number.isFinite(setMs)) {
           if (setMs < fromMs || setMs > nowMs) {
             continue;
@@ -89,34 +98,90 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
 
       const primaryCanonical = aliasMuscle(primaryCandidate);
 
-      if (primaryCanonical && rawAccumulator[primaryCanonical] !== undefined) {
-        rawAccumulator[primaryCanonical] += 1.0;
-      }
+      if (validMode === "strength") {
+        // Mode: Strength
+        // Uses best estimated 1RM from work sets targeting that muscle (primary only)
+        // Needs positive weight and reps; skips bodyweight-only without kg
+        const weight = set.weight_kg != null ? Number(set.weight_kg) : null;
+        const reps = set.reps != null ? Number(set.reps) : null;
 
-      // Secondary muscles resolution: each secondary contributes 0.4
-      const secondaries = extractSecondaryMuscles(set);
-      if (Array.isArray(secondaries) && secondaries.length > 0) {
-        const seenInThisSet = new Set();
-        if (primaryCanonical) {
-          seenInThisSet.add(primaryCanonical);
+        if (primaryCanonical && rawAccumulator[primaryCanonical] !== undefined) {
+          if (
+            weight !== null &&
+            reps !== null &&
+            Number.isFinite(weight) &&
+            Number.isFinite(reps) &&
+            weight > 0 &&
+            reps >= 1
+          ) {
+            const est1rm = estimate1rm(weight, reps);
+            if (est1rm !== null && est1rm > rawAccumulator[primaryCanonical]) {
+              rawAccumulator[primaryCanonical] = est1rm;
+            }
+          }
+        }
+      } else if (validMode === "fatigue") {
+        // Mode: Fatigue
+        // Exponential decay by days: weight * 0.5 ** (ageDays / halfLife)
+        let decay = 1.0;
+        if (Number.isFinite(setMs)) {
+          const ageDays = Math.max(0, (nowMs - setMs) / (24 * 60 * 60 * 1000));
+          decay = Math.pow(0.5, ageDays / halfLifeDays);
         }
 
-        for (const sec of secondaries) {
-          const secCanonical = aliasMuscle(sec);
-          if (
-            secCanonical &&
-            rawAccumulator[secCanonical] !== undefined &&
-            !seenInThisSet.has(secCanonical)
-          ) {
-            rawAccumulator[secCanonical] += 0.4;
-            seenInThisSet.add(secCanonical);
+        if (primaryCanonical && rawAccumulator[primaryCanonical] !== undefined) {
+          rawAccumulator[primaryCanonical] += 1.0 * decay;
+        }
+
+        const secondaries = extractSecondaryMuscles(set);
+        if (Array.isArray(secondaries) && secondaries.length > 0) {
+          const seenInThisSet = new Set();
+          if (primaryCanonical) {
+            seenInThisSet.add(primaryCanonical);
+          }
+
+          for (const sec of secondaries) {
+            const secCanonical = aliasMuscle(sec);
+            if (
+              secCanonical &&
+              rawAccumulator[secCanonical] !== undefined &&
+              !seenInThisSet.has(secCanonical)
+            ) {
+              rawAccumulator[secCanonical] += 0.4 * decay;
+              seenInThisSet.add(secCanonical);
+            }
+          }
+        }
+      } else {
+        // Mode: Balance (default)
+        if (primaryCanonical && rawAccumulator[primaryCanonical] !== undefined) {
+          rawAccumulator[primaryCanonical] += 1.0;
+        }
+
+        const secondaries = extractSecondaryMuscles(set);
+        if (Array.isArray(secondaries) && secondaries.length > 0) {
+          const seenInThisSet = new Set();
+          if (primaryCanonical) {
+            seenInThisSet.add(primaryCanonical);
+          }
+
+          for (const sec of secondaries) {
+            const secCanonical = aliasMuscle(sec);
+            if (
+              secCanonical &&
+              rawAccumulator[secCanonical] !== undefined &&
+              !seenInThisSet.has(secCanonical)
+            ) {
+              rawAccumulator[secCanonical] += 0.4;
+              seenInThisSet.add(secCanonical);
+            }
           }
         }
       }
     }
   }
 
-  // Round raw volumes to 1 decimal place and determine max volume
+  // Round raw values to 1 decimal place and determine max volume / 1RM
   let maxRaw = 0;
   for (const m of MUSCLES) {
     const rounded = Math.round(rawAccumulator[m] * 10) / 10;
@@ -125,6 +190,8 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
       maxRaw = rounded;
     }
   }
+
+  const unit = validMode === "strength" ? "kg" : "sets";
 
   // Format muscles array in canonical order
   const muscles = MUSCLES.map((id) => {
@@ -135,7 +202,7 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
       label: MUSCLE_LABEL_PT[id] || id,
       score,
       raw,
-      unit: 'sets',
+      unit,
     };
   });
 
@@ -150,7 +217,7 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
     .map((m) => m.id);
 
   return {
-    mode: mode || 'balance',
+    mode: validMode,
     days: numDays,
     muscles,
     window: {
@@ -162,4 +229,8 @@ export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
       least: leastTrained,
     },
   };
+}
+
+export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
+  return computeMuscleMap(setsWithExerciseMeta, options);
 }
