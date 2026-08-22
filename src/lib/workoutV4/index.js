@@ -12,3 +12,4 @@ export * from "./oneRm.js";
 export * from "./muscleMap.js";
 export * from "./heatmap.js";
 export * from "./superset.js";
+export * from "./names.js";

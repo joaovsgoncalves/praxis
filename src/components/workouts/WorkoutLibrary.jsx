@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { thumbUrl } from '@/lib/workoutV4';
+import { thumbUrl, displayExerciseName } from '@/lib/workoutV4';
 import ExerciseDetailSheet, {
   formatBodyPart,
   formatEquipment,
@@ -85,7 +85,7 @@ function ExerciseRowItem({ exercise, onSelect }) {
         {img ? (
           <img
             src={img}
-            alt={exercise.name}
+            alt={displayExerciseName(exercise)}
             loading="lazy"
             onError={() => setImgFailed(true)}
             className="h-full w-full object-contain p-1 transition-transform duration-200 group-hover:scale-105"
@@ -99,7 +99,7 @@ function ExerciseRowItem({ exercise, onSelect }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-            {exercise.name}
+            {displayExerciseName(exercise)}
           </p>
           {!isCatalog ? (
             <span className="shrink-0 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">

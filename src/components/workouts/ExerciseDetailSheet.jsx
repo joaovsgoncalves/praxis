@@ -27,6 +27,7 @@ import {
   thumbUrl,
   format1rm,
   preferSteps,
+  displayExerciseName,
 } from '@/lib/workoutV4';
 import {
   TRACKING_LABELS,
@@ -173,7 +174,7 @@ export default function ExerciseDetailSheet({
               ) : null}
             </div>
             <DialogTitle className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              {exercise.name}
+              {displayExerciseName(exercise)}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               {targetMuscleDisplay} · {equipmentDisplay}
@@ -188,7 +189,7 @@ export default function ExerciseDetailSheet({
             {imageUrl ? (
               <img
                 src={imageUrl}
-                alt={exercise.name}
+                alt={displayExerciseName(exercise)}
                 loading="lazy"
                 onError={() => setImgError(true)}
                 className="max-h-56 sm:max-h-64 w-auto object-contain p-3 transition-transform duration-300 group-hover:scale-105"

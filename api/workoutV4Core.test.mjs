@@ -43,6 +43,7 @@ import {
   shouldSkipAutoRest as apiShouldSkipAutoRest,
   isFreestyleSession as apiIsFreestyleSession,
   getSupersetPairIndices as apiGetSupersetPairIndices,
+  translateExerciseNameToPt as apiTranslateExerciseNameToPt,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -1794,5 +1795,19 @@ describe("workoutV4Core — Fase 12 Superset & Freestyle helpers", () => {
       assert.deepEqual(getIndicesFn(exercises, -1), []);
       assert.deepEqual(getIndicesFn(null, 0), []);
     }
+  });
+});
+
+describe('Treinos V4 — nomes PT do catálogo e alias composto', () => {
+  test('barbell bench press vira supino em PT', () => {
+    const pt = apiTranslateExerciseNameToPt('barbell bench press');
+    assert.match(pt.toLowerCase(), /supino/);
+    assert.doesNotMatch(pt.toLowerCase(), /barbell/);
+  });
+
+  test('aliasMuscle resolve muscle_group PT composto', () => {
+    assert.equal(apiAliasMuscle('Latíssimo, core, ombros'), 'upper-back');
+    assert.equal(apiAliasMuscle('Bíceps'), 'biceps');
+    assert.equal(apiAliasMuscle('Quadríceps, glúteo'), 'quadriceps');
   });
 });

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { detectPersonalRecord, estimate1rm, bestEstimated1rm, computeBalanceMap } from './lib/workoutV4Core.js';
+import { detectPersonalRecord, estimate1rm, bestEstimated1rm, computeBalanceMap, translateExerciseNameToPt } from './lib/workoutV4Core.js';
 
 export const WORKOUT_TRACKING_TYPES = [
   'reps',
@@ -255,6 +255,7 @@ export function initWorkoutSchema(db) {
     ['workout_exercises', 'instructions_json TEXT'],
     ['workout_exercises', 'equipment_key TEXT'],
     ['workout_exercises', 'is_bodyweight_default INTEGER DEFAULT 0'],
+    ['workout_exercises', 'name_pt TEXT'],
     ['workout_day_exercises', 'superset_group TEXT'],
     ['workout_session_exercises', 'superset_group TEXT'],
     ['workout_sessions', "kind TEXT DEFAULT 'program'"],
@@ -272,6 +273,35 @@ export function initWorkoutSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_workout_exercises_body_part ON workout_exercises(body_part);
     CREATE INDEX IF NOT EXISTS idx_workout_exercises_target_muscle ON workout_exercises(target_muscle);
   `);
+
+  try {
+    const pending = db.prepare(`
+      SELECT id, name FROM workout_exercises
+      WHERE source = 'catalog' AND (name_pt IS NULL OR trim(name_pt) = '')
+    `).all();
+    if (pending.length) {
+      const upd = db.prepare('UPDATE workout_exercises SET name_pt = ? WHERE id = ?');
+      const tx = db.transaction(() => {
+        for (const row of pending) {
+          upd.run(translateExerciseNameToPt(row.name), row.id);
+        }
+      });
+      tx();
+    }
+  } catch {
+    /* name_pt still migrating */
+  }
+}
+
+function presentExercise(row) {
+  if (!row) return row;
+  const translated = row.source === 'catalog' ? (row.name_pt || translateExerciseNameToPt(row.name)) : null;
+  const namePt = (translated || row.name_pt || '').trim() || null;
+  return {
+    ...row,
+    name_pt: namePt,
+    display_name: namePt || row.name,
+  };
 }
 
 function normalizeExerciseBody(body = {}, existing = null) {
@@ -1066,6 +1096,7 @@ export function registerWorkoutRoutes(app, db) {
     if (q) {
       whereClause += ` AND (
         LOWER(e.name) LIKE LOWER(?)
+        OR LOWER(COALESCE(e.name_pt, '')) LIKE LOWER(?)
         OR LOWER(COALESCE(e.muscle_group, '')) LIKE LOWER(?)
         OR LOWER(COALESCE(e.equipment, '')) LIKE LOWER(?)
         OR LOWER(COALESCE(e.equipment_key, '')) LIKE LOWER(?)
@@ -1073,7 +1104,7 @@ export function registerWorkoutRoutes(app, db) {
         OR LOWER(COALESCE(e.body_part, '')) LIKE LOWER(?)
       )`;
       const needle = `%${q}%`;
-      params.push(needle, needle, needle, needle, needle, needle);
+      params.push(needle, needle, needle, needle, needle, needle, needle);
     }
 
     if (bodyPart) {
@@ -1112,7 +1143,7 @@ export function registerWorkoutRoutes(app, db) {
       ORDER BY usage_count DESC, e.updated_at DESC, e.name ASC
       LIMIT ? OFFSET ?
     `;
-    const items = db.prepare(itemsSql).all(...params, limit, offset);
+    const items = db.prepare(itemsSql).all(...params, limit, offset).map(presentExercise);
 
     res.setHeader('X-Total-Count', String(total));
 
@@ -1136,7 +1167,7 @@ export function registerWorkoutRoutes(app, db) {
       WHERE e.id = ? AND e.status = 'active'
     `).get(req.params.id);
     if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
-    res.json(exercise);
+    res.json(presentExercise(exercise));
   }));
 
   app.get('/api/workouts/exercises/:id/stats', handle((req, res) => {

@@ -110,6 +110,8 @@ const MUSCLE_ALIAS_MAP = {
   "romboide": "upper-back",
   "latíssimo": "upper-back",
   "latissimo": "upper-back",
+  "escápula": "upper-back",
+  "escapula": "upper-back",
 
   // serratus (PT synonyms)
   "serrátil": "serratus",
@@ -373,20 +375,29 @@ export function aliasMuscle(raw) {
   const normalized = raw
     .trim()
     .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ');
 
   if (!normalized) return null;
 
-  if (MUSCLE_ALIAS_MAP[normalized]) {
-    return MUSCLE_ALIAS_MAP[normalized];
-  }
+  const tryKey = (key) => {
+    if (!key) return null;
+    if (MUSCLE_ALIAS_MAP[key]) return MUSCLE_ALIAS_MAP[key];
+    const hyphenated = key.replace(/\s+/g, '-');
+    if (MUSCLE_ALIAS_MAP[hyphenated]) return MUSCLE_ALIAS_MAP[hyphenated];
+    return null;
+  };
 
-  const hyphenated = normalized.replace(/\s+/g, '-');
-  if (MUSCLE_ALIAS_MAP[hyphenated]) {
-    return MUSCLE_ALIAS_MAP[hyphenated];
-  }
+  const direct = tryKey(normalized);
+  if (direct) return direct;
 
+  const parts = normalized.split(/[,;/]| e | and /).map((p) => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    const hit = tryKey(part);
+    if (hit) return hit;
+  }
   return null;
 }
 
@@ -1507,3 +1518,6 @@ export function getSupersetPairIndices(exercises = [], targetIndex = 0) {
   });
   return indices;
 }
+
+export { translateExerciseNameToPt, displayExerciseName } from '../../src/lib/workoutV4/names.js';
+

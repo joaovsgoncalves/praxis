@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { WORKOUT_CATEGORIES, WORKOUT_TRACKING_TYPES, TRACKING_LABELS, WORKOUT_CATEGORY_LABELS } from '@/lib/workouts';
-import { thumbUrl } from '@/lib/workoutV4';
+import { thumbUrl, displayExerciseName } from '@/lib/workoutV4';
 
 const EMPTY_CUSTOM = {
   name: '',
@@ -209,13 +209,13 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary overflow-hidden border border-border/50">
                         {img ? (
-                          <img src={img} alt={exercise.name} loading="lazy" className="h-full w-full object-contain p-0.5" />
+                          <img src={img} alt={displayExerciseName(exercise)} loading="lazy" className="h-full w-full object-contain p-0.5" />
                         ) : (
                           <Sparkles className="h-4 w-4" aria-hidden />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{exercise.name}</p>
+                        <p className="truncate text-sm font-semibold">{displayExerciseName(exercise)}</p>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
                           {WORKOUT_CATEGORY_LABELS[exercise.category] || 'Exercício'} · {TRACKING_LABELS[exercise.tracking_type] || 'Repetições'}
                         </p>
