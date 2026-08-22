@@ -1,3 +1,4 @@
+import "./translateExerciseInstructions.test.mjs";
 import fs from "node:fs";
 import { seedExerciseCatalog } from "../scripts/seed-exercise-catalog.mjs";
 import Database from 'better-sqlite3';

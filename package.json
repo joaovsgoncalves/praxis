@@ -24,7 +24,9 @@
     "prepush:check": "npm run lint && npm run build",
     "deploy:prod": "bash scripts/deploy-praxis-front.sh",
     "seed:exercise-catalog": "node scripts/seed-exercise-catalog.mjs",
-    "seed:exercise-catalog:apply": "node scripts/seed-exercise-catalog.mjs --apply"
+    "seed:exercise-catalog:apply": "node scripts/seed-exercise-catalog.mjs --apply",
+    "translate:exercise-pt": "node scripts/translate-exercise-instructions.mjs",
+    "translate:exercise-pt:apply": "node scripts/translate-exercise-instructions.mjs --apply"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

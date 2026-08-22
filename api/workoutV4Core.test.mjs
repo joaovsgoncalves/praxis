@@ -10,6 +10,7 @@ import {
   formatEquipment as apiFormatEquipment,
   formatMuscleName as apiFormatMuscleName,
   extractInstructionSteps as apiExtractInstructionSteps,
+  preferSteps as apiPreferSteps,
   extractSecondaryMuscles as apiExtractSecondaryMuscles,
   CDN_IMG_BASE as API_CDN_IMG_BASE,
   CDN_GIF_BASE as API_CDN_GIF_BASE,
@@ -54,6 +55,7 @@ import {
   formatEquipment as frontFormatEquipment,
   formatMuscleName as frontFormatMuscleName,
   extractInstructionSteps as frontExtractInstructionSteps,
+  preferSteps as frontPreferSteps,
   extractSecondaryMuscles as frontExtractSecondaryMuscles,
   CDN_IMG_BASE as FRONT_CDN_IMG_BASE,
   CDN_GIF_BASE as FRONT_CDN_GIF_BASE,
@@ -414,6 +416,45 @@ describe('Treinos V4 Fase 4 — Biblioteca UI helpers & formatting', () => {
 
       assert.deepEqual(fn(null), []);
       assert.deepEqual(fn({}), []);
+    }
+  });
+
+  test('preferSteps prefers PT when present, falls back to EN, and respects lang param', () => {
+    for (const fn of [apiPreferSteps, frontPreferSteps]) {
+      const enSteps = ['Step 1: Setup', 'Step 2: Press'];
+      const ptSteps = ['Passo 1: Preparação', 'Passo 2: Empurrar'];
+
+      // 1. Only EN present -> default (pt) returns EN
+      const enOnly = { instructions_json: JSON.stringify({ en: enSteps, pt: [] }) };
+      assert.deepEqual(fn(enOnly), enSteps);
+      assert.deepEqual(fn(enOnly, 'pt'), enSteps);
+      assert.deepEqual(fn(enOnly, 'en'), enSteps);
+
+      // 2. Both PT and EN present -> default (pt) returns PT, en returns EN
+      const both = { instructions_json: { en: enSteps, pt: ptSteps } };
+      assert.deepEqual(fn(both), ptSteps);
+      assert.deepEqual(fn(both, 'pt'), ptSteps);
+      assert.deepEqual(fn(both, 'en'), enSteps);
+
+      // 3. Only PT present -> lang=en falls back to PT
+      const ptOnly = { instructions_json: { en: [], pt: ptSteps } };
+      assert.deepEqual(fn(ptOnly, 'pt'), ptSteps);
+      assert.deepEqual(fn(ptOnly, 'en'), ptSteps);
+
+      // 4. Raw array JSON
+      assert.deepEqual(fn({ instructions_json: JSON.stringify(['Passo A', 'Passo B']) }), ['Passo A', 'Passo B']);
+
+      // 5. Plain text / custom instructions
+      assert.deepEqual(fn({ instructions: 'Passo 1\nPasso 2' }), ['Passo 1', 'Passo 2']);
+
+      // 6. Direct JSON string passed as exercise
+      assert.deepEqual(fn(JSON.stringify({ en: enSteps, pt: ptSteps })), ptSteps);
+
+      // 7. Edge cases
+      assert.deepEqual(fn(null), []);
+      assert.deepEqual(fn(undefined), []);
+      assert.deepEqual(fn({}), []);
+      assert.deepEqual(fn({ instructions_json: 'invalid json', instructions: 'Fallback line' }), ['Fallback line']);
     }
   });
 

@@ -26,6 +26,7 @@ import {
   MUSCLE_LABEL_PT,
   thumbUrl,
   format1rm,
+  preferSteps,
 } from '@/lib/workoutV4';
 import {
   TRACKING_LABELS,
@@ -88,47 +89,10 @@ export function formatMuscleName(muscle) {
   return muscle;
 }
 
+export { preferSteps };
+
 export function extractInstructionSteps(exercise) {
-  if (!exercise) return [];
-
-  if (exercise.instructions_json) {
-    try {
-      const parsed =
-        typeof exercise.instructions_json === 'string'
-          ? JSON.parse(exercise.instructions_json)
-          : exercise.instructions_json;
-
-      if (parsed) {
-        if (Array.isArray(parsed.pt) && parsed.pt.length > 0) {
-          return parsed.pt;
-        }
-        if (Array.isArray(parsed.en) && parsed.en.length > 0) {
-          return parsed.en;
-        }
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // Fall through to plain text
-    }
-  }
-
-  if (exercise.instructions && typeof exercise.instructions === 'string') {
-    const raw = exercise.instructions.trim();
-    if (raw.startsWith('[') && raw.endsWith(']')) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {
-        // Fall through
-      }
-    }
-    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length > 0) return lines;
-  }
-
-  return [];
+  return preferSteps(exercise, 'pt');
 }
 
 export function extractSecondaryMuscles(exercise) {
@@ -177,7 +141,7 @@ export default function ExerciseDetailSheet({
   const bodyPartDisplay = formatBodyPart(exercise.body_part);
   const equipmentDisplay = formatEquipment(exercise.equipment || exercise.equipment_key) || exercise.equipment || 'Livre';
   const secondaryMuscles = extractSecondaryMuscles(exercise);
-  const steps = extractInstructionSteps(exercise);
+  const steps = preferSteps(exercise, 'pt');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

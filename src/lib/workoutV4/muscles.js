@@ -413,47 +413,81 @@ export function formatMuscleName(muscle) {
   return muscle;
 }
 
-export function extractInstructionSteps(exercise) {
+export function preferSteps(exercise, lang = 'pt') {
   if (!exercise) return [];
 
-  if (exercise.instructions_json) {
-    try {
-      const parsed =
-        typeof exercise.instructions_json === 'string'
-          ? JSON.parse(exercise.instructions_json)
-          : exercise.instructions_json;
+  let rawJson = exercise.instructions_json;
+  let rawText = exercise.instructions;
+  let rawSteps = exercise.instruction_steps;
 
-      if (parsed) {
-        if (Array.isArray(parsed.pt) && parsed.pt.length > 0) {
-          return parsed.pt;
-        }
-        if (Array.isArray(parsed.en) && parsed.en.length > 0) {
-          return parsed.en;
-        }
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
+  let parsed = null;
+  if (typeof exercise === 'string') {
+    try {
+      parsed = JSON.parse(exercise);
     } catch {
-      // Fall through to plain text parsing
+      rawText = exercise;
+    }
+  } else if (rawJson) {
+    if (typeof rawJson === 'string') {
+      try {
+        parsed = JSON.parse(rawJson);
+      } catch {
+        // Fall through
+      }
+    } else if (typeof rawJson === 'object') {
+      parsed = rawJson;
+    }
+  } else if (rawSteps) {
+    if (typeof rawSteps === 'object') {
+      parsed = rawSteps;
+    }
+  } else if (exercise && typeof exercise === 'object' && (Array.isArray(exercise.en) || Array.isArray(exercise.pt))) {
+    parsed = exercise;
+  }
+
+  if (parsed) {
+    const ptSteps = Array.isArray(parsed.pt) ? parsed.pt.filter((s) => typeof s === 'string' && s.trim().length > 0) : [];
+    const enSteps = Array.isArray(parsed.en) ? parsed.en.filter((s) => typeof s === 'string' && s.trim().length > 0) : [];
+
+    if (lang === 'pt') {
+      if (ptSteps.length > 0) return ptSteps;
+      if (enSteps.length > 0) return enSteps;
+    } else if (lang === 'en') {
+      if (enSteps.length > 0) return enSteps;
+      if (ptSteps.length > 0) return ptSteps;
+    } else {
+      const target = Array.isArray(parsed[lang]) ? parsed[lang].filter((s) => typeof s === 'string' && s.trim().length > 0) : [];
+      if (target.length > 0) return target;
+      if (ptSteps.length > 0) return ptSteps;
+      if (enSteps.length > 0) return enSteps;
+    }
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.filter((s) => (typeof s === 'string' ? s.trim().length > 0 : Boolean(s)));
     }
   }
 
-  if (exercise.instructions && typeof exercise.instructions === 'string') {
-    const raw = exercise.instructions.trim();
-    if (raw.startsWith('[') && raw.endsWith(']')) {
+  if (rawText && typeof rawText === 'string') {
+    const trimmed = rawText.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
       try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const parsedArray = JSON.parse(trimmed);
+        if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+          return parsedArray.filter((s) => (typeof s === 'string' ? s.trim().length > 0 : Boolean(s)));
+        }
       } catch {
         // Fall through
       }
     }
-    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (lines.length > 0) return lines;
   }
 
   return [];
+}
+
+export function extractInstructionSteps(exercise) {
+  return preferSteps(exercise, 'pt');
 }
 
 export function extractSecondaryMuscles(exercise) {
