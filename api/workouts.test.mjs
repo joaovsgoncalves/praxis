@@ -1249,4 +1249,174 @@ describe("Treinos V4 Fase 8 — 1RM API and stats", () => {
     assert.equal(stats.total_work_sets, 2);
     assert.equal(stats.total_sessions, 1);
   });
+
+  test("GET /api/workouts/muscle-map aggregates balance volume across completed sessions", async () => {
+    const request = (p, opts) => requestJson(server.base, p, opts);
+
+    // 1. Check empty muscle map
+    const emptyMap = await request("/api/workouts/muscle-map?mode=balance&days=14");
+    assert.equal(emptyMap.mode, "balance");
+    assert.equal(emptyMap.days, 14);
+    assert.equal(emptyMap.muscles.length, 18);
+    assert.ok(emptyMap.window.from);
+    assert.ok(emptyMap.window.to);
+    assert.deepEqual(emptyMap.ranked.most, []);
+    assert.equal(emptyMap.ranked.least.length, 18);
+
+    // 2. Setup program with Bench Press and Row
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Mapa Test Program" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Superior A" },
+    });
+    const day = program.days[0];
+
+    const bench = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Supino Reto Mapa Test",
+        category: "strength",
+        body_part: "chest",
+        target_muscle: "chest",
+        secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+      },
+    });
+
+    const row = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Remada Curvada Mapa Test",
+        category: "strength",
+        body_part: "back",
+        target_muscle: "upper-back",
+        secondary_muscles_json: JSON.stringify(["biceps"]),
+      },
+    });
+
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: bench.id, target_sets: 3 },
+    });
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: row.id, target_sets: 2 },
+    });
+
+    // 3. Start session and log sets
+    let session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: day.id },
+    });
+
+    const benchSessionEx = session.exercises.find((e) => e.exercise_id === bench.id);
+    const rowSessionEx = session.exercises.find((e) => e.exercise_id === row.id);
+
+    // Bench: 1 warmup + 2 work sets
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: benchSessionEx.id,
+        weight_kg: 50,
+        reps: 12,
+        set_role: "warmup",
+      },
+    });
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: benchSessionEx.id,
+        weight_kg: 80,
+        reps: 10,
+        set_role: "work",
+      },
+    });
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: benchSessionEx.id,
+        weight_kg: 85,
+        reps: 8,
+        set_role: "work",
+      },
+    });
+
+    // Row: 1 work set
+    await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: rowSessionEx.id,
+        weight_kg: 70,
+        reps: 10,
+        set_role: "work",
+      },
+    });
+
+    // While session is active (not finished), muscle map should NOT include active session sets
+    const activeMap = await request("/api/workouts/muscle-map?mode=balance&days=14");
+    const activeChest = activeMap.muscles.find((m) => m.id === "chest");
+    assert.equal(activeChest.raw, 0);
+
+    // 4. Finish session
+    await request("/api/workouts/sessions/" + session.id + "/finish", {
+      method: "POST",
+      body: {},
+    });
+
+    // 5. Query muscle map after finish
+    const finishedMap = await request("/api/workouts/muscle-map?mode=balance&days=14");
+    assert.equal(finishedMap.mode, "balance");
+    assert.equal(finishedMap.days, 14);
+
+    const chest = finishedMap.muscles.find((m) => m.id === "chest");
+    const upperBack = finishedMap.muscles.find((m) => m.id === "upper-back");
+    const triceps = finishedMap.muscles.find((m) => m.id === "triceps");
+    const deltoids = finishedMap.muscles.find((m) => m.id === "deltoids");
+    const biceps = finishedMap.muscles.find((m) => m.id === "biceps");
+    const quads = finishedMap.muscles.find((m) => m.id === "quadriceps");
+
+    // Bench: 2 work sets -> chest raw = 2.0
+    // Row: 1 work set -> upper-back raw = 1.0
+    // Bench secondaries: triceps 2 * 0.4 = 0.8, deltoids 2 * 0.4 = 0.8
+    // Row secondary: biceps 1 * 0.4 = 0.4
+    // Max raw = 2.0 (chest)
+    assert.equal(chest.raw, 2.0);
+    assert.equal(chest.score, 1.0);
+
+    assert.equal(upperBack.raw, 1.0);
+    assert.equal(upperBack.score, 0.5);
+
+    assert.equal(triceps.raw, 0.8);
+    assert.equal(triceps.score, 0.4);
+
+    assert.equal(deltoids.raw, 0.8);
+    assert.equal(deltoids.score, 0.4);
+
+    assert.equal(biceps.raw, 0.4);
+    assert.equal(biceps.score, 0.2);
+
+    assert.equal(quads.raw, 0.0);
+    assert.equal(quads.score, 0.0);
+
+    assert.deepEqual(finishedMap.ranked.most, [
+      "chest",
+      "upper-back",
+      "deltoids",
+      "triceps",
+      "biceps",
+    ]);
+
+    // Test different days window (e.g. 7, 28)
+    const map7 = await request("/api/workouts/muscle-map?days=7");
+    assert.equal(map7.days, 7);
+    assert.equal(map7.muscles.find((m) => m.id === "chest").raw, 2.0);
+
+    // Test mode fatigue / strength preserves mode in response
+    const fatigueMap = await request("/api/workouts/muscle-map?mode=fatigue&days=14");
+    assert.equal(fatigueMap.mode, "fatigue");
+    assert.equal(fatigueMap.muscles.length, 18);
+  });
+
 });

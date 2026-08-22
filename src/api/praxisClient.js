@@ -347,6 +347,13 @@ export const praxisApi = {
 
   // Workouts
   workouts: {
+    muscleMap: (params = {}) => {
+      const query = new URLSearchParams();
+      if (params.mode) query.set("mode", params.mode);
+      if (params.days !== undefined && params.days !== null) query.set("days", String(params.days));
+      const qs = query.toString();
+      return request(`/api/workouts/muscle-map${qs ? `?${qs}` : ""}`);
+    },
     summary: () => request('/api/workouts/summary'),
     programs: {
       list: () => request('/api/workouts/programs'),

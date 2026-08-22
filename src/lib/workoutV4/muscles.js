@@ -82,6 +82,142 @@ export const EQUIPMENT_LABEL_PT = {
 };
 
 const MUSCLE_ALIAS_MAP = {
+  // trapezius (PT synonyms)
+  "trapézio": "trapezius",
+  "trapezio": "trapezius",
+  "pescoço": "trapezius",
+  "pescoco": "trapezius",
+
+  // deltoids (PT synonyms)
+  "ombro": "deltoids",
+  "ombros": "deltoids",
+  "deltoide": "deltoids",
+  "deltoides": "deltoids",
+  "deltoide anterior": "deltoids",
+  "deltoide lateral": "deltoids",
+  "deltoide posterior": "deltoids",
+
+  // chest (PT synonyms)
+  "peito": "chest",
+  "peitoral": "chest",
+  "peitorais": "chest",
+  "peitoral superior": "chest",
+  "peitoral inferior": "chest",
+
+  // upper-back (PT synonyms)
+  "costas": "upper-back",
+  "dorsal": "upper-back",
+  "dorsais": "upper-back",
+  "romboides": "upper-back",
+  "romboide": "upper-back",
+  "latíssimo": "upper-back",
+  "latissimo": "upper-back",
+
+  // serratus (PT synonyms)
+  "serrátil": "serratus",
+  "serratil": "serratus",
+  "serrátil anterior": "serratus",
+  "serratil anterior": "serratus",
+
+  // biceps (PT synonyms)
+  "bíceps": "biceps",
+  "braço": "biceps",
+  "braços": "biceps",
+  "braco": "biceps",
+  "bracos": "biceps",
+  "braquial": "biceps",
+
+  // triceps (PT synonyms)
+  "tríceps": "triceps",
+
+  // forearm (PT synonyms)
+  "antebraço": "forearm",
+  "antebraco": "forearm",
+  "antebraços": "forearm",
+  "antebracos": "forearm",
+  "punho": "forearm",
+  "punhos": "forearm",
+  "mãos": "forearm",
+  "maos": "forearm",
+  "mão": "forearm",
+  "mao": "forearm",
+
+  // abs (PT synonyms)
+  "abdômen": "abs",
+  "abdomen": "abs",
+  "abdominais": "abs",
+  "abdominal": "abs",
+  "barriga": "abs",
+
+  // obliques (PT synonyms)
+  "oblíquo": "obliques",
+  "obliquo": "obliques",
+  "oblíquos": "obliques",
+  "obliquos": "obliques",
+  "abdômen lateral": "obliques",
+  "abdomen lateral": "obliques",
+
+  // lower-back (PT synonyms)
+  "lombar": "lower-back",
+  "lombares": "lower-back",
+  "coluna": "lower-back",
+
+  // gluteal (PT synonyms)
+  "glúteo": "gluteal",
+  "gluteo": "gluteal",
+  "glúteos": "gluteal",
+  "gluteos": "gluteal",
+  "quadril": "gluteal",
+  "quadris": "gluteal",
+  "bumbum": "gluteal",
+
+  // quadriceps (PT synonyms)
+  "quadríceps": "quadriceps",
+  "coxa": "quadriceps",
+  "coxas": "quadriceps",
+  "perna": "quadriceps",
+  "pernas": "quadriceps",
+
+  // hamstring (PT synonyms)
+  "posterior": "hamstring",
+  "posteriores": "hamstring",
+  "isquiotibiais": "hamstring",
+  "isquiotibial": "hamstring",
+  "posterior de coxa": "hamstring",
+  "posteriores de coxa": "hamstring",
+
+  // adductors (PT synonyms)
+  "adutor": "adductors",
+  "adutores": "adductors",
+  "virilha": "adductors",
+
+  // hip-flexors (PT synonyms)
+  "flexor de quadril": "hip-flexors",
+  "flexores de quadril": "hip-flexors",
+  "flexor quadril": "hip-flexors",
+  "flexores quadril": "hip-flexors",
+
+  // calves (PT synonyms)
+  "panturrilha": "calves",
+  "panturrilhas": "calves",
+  "gastrocnêmio": "calves",
+  "gastrocnemio": "calves",
+  "sóleo": "calves",
+  "soleo": "calves",
+  "tornozelo": "calves",
+  "tornozelos": "calves",
+  "pés": "calves",
+  "pes": "calves",
+  "pé": "calves",
+  "pe": "calves",
+
+  // tibialis (PT synonyms)
+  "tibial": "tibialis",
+  "tibiais": "tibialis",
+  "tibial anterior": "tibialis",
+  "canela": "tibialis",
+  "canelas": "tibialis",
+
   // trapezius
   'trapezius': 'trapezius',
   'traps': 'trapezius',

@@ -9,3 +9,4 @@ export * from "./wakeLock.js";
 export * from "./pr.js";
 export * from "./prefill.js";
 export * from "./oneRm.js";
+export * from "./muscleMap.js";

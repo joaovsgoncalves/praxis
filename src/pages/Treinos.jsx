@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Activity,
   CheckCircle2,
   ChevronRight,
   Clock3,
@@ -22,6 +23,7 @@ import WorkoutProgramDialog from '@/components/workouts/WorkoutProgramDialog';
 import WorkoutProgramEditor from '@/components/workouts/WorkoutProgramEditor';
 import WorkoutSessionView from '@/components/workouts/WorkoutSessionView';
 import WorkoutHistory from '@/components/workouts/WorkoutHistory';
+import WorkoutMuscleMap from '@/components/workouts/WorkoutMuscleMap';
 import WorkoutLibrary from '@/components/workouts/WorkoutLibrary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,6 +35,7 @@ import { formatSeconds, formatWorkoutTarget, workoutDayShortLabel } from '@/lib/
 const TABS = [
   { id: 'hoje', label: 'Hoje', icon: Play },
   { id: 'biblioteca', label: 'Biblioteca', icon: Dumbbell },
+  { id: 'mapa', label: 'Mapa', icon: Activity },
   { id: 'programa', label: 'Programa', icon: ListChecks },
   { id: 'historico', label: 'Histórico', icon: History },
 ];
@@ -158,7 +161,7 @@ export default function Treinos() {
           ) : null}
 
           <div
-            className="grid grid-cols-4 gap-1 rounded-full bg-secondary/40 p-1"
+            className="grid grid-cols-5 gap-1 rounded-full bg-secondary/40 p-1"
             role="tablist"
             aria-label="Seções de treinos"
           >
@@ -221,6 +224,13 @@ export default function Treinos() {
                   />
                 </>
               )
+            ) : null}
+
+                        {tab === 'mapa' ? (
+              <WorkoutMuscleMap
+                onNavigateToLibrary={() => setTab('biblioteca')}
+                onNavigateToProgram={() => setTab('programa')}
+              />
             ) : null}
 
             {tab === 'biblioteca' ? (

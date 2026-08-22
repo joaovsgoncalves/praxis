@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { detectPersonalRecord, estimate1rm, bestEstimated1rm } from './lib/workoutV4Core.js';
+import { detectPersonalRecord, estimate1rm, bestEstimated1rm, computeBalanceMap } from './lib/workoutV4Core.js';
 
 export const WORKOUT_TRACKING_TYPES = [
   'reps',
@@ -672,6 +672,42 @@ export function registerWorkoutRoutes(app, db) {
       return res.status(500).json({ error: 'Não foi possível concluir a ação de treino.' });
     }
   };
+
+  
+  app.get('/api/workouts/muscle-map', handle((req, res) => {
+    const mode = text(req.query?.mode, 'balance').toLowerCase();
+    const days = intOrNull(req.query?.days, { min: 1, max: 365 }) || 14;
+    const now = new Date();
+
+    const rows = db.prepare(`
+      SELECT
+        ss.id,
+        ss.set_role,
+        ss.completed_at,
+        ss.weight_kg,
+        ss.reps,
+        s.id AS session_id,
+        s.status AS session_status,
+        s.started_at AS session_started_at,
+        s.completed_at AS session_completed_at,
+        se.exercise_id,
+        se.exercise_name_snapshot,
+        e.target_muscle,
+        e.muscle_group,
+        e.body_part,
+        e.secondary_muscles_json
+      FROM workout_session_sets ss
+      JOIN workout_session_exercises se ON se.id = ss.session_exercise_id
+      JOIN workout_sessions s ON s.id = ss.session_id
+      LEFT JOIN workout_exercises e ON e.id = se.exercise_id
+      WHERE s.status = 'completed'
+        AND (ss.set_role IS NULL OR ss.set_role != 'warmup')
+      ORDER BY COALESCE(s.completed_at, s.started_at, ss.completed_at) ASC
+    `).all();
+
+    const result = computeBalanceMap(rows, { days, now, mode });
+    res.json(result);
+  }));
 
   app.get('/api/workouts/summary', handle((req, res) => {
     const program = getActiveProgram(db);

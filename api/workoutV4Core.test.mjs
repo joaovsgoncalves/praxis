@@ -31,6 +31,7 @@ import {
   estimate1rm as apiEstimate1rm,
   bestEstimated1rm as apiBestEstimated1rm,
   format1rm as apiFormat1rm,
+  computeBalanceMap as apiComputeBalanceMap,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -64,6 +65,7 @@ import {
   estimate1rm as frontEstimate1rm,
   bestEstimated1rm as frontBestEstimated1rm,
   format1rm as frontFormat1rm,
+  computeBalanceMap as frontComputeBalanceMap,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -971,6 +973,277 @@ describe('workoutV4Core — Fase 8 1RM Epley calculation', () => {
       assert.equal(formatFn(0), null);
       assert.equal(formatFn(-5), null);
       assert.equal(formatFn(""), null);
+    }
+  });
+});
+
+
+describe("workoutV4Core — Fase 9 Muscle Map Balance", () => {
+  test("computeBalanceMap: returns all 18 canonical muscles with zero volume when empty", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const res = computeFn([], { days: 14, now });
+
+      assert.equal(res.mode, "balance");
+      assert.equal(res.days, 14);
+      assert.equal(res.muscles.length, 18);
+      assert.equal(res.window.from, "2026-08-08T20:00:00.000Z");
+      assert.equal(res.window.to, "2026-08-22T20:00:00.000Z");
+      assert.deepEqual(res.ranked.most, []);
+      assert.equal(res.ranked.least.length, 18);
+
+      for (const m of res.muscles) {
+        assert.equal(typeof m.id, "string");
+        assert.equal(typeof m.label, "string");
+        assert.equal(m.score, 0);
+        assert.equal(m.raw, 0);
+        assert.equal(m.unit, "sets");
+      }
+    }
+  });
+
+  test("computeBalanceMap: bench press gives 1.0 to chest and 0.4 to secondaries (triceps, deltoids)", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "chest",
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const triceps = res.muscles.find((m) => m.id === "triceps");
+      const delts = res.muscles.find((m) => m.id === "deltoids");
+      const legs = res.muscles.find((m) => m.id === "quadriceps");
+
+      assert.equal(chest.raw, 1.0);
+      assert.equal(chest.score, 1.0); // max raw = 1.0 -> 1.0 / 1.0 = 1.0
+      assert.equal(triceps.raw, 0.4);
+      assert.equal(triceps.score, 0.4);
+      assert.equal(delts.raw, 0.4);
+      assert.equal(delts.score, 0.4);
+      assert.equal(legs.raw, 0.0);
+      assert.equal(legs.score, 0.0);
+
+      assert.deepEqual(res.ranked.most, ["chest", "deltoids", "triceps"]);
+    }
+  });
+
+  test("computeBalanceMap: row gives 1.0 to upper-back and 0.4 to biceps", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-21T10:00:00.000Z",
+          target_muscle: "upper-back",
+          secondary_muscles_json: JSON.stringify(["biceps"]),
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now });
+      const back = res.muscles.find((m) => m.id === "upper-back");
+      const biceps = res.muscles.find((m) => m.id === "biceps");
+
+      assert.equal(back.raw, 1.0);
+      assert.equal(back.score, 1.0);
+      assert.equal(biceps.raw, 0.4);
+      assert.equal(biceps.score, 0.4);
+    }
+  });
+
+  test("computeBalanceMap: accumulates volume across multiple exercises with weighted balance", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // 3 sets of Bench Press
+        {
+          id: "s1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "chest",
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+        {
+          id: "s2",
+          set_role: "work",
+          completed_at: "2026-08-20T10:05:00.000Z",
+          target_muscle: "chest",
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+        {
+          id: "s3",
+          set_role: "work",
+          completed_at: "2026-08-20T10:10:00.000Z",
+          target_muscle: "chest",
+          secondary_muscles_json: JSON.stringify(["triceps", "deltoids"]),
+        },
+        // 2 sets of Barbell Row
+        {
+          id: "s4",
+          set_role: "work",
+          completed_at: "2026-08-21T10:00:00.000Z",
+          target_muscle: "upper-back",
+          secondary_muscles_json: JSON.stringify(["biceps"]),
+        },
+        {
+          id: "s5",
+          set_role: "work",
+          completed_at: "2026-08-21T10:05:00.000Z",
+          target_muscle: "upper-back",
+          secondary_muscles_json: JSON.stringify(["biceps"]),
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const back = res.muscles.find((m) => m.id === "upper-back");
+      const triceps = res.muscles.find((m) => m.id === "triceps");
+      const delts = res.muscles.find((m) => m.id === "deltoids");
+      const biceps = res.muscles.find((m) => m.id === "biceps");
+
+      // Chest: 3 * 1.0 = 3.0 (maxRaw)
+      assert.equal(chest.raw, 3.0);
+      assert.equal(chest.score, 1.0);
+
+      // Upper back: 2 * 1.0 = 2.0 -> 2.0 / 3.0 = 0.67
+      assert.equal(back.raw, 2.0);
+      assert.equal(back.score, 0.67);
+
+      // Triceps: 3 * 0.4 = 1.2 -> 1.2 / 3.0 = 0.4
+      assert.equal(triceps.raw, 1.2);
+      assert.equal(triceps.score, 0.4);
+
+      // Deltoids: 3 * 0.4 = 1.2 -> 1.2 / 3.0 = 0.4
+      assert.equal(delts.raw, 1.2);
+      assert.equal(delts.score, 0.4);
+
+      // Biceps: 2 * 0.4 = 0.8 -> 0.8 / 3.0 = 0.27
+      assert.equal(biceps.raw, 0.8);
+      assert.equal(biceps.score, 0.27);
+    }
+  });
+
+  test("computeBalanceMap: strictly excludes warmup sets", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        {
+          id: "w1",
+          set_role: "warmup",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "chest",
+        },
+        {
+          id: "w2",
+          set_role: "warmup",
+          completed_at: "2026-08-20T10:02:00.000Z",
+          target_muscle: "chest",
+        },
+        {
+          id: "k1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:05:00.000Z",
+          target_muscle: "chest",
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      assert.equal(chest.raw, 1.0); // Only 1 work set
+    }
+  });
+
+  test("computeBalanceMap: excludes abandoned or incomplete sessions", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        {
+          id: "s1",
+          session_status: "abandoned",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          target_muscle: "chest",
+        },
+        {
+          id: "s2",
+          session_status: "completed",
+          set_role: "work",
+          completed_at: "2026-08-20T10:05:00.000Z",
+          target_muscle: "upper-back",
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now });
+      const chest = res.muscles.find((m) => m.id === "chest");
+      const back = res.muscles.find((m) => m.id === "upper-back");
+
+      assert.equal(chest.raw, 0);
+      assert.equal(back.raw, 1.0);
+    }
+  });
+
+  test("computeBalanceMap: filters strictly within the day window", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        // 20 days ago (outside 14-day window)
+        {
+          id: "old",
+          set_role: "work",
+          completed_at: "2026-08-01T10:00:00.000Z",
+          target_muscle: "quadriceps",
+        },
+        // 5 days ago (inside 14-day window)
+        {
+          id: "recent",
+          set_role: "work",
+          completed_at: "2026-08-17T10:00:00.000Z",
+          target_muscle: "chest",
+        },
+      ];
+
+      const res14 = computeFn(sets, { days: 14, now });
+      assert.equal(res14.muscles.find((m) => m.id === "quadriceps").raw, 0);
+      assert.equal(res14.muscles.find((m) => m.id === "chest").raw, 1.0);
+
+      // With 28-day window, both are included
+      const res28 = computeFn(sets, { days: 28, now });
+      assert.equal(res28.muscles.find((m) => m.id === "quadriceps").raw, 1.0);
+      assert.equal(res28.muscles.find((m) => m.id === "chest").raw, 1.0);
+    }
+  });
+
+  test("computeBalanceMap: supports custom exercises with muscle_group / body_part fallback", () => {
+    for (const computeFn of [apiComputeBalanceMap, frontComputeBalanceMap]) {
+      const now = new Date("2026-08-22T20:00:00.000Z");
+      const sets = [
+        {
+          id: "custom1",
+          set_role: "work",
+          completed_at: "2026-08-20T10:00:00.000Z",
+          muscle_group: "Costas",
+        },
+        {
+          id: "custom2",
+          set_role: "work",
+          completed_at: "2026-08-20T10:05:00.000Z",
+          body_part: "waist",
+        },
+      ];
+
+      const res = computeFn(sets, { days: 14, now });
+      const back = res.muscles.find((m) => m.id === "upper-back");
+      const abs = res.muscles.find((m) => m.id === "abs");
+
+      assert.equal(back.raw, 1.0);
+      assert.equal(abs.raw, 1.0);
     }
   });
 });

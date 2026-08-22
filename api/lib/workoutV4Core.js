@@ -80,6 +80,142 @@ export const EQUIPMENT_LABEL_PT = {
 };
 
 const MUSCLE_ALIAS_MAP = {
+  // trapezius (PT synonyms)
+  "trapézio": "trapezius",
+  "trapezio": "trapezius",
+  "pescoço": "trapezius",
+  "pescoco": "trapezius",
+
+  // deltoids (PT synonyms)
+  "ombro": "deltoids",
+  "ombros": "deltoids",
+  "deltoide": "deltoids",
+  "deltoides": "deltoids",
+  "deltoide anterior": "deltoids",
+  "deltoide lateral": "deltoids",
+  "deltoide posterior": "deltoids",
+
+  // chest (PT synonyms)
+  "peito": "chest",
+  "peitoral": "chest",
+  "peitorais": "chest",
+  "peitoral superior": "chest",
+  "peitoral inferior": "chest",
+
+  // upper-back (PT synonyms)
+  "costas": "upper-back",
+  "dorsal": "upper-back",
+  "dorsais": "upper-back",
+  "romboides": "upper-back",
+  "romboide": "upper-back",
+  "latíssimo": "upper-back",
+  "latissimo": "upper-back",
+
+  // serratus (PT synonyms)
+  "serrátil": "serratus",
+  "serratil": "serratus",
+  "serrátil anterior": "serratus",
+  "serratil anterior": "serratus",
+
+  // biceps (PT synonyms)
+  "bíceps": "biceps",
+  "braço": "biceps",
+  "braços": "biceps",
+  "braco": "biceps",
+  "bracos": "biceps",
+  "braquial": "biceps",
+
+  // triceps (PT synonyms)
+  "tríceps": "triceps",
+
+  // forearm (PT synonyms)
+  "antebraço": "forearm",
+  "antebraco": "forearm",
+  "antebraços": "forearm",
+  "antebracos": "forearm",
+  "punho": "forearm",
+  "punhos": "forearm",
+  "mãos": "forearm",
+  "maos": "forearm",
+  "mão": "forearm",
+  "mao": "forearm",
+
+  // abs (PT synonyms)
+  "abdômen": "abs",
+  "abdomen": "abs",
+  "abdominais": "abs",
+  "abdominal": "abs",
+  "barriga": "abs",
+
+  // obliques (PT synonyms)
+  "oblíquo": "obliques",
+  "obliquo": "obliques",
+  "oblíquos": "obliques",
+  "obliquos": "obliques",
+  "abdômen lateral": "obliques",
+  "abdomen lateral": "obliques",
+
+  // lower-back (PT synonyms)
+  "lombar": "lower-back",
+  "lombares": "lower-back",
+  "coluna": "lower-back",
+
+  // gluteal (PT synonyms)
+  "glúteo": "gluteal",
+  "gluteo": "gluteal",
+  "glúteos": "gluteal",
+  "gluteos": "gluteal",
+  "quadril": "gluteal",
+  "quadris": "gluteal",
+  "bumbum": "gluteal",
+
+  // quadriceps (PT synonyms)
+  "quadríceps": "quadriceps",
+  "coxa": "quadriceps",
+  "coxas": "quadriceps",
+  "perna": "quadriceps",
+  "pernas": "quadriceps",
+
+  // hamstring (PT synonyms)
+  "posterior": "hamstring",
+  "posteriores": "hamstring",
+  "isquiotibiais": "hamstring",
+  "isquiotibial": "hamstring",
+  "posterior de coxa": "hamstring",
+  "posteriores de coxa": "hamstring",
+
+  // adductors (PT synonyms)
+  "adutor": "adductors",
+  "adutores": "adductors",
+  "virilha": "adductors",
+
+  // hip-flexors (PT synonyms)
+  "flexor de quadril": "hip-flexors",
+  "flexores de quadril": "hip-flexors",
+  "flexor quadril": "hip-flexors",
+  "flexores quadril": "hip-flexors",
+
+  // calves (PT synonyms)
+  "panturrilha": "calves",
+  "panturrilhas": "calves",
+  "gastrocnêmio": "calves",
+  "gastrocnemio": "calves",
+  "sóleo": "calves",
+  "soleo": "calves",
+  "tornozelo": "calves",
+  "tornozelos": "calves",
+  "pés": "calves",
+  "pes": "calves",
+  "pé": "calves",
+  "pe": "calves",
+
+  // tibialis (PT synonyms)
+  "tibial": "tibialis",
+  "tibiais": "tibialis",
+  "tibial anterior": "tibialis",
+  "canela": "tibialis",
+  "canelas": "tibialis",
+
   // trapezius
   'trapezius': 'trapezius',
   'traps': 'trapezius',
@@ -809,4 +945,169 @@ export function format1rm(value) {
   if (!Number.isFinite(num) || num <= 0) return null;
 
   return `${num.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
+}
+
+
+/**
+ * Praxis Treinos V4 — Muscle Map Balance (Fase 9)
+ *
+ * Aggregates work-set volume by canonical muscle over a time window.
+ *
+ * Balance scoring rules:
+ * 1. Considers completed work sets in the day window (excludes warmup, incomplete/abandoned).
+ * 2. Primary muscle contributes 1.0 set-equivalent.
+ * 3. Each secondary muscle contributes 0.4 set-equivalents (without duplicate counting).
+ * 4. raw[id] = sum of set-equivalents for muscle id.
+ * 5. score[id] = raw[id] / max(raw) if max(raw) > 0 else 0 (0–1).
+ * 6. Always returns all 18 canonical muscles in standard head-to-toe order.
+ * 7. ranked = { most: [...], least: [...] }.
+ *
+ * @param {Array<Object>} setsWithExerciseMeta List of completed set records with exercise metadata.
+ * @param {Object} [options] Configuration options ({ days, now, mode }).
+ * @returns {Object} Muscle balance map payload.
+ */
+export function computeBalanceMap(setsWithExerciseMeta = [], options = {}) {
+  const {
+    days = 14,
+    now = new Date(),
+    mode = "balance",
+  } = options || {};
+
+  const numDays = Math.max(1, Number(days) || 14);
+  const nowMs =
+    typeof now === "number"
+      ? now
+      : typeof now === "string"
+        ? new Date(now).getTime()
+        : now instanceof Date
+          ? now.getTime()
+          : Date.now();
+
+  const fromMs = nowMs - numDays * 24 * 60 * 60 * 1000;
+  const fromIso = new Date(fromMs).toISOString();
+  const toIso = new Date(nowMs).toISOString();
+
+  // Initialize accumulator for all 18 canonical muscles
+  const rawAccumulator = {};
+  for (const m of MUSCLES) {
+    rawAccumulator[m] = 0;
+  }
+
+  if (Array.isArray(setsWithExerciseMeta)) {
+    for (const set of setsWithExerciseMeta) {
+      if (!set) continue;
+
+      // Exclude warmup sets
+      if (set.set_role === "warmup" || isWarmupSet(set)) {
+        continue;
+      }
+
+      // Exclude abandoned or incomplete sessions if session status is provided
+      if (set.session_status && set.session_status !== "completed") {
+        continue;
+      }
+
+      // Check date window if set or session has a timestamp
+      const setDateStr =
+        set.session_completed_at ||
+        set.completed_at ||
+        set.session_started_at ||
+        set.started_at ||
+        set.created_at ||
+        null;
+
+      if (setDateStr) {
+        const setMs = new Date(setDateStr).getTime();
+        if (Number.isFinite(setMs)) {
+          if (setMs < fromMs || setMs > nowMs) {
+            continue;
+          }
+        }
+      }
+
+      // Primary muscle resolution: target_muscle -> muscle_group -> body_part
+      const primaryCandidate =
+        set.target_muscle ||
+        set.muscle_group ||
+        set.body_part ||
+        set.exercise_target_muscle ||
+        set.exercise_muscle_group ||
+        set.exercise_body_part ||
+        null;
+
+      const primaryCanonical = aliasMuscle(primaryCandidate);
+
+      if (primaryCanonical && rawAccumulator[primaryCanonical] !== undefined) {
+        rawAccumulator[primaryCanonical] += 1.0;
+      }
+
+      // Secondary muscles resolution: each secondary contributes 0.4
+      const secondaries = extractSecondaryMuscles(set);
+      if (Array.isArray(secondaries) && secondaries.length > 0) {
+        const seenInThisSet = new Set();
+        if (primaryCanonical) {
+          seenInThisSet.add(primaryCanonical);
+        }
+
+        for (const sec of secondaries) {
+          const secCanonical = aliasMuscle(sec);
+          if (
+            secCanonical &&
+            rawAccumulator[secCanonical] !== undefined &&
+            !seenInThisSet.has(secCanonical)
+          ) {
+            rawAccumulator[secCanonical] += 0.4;
+            seenInThisSet.add(secCanonical);
+          }
+        }
+      }
+    }
+  }
+
+  // Round raw volumes to 1 decimal place and determine max volume
+  let maxRaw = 0;
+  for (const m of MUSCLES) {
+    const rounded = Math.round(rawAccumulator[m] * 10) / 10;
+    rawAccumulator[m] = rounded;
+    if (rounded > maxRaw) {
+      maxRaw = rounded;
+    }
+  }
+
+  // Format muscles array in canonical order
+  const muscles = MUSCLES.map((id) => {
+    const raw = rawAccumulator[id] || 0;
+    const score = maxRaw > 0 ? Math.round((raw / maxRaw) * 100) / 100 : 0;
+    return {
+      id,
+      label: MUSCLE_LABEL_PT[id] || id,
+      score,
+      raw,
+      unit: "sets",
+    };
+  });
+
+  // Calculate ranked lists
+  const mostTrained = muscles
+    .filter((m) => m.raw > 0)
+    .sort((a, b) => b.raw - a.raw || MUSCLES.indexOf(a.id) - MUSCLES.indexOf(b.id))
+    .map((m) => m.id);
+
+  const leastTrained = [...muscles]
+    .sort((a, b) => a.raw - b.raw || MUSCLES.indexOf(a.id) - MUSCLES.indexOf(b.id))
+    .map((m) => m.id);
+
+  return {
+    mode: mode || "balance",
+    days: numDays,
+    muscles,
+    window: {
+      from: fromIso,
+      to: toIso,
+    },
+    ranked: {
+      most: mostTrained,
+      least: leastTrained,
+    },
+  };
 }
