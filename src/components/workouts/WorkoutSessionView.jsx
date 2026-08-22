@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
+import ExerciseMedia from '@/components/workouts/ExerciseMedia';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -590,6 +591,8 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
             ) : null}
 
             <div className="px-3 py-3 sm:px-4">
+              <ExerciseMedia exercise={currentExercise} className="mb-3" />
+
               {/* Logbook table — direction A */}
               <div className="overflow-hidden rounded-xl border border-border/70">
                 <div

@@ -811,3 +811,138 @@ describe("Treinos V4 Fase 3 exercise catalog API and filters", () => {
     );
   });
 });
+
+describe("Treinos V4 Fase 5 — Session exercise media enrichment", () => {
+  let db;
+  let server;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("session detail enriches exercises with catalog media paths and preserves custom without media", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // 1. Create a catalog exercise with media paths
+    const catalogEx = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Barbell Bench Press",
+        category: "strength",
+        source: "catalog",
+        catalog_external_id: "0001",
+        body_part: "chest",
+        target_muscle: "pectorals",
+        thumb_path: "images/0001-2gPfomN.jpg",
+        gif_path: "videos/0001-2gPfomN.gif",
+        attribution: "© Gym visual — https://gymvisual.com/",
+      },
+    });
+    assert.equal(catalogEx.source, "catalog");
+    assert.equal(catalogEx.thumb_path, "images/0001-2gPfomN.jpg");
+    assert.equal(catalogEx.gif_path, "videos/0001-2gPfomN.gif");
+
+    // 2. Create a custom exercise without media
+    const customEx = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: {
+        name: "Abdominal Supra Custom",
+        category: "calisthenics",
+        source: "custom",
+        muscle_group: "abs",
+      },
+    });
+    assert.equal(customEx.source, "custom");
+    assert.equal(customEx.thumb_path, null);
+    assert.equal(customEx.gif_path, null);
+
+    // 3. Create program and day containing both exercises
+    let program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Treino Fase 5 Teste" },
+    });
+    program = await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Dia A", day_type: "training" },
+    });
+    const day = program.days[0];
+
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: catalogEx.id, target_sets: 3, rep_min: 8, rep_max: 10 },
+    });
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: customEx.id, target_sets: 3, rep_min: 15, rep_max: 20 },
+    });
+
+    // 4. Start active session
+    let session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: day.id },
+    });
+    assert.equal(session.status, "active");
+    assert.equal(session.exercises.length, 2);
+
+    // Exercise 0 (catalog): must have media paths and attribution
+    const sessionCatalog = session.exercises[0];
+    assert.equal(sessionCatalog.exercise_id, catalogEx.id);
+    assert.equal(sessionCatalog.exercise_name_snapshot, "Barbell Bench Press");
+    assert.equal(sessionCatalog.source, "catalog");
+    assert.equal(sessionCatalog.thumb_path, "images/0001-2gPfomN.jpg");
+    assert.equal(sessionCatalog.gif_path, "videos/0001-2gPfomN.gif");
+    assert.equal(sessionCatalog.attribution, "© Gym visual — https://gymvisual.com/");
+
+    // Exercise 1 (custom): without media stays null
+    const sessionCustom = session.exercises[1];
+    assert.equal(sessionCustom.exercise_id, customEx.id);
+    assert.equal(sessionCustom.exercise_name_snapshot, "Abdominal Supra Custom");
+    assert.equal(sessionCustom.source, "custom");
+    assert.equal(sessionCustom.thumb_path, null);
+    assert.equal(sessionCustom.gif_path, null);
+    assert.equal(sessionCustom.attribution, null);
+
+    // 5. GET /api/workouts/sessions/active returns the same enriched structure
+    const active = await request("/api/workouts/sessions/active");
+    assert.equal(active.id, session.id);
+    assert.equal(active.exercises[0].thumb_path, "images/0001-2gPfomN.jpg");
+    assert.equal(active.exercises[0].gif_path, "videos/0001-2gPfomN.gif");
+    assert.equal(active.exercises[1].thumb_path, null);
+
+    // 6. Adding a set preserves media fields on response
+    session = await request("/api/workouts/sessions/" + session.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: sessionCatalog.id,
+        reps: 10,
+        weight_kg: 80,
+      },
+    });
+    assert.equal(session.exercises[0].thumb_path, "images/0001-2gPfomN.jpg");
+    assert.equal(session.exercises[0].gif_path, "videos/0001-2gPfomN.gif");
+    assert.equal(session.exercises[1].thumb_path, null);
+
+    // 7. GET /api/workouts/sessions/:id returns enriched fields
+    const byId = await request("/api/workouts/sessions/" + session.id);
+    assert.equal(byId.exercises[0].thumb_path, "images/0001-2gPfomN.jpg");
+    assert.equal(byId.exercises[0].gif_path, "videos/0001-2gPfomN.gif");
+
+    // 8. Finishing session preserves media fields
+    session = await request("/api/workouts/sessions/" + session.id + "/finish", {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(session.status, "completed");
+    assert.equal(session.exercises[0].thumb_path, "images/0001-2gPfomN.jpg");
+    assert.equal(session.exercises[0].gif_path, "videos/0001-2gPfomN.gif");
+  });
+});

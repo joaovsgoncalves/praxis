@@ -459,9 +459,16 @@ function getSessionDetail(db, sessionId) {
   const session = getSessionSummary(db, sessionId);
   if (!session) return null;
   const exercises = db.prepare(`
-    SELECT * FROM workout_session_exercises
-    WHERE session_id = ?
-    ORDER BY position ASC
+    SELECT
+      se.*,
+      e.thumb_path,
+      e.gif_path,
+      e.attribution,
+      e.source
+    FROM workout_session_exercises se
+    LEFT JOIN workout_exercises e ON e.id = se.exercise_id
+    WHERE se.session_id = ?
+    ORDER BY se.position ASC
   `).all(sessionId).map((exercise) => ({
     ...exercise,
     sets: db.prepare(`

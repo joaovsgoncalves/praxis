@@ -260,6 +260,47 @@ describe('workoutV4Core — media URLs & attribution', () => {
       assert.equal(gifFn(''), null);
     }
   });
+
+  test('thumbUrl and gifUrl resolve session exercise snapshot objects correctly', () => {
+    for (const [thumbFn, gifFn] of [
+      [apiThumbUrl, apiGifUrl],
+      [frontThumbUrl, frontGifUrl],
+    ]) {
+      const sessionExerciseCatalog = {
+        id: 'session-ex-1',
+        session_id: 'session-1',
+        exercise_id: 'ex-catalog-1316',
+        exercise_name_snapshot: 'barbell bent arm pullover',
+        thumb_path: 'images/1316-j599l3T.jpg',
+        gif_path: 'videos/1316-j599l3T.gif',
+        attribution: '© Gym visual — https://gymvisual.com/',
+        source: 'catalog',
+      };
+
+      assert.equal(
+        thumbFn(sessionExerciseCatalog),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/images/1316-j599l3T.jpg',
+      );
+      assert.equal(
+        gifFn(sessionExerciseCatalog),
+        'https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos/1316-j599l3T.gif',
+      );
+
+      const sessionExerciseCustom = {
+        id: 'session-ex-2',
+        session_id: 'session-1',
+        exercise_id: 'ex-custom-1',
+        exercise_name_snapshot: 'Flexão Customizada',
+        thumb_path: null,
+        gif_path: null,
+        attribution: null,
+        source: 'custom',
+      };
+
+      assert.equal(thumbFn(sessionExerciseCustom), null);
+      assert.equal(gifFn(sessionExerciseCustom), null);
+    }
+  });
 });
 
 describe('Treinos V4 Fase 4 — Biblioteca UI helpers & formatting', () => {
