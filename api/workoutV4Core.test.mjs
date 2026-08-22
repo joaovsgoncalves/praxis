@@ -33,6 +33,12 @@ import {
   format1rm as apiFormat1rm,
   computeBalanceMap as apiComputeBalanceMap,
   computeMuscleMap as apiComputeMuscleMap,
+  HEATMAP_MONTHS_PT as API_HEATMAP_MONTHS_PT,
+  HEATMAP_WEEKDAYS_PT as API_HEATMAP_WEEKDAYS_PT,
+  HEATMAP_INTENSITY_BINS as API_HEATMAP_INTENSITY_BINS,
+  getHeatmapIntensityBin as apiGetHeatmapIntensityBin,
+  formatHeatmapTooltip as apiFormatHeatmapTooltip,
+  buildYearHeatmapGrid as apiBuildYearHeatmapGrid,
 } from './lib/workoutV4Core.js';
 
 import {
@@ -68,6 +74,12 @@ import {
   format1rm as frontFormat1rm,
   computeBalanceMap as frontComputeBalanceMap,
   computeMuscleMap as frontComputeMuscleMap,
+  HEATMAP_MONTHS_PT as FRONT_HEATMAP_MONTHS_PT,
+  HEATMAP_WEEKDAYS_PT as FRONT_HEATMAP_WEEKDAYS_PT,
+  HEATMAP_INTENSITY_BINS as FRONT_HEATMAP_INTENSITY_BINS,
+  getHeatmapIntensityBin as frontGetHeatmapIntensityBin,
+  formatHeatmapTooltip as frontFormatHeatmapTooltip,
+  buildYearHeatmapGrid as frontBuildYearHeatmapGrid,
 } from '../src/lib/workoutV4/index.js';
 import { formatRestDuration } from '../src/lib/workouts.js';
 
@@ -1499,6 +1511,158 @@ describe("workoutV4Core — Fase 10 Muscle Map Fatigue & Strength", () => {
         assert.equal(m.score, 0);
       }
       assert.deepEqual(res.ranked.most, []);
+    }
+  });
+});
+
+describe("workoutV4Core — Fase 11 Year Heatmap", () => {
+  test("heatmap constants: months, weekdays, and intensity bins", () => {
+    for (const months of [API_HEATMAP_MONTHS_PT, FRONT_HEATMAP_MONTHS_PT]) {
+      assert.equal(months.length, 12);
+      assert.equal(months[0], "Jan");
+      assert.equal(months[11], "Dez");
+    }
+
+    for (const weekdays of [API_HEATMAP_WEEKDAYS_PT, FRONT_HEATMAP_WEEKDAYS_PT]) {
+      assert.equal(weekdays.length, 7);
+      assert.equal(weekdays[0], "Dom");
+      assert.equal(weekdays[1], "Seg");
+      assert.equal(weekdays[6], "Sáb");
+    }
+
+    for (const bins of [API_HEATMAP_INTENSITY_BINS, FRONT_HEATMAP_INTENSITY_BINS]) {
+      assert.equal(bins.length, 5);
+      assert.equal(bins[0].bin, 0);
+      assert.equal(bins[1].bin, 1);
+      assert.equal(bins[2].bin, 2);
+      assert.equal(bins[3].bin, 3);
+      assert.equal(bins[4].bin, 4);
+    }
+  });
+
+  test("getHeatmapIntensityBin: maps work-set counts into 4 intensity bins (plus 0)", () => {
+    for (const binFn of [apiGetHeatmapIntensityBin, frontGetHeatmapIntensityBin]) {
+      assert.equal(binFn(null), 0);
+      assert.equal(binFn(undefined), 0);
+      assert.equal(binFn(""), 0);
+      assert.equal(binFn(0), 0);
+      assert.equal(binFn(-5), 0);
+
+      // Bin 1: 1..6
+      assert.equal(binFn(1), 1);
+      assert.equal(binFn(3), 1);
+      assert.equal(binFn(6), 1);
+
+      // Bin 2: 7..12
+      assert.equal(binFn(7), 2);
+      assert.equal(binFn(10), 2);
+      assert.equal(binFn(12), 2);
+
+      // Bin 3: 13..18
+      assert.equal(binFn(13), 3);
+      assert.equal(binFn(15), 3);
+      assert.equal(binFn(18), 3);
+
+      // Bin 4: 19+
+      assert.equal(binFn(19), 4);
+      assert.equal(binFn(25), 4);
+      assert.equal(binFn(100), 4);
+    }
+  });
+
+  test("formatHeatmapTooltip: formats Portuguese tooltip strings accurately", () => {
+    for (const formatFn of [apiFormatHeatmapTooltip, frontFormatHeatmapTooltip]) {
+      // Empty day
+      assert.equal(
+        formatFn({ dateStr: "2026-08-22", sessions: 0, work_sets: 0, sets: 0 }),
+        "22 de ago. de 2026 · Nenhum treino registrado"
+      );
+
+      // Single session & work sets
+      assert.equal(
+        formatFn({ dateStr: "2026-08-22", sessions: 1, work_sets: 1, sets: 1 }),
+        "22 de ago. de 2026 · 1 treino · 1 série de trabalho"
+      );
+
+      // Multiple sessions & work sets with warmup sets
+      assert.equal(
+        formatFn({ dateStr: "2026-08-22", sessions: 2, work_sets: 12, sets: 14 }),
+        "22 de ago. de 2026 · 2 treinos · 12 séries de trabalho (14 total)"
+      );
+
+      // Using direct positional arguments
+      assert.equal(
+        formatFn("2026-01-05", 8, 1, 8),
+        "5 de jan. de 2026 · 1 treino · 8 séries de trabalho"
+      );
+    }
+  });
+
+  test("buildYearHeatmapGrid: constructs valid 52-54 week calendar with stats", () => {
+    for (const buildFn of [apiBuildYearHeatmapGrid, frontBuildYearHeatmapGrid]) {
+      const daysData = [
+        { date: "2026-03-15", sessions: 1, sets: 10, work_sets: 8 },
+        { date: "2026-07-20", sessions: 2, sets: 24, work_sets: 20 },
+      ];
+
+      const grid = buildFn(2026, daysData, { today: "2026-08-22" });
+
+      assert.equal(grid.year, 2026);
+      assert.ok(grid.weeks.length >= 52 && grid.weeks.length <= 54, "Must have 52-54 weeks");
+      assert.equal(grid.totalSessions, 3);
+      assert.equal(grid.totalWorkSets, 28);
+      assert.equal(grid.totalSets, 34);
+      assert.equal(grid.activeDaysCount, 2);
+      assert.equal(grid.maxWorkSetsInDay, 20);
+
+      // Every week must have exactly 7 days, starting on Sunday (dayOfWeek 0)
+      for (const week of grid.weeks) {
+        assert.equal(week.length, 7);
+        assert.equal(week[0].dayOfWeek, 0); // Sunday
+        assert.equal(week[6].dayOfWeek, 6); // Saturday
+      }
+
+      // Check specific day cells
+      const flatCells = grid.weeks.flat();
+      const march15 = flatCells.find((c) => c.dateStr === "2026-03-15");
+      assert.ok(march15);
+      assert.equal(march15.inYear, true);
+      assert.equal(march15.sessions, 1);
+      assert.equal(march15.work_sets, 8);
+      assert.equal(march15.bin, 2); // 8 is in bin 2 (7..12)
+      assert.equal(march15.future, false);
+
+      const july20 = flatCells.find((c) => c.dateStr === "2026-07-20");
+      assert.ok(july20);
+      assert.equal(july20.sessions, 2);
+      assert.equal(july20.work_sets, 20);
+      assert.equal(july20.bin, 4); // 20 is in bin 4 (19+)
+
+      // Future day check
+      const dec1 = flatCells.find((c) => c.dateStr === "2026-12-01");
+      assert.ok(dec1);
+      assert.equal(dec1.future, true);
+      assert.equal(dec1.bin, 0);
+
+      // Month labels
+      assert.ok(grid.monthLabels.length >= 12);
+      assert.equal(grid.monthLabels[0].month, 0); // Jan
+    }
+  });
+
+  test("buildYearHeatmapGrid: handles leap year and empty days data gracefully", () => {
+    for (const buildFn of [apiBuildYearHeatmapGrid, frontBuildYearHeatmapGrid]) {
+      const grid = buildFn(2024, []);
+      assert.equal(grid.year, 2024);
+      assert.equal(grid.totalSessions, 0);
+      assert.equal(grid.totalWorkSets, 0);
+      assert.equal(grid.activeDaysCount, 0);
+
+      const flat = grid.weeks.flat();
+      const feb29 = flat.find((c) => c.dateStr === "2024-02-29");
+      assert.ok(feb29, "Leap year must contain Feb 29");
+      assert.equal(feb29.inYear, true);
+      assert.equal(feb29.bin, 0);
     }
   });
 });

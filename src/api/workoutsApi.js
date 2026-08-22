@@ -2,6 +2,10 @@
 export const workoutsApiModule = (request) => ({
   workouts: {
     summary: () => request('/api/workouts/summary'),
+    heatmap: (params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return request(`/api/workouts/heatmap${q ? `?${q}` : ''}`);
+    },
     exercises: {
       list: (params = {}) => {
         const q = new URLSearchParams(params).toString();

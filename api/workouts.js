@@ -674,6 +674,47 @@ export function registerWorkoutRoutes(app, db) {
   };
 
   
+  app.get('/api/workouts/heatmap', handle((req, res) => {
+    let yearNum;
+    if (req.query?.year !== undefined && req.query?.year !== '') {
+      const parsed = Number(req.query.year);
+      if (!Number.isInteger(parsed) || parsed < 1900 || parsed > 2200) {
+        return res.status(400).json({ error: 'Ano inválido. Envie um ano válido (ex: 2026).' });
+      }
+      yearNum = parsed;
+    } else {
+      yearNum = new Date().getFullYear();
+    }
+
+    const yearStr = String(yearNum);
+    // Group completed sessions by calendar day prefix YYYY-MM-DD extracted from session started_at (UTC / ISO date consistently)
+    const rows = db.prepare(`
+      SELECT
+        substr(s.started_at, 1, 10) AS date,
+        COUNT(DISTINCT s.id) AS sessions,
+        COUNT(ss.id) AS sets,
+        SUM(CASE WHEN ss.id IS NOT NULL AND (ss.set_role IS NULL OR ss.set_role != 'warmup') THEN 1 ELSE 0 END) AS work_sets
+      FROM workout_sessions s
+      LEFT JOIN workout_session_sets ss ON ss.session_id = s.id
+      WHERE s.status = 'completed'
+        AND substr(s.started_at, 1, 4) = ?
+      GROUP BY substr(s.started_at, 1, 10)
+      ORDER BY date ASC
+    `).all(yearStr);
+
+    const days = rows.map((r) => ({
+      date: r.date,
+      sessions: Number(r.sessions || 0),
+      sets: Number(r.sets || 0),
+      work_sets: Number(r.work_sets || 0),
+    }));
+
+    res.json({
+      year: yearNum,
+      days,
+    });
+  }));
+
   app.get('/api/workouts/muscle-map', handle((req, res) => {
     const rawMode = req.query?.mode != null ? String(req.query.mode).trim().toLowerCase() : 'balance';
     if (rawMode && !['balance', 'fatigue', 'strength'].includes(rawMode)) {

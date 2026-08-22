@@ -1578,3 +1578,170 @@ describe("Treinos V4 Fase 10 — Muscle Map Fatigue & Strength API", () => {
     assert.equal(strengthMap.ranked.most[1], "chest");
   });
 });
+
+describe("Treinos V4 Fase 11 — Heatmap ano API", () => {
+  let db;
+  let server;
+
+  before(async () => {
+    db = createTestDb({ withWorkouts: true });
+    const app = express();
+    app.use(express.json());
+    registerWorkoutRoutes(app, db);
+    server = await startTestServer(app);
+  });
+
+  after(async () => {
+    await server.close();
+    db.close();
+  });
+
+  test("GET /api/workouts/heatmap validates year parameter with 400 on invalid input", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // Non-numeric string
+    await assert.rejects(
+      () => request("/api/workouts/heatmap?year=abc"),
+      /400/
+    );
+
+    // Out of range (year < 1900 or year > 2200)
+    await assert.rejects(
+      () => request("/api/workouts/heatmap?year=999"),
+      /400/
+    );
+
+    await assert.rejects(
+      () => request("/api/workouts/heatmap?year=99999"),
+      /400/
+    );
+
+    // Default year when omitted
+    const defaultRes = await request("/api/workouts/heatmap");
+    assert.equal(defaultRes.year, new Date().getFullYear());
+    assert.ok(Array.isArray(defaultRes.days));
+  });
+
+  test("GET /api/workouts/heatmap returns two cells > 0 for 2 sessions on different days", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    // 1. Create a program with a training day and exercise
+    const program = await request("/api/workouts/programs", {
+      method: "POST",
+      body: { name: "Treino Heatmap", is_active: 1 },
+    });
+
+    const day = (await request("/api/workouts/programs/" + program.id + "/days", {
+      method: "POST",
+      body: { name: "Dia A", day_type: "training" },
+    })).days[0];
+
+    const exercise = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Supino Reto", category: "strength", tracking_type: "weight_reps" },
+    });
+
+    await request("/api/workouts/days/" + day.id + "/exercises", {
+      method: "POST",
+      body: { exercise_id: exercise.id, target_sets: 3 },
+    });
+
+    // 2. Directly insert 2 completed sessions on different calendar days in 2026:
+    // Session 1: 2026-04-10 -> 2 work sets, 1 warmup set (3 sets total)
+    const session1Id = "session-heatmap-1";
+    db.prepare(`
+      INSERT INTO workout_sessions (
+        id, workout_program_id, workout_day_id, program_name_snapshot,
+        workout_day_name_snapshot, status, started_at, completed_at, duration_seconds
+      ) VALUES (?, ?, ?, ?, ?, 'completed', '2026-04-10T10:00:00.000Z', '2026-04-10T10:45:00.000Z', 2700)
+    `).run(session1Id, program.id, day.id, program.name, day.name);
+
+    const se1Id = "se-heatmap-1";
+    db.prepare(`
+      INSERT INTO workout_session_exercises (
+        id, session_id, exercise_id, exercise_name_snapshot, tracking_type, position
+      ) VALUES (?, ?, ?, 'Supino Reto', 'weight_reps', 0)
+    `).run(se1Id, session1Id, exercise.id);
+
+    // Warmup set
+    db.prepare(`
+      INSERT INTO workout_session_sets (
+        id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+      ) VALUES ('set-h-1', ?, ?, 1, 40, 10, 'warmup', '2026-04-10T10:05:00.000Z')
+    `).run(session1Id, se1Id);
+    // Work set 1
+    db.prepare(`
+      INSERT INTO workout_session_sets (
+        id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+      ) VALUES ('set-h-2', ?, ?, 2, 80, 8, 'work', '2026-04-10T10:10:00.000Z')
+    `).run(session1Id, se1Id);
+    // Work set 2
+    db.prepare(`
+      INSERT INTO workout_session_sets (
+        id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+      ) VALUES ('set-h-3', ?, ?, 3, 80, 7, 'work', '2026-04-10T10:15:00.000Z')
+    `).run(session1Id, se1Id);
+
+    // Session 2: 2026-04-12 -> 3 work sets
+    const session2Id = "session-heatmap-2";
+    db.prepare(`
+      INSERT INTO workout_sessions (
+        id, workout_program_id, workout_day_id, program_name_snapshot,
+        workout_day_name_snapshot, status, started_at, completed_at, duration_seconds
+      ) VALUES (?, ?, ?, ?, ?, 'completed', '2026-04-12T14:00:00.000Z', '2026-04-12T14:50:00.000Z', 3000)
+    `).run(session2Id, program.id, day.id, program.name, day.name);
+
+    const se2Id = "se-heatmap-2";
+    db.prepare(`
+      INSERT INTO workout_session_exercises (
+        id, session_id, exercise_id, exercise_name_snapshot, tracking_type, position
+      ) VALUES (?, ?, ?, 'Supino Reto', 'weight_reps', 0)
+    `).run(se2Id, session2Id, exercise.id);
+
+    db.prepare(`
+      INSERT INTO workout_session_sets (
+        id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+      ) VALUES ('set-h-4', ?, ?, 1, 85, 6, 'work', '2026-04-12T14:10:00.000Z')
+    `).run(session2Id, se2Id);
+    db.prepare(`
+      INSERT INTO workout_session_sets (
+        id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+      ) VALUES ('set-h-5', ?, ?, 2, 85, 6, 'work', '2026-04-12T14:15:00.000Z')
+    `).run(session2Id, se2Id);
+    db.prepare(`
+      INSERT INTO workout_session_sets (
+        id, session_id, session_exercise_id, set_number, weight_kg, reps, set_role, completed_at
+      ) VALUES ('set-h-6', ?, ?, 3, 85, 5, 'work', '2026-04-12T14:20:00.000Z')
+    `).run(session2Id, se2Id);
+
+    // Insert an abandoned session on 2026-04-14 (should NOT appear in heatmap)
+    db.prepare(`
+      INSERT INTO workout_sessions (
+        id, workout_program_id, workout_day_id, program_name_snapshot,
+        workout_day_name_snapshot, status, started_at
+      ) VALUES ('session-abandoned', ?, ?, ?, ?, 'abandoned', '2026-04-14T09:00:00.000Z')
+    `).run(program.id, day.id, program.name, day.name);
+
+    // 3. Query GET /api/workouts/heatmap?year=2026
+    const res = await request("/api/workouts/heatmap?year=2026");
+    assert.equal(res.year, 2026);
+    assert.equal(res.days.length, 2, "Must return exactly 2 distinct active days for 2026");
+
+    const day1 = res.days.find((d) => d.date === "2026-04-10");
+    assert.ok(day1, "Day 1 (2026-04-10) must be present");
+    assert.equal(day1.sessions, 1);
+    assert.equal(day1.sets, 3);
+    assert.equal(day1.work_sets, 2); // 1 warmup excluded from work_sets
+
+    const day2 = res.days.find((d) => d.date === "2026-04-12");
+    assert.ok(day2, "Day 2 (2026-04-12) must be present");
+    assert.equal(day2.sessions, 1);
+    assert.equal(day2.sets, 3);
+    assert.equal(day2.work_sets, 3);
+
+    // Verify day without completed sessions is omitted or returns empty array
+    const emptyYear = await request("/api/workouts/heatmap?year=2023");
+    assert.equal(emptyYear.year, 2023);
+    assert.deepEqual(emptyYear.days, []);
+  });
+});

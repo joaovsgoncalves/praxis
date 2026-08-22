@@ -28,6 +28,7 @@ const OFFLINE_CACHEABLE = [
   '/api/workouts/programs',
   '/api/workouts/exercises',
   '/api/workouts/sessions',
+  '/api/workouts/heatmap',
   '/api/weekly-reviews',
   '/api/finance/overview',
 ];
