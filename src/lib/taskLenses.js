@@ -130,3 +130,64 @@ export function taskBlock(task) {
 
   return { date, start, end };
 }
+
+function timeToMinutes(hhmm) {
+  const [h, m] = String(hhmm || '0:0').split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return 0;
+  return h * 60 + m;
+}
+
+/**
+ * Coloca blocos sobrepostos lado a lado.
+ * Devolve os mesmos itens + { col, cols } (0-indexed).
+ */
+export function layoutTimedBlocks(items) {
+  const list = Array.isArray(items) ? items : [];
+  if (list.length === 0) return [];
+
+  const parsed = list.map((item, index) => {
+    const s = timeToMinutes(item.start);
+    const e = Math.max(timeToMinutes(item.end), s + 1);
+    return { id: item.id, s, e, index };
+  });
+  parsed.sort((a, b) => a.s - b.s || a.e - b.e || String(a.id).localeCompare(String(b.id)));
+
+  const colEnd = [];
+  parsed.forEach((event) => {
+    let col = 0;
+    while (col < colEnd.length && colEnd[col] > event.s) col += 1;
+    if (col === colEnd.length) colEnd.push(event.e);
+    else colEnd[col] = event.e;
+    event.col = col;
+  });
+
+  const parent = parsed.map((_, i) => i);
+  const find = (i) => {
+    if (parent[i] !== i) parent[i] = find(parent[i]);
+    return parent[i];
+  };
+  const unite = (a, b) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  };
+  for (let i = 0; i < parsed.length; i += 1) {
+    for (let j = i + 1; j < parsed.length; j += 1) {
+      if (parsed[j].s >= parsed[i].e) break;
+      if (parsed[i].s < parsed[j].e && parsed[j].s < parsed[i].e) unite(i, j);
+    }
+  }
+  const clusterCols = new Map();
+  parsed.forEach((event, i) => {
+    const root = find(i);
+    clusterCols.set(root, Math.max(clusterCols.get(root) || 1, event.col + 1));
+  });
+  const byId = new Map();
+  parsed.forEach((event, i) => {
+    byId.set(event.id, { col: event.col, cols: clusterCols.get(find(i)) || 1 });
+  });
+  return list.map((item) => ({
+    ...item,
+    ...(byId.get(item.id) || { col: 0, cols: 1 }),
+  }));
+}

@@ -815,7 +815,7 @@ export default function HabitsTasks() {
 
   return (
     <div className="praxis-page overflow-x-hidden">
-      {lens !== 'board' && (
+      {lens !== 'board' && lens !== 'week' && (
         <PageHero
         kicker="Hábitos e tarefas"
         kickerIcon={ListTodo}
@@ -847,7 +847,7 @@ export default function HabitsTasks() {
       </PageHero>
       )}
 
-      {lens !== 'board' && (
+      {lens !== 'board' && lens !== 'week' && (
         <section className="praxis-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <Tabs value={view} onValueChange={handleViewChange}>
@@ -960,7 +960,7 @@ export default function HabitsTasks() {
                   className={cn(
                     'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
                     lens === 'week'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      ? 'bg-domain-gold/20 text-domain-gold border border-domain-gold/30 shadow-sm font-semibold'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
@@ -1051,11 +1051,11 @@ export default function HabitsTasks() {
                     className={cn(
                       'rounded-full px-3 py-1 text-xs font-medium transition-colors',
                       lens === 'week'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        ? 'bg-domain-gold/20 text-domain-gold border border-domain-gold/30 shadow-sm font-semibold'
                         : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    Semana
+                      )}
+                      >
+                      Semana
                   </button>
                 </div>
 

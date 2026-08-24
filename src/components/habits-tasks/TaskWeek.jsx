@@ -1,29 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Calendar,
-  Clock,
-  Plus,
-  CalendarDays,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  CalendarClock,
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Calendar, Plus, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { weekRange, taskBlock } from '@/lib/taskLenses';
+import { weekRange, taskBlock, layoutTimedBlocks } from '@/lib/taskLenses';
 import { fortalezaNowTimeHHMM } from '@/lib/dates';
-import { cleanPriorityPrefix, isTaskOpen, isTaskDone } from '@/lib/tasks';
-import { CategoryBadge } from '@/lib/categories';
+import { cleanPriorityPrefix, isTaskDone } from '@/lib/tasks';
 
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
 const HOUR_HEIGHT = 56; // Altura em px por hora
@@ -35,12 +17,6 @@ const MONTH_NAMES_SHORT = [
   'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
   'jul', 'ago', 'set', 'out', 'nov', 'dez',
 ];
-
-const priorityStyles = {
-  high: 'border-destructive/40 bg-destructive/10 text-destructive',
-  medium: 'border-chart-4/30 bg-chart-4/10 text-chart-4',
-  low: 'border-white/10 bg-secondary/40 text-muted-foreground',
-};
 
 function formatDayHeader(dateStr, index) {
   const parts = String(dateStr || '').split('-');
@@ -83,205 +59,76 @@ function getBlockPosition(block, durationMinutes) {
   const top = (startMinFrom7 / 60) * HOUR_HEIGHT;
   const height = Math.max(28, (duration / 60) * HOUR_HEIGHT);
 
-  const clampedTop = Math.max(0, Math.min(TOTAL_HEIGHT - 28, top));
-  const clampedHeight = Math.min(TOTAL_HEIGHT - clampedTop, height);
+  const minH = 48;
+  const nextHeight = Math.max(minH, height);
+  const clampedTop = Math.max(0, Math.min(TOTAL_HEIGHT - minH, top));
+  const clampedHeight = Math.min(TOTAL_HEIGHT - clampedTop, nextHeight);
 
   return { top: clampedTop, height: clampedHeight };
 }
 
-function UntimedTaskCard({
-  task,
-  today,
-  onToggleComplete,
-  onEditTask,
-  onDeleteTask,
-  onNotToday,
-}) {
+function UntimedTaskChip({ task, onEditTask }) {
   const isDone = isTaskDone(task);
-  const showNotToday =
-    isTaskOpen(task) &&
-    task.category !== 'ideias' &&
-    (!task.date || task.date <= today);
-
   return (
-    <div
+    <button
+      type="button"
       onClick={() => onEditTask?.(task)}
       className={cn(
-        'group relative flex items-center gap-1.5 rounded-lg border p-1.5 text-xs transition-[background-color,border-color] cursor-pointer',
-        'border-white/[0.08] bg-card/70 hover:border-white/20 hover:bg-card/90',
-        isDone && 'opacity-60 bg-card/40'
+        'max-w-full truncate rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-left text-[11px] font-medium text-stone-200 hover:border-white/20',
+        isDone && 'text-muted-foreground line-through',
       )}
+      title={cleanPriorityPrefix(task.title)}
     >
-      <Checkbox
-        checked={isDone}
-        onCheckedChange={() => onToggleComplete?.(task)}
-        onClick={(e) => e.stopPropagation()}
-        className="h-3.5 w-3.5 shrink-0 rounded"
-        aria-label={`Completar ${cleanPriorityPrefix(task.title)}`}
-      />
-      <span
-        className={cn(
-          'min-w-0 flex-1 truncate font-medium',
-          isDone ? 'line-through text-muted-foreground' : 'text-foreground'
-        )}
-      >
-        {cleanPriorityPrefix(task.title)}
-      </span>
-
-      {task.category && task.category !== 'geral' && (
-        <CategoryBadge category={task.category} className="text-[9px] px-1 py-0 shrink-0" />
-      )}
-
-      {task.priority === 'high' && (
-        <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" title="Alta prioridade" />
-      )}
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5 opacity-0 group-hover:opacity-100 -mr-0.5 rounded text-muted-foreground/70 hover:text-foreground transition-opacity"
-            aria-label={`Opções de ${cleanPriorityPrefix(task.title)}`}
-          >
-            <MoreHorizontal className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onClick={() => onEditTask?.(task)}>
-            <Pencil className="mr-2 h-3.5 w-3.5" /> Editar
-          </DropdownMenuItem>
-          {showNotToday && onNotToday ? (
-            <DropdownMenuItem onClick={() => onNotToday(task)}>
-              <CalendarClock className="mr-2 h-3.5 w-3.5" /> Não hoje
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={() => onDeleteTask?.(task)}
-          >
-            <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+      {cleanPriorityPrefix(task.title)}
+    </button>
   );
 }
 
-function TimedTaskBlock({
-  task,
-  block,
-  today,
-  onToggleComplete,
-  onEditTask,
-  onDeleteTask,
-  onNotToday,
-}) {
+function TimedTaskBlock({ task, block, col = 0, cols = 1, onEditTask }) {
   const isDone = isTaskDone(task);
   const { top, height } = getBlockPosition(block, task.duration_minutes);
-  const isCompact = height < 44;
-  const showNotToday =
-    isTaskOpen(task) &&
-    task.category !== 'ideias' &&
-    (!task.date || task.date <= today);
+  const gap = 3;
+  const widthPct = 100 / Math.max(1, cols);
+  const leftPct = col * widthPct;
 
   return (
-    <div
-      onClick={(e) => {
-        e.stopPropagation();
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
         onEditTask?.(task);
       }}
       style={{
         top: `${top}px`,
-        height: `${height - 3}px`,
+        height: `${Math.max(48, height) - 4}px`,
+        left: `calc(${leftPct}% + ${gap}px)`,
+        width: `calc(${widthPct}% - ${gap * 2}px)`,
       }}
       className={cn(
-        'group absolute left-1 right-1 z-10 flex flex-col justify-between overflow-hidden rounded-lg border p-1.5 text-xs shadow-sm transition-[border-color,background-color,box-shadow] cursor-pointer select-none',
-        'border-white/[0.12] bg-card/90 hover:border-domain-gold/50 hover:bg-card hover:shadow-md hover:z-20',
-        priorityStyles[task.priority || 'medium'],
-        isDone && 'opacity-60 bg-card/50 border-white/[0.06]'
+        'absolute z-10 flex flex-col items-start justify-start overflow-hidden rounded-md border px-2 py-1.5 text-left',
+        'border-white/[0.10] bg-[#161a23] hover:border-domain-gold/40 hover:z-20',
+        isDone && 'opacity-55',
       )}
     >
-      <div className="flex items-start gap-1 min-w-0">
-        <Checkbox
-          checked={isDone}
-          onCheckedChange={() => onToggleComplete?.(task)}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded"
-          aria-label={`Completar ${cleanPriorityPrefix(task.title)}`}
-        />
-        <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              'font-semibold leading-tight truncate',
-              isDone ? 'line-through text-muted-foreground' : 'text-foreground'
-            )}
-          >
-            {cleanPriorityPrefix(task.title)}
-          </p>
-          {!isCompact && (
-            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-              <span className="inline-flex items-center gap-0.5 font-mono tabular-nums">
-                <Clock className="h-2.5 w-2.5" />
-                {block.start}–{block.end}
-              </span>
-              {task.category && task.category !== 'geral' && (
-                <CategoryBadge category={task.category} className="text-[9px] px-1 py-0" />
-              )}
-            </div>
-          )}
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 opacity-0 group-hover:opacity-100 -mr-1 -mt-0.5 rounded text-muted-foreground/70 hover:text-foreground transition-opacity shrink-0"
-              aria-label={`Opções de ${cleanPriorityPrefix(task.title)}`}
-            >
-              <MoreHorizontal className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={() => onEditTask?.(task)}>
-              <Pencil className="mr-2 h-3.5 w-3.5" /> Editar
-            </DropdownMenuItem>
-            {showNotToday && onNotToday ? (
-              <DropdownMenuItem onClick={() => onNotToday(task)}>
-                <CalendarClock className="mr-2 h-3.5 w-3.5" /> Não hoje
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => onDeleteTask?.(task)}
-            >
-              <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {isCompact && (
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono tabular-nums">
-          <span>{block.start}</span>
-        </div>
-      )}
-    </div>
+      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+        {block.start}-{block.end}
+      </span>
+      <span
+        className={cn(
+          'mt-0.5 line-clamp-2 break-normal text-[12px] font-medium leading-snug text-stone-100',
+          isDone && 'line-through text-muted-foreground',
+        )}
+      >
+        {cleanPriorityPrefix(task.title)}
+      </span>
+    </button>
   );
 }
 
 export default function TaskWeek({
   tasks = [],
   today,
-  onToggleComplete,
   onEditTask,
-  onDeleteTask,
-  onNotToday,
   onCreateTaskAt,
 }) {
   const todayColRef = useRef(null);
@@ -414,8 +261,10 @@ export default function TaskWeek({
               const dayUntimedTasks = weekTasks.filter(
                 (t) => t.date === day && taskBlock(t) === null
               );
-              const dayTimedTasks = weekTasks.filter(
-                (t) => t.date === day && taskBlock(t) !== null
+              const dayTimedLaid = layoutTimedBlocks(
+                weekTasks
+                  .filter((t) => t.date === day && taskBlock(t))
+                  .map((task) => ({ task, ...taskBlock(task) })),
               );
 
               return (
@@ -457,47 +306,13 @@ export default function TaskWeek({
                     )}
                   </div>
 
-                  {/* Faixa no topo: Tarefas sem hora naquele dia */}
-                  <div className="mb-2 rounded-xl border border-white/[0.06] bg-card/40 p-1.5 min-h-[76px] max-h-[110px] overflow-y-auto space-y-1">
-                    <div className="flex items-center justify-between px-1 text-[10px] font-medium text-muted-foreground/70">
-                      <span>Sem hora</span>
-                      {dayUntimedTasks.length > 0 && (
-                        <span className="font-mono tabular-nums">{dayUntimedTasks.length}</span>
-                      )}
+                  {dayUntimedTasks.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {dayUntimedTasks.map((task) => (
+                        <UntimedTaskChip key={task.id} task={task} onEditTask={onEditTask} />
+                      ))}
                     </div>
-                    {dayUntimedTasks.length === 0 ? (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onCreateTaskAt?.({ date: day, time: '' })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onCreateTaskAt?.({ date: day, time: '' });
-                          }
-                        }}
-                        className="flex h-8 items-center justify-center rounded-lg border border-dashed border-white/[0.06] text-[10px] text-muted-foreground/40 transition-colors hover:border-white/20 hover:bg-white/[0.02] hover:text-muted-foreground cursor-pointer"
-                        title={`Adicionar tarefa sem hora em ${header.dow} ${header.dayNum}`}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        <span>Adicionar</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {dayUntimedTasks.map((task) => (
-                          <UntimedTaskCard
-                            key={task.id}
-                            task={task}
-                            today={today}
-                            onToggleComplete={onToggleComplete}
-                            onEditTask={onEditTask}
-                            onDeleteTask={onDeleteTask}
-                            onNotToday={onNotToday}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Grade de horários do dia */}
                   <div
@@ -529,22 +344,16 @@ export default function TaskWeek({
                     })}
 
                     {/* Blocos de tarefas com horário */}
-                    {dayTimedTasks.map((task) => {
-                      const block = taskBlock(task);
-                      if (!block) return null;
-                      return (
-                        <TimedTaskBlock
-                          key={task.id}
-                          task={task}
-                          block={block}
-                          today={today}
-                          onToggleComplete={onToggleComplete}
-                          onEditTask={onEditTask}
-                          onDeleteTask={onDeleteTask}
-                          onNotToday={onNotToday}
-                        />
-                      );
-                    })}
+                    {dayTimedLaid.map((laid) => (
+                      <TimedTaskBlock
+                        key={laid.task.id}
+                        task={laid.task}
+                        block={laid}
+                        col={laid.col}
+                        cols={laid.cols}
+                        onEditTask={onEditTask}
+                      />
+                    ))}
 
                     {/* Linha de agora (apenas no dia de hoje) */}
                     {isToday && (() => {
