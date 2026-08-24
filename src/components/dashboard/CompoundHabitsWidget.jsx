@@ -75,12 +75,9 @@ function CompoundHabitItem({
       className={cn(
         'relative rounded-xl border transition-[background-color,border-color,box-shadow]',
         'p-3.5',
-        listItem && 'bg-card/60',
         isClosed
           ? 'border-domain-wellness/25 bg-domain-wellness/[0.07]'
-          : isPartial
-            ? 'border-domain-gold/18 bg-domain-gold/[0.055]'
-            : 'border-white/[0.07] bg-white/[0.022] hover:border-white/[0.11] hover:bg-white/[0.035]',
+          : 'border-border/70 bg-card/60 hover:border-amber-500/35',
       )}
     >
       {showConfetti && <ConfettiOverlay />}
