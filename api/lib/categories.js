@@ -1,5 +1,6 @@
 export const CATEGORIES = {
   farmacia: { emoji: '💼', label: 'Trabalho', color: 'green' },
+  gofluxo: { emoji: '🤝', label: 'GoFluxo', color: 'amber' },
   treino: { emoji: '💪', label: 'Treino', color: 'red' },
   estudo: { emoji: '📚', label: 'Estudo', color: 'purple' },
   jotav_fit: { emoji: '📸', label: '@jotav.fit', color: 'pink' },

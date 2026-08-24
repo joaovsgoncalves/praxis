@@ -666,6 +666,7 @@ export default function VoiceCapture() {
                         <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="farmacia">💼 Trabalho / RCA</SelectItem>
+                          <SelectItem value="gofluxo">🤝 GoFluxo</SelectItem>
                           <SelectItem value="treino">💪 Treino</SelectItem>
                           <SelectItem value="estudo">📚 Estudo</SelectItem>
                           <SelectItem value="jotav_fit">📸 @jotav.fit</SelectItem>
