@@ -815,7 +815,8 @@ export default function HabitsTasks() {
 
   return (
     <div className="praxis-page overflow-x-hidden">
-      <PageHero
+      {lens !== 'board' && (
+        <PageHero
         kicker="Hábitos e tarefas"
         kickerIcon={ListTodo}
         title="Hábitos & Tarefas"
@@ -844,8 +845,10 @@ export default function HabitsTasks() {
           />
         </StatGrid>
       </PageHero>
+      )}
 
-      <section className="praxis-panel rounded-3xl p-3 sm:p-4">
+      {lens !== 'board' && (
+        <section className="praxis-panel rounded-3xl p-3 sm:p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <Tabs value={view} onValueChange={handleViewChange}>
             <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-white/[0.03] p-1 flex-nowrap">
@@ -910,9 +913,95 @@ export default function HabitsTasks() {
             ))}
           </div>
         </div>
-      </section>
+        </section>
+      )}
 
-      <div className={cn('grid gap-6', view === 'all' && lens === 'list' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
+      {lens === 'board' ? (
+        <section className="min-w-0 space-y-3 pt-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="praxis-title text-2xl font-semibold tracking-tight text-foreground">
+                Tarefas
+              </h2>
+              <span className="text-sm font-normal text-muted-foreground tabular-nums">
+                ({boardTasksCount})
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-full bg-white/[0.03] p-0.5 border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleLensChange('list')}
+                  className={cn(
+                    'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
+                    lens === 'list'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Lista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLensChange('board')}
+                  className={cn(
+                    'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
+                    lens === 'board'
+                      ? 'bg-domain-gold/20 text-domain-gold border border-domain-gold/30 shadow-sm font-semibold'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Quadro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLensChange('week')}
+                  className={cn(
+                    'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
+                    lens === 'week'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Semana
+                </button>
+              </div>
+
+              <Button
+                onClick={() => handleOpenCreateTask(null)}
+                className="praxis-touch-target h-9 rounded-full px-3.5 text-xs font-medium"
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" /> Tarefa
+              </Button>
+            </div>
+          </div>
+
+          <QuickTaskInput
+            onAdd={handleQuickAddTask}
+            isPending={createTask.isPending}
+          />
+
+          <TaskBoard
+            tasks={tasks}
+            allTasks={tasks}
+            today={today}
+            onUpdateTask={(id, data) => updateTask.mutate({ id, data })}
+            onToggleComplete={(task) => toggleTask.mutate(task)}
+            onEditTask={(task) => setEditingTask(task)}
+            onDeleteTask={(task) => confirmDeleteTask(task)}
+            onNotToday={(task) => notTodayTask.mutate(task.id)}
+            onOpenCreateTask={(columnId) => {
+              if (columnId === 'inbox') handleOpenCreateTask({ date: null, status: 'pending' });
+              else if (columnId === 'todo') handleOpenCreateTask({ date: today, status: 'pending' });
+              else if (columnId === 'doing') handleOpenCreateTask({ date: today, status: 'in_progress' });
+              else if (columnId === 'done') handleOpenCreateTask({ date: today, status: 'completed' });
+              else handleOpenCreateTask(null);
+            }}
+          />
+        </section>
+      ) : (
+        <div className={cn('grid gap-6', view === 'all' && lens === 'list' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
         {(view === 'all' || view === 'tasks') && (
           <section className="min-w-0 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1040,18 +1129,7 @@ export default function HabitsTasks() {
               </div>
             )}
 
-            {lens === 'board' ? (
-              <TaskBoard
-                tasks={categoryFilter === 'all' ? tasks : tasks.filter((t) => t.category === categoryFilter)}
-                allTasks={tasks}
-                today={today}
-                onUpdateTask={(id, data) => updateTask.mutate({ id, data })}
-                onToggleComplete={(task) => toggleTask.mutate(task)}
-                onEditTask={(task) => setEditingTask(task)}
-                onDeleteTask={(task) => confirmDeleteTask(task)}
-                onNotToday={(task) => notTodayTask.mutate(task.id)}
-              />
-            ) : lens === 'week' ? (
+            {lens === 'week' ? (
               <TaskWeek
                 tasks={categoryFilter === 'all' ? tasks : tasks.filter((t) => t.category === categoryFilter)}
                 allTasks={tasks}
@@ -1204,7 +1282,7 @@ export default function HabitsTasks() {
           </section>
         )}
 
-        {(view === 'all' || view === 'habits') && (
+        {(view === 'all' || view === 'habits') && lens === 'list' && (
           <section className="min-w-0 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -1451,6 +1529,7 @@ export default function HabitsTasks() {
           </section>
         )}
       </div>
+      )}
 
       <Dialog
         open={showTaskForm}

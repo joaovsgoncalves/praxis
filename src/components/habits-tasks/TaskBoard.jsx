@@ -2,32 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { BOARD_COLUMNS, tasksForBoardColumn, moveTaskToColumn } from '@/lib/taskLenses';
 import TaskBoardCard from './TaskBoardCard';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const COLUMN_CONFIG = {
   inbox: {
     id: 'inbox',
     title: 'Caixa',
-    emptyText: 'Nenhuma tarefa na caixa',
-    dotClass: 'bg-muted-foreground/60',
+    emptyText: 'Nenhuma tarefa na caixa.',
   },
   todo: {
     id: 'todo',
     title: 'A fazer',
-    emptyText: 'Nenhuma tarefa a fazer',
-    dotClass: 'bg-domain-ember',
+    emptyText: 'Nenhuma tarefa a fazer.',
   },
   doing: {
     id: 'doing',
     title: 'Andamento',
-    emptyText: 'Nenhuma em andamento',
-    dotClass: 'bg-domain-gold',
+    emptyText: 'Nenhuma em andamento.',
   },
   done: {
     id: 'done',
     title: 'Feito',
-    emptyText: 'Nenhuma concluída hoje',
-    dotClass: 'bg-domain-wellness',
+    emptyText: 'Todas as tarefas concluídas.',
   },
 };
 
@@ -59,6 +57,7 @@ export default function TaskBoard({
   onEditTask,
   onDeleteTask,
   onNotToday,
+  onOpenCreateTask,
 }) {
   const isDesktop = useIsDesktop();
   const isDragDisabled = !isDesktop;
@@ -84,7 +83,7 @@ export default function TaskBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="praxis-scroll-x flex gap-3 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory">
+      <div className="praxis-scroll-x flex gap-3 overflow-x-auto pb-4 pt-1 xl:grid xl:grid-cols-4 xl:gap-3.5 xl:overflow-visible">
         {BOARD_COLUMNS.map((columnId) => {
           const colConfig = COLUMN_CONFIG[columnId];
           const columnTasks = tasksForBoardColumn(tasks, columnId, today);
@@ -92,27 +91,39 @@ export default function TaskBoard({
           return (
             <div
               key={columnId}
-              className="flex w-[min(280px,82vw)] shrink-0 flex-col rounded-2xl border border-white/[0.06] bg-card/30 p-3 snap-start xl:min-w-[240px] xl:w-auto xl:flex-1"
+              className="flex w-[min(280px,85vw)] shrink-0 min-w-[240px] flex-col rounded-2xl border border-white/[0.06] bg-[#12151c]/90 p-3 xl:w-auto xl:min-w-[240px] xl:flex-1"
             >
-              <div className="flex items-center justify-between px-1 pb-2.5">
+              {/* Header da coluna: Título + Badge contagem + Botão + */}
+              <div className="flex items-center justify-between px-1 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className={cn('h-2 w-2 rounded-full', colConfig.dotClass)} />
-                  <span className="text-xs font-semibold tracking-wide text-foreground">
+                  <span className="text-sm font-semibold tracking-tight text-stone-100">
                     {colConfig.title}
                   </span>
+                  <span className="rounded-md bg-stone-800/80 px-1.5 py-0.5 text-xs font-mono tabular-nums text-stone-400">
+                    {columnTasks.length}
+                  </span>
                 </div>
-                <span className="text-xs font-mono tabular-nums text-muted-foreground/70">
-                  {columnTasks.length}
-                </span>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-colors"
+                  onClick={() => onOpenCreateTask?.(columnId)}
+                  aria-label={'Adicionar tarefa em ' + colConfig.title}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
               </div>
 
+              {/* Lista de cartões */}
               <Droppable droppableId={columnId} isDropDisabled={isDragDisabled}>
                 {(droppableProvided, droppableSnapshot) => (
                   <div
                     ref={droppableProvided.innerRef}
                     {...droppableProvided.droppableProps}
                     className={cn(
-                      'flex-1 min-h-[140px] space-y-2 rounded-xl p-1 transition-colors',
+                      'flex-1 min-h-[140px] space-y-2 rounded-xl p-0.5 transition-colors',
                       droppableSnapshot.isDraggingOver && 'bg-white/[0.02] ring-1 ring-white/10'
                     )}
                   >
@@ -143,8 +154,8 @@ export default function TaskBoard({
                     ))}
                     {droppableProvided.placeholder}
                     {columnTasks.length === 0 && !droppableSnapshot.isDraggingOver && (
-                      <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/[0.05] p-3 text-center">
-                        <p className="text-xs text-muted-foreground/50">{colConfig.emptyText}</p>
+                      <div className="flex items-center justify-center py-8 text-center">
+                        <p className="text-xs text-muted-foreground/45">{colConfig.emptyText}</p>
                       </div>
                     )}
                   </div>
