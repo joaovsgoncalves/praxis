@@ -12,6 +12,8 @@ import {
   GripVertical,
   Pencil,
   CalendarClock,
+  MoreHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,6 +49,7 @@ export default function TodayTasks({
   allTasksForRecurrence,
   onToggleComplete,
   onEditTask,
+  onDeleteTask,
   onNotToday,
   notTodayBusy = false,
   onReorderPending,
