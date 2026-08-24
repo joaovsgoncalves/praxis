@@ -912,7 +912,7 @@ export default function HabitsTasks() {
         </div>
       </section>
 
-      <div className={cn('grid gap-6', view === 'all' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
+      <div className={cn('grid gap-6', view === 'all' && lens === 'list' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
         {(view === 'all' || view === 'tasks') && (
           <section className="min-w-0 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

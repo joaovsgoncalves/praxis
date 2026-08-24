@@ -73,7 +73,7 @@ export default function TaskBoardCard({
       {...dragProvided?.draggableProps}
       style={dragProvided?.draggableProps?.style}
       className={cn(
-        'group relative flex flex-col gap-2 rounded-xl border p-3 transition-[background-color,border-color,box-shadow]',
+        'group relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-xl border p-3 transition-[background-color,border-color,box-shadow]',
         snapshot?.isDragging
           ? 'z-50 border-domain-gold/40 bg-card shadow-xl shadow-black/40 ring-1 ring-domain-gold/30'
           : 'border-white/[0.06] bg-card/60 hover:border-white/[0.12] hover:bg-card/80',
@@ -101,7 +101,7 @@ export default function TaskBoardCard({
 
         <p
           className={cn(
-            'flex-1 min-w-0 text-sm font-medium leading-snug break-words',
+            'min-w-0 flex-1 overflow-hidden text-sm font-medium leading-snug line-clamp-2 break-normal',
             isDone ? 'line-through text-muted-foreground' : 'text-foreground'
           )}
         >

@@ -84,7 +84,7 @@ export default function TaskBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="praxis-scroll-x flex gap-3 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-x-visible lg:pb-0">
+      <div className="praxis-scroll-x flex gap-3 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory">
         {BOARD_COLUMNS.map((columnId) => {
           const colConfig = COLUMN_CONFIG[columnId];
           const columnTasks = tasksForBoardColumn(tasks, columnId, today);
@@ -92,7 +92,7 @@ export default function TaskBoard({
           return (
             <div
               key={columnId}
-              className="flex flex-col rounded-2xl border border-white/[0.06] bg-card/30 p-3 min-w-[260px] max-w-[320px] sm:min-w-[280px] lg:max-w-none lg:min-w-0 snap-start flex-1"
+              className="flex w-[min(280px,82vw)] shrink-0 flex-col rounded-2xl border border-white/[0.06] bg-card/30 p-3 snap-start xl:min-w-[240px] xl:w-auto xl:flex-1"
             >
               <div className="flex items-center justify-between px-1 pb-2.5">
                 <div className="flex items-center gap-2">
