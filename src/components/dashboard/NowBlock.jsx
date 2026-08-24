@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from '@/lib/categories';
 import { formatTaskTimeLabel, isTaskOverdue } from '@/lib/nowTask';
-import { Timer, CheckCircle2, Clock, AlertTriangle, Mic, Plus, Flame } from 'lucide-react';
+import { Timer, CheckCircle2, Clock, AlertTriangle, Plus, Flame } from 'lucide-react';
 
 export default function NowBlock({
   task,
@@ -14,8 +14,7 @@ export default function NowBlock({
   onComplete,
   onSnooze15,
   onSnoozeTomorrow,
-  onAddTask,
-  onVoiceCapture,
+  onAddTask,
 }) {
   if (!task) {
       return (
@@ -41,14 +40,6 @@ export default function NowBlock({
                   <Button
                     type="button"
                     className="praxis-touch-target praxis-glow-ember w-full gap-2 rounded-full bg-amber-500 text-slate-950 hover:bg-amber-400 sm:w-auto"
-                    onClick={onVoiceCapture}
-                  >
-                    <Mic className="h-4 w-4" /> Falar meu dia
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="praxis-touch-target w-full gap-2 rounded-full border-amber-500/25 bg-white/[0.03] hover:border-amber-500/40 hover:bg-amber-500/10 sm:w-auto"
                     onClick={onAddTask}
                   >
                     <Plus className="h-4 w-4" /> Nova tarefa

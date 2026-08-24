@@ -354,10 +354,76 @@ export default function CompoundHabitsWidget({
         });
       }
     },
+    onMutate: async ({ habitId, isDone }) => {
+      await queryClient.cancelQueries({ queryKey: ['habits'] });
+      await queryClient.cancelQueries({ queryKey: ['allHabits'] });
+      await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
+
+      const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
+      const prevLogs = queryClient.getQueriesData({ queryKey: ['habitLogs'] });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habitId) {
+            return {
+              ...h,
+              completed_today: !isDone,
+              skipped_today: false,
+              day_outcome: isDone ? 'open' : 'done',
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habitId
+                  ? {
+                      ...child,
+                      completed_today: !isDone,
+                      skipped_today: false,
+                      day_outcome: isDone ? 'open' : 'done',
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ['habits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['allHabits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        if (isDone) {
+          return old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        }
+        const filtered = old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: 'temp-' + Date.now(),
+            habit_id: habitId,
+            date: today,
+            outcome: 'done',
+            completed: true,
+          },
+        ];
+      });
+
+      return { prevHabits, prevAllHabits, prevLogs };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao atualizar hábito');
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
 
@@ -369,14 +435,78 @@ export default function CompoundHabitsWidget({
       ...(skipReason ? { skip_reason: skipReason } : {}),
       ...(skipNote ? { note: skipNote } : {}),
     }),
+    onMutate: async ({ habitId, skipReason, skipNote }) => {
+      await queryClient.cancelQueries({ queryKey: ['habits'] });
+      await queryClient.cancelQueries({ queryKey: ['allHabits'] });
+      await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
+
+      const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
+      const prevLogs = queryClient.getQueriesData({ queryKey: ['habitLogs'] });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habitId) {
+            return {
+              ...h,
+              completed_today: false,
+              skipped_today: true,
+              day_outcome: 'skipped',
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habitId
+                  ? {
+                      ...child,
+                      completed_today: false,
+                      skipped_today: true,
+                      day_outcome: 'skipped',
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ['habits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['allHabits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        const filtered = old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: 'temp-' + Date.now(),
+            habit_id: habitId,
+            date: today,
+            outcome: 'skipped',
+            skip_reason: skipReason || null,
+            note: skipNote || null,
+            completed: false,
+          },
+        ];
+      });
+
+      return { prevHabits, prevAllHabits, prevLogs };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao registrar');
+    },
     onSuccess: () => {
       toast('Não rolou — registrado.');
       setSkipHabitTarget(null);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
     },
   });
 

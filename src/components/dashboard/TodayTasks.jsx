@@ -21,6 +21,13 @@ import { sparkFromElement } from '@/lib/celebration';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
 import { sortPendingWithOverdueFirst, addDaysToDateKey } from '@/lib/taskListFilters';
 import { SectionHeading } from '@/components/layout/PraxisPage';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const priorityStyles = {
   high: 'bg-destructive/10 text-destructive border-destructive/20',
@@ -142,7 +149,7 @@ export default function TodayTasks({
               <p className="text-sm text-muted-foreground">
                 {upcomingOpenCount > 0
                   ? `Nenhuma tarefa para hoje · ${upcomingOpenCount} na semana`
-                  : 'Nenhuma tarefa para hoje. Que tal capturar uma por voz?'}
+                  : 'Nenhuma tarefa para hoje.'}
               </p>
               {upcomingOpenCount > 0 && (
                 <Link
@@ -263,7 +270,7 @@ export default function TodayTasks({
                               )}
                             </div>
                           </div>
-                          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-col sm:items-stretch shrink-0">
+                          <div className="flex w-full items-center justify-end gap-1.5 sm:w-auto shrink-0">
                             {onNotToday ? (
                               <Button
                                 type="button"
@@ -281,21 +288,47 @@ export default function TodayTasks({
                               type="button"
                               size="default"
                               variant="secondary"
-                              className="h-9 flex-1 gap-1.5 rounded-lg px-3 text-xs touch-manipulation"
+                              className="h-9 flex-1 gap-1.5 rounded-lg px-3 text-xs touch-manipulation sm:flex-none"
                               onClick={() => onEditTask?.(task)}
                             >
                               <Pencil className="w-4 h-4" />
                               Editar
                             </Button>
-                            <Link
-                              to={`/foco?taskId=${task.id}`}
-                              className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline sm:text-left"
-                            >
-                              <span className="inline-flex items-center gap-1">
-                                <Timer className="h-3.5 w-3.5" />
-                                Iniciar foco
-                              </span>
-                            </Link>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 min-h-[44px] min-w-[44px] shrink-0 rounded-lg text-muted-foreground hover:text-foreground touch-manipulation"
+                                  aria-label={`Mais opções para ${task.title}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem asChild>
+                                  <Link to={`/foco?taskId=${task.id}`} className="flex items-center">
+                                    <Timer className="mr-2 h-4 w-4" /> Iniciar foco
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                                </DropdownMenuItem>
+                                {onNotToday && (
+                                  <DropdownMenuItem onClick={() => onNotToday(task)}>
+                                    <CalendarClock className="mr-2 h-4 w-4" /> Não hoje
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => onDeleteTask?.(task)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                                               )}
@@ -336,16 +369,31 @@ export default function TodayTasks({
                   <p className="text-[11px] text-green-400/80 mt-0.5">Limpa hoje · era de {task.date}</p>
                 )}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 shrink-0 touch-manipulation"
-                aria-label="Editar tarefa concluída"
-                onClick={() => onEditTask?.(task)}
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 min-h-[44px] min-w-[44px] shrink-0 rounded-lg touch-manipulation text-muted-foreground hover:text-foreground"
+                    aria-label={`Opções da tarefa ${task.title}`}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                    <Pencil className="mr-2 h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onDeleteTask?.(task)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <CategoryBadge category={task.category} className="opacity-60 hidden sm:flex" />
               <CheckCircle2 className="w-5 h-5 text-domain-wellness shrink-0" />
             </motion.div>

@@ -39,3 +39,7 @@ export function sortTodayRelevantTasks(a, b) {
 
   return String(a?.time || '').localeCompare(String(b?.time || ''));
 }
+export function cleanPriorityPrefix(title = "") {
+  const cleaned = String(title).replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, "").trim();
+  return cleaned || title;
+}

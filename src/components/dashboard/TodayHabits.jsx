@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Flame, Minus } from 'lucide-react';
+import { Flame, Minus, MoreHorizontal, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
@@ -13,6 +13,13 @@ import {
   todayLogForHabit,
 } from '@/lib/habits';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const LONG_PRESS_MS = 480;
 
@@ -21,6 +28,7 @@ export default function TodayHabits({
   habitLogs,
   onToggleHabit,
   onSkipHabit,
+  onDeleteHabit,
   title = 'Hábitos de Hoje',
   today: todayProp,
 }) {
@@ -235,31 +243,76 @@ export default function TodayHabits({
                               </span>
                             ) : null}
 
-              {skipped ? (
-                <button
-                  type="button"
-                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground"
-                  aria-label={`Abrir não rolou — ${habit.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openSkipSheet(habit);
-                  }}
-                >
-                  Nomear
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-100/95 transition-colors hover:bg-amber-500/20"
-                  aria-label={`Não rolou — ${habit.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openSkipSheet(habit);
-                  }}
-                >
-                  Não rolou
-                </button>
-              )}
+              <div className="flex items-center gap-1 shrink-0">
+                {skipped ? (
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground touch-manipulation"
+                    aria-label={`Abrir não rolou — ${habit.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openSkipSheet(habit);
+                    }}
+                  >
+                    Nomear
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-100/95 transition-colors hover:bg-amber-500/20 touch-manipulation"
+                    aria-label={`Não rolou — ${habit.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openSkipSheet(habit);
+                    }}
+                  >
+                    Não rolou
+                  </button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-8 w-8 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground touch-manipulation"
+                      aria-label={`Opções do hábito ${habit.title}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {skipped ? (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleHabit?.(habit.id, true);
+                        }}
+                      >
+                        Desfazer não rolou
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openSkipSheet(habit);
+                        }}
+                      >
+                        <Minus className="mr-2 h-4 w-4" /> Não rolou
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteHabit?.(habit);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           );
         })}

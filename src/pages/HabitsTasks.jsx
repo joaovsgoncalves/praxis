@@ -32,13 +32,12 @@ import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
 import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
-import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder } from '@/lib/taskReorder';
-import { isTaskOpen } from '@/lib/tasks';
+import { isTaskOpen, isTaskDone, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
   HABIT_STATUS_LABELS,
@@ -48,7 +47,6 @@ import {
   formatPreferredTime,
   getHabitDayOutcome,
   isHabitDueOnDate,
-  isHabitLogDone,
   isQuantitativeHabit,
   todayLogForHabit,
 } from '@/lib/habits';
@@ -68,10 +66,6 @@ import {
   setTaskScopeInSearchParams,
 } from '@/lib/urlDeepLinks';
 
-function cleanPriorityPrefix(title = '') {
-  const cleaned = String(title).replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
-  return cleaned || title;
-}
 
 const priorityStyles = {
   high: 'bg-destructive/15 text-destructive border-destructive/20',
@@ -123,7 +117,7 @@ export default function HabitsTasks() {
     setSearchParams(setHabitTasksTabInSearchParams(searchParams, next), { replace: true });
   };
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+  const { data: tasks = [] } = useQuery({
     queryKey: ['tasks', today],
     queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
@@ -180,12 +174,89 @@ export default function HabitsTasks() {
 
   const deleteTask = useMutation({
     mutationFn: (id) => praxisApi.tasks.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allTasks'] }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
+      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
+
+      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
+
+      const filterList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((t) => t.id !== id);
+      };
+
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, filterList);
+      queryClient.setQueriesData({ queryKey: ['allTasks'] }, filterList);
+      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, filterList);
+
+      return { prevTasks, prevAllTasks, prevDashboard };
+    },
+    onError: (_err, _id, context) => {
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao excluir tarefa');
+    },
+    onSuccess: () => {
+      toast.success('Tarefa excluída');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+    },
   });
 
   const deleteHabit = useMutation({
     mutationFn: (id) => praxisApi.habits.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['allHabits'] }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['allHabits'] });
+      await queryClient.cancelQueries({ queryKey: ['habits'] });
+      await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
+
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
+      const prevLogs = queryClient.getQueriesData({ queryKey: ['habitLogs'] });
+
+      const filterHabitList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old
+          .filter((h) => h.id !== id)
+          .map((h) => ({
+            ...h,
+            children: Array.isArray(h.children)
+              ? h.children.filter((c) => c.id !== id)
+              : h.children,
+          }));
+      };
+
+      queryClient.setQueriesData({ queryKey: ['allHabits'] }, filterHabitList);
+      queryClient.setQueriesData({ queryKey: ['habits'] }, filterHabitList);
+      queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) =>
+        Array.isArray(old) ? old.filter((l) => l.habit_id !== id) : old
+      );
+
+      return { prevAllHabits, prevHabits, prevLogs };
+    },
+    onError: (_err, _id, context) => {
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao excluir hábito');
+    },
+    onSuccess: () => {
+      toast.success('Hábito excluído');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+    },
   });
 
   const reorderTasks = useMutation({
@@ -205,15 +276,58 @@ export default function HabitsTasks() {
   });
 
   const toggleTask = useMutation({
-    mutationFn: (task) => praxisApi.tasks.update(task.id, {
-      status: task.status === 'completed' ? 'pending' : 'completed',
-    }),
-    onSuccess: (data, task) => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+    mutationFn: (task) => {
+      const nextStatus = isTaskDone(task) ? 'pending' : 'completed';
+      return praxisApi.tasks.update(task.id, { status: nextStatus });
+    },
+    onMutate: async (task) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
+      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
+
+      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
+
+      const nextStatus = isTaskDone(task) ? 'pending' : 'completed';
+      if (nextStatus === 'completed') hapticLight();
+
+      const updateList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t) =>
+          t.id === task.id
+            ? {
+                ...t,
+                status: nextStatus,
+                completed_date: nextStatus === 'completed' ? today : null,
+                completed_at: nextStatus === 'completed' ? new Date().toISOString() : null,
+              }
+            : t
+        );
+      };
+
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['allTasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, updateList);
+
+      return { prevTasks, prevAllTasks, prevDashboard };
+    },
+    onError: (_err, _task, context) => {
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao atualizar tarefa');
+    },
+    onSuccess: (data) => {
       dispatchPraxisLevelUpFromResponse(data);
       notifyPraxisRecurrenceSpawned(data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
-      if (task.status !== 'completed') hapticLight();
     },
   });
 
@@ -232,11 +346,80 @@ export default function HabitsTasks() {
         });
       }
     },
-    onSuccess: (_data, { isDone }) => {
-      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    onMutate: async ({ habitId, isDone, value }) => {
+      await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
+      await queryClient.cancelQueries({ queryKey: ['allHabits'] });
+      await queryClient.cancelQueries({ queryKey: ['habits'] });
+
+      const prevLogs = queryClient.getQueriesData({ queryKey: ['habitLogs'] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
+
       if (!isDone) hapticLight();
+
+      queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        if (isDone) {
+          return old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        }
+        const filtered = old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: `temp-${Date.now()}`,
+            habit_id: habitId,
+            date: today,
+            outcome: 'done',
+            completed: true,
+            ...(value !== undefined ? { value } : {}),
+          },
+        ];
+      });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habitId) {
+            return {
+              ...h,
+              completed_today: !isDone,
+              skipped_today: false,
+              day_outcome: isDone ? 'open' : 'done',
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habitId
+                  ? {
+                      ...child,
+                      completed_today: !isDone,
+                      skipped_today: false,
+                      day_outcome: isDone ? 'open' : 'done',
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ['allHabits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['habits'] }, updateHabitItems);
+
+      return { prevLogs, prevAllHabits, prevHabits };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao atualizar hábito');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
 
@@ -250,29 +433,129 @@ export default function HabitsTasks() {
         ...(skipNote ? { note: skipNote } : {}),
       });
     },
+    onMutate: async ({ habitId, skipReason, skipNote }) => {
+      await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
+      await queryClient.cancelQueries({ queryKey: ['allHabits'] });
+      await queryClient.cancelQueries({ queryKey: ['habits'] });
+
+      const prevLogs = queryClient.getQueriesData({ queryKey: ['habitLogs'] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
+
+      queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        const filtered = old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: `temp-${Date.now()}`,
+            habit_id: habitId,
+            date: today,
+            outcome: 'skipped',
+            skip_reason: skipReason || null,
+            note: skipNote || null,
+            completed: false,
+          },
+        ];
+      });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habitId) {
+            return {
+              ...h,
+              completed_today: false,
+              skipped_today: true,
+              day_outcome: 'skipped',
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habitId
+                  ? {
+                      ...child,
+                      completed_today: false,
+                      skipped_today: true,
+                      day_outcome: 'skipped',
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ['allHabits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['habits'] }, updateHabitItems);
+
+      return { prevLogs, prevAllHabits, prevHabits };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao registrar');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
       toast('Registrado. O importante é não quebrar a corrente dois dias seguidos.');
       setSkipSheetHabit(null);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
     },
   });
 
   const notTodayTask = useMutation({
     mutationFn: (taskId) => praxisApi.tasks.notToday(taskId, {}),
+    onMutate: async (taskId) => {
+      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
+
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
+      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
+
+      const updateList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                status: 'pending',
+                date: addDaysToDateKey(today, 1),
+                day_outcome: 'not_today',
+                day_outcome_date: today,
+              }
+            : t
+        );
+      };
+
+      queryClient.setQueriesData({ queryKey: ['allTasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, updateList);
+
+      return { prevAllTasks, prevTasks, prevDashboard };
+    },
+    onError: (_err, _taskId, context) => {
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao adiar tarefa');
+    },
     onSuccess: () => {
+      toast('Adiado. Empurrado pra amanhã sem culpa, mas com compromisso.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      toast('Adiado. Empurrado pra amanhã sem culpa, mas com compromisso.');
     },
   });
-
-  const isHabitCompletedToday = (habitId) => {
-    const log = todayLogForHabit(habitLogs, habitId, today);
-    return isHabitLogDone(log);
-  };
 
   const habitDayOutcome = (habitId) => {
     const log = todayLogForHabit(habitLogs, habitId, today);
@@ -1121,7 +1404,6 @@ export default function HabitsTasks() {
         }}
       />
 
-      <VoiceCaptureButton />
     </div>
   );
 }

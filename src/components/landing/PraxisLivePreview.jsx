@@ -178,7 +178,6 @@ export function PraxisLivePreview() {
               {[
                 ['Hoje', CircleDot, true],
                 ['Tarefas', Check, false],
-                ['Falar', Mic, false],
                 ['Revisar', MoonStar, false],
               ].map(([label, Icon, active]) => (
                 <div

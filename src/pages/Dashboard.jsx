@@ -1,46 +1,55 @@
-import React, { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { praxisApi } from '@/api/praxisClient';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import HeroDay from '@/components/dashboard/HeroDay';
-import NowBlock from '@/components/dashboard/NowBlock';
-import TodayTasks from '@/components/dashboard/TodayTasks';
-import TodayHabits from '@/components/dashboard/TodayHabits';
-import WellnessWidget from '@/components/dashboard/WellnessWidget';
-import VoiceCaptureButton from '@/components/shared/VoiceCaptureButton';
-import NutritionTodayCard from '@/components/nutrition/NutritionTodayCard';
-import TodayFinanceCard from '@/components/finance/TodayFinanceCard';
-import TodayCalendar from '@/components/dashboard/TodayCalendar';
-import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
-import XpProgressStrip from '@/components/dashboard/XpProgressStrip';
-import CapturePendingBanner from '@/components/dashboard/CapturePendingBanner';
-import WeeklyReviewPrompt from '@/components/dashboard/WeeklyReviewPrompt';
-import AvoidanceWidget from '@/components/dashboard/AvoidanceWidget';
-import PwaInstallBanner from '@/components/shared/PwaInstallBanner';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, Gauge, ListChecks } from 'lucide-react';
-import TaskForm from '@/components/habits-tasks/TaskForm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from '@/lib/dates';
-import { pickNowTask } from '@/lib/nowTask';
-import { isHabitDueOnDate } from '@/lib/habits';
-import { buildDragOrder } from '@/lib/taskReorder';
-import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
-import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
-import { isTaskCompletedForToday, isTaskDone, isTaskOpen } from '@/lib/tasks';
+import React, { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { praxisApi } from "@/api/praxisClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import HeroDay from "@/components/dashboard/HeroDay";
+import NowBlock from "@/components/dashboard/NowBlock";
+import TodayTasks from "@/components/dashboard/TodayTasks";
+import TodayHabits from "@/components/dashboard/TodayHabits";
+import WellnessWidget from "@/components/dashboard/WellnessWidget";
+import NutritionTodayCard from "@/components/nutrition/NutritionTodayCard";
+import TodayFinanceCard from "@/components/finance/TodayFinanceCard";
+import TodayCalendar from "@/components/dashboard/TodayCalendar";
+import CompoundHabitsWidget from "@/components/dashboard/CompoundHabitsWidget";
+import XpProgressStrip from "@/components/dashboard/XpProgressStrip";
+import WeeklyReviewPrompt from "@/components/dashboard/WeeklyReviewPrompt";
+import AvoidanceWidget from "@/components/dashboard/AvoidanceWidget";
+import PwaInstallBanner from "@/components/shared/PwaInstallBanner";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ChevronDown, Gauge, ListChecks } from "lucide-react";
+import TaskForm from "@/components/habits-tasks/TaskForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from "@/lib/dates";
+import { pickNowTask } from "@/lib/nowTask";
+import { isHabitDueOnDate } from "@/lib/habits";
+import { buildDragOrder } from "@/lib/taskReorder";
+import { dispatchPraxisLevelUpFromResponse } from "@/lib/praxisLevelUp";
+import { notifyPraxisRecurrenceSpawned } from "@/lib/praxisRecurrenceToast";
+import { isTaskCompletedForToday, isTaskDone, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
+import {
+  addDaysToDateKey,
   countOpenOverdue,
   sortTasksForList,
-} from '@/lib/taskListFilters';
-import OverdueTasksBanner from '@/components/dashboard/OverdueTasksBanner';
-import SuggestedGoalCard from '@/components/dashboard/SuggestedGoalCard';
-import { toast } from 'sonner';
+} from "@/lib/taskListFilters";
+import OverdueTasksBanner from "@/components/dashboard/OverdueTasksBanner";
+import SuggestedGoalCard from "@/components/dashboard/SuggestedGoalCard";
+import { toast } from "sonner";
 
 // Lote 7: widgets sem glow de domínio (app mais quieto)
 const Slot = ({ children }) => <div>{children}</div>;
 
-function DashboardGroupHeading({ icon: Icon, eyebrow, title, description, tone = 'text-domain-gold' }) {
+function DashboardGroupHeading({ icon: Icon, eyebrow, title, description, tone = "text-domain-gold" }) {
   return (
     <div className="mb-3 flex items-start gap-3 px-1 sm:mb-4">
       <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
@@ -62,14 +71,14 @@ export default function Dashboard() {
   const today = fortalezaDateKey();
 
   useEffect(() => {
-    if (searchParams.get('from') === 'capture') {
-      navigate('/captura', { replace: true });
+    if (searchParams.get("from") === "capture") {
+      navigate("/captura", { replace: true });
     }
   }, [searchParams, navigate]);
 
   const { data: allTasks = [], isLoading: isLoadingTasks } = useQuery({
-    queryKey: ['dashboardTasks', today],
-    queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
+    queryKey: ["dashboardTasks", today],
+    queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: "1", today }),
   });
 
   const overdueOpenCount = React.useMemo(
@@ -80,9 +89,9 @@ export default function Dashboard() {
   const tasks = React.useMemo(() => {
     return allTasks
       .filter((task) => {
-        if (task.status === 'cancelled') return false;
+        if (task.status === "cancelled") return false;
         if (isTaskOpen(task)) {
-          const d = (task.date || '').slice(0, 10);
+          const d = (task.date || "").slice(0, 10);
           if (!d) return false;
           return d <= today;
         }
@@ -92,22 +101,22 @@ export default function Dashboard() {
   }, [allTasks, today]);
 
   const { data: habits = [], isLoading: isLoadingHabits } = useQuery({
-    queryKey: ['habits', today],
-    queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
+    queryKey: ["habits", today],
+    queryFn: () => praxisApi.habits.list({ status: "active", date: today }),
   });
 
   const { data: habitLogs = [], isLoading: isLoadingLogs } = useQuery({
-    queryKey: ['habitLogs', today],
+    queryKey: ["habitLogs", today],
     queryFn: () => praxisApi.habitLogs.list({ date: today }),
   });
 
   const { data: wellnessChecks = [], isLoading: isLoadingWellness } = useQuery({
-    queryKey: ['wellness', today],
+    queryKey: ["wellness", today],
     queryFn: () => praxisApi.wellness.list({ date: today }),
   });
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery({
-    queryKey: ['userSettings'],
+    queryKey: ["userSettings"],
     queryFn: () => praxisApi.user.getSettings(),
     staleTime: 5 * 60 * 1000,
   });
@@ -115,34 +124,139 @@ export default function Dashboard() {
   const todayCheck = wellnessChecks[0] || null;
   const [editingTask, setEditingTask] = React.useState(null);
   const [showNewTaskForm, setShowNewTaskForm] = React.useState(false);
+  const [taskPendingDelete, setTaskPendingDelete] = React.useState(null);
+  const [habitPendingDelete, setHabitPendingDelete] = React.useState(null);
 
   const invalidateTaskQueries = React.useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-    queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    queryClient.invalidateQueries({ queryKey: ['allTasks'] });
-    queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
-    queryClient.invalidateQueries({ queryKey: ['gamification'] });
+    queryClient.invalidateQueries({ queryKey: ["dashboardTasks"] });
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["allTasks"] });
+    queryClient.invalidateQueries({ queryKey: ["pendingTasks"] });
+    queryClient.invalidateQueries({ queryKey: ["gamification"] });
   }, [queryClient]);
 
   const toggleTaskMutation = useMutation({
     mutationFn: (task) => {
-      const newStatus = isTaskDone(task) ? 'pending' : 'completed';
+      const newStatus = isTaskDone(task) ? "pending" : "completed";
       return praxisApi.tasks.update(task.id, { status: newStatus });
     },
+    onMutate: async (task) => {
+      await queryClient.cancelQueries({ queryKey: ["dashboardTasks"] });
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      await queryClient.cancelQueries({ queryKey: ["allTasks"] });
+
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ["dashboardTasks"] });
+      const prevTasks = queryClient.getQueriesData({ queryKey: ["tasks"] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ["allTasks"] });
+
+      const nextStatus = isTaskDone(task) ? "pending" : "completed";
+      const updateList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t) =>
+          t.id === task.id
+            ? {
+                ...t,
+                status: nextStatus,
+                completed_date: nextStatus === "completed" ? today : null,
+                completed_at: nextStatus === "completed" ? new Date().toISOString() : null,
+              }
+            : t
+        );
+      };
+
+      queryClient.setQueriesData({ queryKey: ["dashboardTasks"] }, updateList);
+      queryClient.setQueriesData({ queryKey: ["tasks"] }, updateList);
+      queryClient.setQueriesData({ queryKey: ["allTasks"] }, updateList);
+
+      return { prevDashboard, prevTasks, prevAllTasks };
+    },
+    onError: (_err, _task, context) => {
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao atualizar tarefa");
+    },
     onSuccess: (updated) => {
-      invalidateTaskQueries();
       dispatchPraxisLevelUpFromResponse(updated);
       notifyPraxisRecurrenceSpawned(updated);
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+    },
+    onSettled: () => {
+      invalidateTaskQueries();
     },
   });
+
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ["dashboardTasks"] });
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      await queryClient.cancelQueries({ queryKey: ["allTasks"] });
+
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ["dashboardTasks"] });
+      const prevTasks = queryClient.getQueriesData({ queryKey: ["tasks"] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ["allTasks"] });
+
+      const updateList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t) => (t.id === id ? { ...t, ...data } : t));
+      };
+
+      queryClient.setQueriesData({ queryKey: ["dashboardTasks"] }, updateList);
+      queryClient.setQueriesData({ queryKey: ["tasks"] }, updateList);
+      queryClient.setQueriesData({ queryKey: ["allTasks"] }, updateList);
+
+      return { prevDashboard, prevTasks, prevAllTasks };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao atualizar tarefa");
+    },
     onSuccess: () => {
-      invalidateTaskQueries();
       setEditingTask(null);
     },
+    onSettled: () => {
+      invalidateTaskQueries();
+    },
   });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (id) => praxisApi.tasks.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["dashboardTasks"] });
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      await queryClient.cancelQueries({ queryKey: ["allTasks"] });
+
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ["dashboardTasks"] });
+      const prevTasks = queryClient.getQueriesData({ queryKey: ["tasks"] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ["allTasks"] });
+
+      const filterList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((t) => t.id !== id);
+      };
+
+      queryClient.setQueriesData({ queryKey: ["dashboardTasks"] }, filterList);
+      queryClient.setQueriesData({ queryKey: ["tasks"] }, filterList);
+      queryClient.setQueriesData({ queryKey: ["allTasks"] }, filterList);
+
+      return { prevDashboard, prevTasks, prevAllTasks };
+    },
+    onError: (_err, _id, context) => {
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao excluir tarefa");
+    },
+    onSuccess: () => {
+      toast.success("Tarefa excluída");
+    },
+    onSettled: () => {
+      invalidateTaskQueries();
+    },
+  });
+
   const createTaskMutation = useMutation({
     mutationFn: (data) => praxisApi.tasks.create({ ...data, date: data.date || today }),
     onSuccess: () => {
@@ -150,6 +264,7 @@ export default function Dashboard() {
       setShowNewTaskForm(false);
     },
   });
+
   const reorderTasksMutation = useMutation({
     mutationFn: (orderedIds) => praxisApi.tasks.reorder(orderedIds),
     onSuccess: invalidateTaskQueries,
@@ -166,21 +281,89 @@ export default function Dashboard() {
 
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone }) => {
-      const logs = habitLogs.filter(l => l.habit_id === habitId && l.date === today);
+      const logs = habitLogs.filter((l) => l.habit_id === habitId && l.date === today);
       if (isDone && logs[0]) {
         await praxisApi.habitLogs.delete(logs[0].id);
       } else if (!isDone) {
         await praxisApi.habitLogs.create({
           habit_id: habitId,
           date: today,
-          outcome: 'done',
+          outcome: "done",
           completed: true,
         });
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    onMutate: async ({ habitId, isDone }) => {
+      await queryClient.cancelQueries({ queryKey: ["habitLogs"] });
+      await queryClient.cancelQueries({ queryKey: ["habits"] });
+      await queryClient.cancelQueries({ queryKey: ["allHabits"] });
+
+      const prevLogs = queryClient.getQueriesData({ queryKey: ["habitLogs"] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ["habits"] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ["allHabits"] });
+
+      queryClient.setQueriesData({ queryKey: ["habitLogs"] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        if (isDone) {
+          return old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        }
+        const filtered = old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: `temp-${Date.now()}`,
+            habit_id: habitId,
+            date: today,
+            outcome: "done",
+            completed: true,
+          },
+        ];
+      });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habitId) {
+            return {
+              ...h,
+              completed_today: !isDone,
+              skipped_today: false,
+              day_outcome: isDone ? "open" : "done",
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habitId
+                  ? {
+                      ...child,
+                      completed_today: !isDone,
+                      skipped_today: false,
+                      day_outcome: isDone ? "open" : "done",
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ["habits"] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ["allHabits"] }, updateHabitItems);
+
+      return { prevLogs, prevHabits, prevAllHabits };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao atualizar hábito");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
+      queryClient.invalidateQueries({ queryKey: ["gamification"] });
     },
   });
 
@@ -189,41 +372,195 @@ export default function Dashboard() {
       await praxisApi.habitLogs.create({
         habit_id: habitId,
         date: today,
-        outcome: 'skipped',
+        outcome: "skipped",
         ...(skipReason ? { skip_reason: skipReason } : {}),
         ...(skipNote ? { note: skipNote } : {}),
       });
     },
+    onMutate: async ({ habitId, skipReason, skipNote }) => {
+      await queryClient.cancelQueries({ queryKey: ["habitLogs"] });
+      await queryClient.cancelQueries({ queryKey: ["habits"] });
+      await queryClient.cancelQueries({ queryKey: ["allHabits"] });
+
+      const prevLogs = queryClient.getQueriesData({ queryKey: ["habitLogs"] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ["habits"] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ["allHabits"] });
+
+      queryClient.setQueriesData({ queryKey: ["habitLogs"] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        const filtered = old.filter((l) => !(l.habit_id === habitId && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: `temp-${Date.now()}`,
+            habit_id: habitId,
+            date: today,
+            outcome: "skipped",
+            skip_reason: skipReason || null,
+            note: skipNote || null,
+            completed: false,
+          },
+        ];
+      });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habitId) {
+            return {
+              ...h,
+              completed_today: false,
+              skipped_today: true,
+              day_outcome: "skipped",
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habitId
+                  ? {
+                      ...child,
+                      completed_today: false,
+                      skipped_today: true,
+                      day_outcome: "skipped",
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ["habits"] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ["allHabits"] }, updateHabitItems);
+
+      return { prevLogs, prevHabits, prevAllHabits };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao registrar");
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      toast('Não rolou — registrado.');
+      toast("Não rolou — registrado.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
+    },
+  });
+
+  const deleteHabitMutation = useMutation({
+    mutationFn: (id) => praxisApi.habits.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["habits"] });
+      await queryClient.cancelQueries({ queryKey: ["allHabits"] });
+      await queryClient.cancelQueries({ queryKey: ["habitLogs"] });
+
+      const prevHabits = queryClient.getQueriesData({ queryKey: ["habits"] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ["allHabits"] });
+      const prevLogs = queryClient.getQueriesData({ queryKey: ["habitLogs"] });
+
+      const filterHabitList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old
+          .filter((h) => h.id !== id)
+          .map((h) => ({
+            ...h,
+            children: Array.isArray(h.children)
+              ? h.children.filter((c) => c.id !== id)
+              : h.children,
+          }));
+      };
+
+      queryClient.setQueriesData({ queryKey: ["habits"] }, filterHabitList);
+      queryClient.setQueriesData({ queryKey: ["allHabits"] }, filterHabitList);
+      queryClient.setQueriesData({ queryKey: ["habitLogs"] }, (old) =>
+        Array.isArray(old) ? old.filter((l) => l.habit_id !== id) : old
+      );
+
+      return { prevHabits, prevAllHabits, prevLogs };
+    },
+    onError: (_err, _id, context) => {
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao excluir hábito");
+    },
+    onSuccess: () => {
+      toast.success("Hábito excluído");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["allHabits"] });
+      queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
     },
   });
 
   const notTodayTaskMutation = useMutation({
     mutationFn: (taskId) => praxisApi.tasks.notToday(taskId, {}),
+    onMutate: async (taskId) => {
+      await queryClient.cancelQueries({ queryKey: ["dashboardTasks"] });
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      await queryClient.cancelQueries({ queryKey: ["allTasks"] });
+
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ["dashboardTasks"] });
+      const prevTasks = queryClient.getQueriesData({ queryKey: ["tasks"] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ["allTasks"] });
+
+      const updateList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                status: "pending",
+                date: addDaysToDateKey(today, 1),
+                day_outcome: "not_today",
+                day_outcome_date: today,
+              }
+            : t
+        );
+      };
+
+      queryClient.setQueriesData({ queryKey: ["dashboardTasks"] }, updateList);
+      queryClient.setQueriesData({ queryKey: ["tasks"] }, updateList);
+      queryClient.setQueriesData({ queryKey: ["allTasks"] }, updateList);
+
+      return { prevDashboard, prevTasks, prevAllTasks };
+    },
+    onError: (_err, _taskId, context) => {
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao adiar tarefa");
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      toast('Beleza — fica pra amanhã.');
+      toast("Beleza — fica pra amanhã.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["allTasks"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardTasks"] });
     },
   });
+
   const saveWellnessMutation = useMutation({
     mutationFn: async (data) => praxisApi.wellness.create({ ...data, date: today }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['wellness'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wellness"] }),
   });
 
   const nowTask = React.useMemo(() => pickNowTask(allTasks, today), [allTasks, today]);
 
   const compoundHabits = React.useMemo(
-    () => habits.filter((habit) => habit.kind === 'compound'),
+    () => habits.filter((habit) => habit.kind === "compound"),
     [habits],
   );
 
   const standaloneHabits = React.useMemo(
-    () => habits.filter((habit) => habit.kind !== 'compound'),
+    () => habits.filter((habit) => habit.kind !== "compound"),
     [habits],
   );
 
@@ -245,12 +582,12 @@ export default function Dashboard() {
     [compoundHabits, standaloneHabitsDueToday, today],
   );
 
-  const completedTasks = tasks.filter(t => isTaskDone(t)).length;
-  const todayLogs = habitLogs.filter(l => l.date === today);
+  const completedTasks = tasks.filter((t) => isTaskDone(t)).length;
+  const todayLogs = habitLogs.filter((l) => l.date === today);
   const completedHabits = essentialHabits.filter((h) => {
     const log = todayLogs.find((l) => l.habit_id === h.id);
-    if (!log || log.outcome === 'skipped') return false;
-    return log.outcome === 'done' || log.completed === 1 || log.completed === true;
+    if (!log || log.outcome === "skipped") return false;
+    return log.outcome === "done" || log.completed === 1 || log.completed === true;
   }).length;
 
   const handleSnooze15 = (task) => {
@@ -263,9 +600,14 @@ export default function Dashboard() {
     updateTaskMutation.mutate({ id: task.id, data });
   };
 
-  const isLoading = isLoadingTasks || isLoadingHabits || isLoadingLogs || isLoadingWellness || isLoadingSettings;
+  const isInitialLoading =
+    (isLoadingTasks && allTasks.length === 0) ||
+    (isLoadingHabits && habits.length === 0) ||
+    (isLoadingLogs && habitLogs.length === 0 && habits.length === 0) ||
+    (isLoadingWellness && wellnessChecks.length === 0 && allTasks.length === 0) ||
+    (isLoadingSettings && !settings && allTasks.length === 0);
 
-  if (isLoading) {
+  if (isInitialLoading && allTasks.length === 0 && habits.length === 0) {
     return (
       <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5 animate-pulse">
         <div className="h-44 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
@@ -290,20 +632,18 @@ export default function Dashboard() {
       <PwaInstallBanner />
 
       {/* Agora first — decisão do dia antes do resumo (lote 10a) */}
-      <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '20ms' }}>
+      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "20ms" }}>
         <NowBlock
           task={nowTask}
           today={today}
-          busy={updateTaskMutation.isPending || toggleTaskMutation.isPending}
           onComplete={(t) => toggleTaskMutation.mutate(t)}
           onSnooze15={handleSnooze15}
           onSnoozeTomorrow={handleSnoozeTomorrow}
-          onVoiceCapture={() => navigate('/captura')}
           onAddTask={() => setShowNewTaskForm(true)}
         />
       </div>
 
-      <div className="praxis-dashboard-reveal" style={{ '--praxis-reveal-delay': '70ms' }}>
+      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "70ms" }}>
         <HeroDay
           habitsDone={completedHabits}
           habitsTotal={essentialHabits.length}
@@ -313,14 +653,13 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="praxis-dashboard-reveal grid gap-2" style={{ '--praxis-reveal-delay': '110ms' }}>
+      <div className="praxis-dashboard-reveal grid gap-2" style={{ "--praxis-reveal-delay": "110ms" }}>
         <OverdueTasksBanner count={overdueOpenCount} />
-        <CapturePendingBanner />
       </div>
 
       <div
         className="praxis-dashboard-reveal grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(350px,0.9fr)] xl:gap-6"
-        style={{ '--praxis-reveal-delay': '150ms' }}
+        style={{ "--praxis-reveal-delay": "150ms" }}
       >
         <section className="min-w-0">
           <DashboardGroupHeading
@@ -338,6 +677,7 @@ export default function Dashboard() {
                 allTasksForRecurrence={allTasks}
                 onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
                 onEditTask={setEditingTask}
+                onDeleteTask={setTaskPendingDelete}
                 onNotToday={(t) => notTodayTaskMutation.mutate(t.id)}
                 notTodayBusy={notTodayTaskMutation.isPending}
                 onReorderPending={handleReorderPending}
@@ -354,6 +694,7 @@ export default function Dashboard() {
                 onSkipHabit={(habitId, skipReason, skipNote) =>
                   skipHabitMutation.mutate({ habitId, skipReason, skipNote })
                 }
+                onDeleteHabit={setHabitPendingDelete}
               />
             </Slot>
             <Slot domain="wellness">
@@ -382,7 +723,7 @@ export default function Dashboard() {
       <Collapsible
         defaultOpen={false}
         className="praxis-dashboard-reveal rounded-2xl border border-white/[0.055] bg-white/[0.018]"
-        style={{ '--praxis-reveal-delay': '190ms' }}
+        style={{ "--praxis-reveal-delay": "190ms" }}
       >
         <CollapsibleTrigger asChild>
           <Button variant="ghost" className="h-auto w-full justify-between rounded-2xl px-4 py-4 hover:bg-white/[0.025] sm:px-5">
@@ -436,7 +777,74 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      <VoiceCaptureButton />
+      <AlertDialog
+        open={Boolean(taskPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setTaskPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {taskPendingDelete && (
+                <>
+                  "{cleanPriorityPrefix(taskPendingDelete.title)}"
+                  {taskPendingDelete.status === "pending" || taskPendingDelete.status === "in_progress"
+                    ? " está aberta e será excluída."
+                    : " será excluída."}{" "}
+                  Isso não pode ser desfeito.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={() => {
+                if (taskPendingDelete) deleteTaskMutation.mutate(taskPendingDelete.id);
+                setTaskPendingDelete(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(habitPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setHabitPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir hábito?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {habitPendingDelete && (
+                <>
+                  "{cleanPriorityPrefix(habitPendingDelete.title)}" será excluído permanentemente, junto com todos
+                  os check-ins e o histórico de streak. Isso não pode ser desfeito.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={() => {
+                if (habitPendingDelete) deleteHabitMutation.mutate(habitPendingDelete.id);
+                setHabitPendingDelete(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
