@@ -6,6 +6,7 @@ import HeroDay from "@/components/dashboard/HeroDay";
 import NowBlock from "@/components/dashboard/NowBlock";
 import TodayTasks from "@/components/dashboard/TodayTasks";
 import TodayHabits from "@/components/dashboard/TodayHabits";
+import SinceHabitCard from "@/components/dashboard/SinceHabitCard";
 import WellnessWidget from "@/components/dashboard/WellnessWidget";
 import NutritionTodayCard from "@/components/nutrition/NutritionTodayCard";
 import TodayFinanceCard from "@/components/finance/TodayFinanceCard";
@@ -560,8 +561,13 @@ export default function Dashboard() {
     [habits],
   );
 
+  const sinceHabits = React.useMemo(
+    () => habits.filter((habit) => habit.tracking_mode === "since" && habit.status === "active"),
+    [habits],
+  );
+
   const standaloneHabits = React.useMemo(
-    () => habits.filter((habit) => habit.kind !== "compound"),
+    () => habits.filter((habit) => habit.kind !== "compound" && habit.tracking_mode !== "since"),
     [habits],
   );
 
@@ -685,6 +691,11 @@ export default function Dashboard() {
                 reorderBusy={reorderTasksMutation.isPending}
               />
             </Slot>
+            {sinceHabits.map((habit) => (
+              <Slot key={habit.id} domain="gold">
+                <SinceHabitCard habit={habit} today={today} />
+              </Slot>
+            ))}
             <Slot domain="wellness">
               <TodayHabits
                 title="Hábitos essenciais"

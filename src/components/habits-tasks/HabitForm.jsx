@@ -34,6 +34,8 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     kind: initial.kind === 'compound' ? 'compound' : 'simple',
+    tracking_mode: initial.tracking_mode || 'check',
+    since_date: initial.since_date || '',
     title: initial.title || '',
     description: initial.description || '',
     emoji: initial.emoji || '',
@@ -116,6 +118,8 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
 
     const common = {
       kind: form.kind,
+      tracking_mode: form.tracking_mode,
+      since_date: form.since_date,
       title: form.title.trim(),
       description: form.description.trim(),
       frequency: form.frequency,

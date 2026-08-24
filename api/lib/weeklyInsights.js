@@ -26,6 +26,7 @@ function parseRecurrenceDays(habit) {
 
 export function isHabitDueOnDate(habit, dateStr) {
   if (!habit || habit.status !== 'active') return false;
+  if (habit.tracking_mode === 'since') return false;
   const d = new Date(`${dateStr}T12:00:00`);
   const dow = d.getDay();
   const freq = habit.frequency || 'daily';

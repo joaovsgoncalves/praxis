@@ -182,6 +182,8 @@ export function initializeDatabase(db) {
     parent_id TEXT,
     position_in_parent INTEGER,
     emoji TEXT DEFAULT '',
+    tracking_mode TEXT DEFAULT 'check',
+    since_date TEXT DEFAULT '',
     created_date TEXT DEFAULT (datetime('now'))
   );
 
@@ -359,6 +361,16 @@ if (!habitsCols2.includes('position_in_parent')) {
 if (!habitsCols2.includes('emoji')) {
   db.exec("ALTER TABLE habits ADD COLUMN emoji TEXT DEFAULT ''");
 }
+if (!habitsCols2.includes('tracking_mode')) {
+  db.exec("ALTER TABLE habits ADD COLUMN tracking_mode TEXT DEFAULT 'check'");
+}
+if (!habitsCols2.includes('since_date')) {
+  db.exec("ALTER TABLE habits ADD COLUMN since_date TEXT DEFAULT ''");
+}
+db.prepare(`
+  UPDATE habits SET tracking_mode = 'check'
+  WHERE tracking_mode IS NULL OR tracking_mode = ''
+`).run();
 db.prepare(`
   UPDATE habits
   SET emoji = description, description = ''

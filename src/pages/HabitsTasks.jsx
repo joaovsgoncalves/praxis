@@ -46,6 +46,7 @@ import {
   countHabitDayOutcomes,
   formatFrequencyLabel,
   formatPreferredTime,
+  formatSinceDatePt,
   getHabitDayOutcome,
   isHabitDueOnDate,
   isQuantitativeHabit,
@@ -1358,21 +1359,24 @@ export default function HabitsTasks() {
                   }}
                 />
                 {flatHabits.map((habit, index) => {
+                  const isSince = habit.tracking_mode === 'since';
                   const outcome = habitDayOutcome(habit.id);
                   const done = outcome === 'done';
                   const skipped = outcome === 'skipped';
                   const dueToday = isHabitDueOnDate(habit, today);
-                  const canCheckIn = habit.status === 'active' && dueToday;
+                  const canCheckIn = !isSince && habit.status === 'active' && dueToday;
                   const todayLog = todayLogForHabit(habitLogs, habit.id, today);
                   const quant = isQuantitativeHabit(habit);
+                  const sinceDays = habit.days_since ?? habit.current_streak ?? 0;
                   return (
                     <Card
                       key={habit.id}
                       ref={el => { if (el) habitRowRefs.current.set(habit.id, el); else habitRowRefs.current.delete(habit.id); }}
                       className={cn(
                         'card-domain domain-wellness overflow-hidden bg-card/75 transition-colors',
-                        done && 'border-domain-wellness/30 bg-domain-wellness/10',
-                        skipped && 'border-amber-500/25 bg-amber-500/[0.08]',
+                        isSince && 'border-domain-gold/25 bg-card/85',
+                        !isSince && done && 'border-domain-wellness/30 bg-domain-wellness/10',
+                        !isSince && skipped && 'border-amber-500/25 bg-amber-500/[0.08]',
                       )}
                     >
                       <CardContent
@@ -1381,7 +1385,11 @@ export default function HabitsTasks() {
                           compact ? 'p-2.5 sm:p-3' : 'flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5',
                         )}
                       >
-                        {canCheckIn ? (
+                        {isSince ? (
+                          <div className={cn('flex shrink-0 items-center justify-center rounded-full bg-domain-gold/10 text-domain-gold', compact ? 'h-6 w-6' : 'h-8 w-8')}>
+                            <Clock className={cn(compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} aria-hidden />
+                          </div>
+                        ) : canCheckIn ? (
                           <button
                             type="button"
                             onClick={(evt) => {
@@ -1415,7 +1423,7 @@ export default function HabitsTasks() {
                         ) : (
                           <div className={cn('shrink-0', compact ? 'h-4 w-4' : 'h-5 w-5')} aria-hidden />
                         )}
-                        {!compact && (
+                        {!compact && !isSince && (
                           <Flame className={cn(
                             'shrink-0 h-5 w-5 text-primary',
                             done && 'text-domain-wellness',
@@ -1428,20 +1436,30 @@ export default function HabitsTasks() {
                               className={cn(
                                 'font-semibold leading-snug',
                                 compact ? 'text-sm truncate' : 'text-base',
-                                done && 'text-domain-wellness line-through opacity-80',
-                                skipped && 'text-muted-foreground opacity-75',
+                                !isSince && done && 'text-domain-wellness line-through opacity-80',
+                                !isSince && skipped && 'text-muted-foreground opacity-75',
                               )}
                             >
                               {cleanPriorityPrefix(habit.title)}
                             </p>
                             <CategoryBadge category={habit.category} />
+                            {isSince && (
+                              <>
+                                <Badge variant="outline" className="border-domain-gold/30 bg-domain-gold/10 text-[11px] font-semibold tabular-nums text-domain-gold">
+                                  {sinceDays} {sinceDays === 1 ? 'dia' : 'dias'}
+                                </Badge>
+                                <span className="rounded-full border border-domain-gold/20 bg-domain-gold/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-domain-gold">
+                                  Limpo
+                                </span>
+                              </>
+                            )}
                             {formatPreferredTime(habit.preferred_time) ? (
                               <Badge variant="outline" className="gap-1 border-domain-gold/30 bg-domain-gold/10 text-[10px] text-domain-gold">
                                 <Clock className="h-3 w-3" aria-hidden />
                                 {formatPreferredTime(habit.preferred_time)}
                               </Badge>
                             ) : null}
-                            {skipped && (
+                            {!isSince && skipped && (
                               <Badge variant="outline" className="border-amber-500/30 text-[10px] text-amber-200/90">
                                 Não rolou
                                 {todayLog?.skip_reason
@@ -1449,7 +1467,7 @@ export default function HabitsTasks() {
                                   : ''}
                               </Badge>
                             )}
-                            {habit.current_streak > 0 && (
+                            {!isSince && habit.current_streak > 0 && (
                               <span className="text-[10px] text-orange-400 shrink-0">🔥{habit.current_streak}</span>
                             )}
                             {habit.status !== 'active' && (
@@ -1458,12 +1476,18 @@ export default function HabitsTasks() {
                               </Badge>
                             )}
                           </div>
-                          {skipped && todayLog?.note ? (
+                          {isSince && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {formatSinceDatePt(habit.since_date)}
+                              {habit.since_line ? ` · ${habit.since_line}` : ''}
+                            </p>
+                          )}
+                          {!isSince && skipped && todayLog?.note ? (
                             <p className="mt-1 text-[11px] leading-snug text-amber-100/75">
                               “{todayLog.note}”
                             </p>
                           ) : null}
-                          {!compact && (
+                          {!compact && !isSince && (
                             <>
                               <Badge variant="outline" className="mt-1.5 text-xs">
                                 {formatFrequencyLabel(habit)}
@@ -1480,7 +1504,7 @@ export default function HabitsTasks() {
                             </>
                           )}
                         </div>
-                        {canCheckIn && outcome !== 'skipped' ? (
+                        {!isSince && canCheckIn && outcome !== 'skipped' ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -1492,7 +1516,7 @@ export default function HabitsTasks() {
                             Não rolou
                           </Button>
                         ) : null}
-                        {canCheckIn && outcome === 'skipped' ? (
+                        {!isSince && canCheckIn && outcome === 'skipped' ? (
                           <Button
                             type="button"
                             variant="outline"

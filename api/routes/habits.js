@@ -5,6 +5,13 @@ import {
   isHabitLogDone,
   isHabitLogSkipped,
 } from '../lib/habitStreaks.js';
+import {
+  daysSinceDate,
+  decorateSinceHabit,
+  isSinceHabit,
+  normalizeSinceDate,
+  normalizeTrackingMode,
+} from '../lib/habitSinceCounter.js';
 
 const HABIT_KINDS = new Set(['simple', 'compound']);
 
@@ -80,7 +87,7 @@ export function listHabitTree({ db, getLocalDateString, status = 'active', date 
       ? legacyMetadata.get(habit.source)
       : null;
 
-    return {
+    let result = {
       ...habit,
       ...streaks,
       completed_today: done,
@@ -96,6 +103,10 @@ export function listHabitTree({ db, getLocalDateString, status = 'active', date 
           }
         : {}),
     };
+    if (isSinceHabit(result)) {
+      result = decorateSinceHabit(result, today);
+    }
+    return result;
   });
 
   const childrenByParent = new Map();
@@ -336,7 +347,23 @@ export function createHabitsRouter(ctx) {
       children_ids,
       children,
       emoji,
+      tracking_mode,
+      since_date,
     } = req.body;
+
+    const normTrackingMode = normalizeTrackingMode(tracking_mode);
+    if (normTrackingMode === null) {
+      return res.status(400).json({ error: 'Invalid tracking_mode' });
+    }
+    const habitTrackingMode = normTrackingMode || 'check';
+    const normSinceDate = normalizeSinceDate(since_date);
+    if (normSinceDate === null) {
+      return res.status(400).json({ error: 'Invalid since_date (must be YYYY-MM-DD)' });
+    }
+    if (habitTrackingMode === 'since' && !normSinceDate) {
+      return res.status(400).json({ error: 'Valid since_date is required for tracking_mode=since' });
+    }
+    const habitSinceDate = normSinceDate || '';
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
     if (!HABIT_KINDS.has(kind)) return res.status(400).json({ error: 'Invalid habit kind' });
@@ -362,14 +389,15 @@ export function createHabitsRouter(ctx) {
         INSERT INTO habits (
           id, title, description, emoji, frequency, category, streak_target, goal_id, source,
           sort_order, recurrence_days, target_value, unit, preferred_time, kind,
-          parent_id, position_in_parent
+          parent_id, position_in_parent, tracking_mode, since_date
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, habitTitle, description, kind === 'compound' ? String(emoji || '') : '', freq,
         category, Number(streak_target) || 30,
         goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || '',
-        prefTime || '', kind, parent_id || null, childPosition
+        prefTime || '', kind, parent_id || null, childPosition,
+        habitTrackingMode, habitSinceDate
       );
 
       const requestedChildren = children_ids ?? children;
@@ -415,7 +443,28 @@ export function createHabitsRouter(ctx) {
       title, description, frequency, category, streak_target, goal_id, source, status,
       sort_order, recurrence_days, target_value, unit, preferred_time, kind,
       parent_id, position_in_parent, children_ids, children, emoji,
+      tracking_mode, since_date,
     } = req.body;
+
+    let normTrackingMode;
+    if (tracking_mode !== undefined) {
+      normTrackingMode = normalizeTrackingMode(tracking_mode);
+      if (normTrackingMode === null) {
+        return res.status(400).json({ error: 'Invalid tracking_mode' });
+      }
+    }
+    let normSinceDate;
+    if (since_date !== undefined) {
+      normSinceDate = normalizeSinceDate(since_date);
+      if (normSinceDate === null) {
+        return res.status(400).json({ error: 'Invalid since_date (must be YYYY-MM-DD)' });
+      }
+    }
+    const effectiveTrackingMode = normTrackingMode ?? existing.tracking_mode ?? 'check';
+    const effectiveSinceDate = normSinceDate !== undefined ? normSinceDate : (existing.since_date || '');
+    if (effectiveTrackingMode === 'since' && !effectiveSinceDate) {
+      return res.status(400).json({ error: 'Valid since_date is required for tracking_mode=since' });
+    }
 
     if (status !== undefined && status !== null && !HABIT_STATUSES.has(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -469,7 +518,9 @@ export function createHabitsRouter(ctx) {
           preferred_time = COALESCE(?, preferred_time),
           kind = COALESCE(?, kind),
           parent_id = CASE WHEN ? = 1 THEN ? ELSE parent_id END,
-          position_in_parent = CASE WHEN ? = 1 THEN ? ELSE position_in_parent END
+          position_in_parent = CASE WHEN ? = 1 THEN ? ELSE position_in_parent END,
+          tracking_mode = COALESCE(?, tracking_mode),
+          since_date = COALESCE(?, since_date)
         WHERE id = ?
       `).run(
         title !== undefined ? stripPriorityPrefix(title) : null,
@@ -492,6 +543,8 @@ export function createHabitsRouter(ctx) {
         parent_id || null,
         shouldUpdatePosition ? 1 : 0,
         nextPosition,
+        normTrackingMode ?? null,
+        normSinceDate ?? null,
         req.params.id
       );
 
@@ -555,6 +608,15 @@ export function createHabitsRouter(ctx) {
         title: habit.title,
         current_streak: null,
         best_streak: null,
+      });
+    }
+    if (isSinceHabit(habit)) {
+      const days = daysSinceDate(habit.since_date, getLocalDateString());
+      return res.json({
+        habit_id: habit.id,
+        title: habit.title,
+        current_streak: days,
+        best_streak: Math.max(Number(habit.best_streak) || 0, days),
       });
     }
     const { current_streak, best_streak } = getStreaksForHabit(
@@ -641,6 +703,9 @@ export function registerHabitLogRoutes(app, ctx) {
     if (!habit) return res.status(404).json({ error: 'Habit not found' });
     if (habit.kind === 'compound') {
       return res.status(400).json({ error: 'Compound habits are completed through their steps' });
+    }
+    if (isSinceHabit(habit)) {
+      return res.status(400).json({ error: 'Hábitos do tipo since são contadores e não aceitam check diário' });
     }
 
     const normalized = normalizeHabitOutcome(req.body || {});
