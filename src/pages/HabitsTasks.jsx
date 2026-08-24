@@ -66,7 +66,11 @@ import {
   setHabitTasksTabInSearchParams,
   taskScopeFromSearchParams,
   setTaskScopeInSearchParams,
+  taskLensFromSearchParams,
+  setTaskLensInSearchParams,
 } from '@/lib/urlDeepLinks';
+import { boardColumnForTask } from '@/lib/taskLenses';
+import TaskBoard from '@/components/habits-tasks/TaskBoard';
 
 
 const priorityStyles = {
@@ -96,6 +100,7 @@ export default function HabitsTasks() {
   const [taskSelectionMode, setTaskSelectionMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(() => new Set());
   const [taskScope, setTaskScope] = useState(() => taskScopeFromSearchParams(searchParams));
+  const [lens, setLens] = useState(() => taskLensFromSearchParams(searchParams));
   const [skipSheetHabit, setSkipSheetHabit] = useState(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState(null);
   const [habitPendingDelete, setHabitPendingDelete] = useState(null);
@@ -106,7 +111,13 @@ export default function HabitsTasks() {
   useEffect(() => {
     setView(habitTasksTabFromSearchParams(searchParams));
     setTaskScope(taskScopeFromSearchParams(searchParams));
+    setLens(taskLensFromSearchParams(searchParams));
   }, [searchParams]);
+
+  const handleLensChange = (nextLens) => {
+    setLens(nextLens);
+    setSearchParams(setTaskLensInSearchParams(searchParams, nextLens), { replace: true });
+  };
 
   const handleTaskScopeChange = (scope) => {
     setTaskScope(scope);
@@ -160,7 +171,7 @@ export default function HabitsTasks() {
       { title, date: null, status: 'pending', source: 'manual' },
       {
         onSuccess: () => {
-          if (taskScope === 'today') {
+          if (lens === 'list' && taskScope === 'today') {
             handleTaskScopeChange('inbox');
           }
           toast.success('Foi pra Caixa');
@@ -174,11 +185,64 @@ export default function HabitsTasks() {
 
   const updateTask = useMutation({
     mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
-    onSuccess: () => {
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
+      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
+
+      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
+
+      if (data?.status === 'completed') hapticLight();
+
+      const updateList = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                ...data,
+                completed_date:
+                  data?.status === 'completed'
+                    ? today
+                    : data?.status && data.status !== 'completed'
+                    ? null
+                    : t.completed_date,
+                completed_at:
+                  data?.status === 'completed'
+                    ? new Date().toISOString()
+                    : data?.status && data.status !== 'completed'
+                    ? null
+                    : t.completed_at,
+              }
+            : t
+        );
+      };
+
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['allTasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, updateList);
+
+      return { prevTasks, prevAllTasks, prevDashboard };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao atualizar tarefa');
+    },
+    onSuccess: (data) => {
+      dispatchPraxisLevelUpFromResponse(data);
+      notifyPraxisRecurrenceSpawned(data);
+      setEditingTask(null);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      setEditingTask(null);
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
 
@@ -649,6 +713,11 @@ export default function HabitsTasks() {
     toggleHabit.mutate({ habitId: habit.id, isDone });
   };
 
+  const boardTasksCount = tasks.filter((t) => {
+    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+    return boardColumnForTask(t, today) !== null;
+  }).length;
+
   const scopedTasks = filterTasksByScope(tasks, taskScope, today);
   const overdueInScope = countOpenOverdue(scopedTasks, today);
   const overdueOpenTotal = countOpenOverdue(tasks, today);
@@ -836,48 +905,79 @@ export default function HabitsTasks() {
                 <h2 className="praxis-title text-2xl font-semibold">
                   Tarefas
                   <span className="ml-2 text-base font-normal text-muted-foreground">
-                    ({filteredTasks.length})
+                    ({lens === 'board' ? boardTasksCount : filteredTasks.length})
                   </span>
                 </h2>
-                {overdueInScope > 0 && taskScope !== 'overdue' && (
+                {lens === 'list' && overdueInScope > 0 && taskScope !== 'overdue' && (
                   <p className="mt-1 text-xs text-destructive">
                     {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste recorte
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 sm:justify-end">
-                <Button
-                  type="button"
-                  variant={taskSelectionMode ? 'secondary' : 'outline'}
-                  size="sm"
-                  className="h-9 rounded-full"
-                  onClick={() => {
-                    setTaskSelectionMode((v) => !v);
-                    setSelectedTaskIds(new Set());
-                  }}
-                >
-                  {taskSelectionMode ? 'Pronto' : 'Selecionar'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-full gap-1"
-                  disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
-                  onClick={openBulkArchive}
-                >
-                  <Archive className="h-4 w-4" />
-                  Arquivar
-                </Button>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="pending">Pendentes</SelectItem>
-                    <SelectItem value="in_progress">Andamento</SelectItem>
-                    <SelectItem value="completed">Concluídas</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="flex items-center rounded-full bg-white/[0.03] p-0.5 border border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleLensChange('list')}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                      lens === 'list'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Lista
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLensChange('board')}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                      lens === 'board'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Quadro
+                  </button>
+                </div>
+
+                {lens === 'list' && (
+                  <>
+                    <Button
+                      type="button"
+                      variant={taskSelectionMode ? 'secondary' : 'outline'}
+                      size="sm"
+                      className="h-9 rounded-full"
+                      onClick={() => {
+                        setTaskSelectionMode((v) => !v);
+                        setSelectedTaskIds(new Set());
+                      }}
+                    >
+                      {taskSelectionMode ? 'Pronto' : 'Selecionar'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-full gap-1"
+                      disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
+                      onClick={openBulkArchive}
+                    >
+                      <Archive className="h-4 w-4" />
+                      Arquivar
+                    </Button>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="pending">Pendentes</SelectItem>
+                        <SelectItem value="in_progress">Andamento</SelectItem>
+                        <SelectItem value="completed">Concluídas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
               </div>
             </div>
 
@@ -886,31 +986,44 @@ export default function HabitsTasks() {
               isPending={createTask.isPending}
             />
 
-            <div className="praxis-scroll-x flex gap-2 pb-1">
-              {TASK_SCOPE_CHIPS.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => handleTaskScopeChange(chip.id)}
-                  className={cn(
-                    'rounded-full px-3 py-1.5 text-xs font-medium transition-colors shrink-0',
-                    taskScope === chip.id
-                      ? 'bg-primary/90 text-primary-foreground'
-                      : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground',
-                  )}
-                >
-                  {chip.label}
-                  {chip.id === 'overdue' && countOpenOverdue(tasks, today) > 0
-                    ? ` (${countOpenOverdue(tasks, today)})`
-                    : ''}
-                  {chip.id === 'inbox' && countOpenInbox(tasks) > 0
-                    ? ` (${countOpenInbox(tasks)})`
-                    : ''}
-                </button>
-              ))}
-            </div>
+            {lens === 'list' && (
+              <div className="praxis-scroll-x flex gap-2 pb-1">
+                {TASK_SCOPE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => handleTaskScopeChange(chip.id)}
+                    className={cn(
+                      'rounded-full px-3 py-1.5 text-xs font-medium transition-colors shrink-0',
+                      taskScope === chip.id
+                        ? 'bg-primary/90 text-primary-foreground'
+                        : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    {chip.label}
+                    {chip.id === 'overdue' && countOpenOverdue(tasks, today) > 0
+                      ? ` (${countOpenOverdue(tasks, today)})`
+                      : ''}
+                    {chip.id === 'inbox' && countOpenInbox(tasks) > 0
+                      ? ` (${countOpenInbox(tasks)})`
+                      : ''}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            {filteredTasks.length === 0 ? (
+            {lens === 'board' ? (
+              <TaskBoard
+                tasks={categoryFilter === 'all' ? tasks : tasks.filter((t) => t.category === categoryFilter)}
+                allTasks={tasks}
+                today={today}
+                onUpdateTask={(id, data) => updateTask.mutate({ id, data })}
+                onToggleComplete={(task) => toggleTask.mutate(task)}
+                onEditTask={(task) => setEditingTask(task)}
+                onDeleteTask={(task) => confirmDeleteTask(task)}
+                onNotToday={(task) => notTodayTask.mutate(task.id)}
+              />
+            ) : filteredTasks.length === 0 ? (
               <PraxisEmptyState
                 icon={ListTodo}
                 title={taskScope === 'inbox' ? 'Caixa vazia' : 'Nenhuma tarefa neste filtro'}
