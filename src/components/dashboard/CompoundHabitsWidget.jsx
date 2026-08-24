@@ -41,7 +41,7 @@ function CompoundHabitItem({
   listItem = false,
 }) {
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const prevAllDoneRef = useRef(null);
   const steps = compound.children || [];
   const completedCount = steps.filter((step) => habitDayState(step) === 'done').length;
@@ -74,8 +74,8 @@ function CompoundHabitItem({
     <div
       className={cn(
         'relative rounded-xl border transition-[background-color,border-color,box-shadow]',
-        listItem ? 'p-4 sm:p-5' : 'p-3.5',
-        listItem && 'card-domain domain-wellness bg-card/75',
+        'p-3.5',
+        listItem && 'bg-card/60',
         isClosed
           ? 'border-domain-wellness/25 bg-domain-wellness/[0.07]'
           : isPartial
@@ -545,13 +545,13 @@ export default function CompoundHabitsWidget({
         </div>
       )}
       {!isLoading && !isError && compounds.length > 0 && (
-        <div className={cn(variant === 'list' ? 'space-y-4' : 'space-y-3')}>
+        <div className={cn(variant === 'card' ? 'space-y-3' : 'space-y-2.5')}>
           {compounds.map((compound) => (
             <CompoundHabitItem
               key={compound.id}
               compound={compound}
               collapsible={collapsible}
-              listItem={variant === 'list'}
+              listItem={variant !== 'card'}
               onToggleHabit={(habitId, isDone) =>
                 toggleHabitMutation.mutate({ habitId, isDone })
               }
@@ -569,7 +569,7 @@ export default function CompoundHabitsWidget({
 
   return (
     <>
-      {variant === 'list' ? content : (
+      {variant !== 'card' ? content : (
         <Card className="praxis-dashboard-card">
           <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
             <div className="flex items-start gap-3">

@@ -6,12 +6,10 @@ import HeroDay from "@/components/dashboard/HeroDay";
 import NowBlock from "@/components/dashboard/NowBlock";
 import TodayTasks from "@/components/dashboard/TodayTasks";
 import TodayHabits from "@/components/dashboard/TodayHabits";
-import SinceHabitCard from "@/components/dashboard/SinceHabitCard";
 import WellnessWidget from "@/components/dashboard/WellnessWidget";
 import NutritionTodayCard from "@/components/nutrition/NutritionTodayCard";
 import TodayFinanceCard from "@/components/finance/TodayFinanceCard";
 import TodayCalendar from "@/components/dashboard/TodayCalendar";
-import CompoundHabitsWidget from "@/components/dashboard/CompoundHabitsWidget";
 import XpProgressStrip from "@/components/dashboard/XpProgressStrip";
 import WeeklyReviewPrompt from "@/components/dashboard/WeeklyReviewPrompt";
 import AvoidanceWidget from "@/components/dashboard/AvoidanceWidget";
@@ -691,16 +689,14 @@ export default function Dashboard() {
                 reorderBusy={reorderTasksMutation.isPending}
               />
             </Slot>
-            {sinceHabits.map((habit) => (
-              <Slot key={habit.id} domain="gold">
-                <SinceHabitCard habit={habit} today={today} />
-              </Slot>
-            ))}
             <Slot domain="wellness">
               <TodayHabits
                 title="Hábitos essenciais"
                 today={today}
                 habits={standaloneHabitsDueToday}
+                compounds={compoundHabits}
+                sinceHabits={sinceHabits}
+                summaryHabits={essentialHabits}
                 habitLogs={habitLogs}
                 onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
                 onSkipHabit={(habitId, skipReason, skipNote) =>
@@ -708,9 +704,6 @@ export default function Dashboard() {
                 }
                 onDeleteHabit={setHabitPendingDelete}
               />
-            </Slot>
-            <Slot domain="wellness">
-              <CompoundHabitsWidget compounds={compoundHabits} today={today} />
             </Slot>
           </div>
         </section>

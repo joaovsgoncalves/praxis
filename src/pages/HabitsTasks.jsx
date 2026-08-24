@@ -30,6 +30,7 @@ import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { hapticLight } from '@/lib/haptics';
 import HabitForm from '@/components/habits-tasks/HabitForm';
 import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
+import SinceHabitCard from '@/components/dashboard/SinceHabitCard';
 import { TaskRowMenu, HabitRowMenu } from '@/components/habits-tasks/ListRowMenus';
 import NoiseCleanupDialog from '@/components/habits-tasks/NoiseCleanupDialog';
 import TaskBulkArchiveDialog from '@/components/habits-tasks/TaskBulkArchiveDialog';
@@ -53,6 +54,7 @@ import {
   todayLogForHabit,
 } from '@/lib/habits';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
+import { partitionCompoundHabitsForDay } from '@/lib/compoundHabitOrder';
 import {
   TASK_SCOPE_CHIPS,
   filterTasksByScope,
@@ -773,6 +775,14 @@ export default function HabitsTasks() {
   });
   const compoundHabits = filteredHabits.filter((habit) => habit.kind === 'compound');
   const flatHabits = filteredHabits.filter((habit) => habit.kind !== 'compound');
+  const { beforeChecks: openingCompounds, afterChecks: closingCompounds } =
+    partitionCompoundHabitsForDay(compoundHabits);
+  const checkHabits = flatHabits.filter((habit) => habit.tracking_mode !== 'since');
+  const sinceHabits = flatHabits.filter((habit) => habit.tracking_mode === 'since');
+  const orderedFlatHabits = [
+    ...checkHabits,
+    ...sinceHabits,
+  ];
   const activeLeafHabits = activeHabitsList.flatMap((habit) =>
     habit.kind === 'compound' ? (habit.children || []) : [habit]
   );
@@ -1349,7 +1359,7 @@ export default function HabitsTasks() {
               <div className="space-y-3">
                 <CompoundHabitsWidget
                   collapsible
-                  compounds={compoundHabits}
+                  compounds={openingCompounds}
                   today={today}
                   status={habitStatusFilter}
                   variant="list"
@@ -1358,8 +1368,34 @@ export default function HabitsTasks() {
                     setEditingHabit(compound);
                   }}
                 />
-                {flatHabits.map((habit, index) => {
+                {orderedFlatHabits.map((habit, index) => {
                   const isSince = habit.tracking_mode === 'since';
+                  if (isSince) {
+                    return (
+                      <SinceHabitCard
+                        key={habit.id}
+                        habit={habit}
+                        compact={compact}
+                        trailing={(
+                          <HabitRowMenu
+                            label={cleanPriorityPrefix(habit.title)}
+                            habit={habit}
+                            busy={reorderHabits.isPending}
+                            disableUp
+                            disableDown
+                            onMoveUp={() => moveHabit(habit.id, -1)}
+                            onMoveDown={() => moveHabit(habit.id, 1)}
+                            onEdit={() => {
+                              setShowHabitForm(false);
+                              setEditingHabit(habit);
+                            }}
+                            onDelete={() => confirmDeleteHabit(habit)}
+                            onSetStatus={(status) => setHabitStatus.mutate({ id: habit.id, status })}
+                          />
+                        )}
+                      />
+                    );
+                  }
                   const outcome = habitDayOutcome(habit.id);
                   const done = outcome === 'done';
                   const skipped = outcome === 'skipped';
@@ -1535,7 +1571,7 @@ export default function HabitsTasks() {
                           canCheckIn={canCheckIn}
                           dayOutcome={outcome}
                           disableUp={index === 0}
-                          disableDown={index === flatHabits.length - 1}
+                          disableDown={index === checkHabits.length - 1}
                           onMoveUp={() => moveHabit(habit.id, -1)}
                           onMoveDown={() => moveHabit(habit.id, 1)}
                           onEdit={() => { setShowHabitForm(false); setEditingHabit(habit); }}
@@ -1548,6 +1584,17 @@ export default function HabitsTasks() {
                     </Card>
                   );
                 })}
+                <CompoundHabitsWidget
+                  collapsible
+                  compounds={closingCompounds}
+                  today={today}
+                  status={habitStatusFilter}
+                  variant="list"
+                  onEditCompound={(compound) => {
+                    setShowHabitForm(false);
+                    setEditingHabit(compound);
+                  }}
+                />
               </div>
             )}
           </section>

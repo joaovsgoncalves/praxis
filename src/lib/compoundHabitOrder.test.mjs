@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import {
   compareCompoundHabitsForDay,
+  partitionCompoundHabitsForDay,
   sortCompoundHabitsForDay,
   titlePeriodMinutes,
 } from './compoundHabitOrder.js';
@@ -48,5 +49,23 @@ const withStep = {
 };
 const eveningTitle = { id: 'e', title: 'Noite de sono' };
 assert.ok(compareCompoundHabitsForDay(withStep, eveningTitle) < 0);
+
+// Unified list: morning routines, checks, since clock, then closing last.
+const simple = { id: 'water', title: 'Beber 2L' };
+const since = { id: 'clean', title: 'Sem pornografia', tracking_mode: 'since' };
+const night = { id: 'night', title: 'Preparar o sono' };
+const { beforeChecks, afterChecks } = partitionCompoundHabitsForDay([
+  fechamento,
+  night,
+  abertura,
+]);
+const unified = [...beforeChecks, simple, since, ...afterChecks];
+assert.deepEqual(unified.map((item) => item.title), [
+  'Abertura do dia',
+  'Beber 2L',
+  'Sem pornografia',
+  'Preparar o sono',
+  'Fechamento do dia',
+]);
 
 console.log('compoundHabitOrder.test.mjs: ok');

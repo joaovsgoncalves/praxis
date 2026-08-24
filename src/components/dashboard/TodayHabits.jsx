@@ -13,6 +13,9 @@ import {
   todayLogForHabit,
 } from '@/lib/habits';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
+import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
+import SinceHabitCard from '@/components/dashboard/SinceHabitCard';
+import { partitionCompoundHabitsForDay } from '@/lib/compoundHabitOrder';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +28,9 @@ const LONG_PRESS_MS = 480;
 
 export default function TodayHabits({
   habits,
+  compounds = [],
+  sinceHabits = [],
+  summaryHabits,
   habitLogs,
   onToggleHabit,
   onSkipHabit,
@@ -38,12 +44,17 @@ export default function TodayHabits({
   const longPressFired = useRef(false);
   const [skipSheetHabit, setSkipSheetHabit] = useState(null);
 
+  const habitsForSummary = summaryHabits || habits;
+  const { beforeChecks, afterChecks } = partitionCompoundHabitsForDay(compounds);
+  const hasRows = habits.length > 0 || compounds.length > 0 || sinceHabits.length > 0;
   const { done: doneCount, skipped: skippedCount, open: openCount } = countHabitDayOutcomes(
-    habits,
+    habitsForSummary,
     habitLogs,
     today,
   );
-  const donePct = habits.length > 0 ? Math.round((doneCount / habits.length) * 100) : 0;
+  const donePct = habitsForSummary.length > 0
+    ? Math.round((doneCount / habitsForSummary.length) * 100)
+    : 0;
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -128,7 +139,7 @@ export default function TodayHabits({
             <h3 className="praxis-title mt-1 text-xl font-semibold tracking-[-0.035em]">{title}</h3>
           </div>
           <span className="shrink-0 text-right text-sm tabular-nums text-muted-foreground">
-            {doneCount}/{habits.length}
+            {doneCount}/{habitsForSummary.length}
             {skippedCount > 0 || openCount > 0 ? (
               <span className="mt-0.5 block text-[10px] font-normal normal-case tracking-normal">
                 {doneCount} feitos
@@ -138,7 +149,7 @@ export default function TodayHabits({
             ) : null}
           </span>
         </div>
-        {habits.length > 0 ? (
+        {habitsForSummary.length > 0 ? (
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.055] rail-inset">
             <div
               className="praxis-progress-fill h-full rounded-full bg-gradient-to-r from-domain-wellness to-domain-gold"
@@ -149,10 +160,19 @@ export default function TodayHabits({
       </CardHeader>
 
       <CardContent className="space-y-2.5 px-5 pb-5 sm:px-5 sm:pb-5">
-        {habits.length === 0 ? (
+        {!hasRows ? (
           <p className="py-5 text-center text-sm text-muted-foreground">
             Nenhum hábito essencial para hoje.
           </p>
+        ) : null}
+
+        {beforeChecks.length > 0 ? (
+          <CompoundHabitsWidget
+            collapsible
+            compounds={beforeChecks}
+            today={today}
+            variant="inline"
+          />
         ) : null}
 
         {habits.map((habit) => {
@@ -316,6 +336,19 @@ export default function TodayHabits({
             </div>
           );
         })}
+
+        {sinceHabits.map((habit) => (
+          <SinceHabitCard key={habit.id} habit={habit} />
+        ))}
+
+        {afterChecks.length > 0 ? (
+          <CompoundHabitsWidget
+            collapsible
+            compounds={afterChecks}
+            today={today}
+            variant="inline"
+          />
+        ) : null}
       </CardContent>
 
       <SkipHabitSheet

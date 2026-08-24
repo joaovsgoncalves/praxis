@@ -202,6 +202,30 @@ export function daysSinceDate(sinceDate, today) {
   return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86_400_000));
 }
 
+/**
+ * Live elapsed clock from YYYY-MM-DD 00:00 in America/Fortaleza (UTC-03:00).
+ * Returns a clamped, decomposed duration suitable for a D/H/M/S counter.
+ */
+export function elapsedSinceFortalezaMidnight(sinceDate, now = Date.now()) {
+  const start = normalizeSinceDate(sinceDate);
+  const empty = { days: 0, hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 };
+  if (!start) return empty;
+
+  const [year, month, day] = start.split('-').map(Number);
+  const anchorMs = Date.UTC(year, month - 1, day, 3, 0, 0);
+  const nowMs = now instanceof Date ? now.getTime() : Number(now);
+  if (!Number.isFinite(nowMs)) return empty;
+
+  const totalSeconds = Math.max(0, Math.floor((nowMs - anchorMs) / 1000));
+  return {
+    days: Math.floor(totalSeconds / 86_400),
+    hours: Math.floor((totalSeconds % 86_400) / 3_600),
+    minutes: Math.floor((totalSeconds % 3_600) / 60),
+    seconds: totalSeconds % 60,
+    totalSeconds,
+  };
+}
+
 export function sinceMilestone(days) {
   const n = Number(days) || 0;
   if (n <= 2) {

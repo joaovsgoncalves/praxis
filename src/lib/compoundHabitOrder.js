@@ -8,6 +8,7 @@ import { normalizePreferredTime } from './habits.js';
 const MORNING_RE = /abertura|manh[ãa]|acordar|amanhecer|despertar|wake/i;
 const AFTERNOON_RE = /tarde|almo[cç]o|meio[- ]?dia/i;
 const EVENING_RE = /fechamento|noite|dormir|sono|jantar|fim do dia|encerramento/i;
+const CLOSING_RE = /fechamento|fim do dia|encerramento/i;
 
 /** Default minutes when only title keywords apply. */
 const KEYWORD_MINUTES = {
@@ -65,4 +66,29 @@ export function sortCompoundHabitsForDay(compounds) {
     return Array.isArray(compounds) ? [...compounds] : [];
   }
   return [...compounds].sort(compareCompoundHabitsForDay);
+}
+
+/**
+ * Split the sorted routines around regular check habits in the unified list.
+ * Evening/closing routines always belong to the tail, so Fechamento stays last.
+ */
+export function partitionCompoundHabitsForDay(compounds) {
+  const beforeChecks = [];
+  const afterChecks = [];
+
+  for (const compound of sortCompoundHabitsForDay(compounds)) {
+    const titleMinutes = titlePeriodMinutes(compound?.title);
+    const { minutes } = compoundHabitDayRank(compound);
+    const isMorning = titleMinutes === KEYWORD_MINUTES.morning
+      || (titleMinutes === null && minutes < 12 * 60);
+    (isMorning ? beforeChecks : afterChecks).push(compound);
+  }
+
+  afterChecks.sort((a, b) => {
+    const aClosing = CLOSING_RE.test(String(a?.title || ''));
+    const bClosing = CLOSING_RE.test(String(b?.title || ''));
+    return Number(aClosing) - Number(bClosing);
+  });
+
+  return { beforeChecks, afterChecks };
 }
