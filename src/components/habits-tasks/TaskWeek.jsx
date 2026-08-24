@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, CalendarDays } from 'lucide-react';
+import { Calendar, Plus, CalendarDays, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { weekRange, taskBlock, layoutTimedBlocks } from '@/lib/taskLenses';
 import { fortalezaNowTimeHHMM } from '@/lib/dates';
