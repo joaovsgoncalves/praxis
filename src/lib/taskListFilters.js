@@ -25,6 +25,11 @@ export function countOpenOverdue(tasks, today) {
   return tasks.filter((t) => isTaskOverdue(t, today)).length;
 }
 
+export function countOpenInbox(tasks) {
+  if (!Array.isArray(tasks)) return 0;
+  return tasks.filter((t) => isInboxTask(t)).length;
+}
+
 export function filterTasksByScope(tasks, scope, today) {
   const open = tasks.filter((t) => !isTaskClosed(t));
   switch (scope) {

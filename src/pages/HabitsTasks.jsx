@@ -23,6 +23,7 @@ import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, 
 import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
+import QuickTaskInput from '@/components/habits-tasks/QuickTaskInput';
 import TaskRecurrenceBadge from '@/components/habits-tasks/TaskRecurrenceBadge';
 import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
@@ -37,7 +38,7 @@ import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder } from '@/lib/taskReorder';
-import { isTaskOpen, isTaskDone, cleanPriorityPrefix } from '@/lib/tasks';
+import { isTaskOpen, isTaskDone, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
   HABIT_STATUS_LABELS,
@@ -56,6 +57,7 @@ import {
   filterTasksByScope,
   sortTasksForList,
   countOpenOverdue,
+  countOpenInbox,
   isTaskOverdue,
   addDaysToDateKey,
 } from '@/lib/taskListFilters';
@@ -144,8 +146,31 @@ export default function HabitsTasks() {
 
   const createTask = useMutation({
     mutationFn: (data) => praxisApi.tasks.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['allTasks'] }); queryClient.invalidateQueries({ queryKey: ['tasks'] }); setShowTaskForm(false); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      setShowTaskForm(false);
+    },
   });
+
+  const handleQuickAddTask = (title) => {
+    createTask.mutate(
+      { title, date: null, status: 'pending', source: 'manual' },
+      {
+        onSuccess: () => {
+          if (taskScope === 'today') {
+            handleTaskScopeChange('inbox');
+          }
+          toast.success('Foi pra Caixa');
+        },
+        onError: () => {
+          toast.error('Erro ao criar tarefa');
+        },
+      }
+    );
+  };
 
   const updateTask = useMutation({
     mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
@@ -849,11 +874,17 @@ export default function HabitsTasks() {
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="in_progress">Andamento</SelectItem>
                     <SelectItem value="completed">Concluídas</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            <QuickTaskInput
+              onAdd={handleQuickAddTask}
+              isPending={createTask.isPending}
+            />
 
             <div className="praxis-scroll-x flex gap-2 pb-1">
               {TASK_SCOPE_CHIPS.map((chip) => (
@@ -872,6 +903,9 @@ export default function HabitsTasks() {
                   {chip.id === 'overdue' && countOpenOverdue(tasks, today) > 0
                     ? ` (${countOpenOverdue(tasks, today)})`
                     : ''}
+                  {chip.id === 'inbox' && countOpenInbox(tasks) > 0
+                    ? ` (${countOpenInbox(tasks)})`
+                    : ''}
                 </button>
               ))}
             </div>
@@ -879,31 +913,35 @@ export default function HabitsTasks() {
             {filteredTasks.length === 0 ? (
               <PraxisEmptyState
                 icon={ListTodo}
-                title="Nenhuma tarefa neste filtro"
+                title={taskScope === 'inbox' ? 'Caixa vazia' : 'Nenhuma tarefa neste filtro'}
                 description={
-                  taskScope === 'today' && overdueOpenTotal > 0
+                  taskScope === 'inbox'
+                    ? 'Tarefa sem dia. Entra aqui até você datar.'
+                    : taskScope === 'today' && overdueOpenTotal > 0
                     ? `Nada para hoje no calendário. Você tem ${overdueOpenTotal} atrasada${
                         overdueOpenTotal === 1 ? '' : 's'
                       } — vale abrir esse filtro.`
                     : 'Crie uma tarefa ou mude o filtro acima.'
                 }
-                action={(
-                  <>
-                    {taskScope === 'today' && overdueOpenTotal > 0 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-full praxis-touch-target"
-                        onClick={() => handleTaskScopeChange('overdue')}
-                      >
-                        Ver atrasadas ({overdueOpenTotal})
+                action={
+                  taskScope === 'inbox' ? null : (
+                    <>
+                      {taskScope === 'today' && overdueOpenTotal > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-full praxis-touch-target"
+                          onClick={() => handleTaskScopeChange('overdue')}
+                        >
+                          Ver atrasadas ({overdueOpenTotal})
+                        </Button>
+                      )}
+                      <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
+                        <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
                       </Button>
-                    )}
-                    <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
-                      <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
-                    </Button>
-                  </>
-                )}
+                    </>
+                  )
+                }
               />
             ) : (
               <div className="space-y-3">
@@ -960,6 +998,16 @@ export default function HabitsTasks() {
                           {isTaskOverdue(task, today) && (
                             <Badge variant="destructive" className="text-[10px] shrink-0">
                               Atrasada
+                            </Badge>
+                          )}
+                          {task.status === 'in_progress' && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0 border-primary/30 bg-primary/10 text-primary">
+                              Andamento
+                            </Badge>
+                          )}
+                          {isInboxTask(task) && (
+                            <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0 border-white/15 text-muted-foreground">
+                              Caixa
                             </Badge>
                           )}
                         </div>

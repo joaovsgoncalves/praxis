@@ -13,6 +13,7 @@ import {
 import {
   TASK_SCOPE_CHIPS,
   filterTasksByScope,
+  countOpenInbox,
 } from '../src/lib/taskListFilters.js';
 import {
   taskScopeFromSearchParams,
@@ -164,6 +165,7 @@ describe('taskLenses - PRD Fase 0', () => {
 
     const inboxTasks = filterTasksByScope(sampleTasks, 'inbox', '2026-08-24');
     assert.deepEqual(inboxTasks.map(t => t.id), ['inbox-1']);
+    assert.equal(countOpenInbox(sampleTasks), 1);
   });
 
   // urlDeepLinks extensions
