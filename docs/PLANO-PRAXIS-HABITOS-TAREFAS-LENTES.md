@@ -1,6 +1,6 @@
 # Praxis — Hábitos e tarefas em 3 lentes
 
-**Status:** em execução. Gemini 3.7 high (`agy`) fecha fases 0–3. A.N.A. semeia hábitos + QA + ship.  
+**Status:** MVP 0–3 no ar em `dopraxis.vercel.app` (`3b3ba8f`, 2026-08-24). Fase 4 (Foco→andamento + marcas de hábito) continua opcional.  
 **Data:** 2026-08-24  
 **Referência visual:** Sistema Forja (`/productivity` e `/habits`) como **padrão de lentes + catálogo de hábitos**, não como pele.  
 **URL viva:** https://dopraxis.vercel.app/habitos-tarefas  
