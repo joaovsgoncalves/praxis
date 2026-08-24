@@ -277,23 +277,13 @@ export default function TodayTasks({
                                 size="default"
                                 variant="outline"
                                 disabled={notTodayBusy}
-                                className="h-9 flex-1 gap-1.5 rounded-lg border-amber-500/25 bg-amber-500/10 px-3 text-xs text-amber-100 touch-manipulation hover:bg-amber-500/20 sm:flex-none"
+                                className="h-9 flex-1 gap-1.5 rounded-lg border-amber-500/25 bg-amber-500/10 px-3 text-xs text-amber-100 touch-manipulation hover:bg-amber-500/20 sm:flex-none sm:min-w-[7.5rem]"
                                 onClick={() => onNotToday(task)}
                               >
                                 <CalendarClock className="w-4 h-4" />
                                 Não hoje
                               </Button>
                             ) : null}
-                            <Button
-                              type="button"
-                              size="default"
-                              variant="secondary"
-                              className="h-9 flex-1 gap-1.5 rounded-lg px-3 text-xs touch-manipulation sm:flex-none"
-                              onClick={() => onEditTask?.(task)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                              Editar
-                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button

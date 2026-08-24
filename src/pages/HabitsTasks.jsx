@@ -334,8 +334,9 @@ export default function HabitsTasks() {
   const toggleHabit = useMutation({
     mutationFn: async ({ habitId, isDone, value }) => {
       const logs = habitLogs.filter(log => log.habit_id === habitId && log.date === today);
-      if (isDone && logs[0]) {
-        await praxisApi.habitLogs.delete(logs[0].id);
+      const realLog = logs.find((log) => log.id && !String(log.id).startsWith('temp-'));
+      if (isDone && realLog) {
+        await praxisApi.habitLogs.delete(realLog.id);
       } else if (!isDone) {
         await praxisApi.habitLogs.create({
           habit_id: habitId,
