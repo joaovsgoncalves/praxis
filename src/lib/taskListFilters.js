@@ -1,7 +1,8 @@
-import { isTaskDone, isTaskOpen, isTaskClosed, isTaskForToday } from '@/lib/tasks';
+import { isTaskDone, isTaskOpen, isTaskClosed, isTaskForToday, isInboxTask } from './tasks.js';
 
 export const TASK_SCOPE_CHIPS = [
   { id: 'today', label: 'Hoje' },
+  { id: 'inbox', label: 'Caixa' },
   { id: 'week', label: 'Semana' },
   { id: 'overdue', label: 'Atrasadas' },
   { id: 'all', label: 'Todas' },
@@ -27,6 +28,8 @@ export function countOpenOverdue(tasks, today) {
 export function filterTasksByScope(tasks, scope, today) {
   const open = tasks.filter((t) => !isTaskClosed(t));
   switch (scope) {
+    case 'inbox':
+      return open.filter((t) => isInboxTask(t));
     case 'overdue':
       return open.filter((t) => isTaskOverdue(t, today));
     case 'week': {

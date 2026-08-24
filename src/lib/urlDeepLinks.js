@@ -18,7 +18,7 @@ export function stripQueryParam(searchParams, key) {
   return next;
 }
 
-const TASK_SCOPES = new Set(['today', 'week', 'overdue', 'all']);
+const TASK_SCOPES = new Set(['today', 'inbox', 'week', 'overdue', 'all']);
 
 export function taskScopeFromSearchParams(searchParams) {
   const scope = searchParams.get('scope');
@@ -29,5 +29,19 @@ export function setTaskScopeInSearchParams(searchParams, scope) {
   const next = new URLSearchParams(searchParams);
   if (!scope || scope === 'today') next.delete('scope');
   else next.set('scope', scope);
+  return next;
+}
+
+const TASK_LENSES = new Set(['list', 'board', 'week']);
+
+export function taskLensFromSearchParams(searchParams) {
+  const lens = searchParams.get('lens');
+  return TASK_LENSES.has(lens) ? lens : 'list';
+}
+
+export function setTaskLensInSearchParams(searchParams, lens) {
+  const next = new URLSearchParams(searchParams);
+  if (!lens || lens === 'list') next.delete('lens');
+  else next.set('lens', lens);
   return next;
 }

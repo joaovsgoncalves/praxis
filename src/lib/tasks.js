@@ -7,6 +7,9 @@ export const isTaskClosed = (task) =>
 export const isTaskOpen = (task) =>
   task?.status === 'pending' || task?.status === 'in_progress';
 
+export const isInboxTask = (task) =>
+  Boolean(isTaskOpen(task) && !(task?.date && String(task.date).trim()));
+
 export const taskCompletionDate = (task) => (
   task?.completed_date || String(task?.completed_at || task?.updated_date || '').slice(0, 10)
 );
