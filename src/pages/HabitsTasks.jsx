@@ -69,8 +69,9 @@ import {
   taskLensFromSearchParams,
   setTaskLensInSearchParams,
 } from '@/lib/urlDeepLinks';
-import { boardColumnForTask } from '@/lib/taskLenses';
+import { boardColumnForTask, weekRange } from '@/lib/taskLenses';
 import TaskBoard from '@/components/habits-tasks/TaskBoard';
+import TaskWeek from '@/components/habits-tasks/TaskWeek';
 
 
 const priorityStyles = {
@@ -92,6 +93,7 @@ export default function HabitsTasks() {
   const [statusFilter, setStatusFilter] = useState('pending');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [createTaskInitial, setCreateTaskInitial] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
@@ -113,6 +115,11 @@ export default function HabitsTasks() {
     setTaskScope(taskScopeFromSearchParams(searchParams));
     setLens(taskLensFromSearchParams(searchParams));
   }, [searchParams]);
+
+  const handleOpenCreateTask = (initialData = null) => {
+    setCreateTaskInitial(initialData);
+    setShowTaskForm(true);
+  };
 
   const handleLensChange = (nextLens) => {
     setLens(nextLens);
@@ -718,6 +725,15 @@ export default function HabitsTasks() {
     return boardColumnForTask(t, today) !== null;
   }).length;
 
+  const weekRangeCurrent = weekRange(today);
+  const weekTasksCount = tasks.filter((t) => {
+    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+    if (t.category === 'ideias' || t.status === 'cancelled') return false;
+    if (!t.date) return false;
+    const d = String(t.date).slice(0, 10);
+    return d >= weekRangeCurrent.start && d <= weekRangeCurrent.end;
+  }).length;
+
   const scopedTasks = filterTasksByScope(tasks, taskScope, today);
   const overdueInScope = countOpenOverdue(scopedTasks, today);
   const overdueOpenTotal = countOpenOverdue(tasks, today);
@@ -806,7 +822,7 @@ export default function HabitsTasks() {
         description="Hoje, semana ou atrasadas — arquive em lote o que não vale mais."
         action={(
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
-            <Button onClick={() => setShowTaskForm(true)} className="praxis-touch-target h-11 w-full rounded-full px-4 sm:w-auto">
+            <Button onClick={() => handleOpenCreateTask(null)} className="praxis-touch-target h-11 w-full rounded-full px-4 sm:w-auto">
               <Plus className="mr-1.5 h-4 w-4" /> Tarefa
             </Button>
             <Button
@@ -905,7 +921,7 @@ export default function HabitsTasks() {
                 <h2 className="praxis-title text-2xl font-semibold">
                   Tarefas
                   <span className="ml-2 text-base font-normal text-muted-foreground">
-                    ({lens === 'board' ? boardTasksCount : filteredTasks.length})
+                    ({lens === 'board' ? boardTasksCount : lens === 'week' ? weekTasksCount : filteredTasks.length})
                   </span>
                 </h2>
                 {lens === 'list' && overdueInScope > 0 && taskScope !== 'overdue' && (
@@ -939,6 +955,18 @@ export default function HabitsTasks() {
                     )}
                   >
                     Quadro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLensChange('week')}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                      lens === 'week'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    Semana
                   </button>
                 </div>
 
@@ -1023,6 +1051,18 @@ export default function HabitsTasks() {
                 onDeleteTask={(task) => confirmDeleteTask(task)}
                 onNotToday={(task) => notTodayTask.mutate(task.id)}
               />
+            ) : lens === 'week' ? (
+              <TaskWeek
+                tasks={categoryFilter === 'all' ? tasks : tasks.filter((t) => t.category === categoryFilter)}
+                allTasks={tasks}
+                today={today}
+                onUpdateTask={(id, data) => updateTask.mutate({ id, data })}
+                onToggleComplete={(task) => toggleTask.mutate(task)}
+                onEditTask={(task) => setEditingTask(task)}
+                onDeleteTask={(task) => confirmDeleteTask(task)}
+                onNotToday={(task) => notTodayTask.mutate(task.id)}
+                onCreateTaskAt={(initialData) => handleOpenCreateTask(initialData)}
+              />
             ) : filteredTasks.length === 0 ? (
               <PraxisEmptyState
                 icon={ListTodo}
@@ -1049,7 +1089,7 @@ export default function HabitsTasks() {
                           Ver atrasadas ({overdueOpenTotal})
                         </Button>
                       )}
-                      <Button onClick={() => setShowTaskForm(true)} className="rounded-full praxis-touch-target">
+                      <Button onClick={() => handleOpenCreateTask(null)} className="rounded-full praxis-touch-target">
                         <Plus className="mr-1.5 h-4 w-4" /> Nova tarefa
                       </Button>
                     </>
@@ -1412,10 +1452,24 @@ export default function HabitsTasks() {
         )}
       </div>
 
-      <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
+      <Dialog
+        open={showTaskForm}
+        onOpenChange={(open) => {
+          setShowTaskForm(open);
+          if (!open) setCreateTaskInitial(null);
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
-          <TaskForm onSubmit={(data) => createTask.mutate(data)} onCancel={() => setShowTaskForm(false)} />
+          <TaskForm
+            key={createTaskInitial ? (createTaskInitial.date || '') + '_' + (createTaskInitial.time || '') : 'new-task'}
+            initial={createTaskInitial || {}}
+            onSubmit={(data) => createTask.mutate(data)}
+            onCancel={() => {
+              setShowTaskForm(false);
+              setCreateTaskInitial(null);
+            }}
+          />
         </DialogContent>
       </Dialog>
 
