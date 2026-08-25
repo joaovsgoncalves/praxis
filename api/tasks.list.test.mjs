@@ -108,3 +108,63 @@ test('include_overdue excludes open ideas from operational open tasks', async (t
   assert.ok(ids.includes('open-task'), 'real task missing');
   assert.ok(!ids.includes('open-idea'), 'idea task should not be in operational list');
 });
+
+test('unfiltered list honors requested limit above 200 so dump matches DB', async (t) => {
+  const db = createTestDb();
+  const app = express();
+  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const server = await startTestServer(app);
+  t.after(() => {
+    db.close();
+    return server.close();
+  });
+
+  const insert = db.prepare(`
+    INSERT INTO tasks (id, title, date, status, priority, category, sort_order, completed_date)
+    VALUES (?, ?, ?, ?, 'medium', 'pessoal', ?, ?)
+  `);
+
+  for (let index = 0; index < 200; index += 1) {
+    insert.run(`old-${index}`, `Old task ${index}`, '2026-06-01', 'completed', index, '2026-06-01');
+  }
+  insert.run('today-open-1', 'Pending after cap', '2026-07-18', 'pending', 500, null);
+  insert.run('today-open-2', 'Another pending after cap', '2026-07-18', 'pending', 501, null);
+
+  const capped = await requestJson(server.base, '/api/tasks?limit=200');
+  assert.equal(capped.length, 200);
+
+  const dump = await requestJson(server.base, '/api/tasks?limit=1000');
+  const dumpIds = dump.map((task) => task.id);
+  assert.equal(dump.length, 202);
+  assert.ok(dumpIds.includes('today-open-1'), 'pending after 200-row cap missing from dump');
+  assert.ok(dumpIds.includes('today-open-2'), 'second pending after cap missing from dump');
+});
+
+test('unfiltered list supports offset pagination', async (t) => {
+  const db = createTestDb();
+  const app = express();
+  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const server = await startTestServer(app);
+  t.after(() => {
+    db.close();
+    return server.close();
+  });
+
+  const insert = db.prepare(`
+    INSERT INTO tasks (id, title, date, status, priority, category, sort_order, completed_date)
+    VALUES (?, ?, ?, ?, 'medium', 'pessoal', ?, ?)
+  `);
+  for (let index = 0; index < 5; index += 1) {
+    insert.run(`row-${index}`, `Row ${index}`, '2026-07-18', 'pending', index, null);
+  }
+
+  const page1 = await requestJson(server.base, '/api/tasks?limit=2&offset=0');
+  const page2 = await requestJson(server.base, '/api/tasks?limit=2&offset=2');
+  const page3 = await requestJson(server.base, '/api/tasks?limit=2&offset=4');
+
+  assert.equal(page1.length, 2);
+  assert.equal(page2.length, 2);
+  assert.equal(page3.length, 1);
+  const ids = [...page1, ...page2, ...page3].map((task) => task.id);
+  assert.deepEqual(ids, ['row-0', 'row-1', 'row-2', 'row-3', 'row-4']);
+});

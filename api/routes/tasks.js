@@ -23,8 +23,9 @@ export function createTasksRouter(ctx) {
   const router = Router();
 
   router.get('/', (req, res) => {
-    const { date, status, category, idea_status, limit = 100, include_overdue, today: todayParam } = req.query;
-    const limitN = Math.min(200, Math.max(1, Number(limit) || 100));
+    const { date, status, category, idea_status, limit = 100, offset = 0, include_overdue, today: todayParam } = req.query;
+    const limitN = Math.min(1000, Math.max(1, Number(limit) || 100));
+    const offsetN = Math.max(0, Number(offset) || 0);
     const today = String(todayParam || getLocalDateString()).slice(0, 10);
     const mergeOverdue = include_overdue === '1' || include_overdue === 'true';
 
@@ -36,8 +37,8 @@ export function createTasksRouter(ctx) {
     if (category) { query += ' AND category = ?'; params.push(category); }
     if (idea_status) { query += ' AND idea_status = ?'; params.push(idea_status); }
 
-    query += ' ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC LIMIT ?';
-    params.push(limitN);
+    query += ' ORDER BY sort_order IS NULL, sort_order ASC, created_date DESC LIMIT ? OFFSET ?';
+    params.push(limitN, offsetN);
 
     const recent = db.prepare(query).all(...params);
 
