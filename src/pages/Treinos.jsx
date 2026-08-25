@@ -27,17 +27,22 @@ import WorkoutMuscleMap from '@/components/workouts/WorkoutMuscleMap';
 import WorkoutLibrary from '@/components/workouts/WorkoutLibrary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatSeconds, formatWorkoutTarget, workoutDayShortLabel } from '@/lib/workouts';
+import {
+  formatSeconds,
+  formatSessionDuration,
+  formatWorkoutTarget,
+  workoutDateLabel,
+  workoutDayShortLabel,
+} from '@/lib/workouts';
 
 const TABS = [
   { id: 'hoje', label: 'Hoje', icon: Play },
-  { id: 'biblioteca', label: 'Biblioteca', icon: Dumbbell },
-  { id: 'mapa', label: 'Mapa', icon: Activity },
   { id: 'programa', label: 'Programa', icon: ListChecks },
-  { id: 'historico', label: 'Histórico', icon: History },
+  { id: 'biblioteca', label: 'Biblioteca', icon: Dumbbell },
+  { id: 'progresso', label: 'Progresso', icon: History },
+  { id: 'corpo', label: 'Corpo', icon: Activity },
 ];
 
 export default function Treinos() {
@@ -56,6 +61,12 @@ export default function Treinos() {
   const { data: programs = [] } = useQuery({
     queryKey: ['workouts', 'programs'],
     queryFn: () => praxisApi.workouts.programs.list(),
+    retry: 1,
+  });
+
+  const { data: completedSessions = [] } = useQuery({
+    queryKey: ['workouts', 'sessions', 'last-completed'],
+    queryFn: () => praxisApi.workouts.sessions.list({ status: 'completed', limit: 1 }),
     retry: 1,
   });
 
@@ -117,6 +128,7 @@ export default function Treinos() {
   const program = summary?.active_program || null;
   const currentDay = summary?.current_day || null;
   const activeSession = summary?.active_session || null;
+  const lastSession = Array.isArray(completedSessions) ? completedSessions[0] || null : null;
 
   return (
     <div className="praxis-page space-y-6 pb-24">
@@ -124,7 +136,7 @@ export default function Treinos() {
         kicker="Corpo"
         kickerIcon={Dumbbell}
         title="Jota Fit"
-        description="Teu treino de hoje, sem ruído."
+        description="Treino de hoje."
       />
 
       {isLoading ? <PraxisListSkeleton rows={4} /> : null}
@@ -140,7 +152,7 @@ export default function Treinos() {
 
       {!isLoading && (!isError || summary) ? (
         <>
-          {activeSession ? (
+          {activeSession && tab !== 'hoje' ? (
             <Card className="border-primary/35 bg-primary/10 shadow-none">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -193,35 +205,55 @@ export default function Treinos() {
             {tab === 'hoje' ? (
               program ? (
                 <TodayWorkout
-                  program={program}
                   currentDay={currentDay}
                   activeSession={activeSession}
-                  totalCompleted={summary?.total_completed || 0}
+                  lastSession={lastSession}
                   onStart={(dayId) => startSession.mutate(dayId)}
                   onContinue={() => setActiveSessionId(activeSession?.id)}
                   starting={startSession.isPending}
                   onAdvanceRest={() => advanceRest.mutate({ programId: program.id, dayId: currentDay.id })}
                   advancingRest={advanceRest.isPending}
                   onOpenProgram={() => setTab('programa')}
+                  onOpenLast={() => setTab('progresso')}
                   onStartFreestyle={() => startSession.mutate({ kind: 'freestyle', name: 'Treino Livre' })}
                 />
               ) : (
                 <>
-                  <PraxisEmptyState
-                    icon={Dumbbell}
-                    title="Monta teu primeiro programa"
-                    description="Cria o ciclo, adiciona os dias e define exercícios, séries, repetições e descanso."
-                    action={(
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <Button type="button" className="rounded-full" onClick={() => setProgramDialogOpen(true)}>
-                          <Plus className="mr-1.5 h-4 w-4" /> Criar programa
+                  {activeSession ? (
+                    <Card className="overflow-hidden border-border/80 bg-card/35 shadow-none">
+                      <CardContent className="p-5">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Treino em andamento</p>
+                        <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">{activeSession.workout_day_name_snapshot}</h2>
+                        <p className="mt-2 text-sm text-muted-foreground">{activeSession.completed_sets || 0} séries registradas</p>
+                        <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={() => setActiveSessionId(activeSession.id)}>
+                          <Play className="mr-2 h-5 w-5 fill-current" /> Continuar
                         </Button>
-                        <Button type="button" variant="outline" className="rounded-full" onClick={() => startSession.mutate({ kind: 'freestyle', name: 'Treino Livre' })} disabled={startSession.isPending}>
-                          <Play className="mr-1.5 h-4 w-4 fill-current" /> Treino livre
-                        </Button>
-                      </div>
-                    )}
-                  />
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <PraxisEmptyState
+                      icon={Dumbbell}
+                      title="Monta teu primeiro programa"
+                      description="Cria o ciclo, adiciona os dias e define exercícios, séries, repetições e descanso."
+                      action={(
+                        <div className="flex flex-col items-center gap-2">
+                          <Button type="button" className="h-12 rounded-xl px-6 text-base" onClick={() => setProgramDialogOpen(true)}>
+                            <Plus className="mr-1.5 h-4 w-4" /> Criar programa
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-9 rounded-xl text-sm text-muted-foreground"
+                            onClick={() => startSession.mutate({ kind: 'freestyle', name: 'Treino Livre' })}
+                            disabled={startSession.isPending}
+                          >
+                            Treino livre
+                          </Button>
+                        </div>
+                      )}
+                    />
+                  )}
+                  <LastWorkoutCard session={lastSession} onOpen={() => setTab('progresso')} />
                   <WorkoutProgramDialog
                     open={programDialogOpen}
                     onOpenChange={setProgramDialogOpen}
@@ -230,20 +262,6 @@ export default function Treinos() {
                   />
                 </>
               )
-            ) : null}
-
-                        {tab === 'mapa' ? (
-              <WorkoutMuscleMap
-                onNavigateToLibrary={() => setTab('biblioteca')}
-                onNavigateToProgram={() => setTab('programa')}
-              />
-            ) : null}
-
-            {tab === 'biblioteca' ? (
-              <WorkoutLibrary
-                summary={summary}
-                onOpenProgram={() => setTab('programa')}
-              />
             ) : null}
 
             {tab === 'programa' ? (
@@ -278,7 +296,21 @@ export default function Treinos() {
               )
             ) : null}
 
-            {tab === 'historico' ? <WorkoutHistory /> : null}
+            {tab === 'biblioteca' ? (
+              <WorkoutLibrary
+                summary={summary}
+                onOpenProgram={() => setTab('programa')}
+              />
+            ) : null}
+
+            {tab === 'progresso' ? <WorkoutHistory /> : null}
+
+            {tab === 'corpo' ? (
+              <WorkoutMuscleMap
+                onNavigateToLibrary={() => setTab('biblioteca')}
+                onNavigateToProgram={() => setTab('programa')}
+              />
+            ) : null}
           </div>
         </>
       ) : null}
@@ -286,38 +318,83 @@ export default function Treinos() {
   );
 }
 
+function lastWorkoutWorkSets(session = {}) {
+  if (session.completed_work_sets != null) return Number(session.completed_work_sets);
+  return Number(session.completed_sets || 0);
+}
+
+function LastWorkoutCard({ session, onOpen }) {
+  if (!session) return null;
+  const workSets = lastWorkoutWorkSets(session);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full rounded-2xl border border-border/70 bg-card/35 px-4 py-4 text-left transition-colors hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Último treino</p>
+      <div className="mt-2 flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{session.workout_day_name_snapshot}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {workoutDateLabel(session.started_at || session.completed_at)}
+            {session.duration_seconds ? ` · ${formatSessionDuration(session.duration_seconds)}` : ''}
+            {workSets ? ` · ${workSets} ${workSets === 1 ? 'série' : 'séries'}` : ''}
+          </p>
+        </div>
+        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </div>
+    </button>
+  );
+}
+
+function FreestyleLink({ onClick, disabled }) {
+  if (!onClick) return null;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className="h-9 w-full rounded-xl text-sm font-normal text-muted-foreground hover:text-foreground"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      Treino livre
+    </Button>
+  );
+}
+
 function TodayWorkout({
-  program,
   currentDay,
   activeSession,
-  totalCompleted,
+  lastSession,
   onStart,
   onContinue,
   starting,
   onAdvanceRest,
   advancingRest,
   onOpenProgram,
+  onOpenLast,
   onStartFreestyle,
 }) {
   if (!currentDay) {
     return (
-      <PraxisEmptyState
-        icon={ListChecks}
-        title="Teu programa ainda não tem dias"
-        description="Adiciona Pull, Push, Legs, descanso ou qualquer divisão que você usa."
-        action={<Button type="button" className="rounded-full" onClick={onOpenProgram}><Plus className="mr-1.5 h-4 w-4" /> Montar programa</Button>}
-      />
+      <div className="space-y-5">
+        <PraxisEmptyState
+          icon={ListChecks}
+          title="Teu programa ainda não tem dias"
+          description="Adiciona Pull, Push, Legs, descanso ou qualquer divisão que você usa."
+          action={<Button type="button" className="rounded-full" onClick={onOpenProgram}><Plus className="mr-1.5 h-4 w-4" /> Montar programa</Button>}
+        />
+        <LastWorkoutCard session={lastSession} onOpen={onOpenLast} />
+      </div>
     );
   }
 
-  const days = program.days || [];
-  const isSessionActiveForCurrentDay = Boolean(activeSession && activeSession.workout_day_id === currentDay.id);
-  const currentIndex = days.findIndex((day) => day.id === currentDay.id);
-  const cycleProgress = days.length ? Math.round(((currentIndex + 1) / days.length) * 100) : 0;
-  const exerciseCount = currentDay.exercises?.length || 0;
+  const hasActiveSession = Boolean(activeSession);
   const dayMeta = currentDay.day_type === 'rest'
     ? 'Dia de recuperação'
-    : `${exerciseCount} ex${currentDay.estimated_duration_minutes ? ` · ~${currentDay.estimated_duration_minutes} min` : ''}`;
+    : workoutDayShortLabel(currentDay);
 
   return (
     <div className="space-y-5">
@@ -327,17 +404,21 @@ function TodayWorkout({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                  {currentDay.day_type === 'rest' ? 'Hoje é descanso' : 'Próximo treino'}
+                  {hasActiveSession ? 'Treino em andamento' : currentDay.day_type === 'rest' ? 'Hoje é descanso' : 'Treino de hoje'}
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">{currentDay.name}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{dayMeta}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {hasActiveSession
+                    ? `${activeSession.completed_sets || 0} séries registradas`
+                    : dayMeta}
+                </p>
               </div>
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-                {currentDay.day_type === 'rest' ? <RotateCcw className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
+                {hasActiveSession ? <Play className="h-5 w-5 fill-current" /> : currentDay.day_type === 'rest' ? <RotateCcw className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
               </div>
             </div>
 
-            {currentDay.notes ? (
+            {currentDay.notes && !hasActiveSession ? (
               <details className="group mt-3 rounded-xl bg-background/35 px-3 py-2">
                 <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-muted-foreground marker:content-none">
                   <span>Nota</span>
@@ -347,59 +428,41 @@ function TodayWorkout({
               </details>
             ) : null}
 
-            {currentDay.day_type === 'rest' ? (
-              <Button type="button" className="mt-5 h-12 w-full rounded-xl" onClick={onAdvanceRest} disabled={advancingRest}>
+            {hasActiveSession ? (
+              <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={onContinue}>
+                <Play className="mr-2 h-5 w-5 fill-current" /> Continuar
+              </Button>
+            ) : currentDay.day_type === 'rest' ? (
+              <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={onAdvanceRest} disabled={advancingRest}>
                 <CheckCircle2 className="mr-2 h-5 w-5" />
                 {advancingRest ? 'Avançando...' : 'Concluir descanso'}
               </Button>
             ) : currentDay.exercises?.length ? (
-              !isSessionActiveForCurrentDay ? (
-                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                  <Button
-                    type="button"
-                    className="h-12 flex-1 rounded-xl text-base"
-                    onClick={() => onStart(currentDay.id)}
-                    disabled={starting}
-                  >
-                    <Play className="mr-2 h-5 w-5 fill-current" />
-                    {starting ? 'Começando...' : 'Começar treino'}
-                  </Button>
-                  {onStartFreestyle ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-12 rounded-xl text-sm"
-                      onClick={onStartFreestyle}
-                      disabled={starting}
-                    >
-                      <Plus className="mr-2 h-4 w-4" /> Treino livre
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null
+              <div className="mt-5 flex flex-col gap-1">
+                <Button
+                  type="button"
+                  className="h-12 w-full rounded-xl text-base"
+                  onClick={() => onStart(currentDay.id)}
+                  disabled={starting}
+                >
+                  <Play className="mr-2 h-5 w-5 fill-current" />
+                  {starting ? 'Começando...' : 'Começar treino'}
+                </Button>
+                <FreestyleLink onClick={onStartFreestyle} disabled={starting} />
+              </div>
             ) : (
-              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                <Button type="button" variant="outline" className="h-12 flex-1 rounded-xl" onClick={onOpenProgram}>
+              <div className="mt-5 flex flex-col gap-1">
+                <Button type="button" variant="outline" className="h-12 w-full rounded-xl" onClick={onOpenProgram}>
                   <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
                 </Button>
-                {onStartFreestyle ? (
-                  <Button type="button" variant="secondary" className="h-12 rounded-xl text-sm" onClick={onStartFreestyle} disabled={starting}>
-                    <Play className="mr-2 h-4 w-4 fill-current" /> Treino livre
-                  </Button>
-                ) : null}
+                <FreestyleLink onClick={onStartFreestyle} disabled={starting} />
               </div>
             )}
           </div>
-
-          <div className="border-t border-border/60 bg-background/25 px-5 py-3.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Ciclo · dia {currentIndex + 1} de {days.length}</span>
-              <span>{totalCompleted} {totalCompleted === 1 ? 'treino concluído' : 'treinos concluídos'}</span>
-            </div>
-            <Progress value={cycleProgress} className="mt-2 h-1" />
-          </div>
         </CardContent>
       </Card>
+
+      <LastWorkoutCard session={lastSession} onOpen={onOpenLast} />
 
       {currentDay.day_type === 'training' && currentDay.exercises?.length ? (
         <Card className="border-border/80 bg-card/35 shadow-none">
@@ -427,64 +490,6 @@ function TodayWorkout({
           </CardContent>
         </Card>
       ) : null}
-
-      <details className="group rounded-xl border border-border/60 bg-card/25">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold marker:content-none">
-          <span>Teu ciclo</span>
-          <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
-            {days.length} dias
-            <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" aria-hidden />
-          </span>
-        </summary>
-        <div className="space-y-2 border-t border-border/60 px-3 pb-3 pt-3">
-          <div className="flex justify-end">
-            <Button type="button" variant="ghost" size="sm" className="h-8 rounded-full text-xs" onClick={onOpenProgram}>Editar ciclo</Button>
-          </div>
-          <div className="space-y-1.5">
-            {days.map((day, index) => {
-              const isCurrent = day.id === currentDay.id;
-              const isSessionActive = Boolean(activeSession && activeSession.workout_day_id === day.id);
-              const isRest = day.day_type === 'rest';
-
-              return (
-                <div
-                  key={day.id}
-                  className={cn(
-                    'flex items-center gap-3 rounded-xl border px-3.5 py-2.5',
-                    isCurrent ? 'border-primary/40 bg-primary/8' : 'border-border/60 bg-card/25',
-                  )}
-                >
-                  <div className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums',
-                    isCurrent ? 'bg-primary/15 text-primary' : 'bg-secondary/45 text-muted-foreground',
-                  )}>
-                    {isRest ? <RotateCcw className="h-3.5 w-3.5" /> : index + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium">{day.name}</p>
-                      {isCurrent ? <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-primary">Próximo</span> : null}
-                    </div>
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{workoutDayShortLabel(day)}</p>
-                  </div>
-                  {isRest ? null : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={isSessionActive ? 'default' : 'outline'}
-                      className="h-8 shrink-0 rounded-full px-3 text-xs"
-                      onClick={() => (isSessionActive ? onContinue() : onStart(day.id))}
-                      disabled={!isSessionActive && starting}
-                    >
-                      {isSessionActive ? 'Continuar' : 'Começar'}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </details>
     </div>
   );
 }

@@ -11,7 +11,7 @@ function json(route, body, status = 200) {
   });
 }
 
-test('Treinos V4: Biblioteca, Mapa e Histórico aparecem no mobile 390', async ({ page }) => {
+test('Jota Fit: Biblioteca, Progresso e Corpo aparecem no mobile 390', async ({ page }) => {
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -69,13 +69,20 @@ test('Treinos V4: Biblioteca, Mapa e Histórico aparecem no mobile 390', async (
   });
 
   await page.goto('/jota-fit');
-  await expect(page.getByRole('button', { name: 'Biblioteca' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mapa' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Histórico' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Hoje' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Programa' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Biblioteca' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Progresso' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Corpo' })).toBeVisible();
+  await expect(page.getByRole('tablist', { name: 'Seções do Jota Fit' }).getByRole('tab', { name: 'Mapa' })).toHaveCount(0);
+  await expect(page.getByRole('tablist', { name: 'Seções do Jota Fit' }).getByRole('tab', { name: 'Histórico' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Biblioteca' }).click();
+  await page.getByRole('tab', { name: 'Biblioteca' }).click();
   await expect(page.getByText(/Barbell Bench Press|Biblioteca/i).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Mapa' }).click();
+  await page.getByRole('tab', { name: 'Progresso' }).click();
+  await expect(page.getByText(/Nenhum treino concluído/i).first()).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Corpo' }).click();
   await expect(page.getByText(/Peito|Balanço|Balance|Fadiga/i).first()).toBeVisible();
 });

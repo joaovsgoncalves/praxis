@@ -361,8 +361,8 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   await page.getByRole('button', { name: /Finalizar treino/i }).click();
   await expect(page.getByText('Descanso', { exact: true }).first()).toBeVisible();
 
-  // Histórico: a sessão aparece com séries de trabalho + aquecimento e detalhes de RIR/qualidade.
-  await page.getByRole('tab', { name: 'Histórico' }).click();
+  // Progresso: a sessão aparece com séries de trabalho + aquecimento e detalhes de RIR/qualidade.
+  await page.getByRole('tab', { name: 'Progresso' }).click();
   await page.getByRole('button', { name: /Push Força/i }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('RIR 2', { exact: true })).toBeVisible();
