@@ -88,7 +88,7 @@ export default function Projects() {
         kicker="Produtos vivos"
         kickerIcon={Layers}
         title="Projetos"
-        description="O que existe, o que está na mesa, o que pausou de propósito — e a fatia de cada um agora."
+        description="O que existe, o que está na mesa, o que pausou de propósito. E a fatia de cada um agora."
       />
 
       <div className="mt-6">
