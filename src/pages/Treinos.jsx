@@ -25,6 +25,7 @@ import WorkoutHistory from '@/components/workouts/WorkoutHistory';
 import WorkoutProgress from '@/components/workouts/WorkoutProgress';
 import WorkoutMuscleMap from '@/components/workouts/WorkoutMuscleMap';
 import WorkoutLibrary from '@/components/workouts/WorkoutLibrary';
+import MacroBars from '@/components/nutrition/MacroBars';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -35,6 +36,8 @@ import {
   workoutDateLabel,
   workoutDayShortLabel,
 } from '@/lib/workouts';
+
+const HOME_CTA_CLASS = 'h-14 min-h-14 w-full rounded-xl text-lg [&_svg]:size-5';
 
 function tabFromPath(pathname) {
   if (pathname.startsWith('/jota-fit/programa')) return 'programa';
@@ -194,9 +197,9 @@ export default function Treinos() {
                     <Card className="overflow-hidden border-border/80 bg-card/35 shadow-none">
                       <CardContent className="p-5">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Treino em andamento</p>
-                        <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">{activeSession.workout_day_name_snapshot}</h2>
+                        <h2 className="mt-2 text-3xl font-semibold leading-tight tracking-tight">{activeSession.workout_day_name_snapshot}</h2>
                         <p className="mt-2 text-sm text-muted-foreground">{activeSession.completed_sets || 0} séries registradas</p>
-                        <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={() => setActiveSessionId(activeSession.id)}>
+                        <Button type="button" className={`mt-5 ${HOME_CTA_CLASS}`} onClick={() => setActiveSessionId(activeSession.id)}>
                           <Play className="mr-2 h-5 w-5 fill-current" /> Continuar
                         </Button>
                       </CardContent>
@@ -224,6 +227,7 @@ export default function Treinos() {
                       )}
                     />
                   )}
+                  <DietaHojeCard />
                   <LastWorkoutCard session={lastSession} onOpen={() => goTab('progresso')} />
                   <WorkoutProgramDialog
                     open={programDialogOpen}
@@ -373,6 +377,68 @@ function BodyWeightReadCard() {
   );
 }
 
+function dietaKcalLabel(totals = {}, targets = {}) {
+  const used = Math.round(Number(totals.kcal) || 0);
+  const hasTarget = targets.kcal != null && Number(targets.kcal) > 0;
+  if (hasTarget) {
+    return `${used.toLocaleString('pt-BR')} / ${Math.round(Number(targets.kcal)).toLocaleString('pt-BR')} kcal`;
+  }
+  return `${used.toLocaleString('pt-BR')} kcal`;
+}
+
+function DietaHojeCard() {
+  const { data: day, isLoading, isError } = useQuery({
+    queryKey: ['nutrition', 'day', 'today'],
+    queryFn: () => praxisApi.nutrition.day(),
+    retry: 1,
+    staleTime: 30_000,
+  });
+
+  if (isLoading) {
+    return (
+      <Card className="border-border/80 bg-card/35 shadow-none">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Carregando dieta…</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totals = day?.totals || {};
+  const targets = day?.targets || {};
+  const usedKcal = Number(totals.kcal) || 0;
+  const hasTarget = targets.kcal != null && Number(targets.kcal) > 0;
+  const empty = !day || (!hasTarget && usedKcal <= 0);
+
+  if (isError || empty) {
+    return (
+      <Card className="border-border/80 bg-card/35 shadow-none">
+        <CardContent className="flex items-center justify-between gap-3 p-4">
+          <p className="text-sm text-muted-foreground">Dieta na Nutrição</p>
+          <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full">
+            <Link to="/nutricao">Nutrição</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Link
+      to="/nutricao"
+      className="block rounded-2xl border border-border/70 bg-card/35 p-4 text-left transition-colors hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Dieta de hoje</p>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{dietaKcalLabel(totals, targets)}</span>
+      </div>
+      <div className="mt-3">
+        <MacroBars totals={totals} targets={targets} variant="compact" />
+      </div>
+    </Link>
+  );
+}
+
 function lastWorkoutWorkSets(session = {}) {
   if (session.completed_work_sets != null) return Number(session.completed_work_sets);
   return Number(session.completed_sets || 0);
@@ -441,6 +507,7 @@ function TodayWorkout({
           description="Adiciona Pull, Push, Legs, descanso ou qualquer divisão que você usa."
           action={<Button type="button" className="rounded-full" onClick={onOpenProgram}><Plus className="mr-1.5 h-4 w-4" /> Montar programa</Button>}
         />
+        <DietaHojeCard />
         <LastWorkoutCard session={lastSession} onOpen={onOpenLast} />
       </div>
     );
@@ -461,7 +528,7 @@ function TodayWorkout({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
                   {hasActiveSession ? 'Treino em andamento' : currentDay.day_type === 'rest' ? 'Hoje é descanso' : 'Treino de hoje'}
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-tight">{currentDay.name}</h2>
+                <h2 className="mt-2 text-3xl font-semibold leading-tight tracking-tight">{currentDay.name}</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {hasActiveSession
                     ? `${activeSession.completed_sets || 0} séries registradas`
@@ -484,11 +551,11 @@ function TodayWorkout({
             ) : null}
 
             {hasActiveSession ? (
-              <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={onContinue}>
+              <Button type="button" className={`mt-5 ${HOME_CTA_CLASS}`} onClick={onContinue}>
                 <Play className="mr-2 h-5 w-5 fill-current" /> Continuar
               </Button>
             ) : currentDay.day_type === 'rest' ? (
-              <Button type="button" className="mt-5 h-12 w-full rounded-xl text-base" onClick={onAdvanceRest} disabled={advancingRest}>
+              <Button type="button" className={`mt-5 ${HOME_CTA_CLASS}`} onClick={onAdvanceRest} disabled={advancingRest}>
                 <CheckCircle2 className="mr-2 h-5 w-5" />
                 {advancingRest ? 'Avançando...' : 'Concluir descanso'}
               </Button>
@@ -496,7 +563,7 @@ function TodayWorkout({
               <div className="mt-5 flex flex-col gap-1">
                 <Button
                   type="button"
-                  className="h-12 w-full rounded-xl text-base"
+                  className={HOME_CTA_CLASS}
                   onClick={() => onStart(currentDay.id)}
                   disabled={starting}
                 >
@@ -507,7 +574,7 @@ function TodayWorkout({
               </div>
             ) : (
               <div className="mt-5 flex flex-col gap-1">
-                <Button type="button" variant="outline" className="h-12 w-full rounded-xl" onClick={onOpenProgram}>
+                <Button type="button" variant="outline" className={HOME_CTA_CLASS} onClick={onOpenProgram}>
                   <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
                 </Button>
                 <FreestyleLink onClick={onStartFreestyle} disabled={starting} />
@@ -517,33 +584,36 @@ function TodayWorkout({
         </CardContent>
       </Card>
 
+      <DietaHojeCard />
+
       <LastWorkoutCard session={lastSession} onOpen={onOpenLast} />
 
       {currentDay.day_type === 'training' && currentDay.exercises?.length ? (
-        <Card className="border-border/80 bg-card/35 shadow-none">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3.5 sm:px-5">
-              <p className="text-sm font-semibold">Exercícios de hoje</p>
-              <span className="text-xs text-muted-foreground">{currentDay.exercises.length}</span>
-            </div>
-            <div className="divide-y divide-border/60">
-              {currentDay.exercises.map((exercise, index) => (
-                <div key={exercise.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary/55 text-xs font-semibold tabular-nums text-muted-foreground">
-                    {index + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{exercise.exercise_name}</p>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                      <span>{formatWorkoutTarget(exercise).replace(/^(\d+) séries? · /, '$1×')}</span>
-                      <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {formatSeconds(exercise.rest_seconds)}</span>
-                    </div>
+        <details className="group rounded-2xl border border-border/80 bg-card/35">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 marker:content-none sm:px-5">
+            <p className="text-sm font-semibold">Exercícios de hoje</p>
+            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+              {currentDay.exercises.length}
+              <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" aria-hidden />
+            </span>
+          </summary>
+          <div className="divide-y divide-border/60 border-t border-border/70">
+            {currentDay.exercises.map((exercise, index) => (
+              <div key={exercise.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary/55 text-xs font-semibold tabular-nums text-muted-foreground">
+                  {index + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{exercise.exercise_name}</p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <span>{formatWorkoutTarget(exercise).replace(/^(\d+) séries? · /, '$1×')}</span>
+                    <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {formatSeconds(exercise.rest_seconds)}</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            ))}
+          </div>
+        </details>
       ) : null}
     </div>
   );
