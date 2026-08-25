@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
+import JotaFitLayout from '@/components/jota-fit/JotaFitLayout';
 import Dashboard from '@/pages/Dashboard';
 import HabitsTasks from '@/pages/HabitsTasks';
 import Ideas from '@/pages/Ideas';
@@ -97,7 +98,13 @@ const AuthenticatedApp = () => {
         <Route path="/ideias" element={<Ideas />} />
         <Route path="/compras" element={<Compras />} />
         <Route path="/financas" element={<Financas />} />
-        <Route path="/jota-fit" element={<Treinos />} />
+        <Route path="/jota-fit" element={<JotaFitLayout />}>
+          <Route index element={<Treinos />} />
+          <Route path="programa" element={<Treinos />} />
+          <Route path="biblioteca" element={<Treinos />} />
+          <Route path="progresso" element={<Treinos />} />
+          <Route path="corpo" element={<Treinos />} />
+        </Route>
         <Route path="/treinos" element={<Navigate to="/jota-fit" replace />} />
         <Route path="/nutricao" element={<Nutricao />} />
         <Route path="/foco" element={<Focus />} />

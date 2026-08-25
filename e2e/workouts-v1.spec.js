@@ -300,7 +300,13 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   await mockPraxisApi(page);
   await page.goto('/jota-fit');
 
-  await expect(page.getByRole('main').getByRole('heading', { name: 'Jota Fit' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: 'JOTA FIT' })).toBeVisible();
+  await expect(page).toHaveTitle('Jota Fit');
+  const jotaNav = page.getByRole('navigation', { name: 'Seções do Jota Fit' });
+  await expect(jotaNav.getByRole('link', { name: 'Hoje' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Navegação principal' })).toHaveCount(0);
+  await expect(page.getByRole('complementary')).toHaveCount(0);
+  await expect(page.locator('canvas[data-praxis-particles]')).toHaveCount(0);
   await expect(page.getByText('Push Força', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Começar treino/i })).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -308,6 +314,7 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   await page.getByRole('button', { name: /Começar treino/i }).click();
   await expect(page.getByRole('heading', { name: 'Supino reto' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Navegação principal' })).toHaveCount(0);
+  await expect(jotaNav).toHaveCount(0);
   await expect(page.getByRole('complementary')).toHaveCount(0);
   await expect(page.locator('canvas[data-praxis-particles]')).toHaveCount(0);
 
@@ -362,16 +369,16 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   await expect(page.getByText('Descanso', { exact: true }).first()).toBeVisible();
 
   // Progresso: a sessão aparece com séries de trabalho + aquecimento e detalhes de RIR/qualidade.
-  await page.getByRole('tab', { name: 'Progresso' }).click();
+  await page.getByRole('navigation', { name: 'Seções do Jota Fit' }).getByRole('link', { name: 'Progresso' }).click();
   await page.getByRole('button', { name: /Push Força/i }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('RIR 2', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('RIR 2', { exact: true }).first()).toBeVisible();
   await expect(dialog.getByText('Limpa', { exact: true })).toBeVisible();
   await expect(dialog.getByText(/aquec\./).first()).toBeVisible();
   await page.keyboard.press('Escape');
 
   // Prefill: conclui o descanso, reinicia o treino e a "Última" traz só as séries de trabalho.
-  await page.getByRole('tab', { name: 'Hoje' }).click();
+  await page.getByRole('navigation', { name: 'Seções do Jota Fit' }).getByRole('link', { name: 'Hoje' }).click();
   await page.getByRole('button', { name: /Concluir descanso/i }).click();
   await page.getByRole('button', { name: /Começar treino/i }).click();
   await expect(page.getByText('60 kg · 6 reps · 60 kg · 5 reps')).toBeVisible();

@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Activity,
   CheckCircle2,
   ChevronRight,
   Clock3,
   Dumbbell,
-  History,
   ListChecks,
   Play,
   Plus,
@@ -16,7 +14,6 @@ import {
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import {
-  PageHero,
   PraxisEmptyState,
   PraxisListSkeleton,
 } from '@/components/layout/PraxisPage';
@@ -31,7 +28,6 @@ import WorkoutLibrary from '@/components/workouts/WorkoutLibrary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import {
   formatSeconds,
   formatSessionDuration,
@@ -40,16 +36,24 @@ import {
   workoutDayShortLabel,
 } from '@/lib/workouts';
 
-const TABS = [
-  { id: 'hoje', label: 'Hoje', icon: Play },
-  { id: 'programa', label: 'Programa', icon: ListChecks },
-  { id: 'biblioteca', label: 'Biblioteca', icon: Dumbbell },
-  { id: 'progresso', label: 'Progresso', icon: History },
-  { id: 'corpo', label: 'Corpo', icon: Activity },
-];
+function tabFromPath(pathname) {
+  if (pathname.startsWith('/jota-fit/programa')) return 'programa';
+  if (pathname.startsWith('/jota-fit/biblioteca')) return 'biblioteca';
+  if (pathname.startsWith('/jota-fit/progresso')) return 'progresso';
+  if (pathname.startsWith('/jota-fit/corpo')) return 'corpo';
+  return 'hoje';
+}
+
+function pathForTab(id) {
+  if (id === 'hoje') return '/jota-fit';
+  return `/jota-fit/${id}`;
+}
 
 export default function Treinos() {
-  const [tab, setTab] = useState('hoje');
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const tab = tabFromPath(pathname);
+  const goTab = (id) => navigate(pathForTab(id));
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [programDialogOpen, setProgramDialogOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -79,7 +83,7 @@ export default function Treinos() {
     mutationFn: (data) => praxisApi.workouts.programs.create(data),
     onSuccess: () => {
       setProgramDialogOpen(false);
-      setTab('programa');
+      goTab('programa');
       refresh();
       toast.success('Programa criado', { description: 'Agora adiciona os dias e monta teus treinos.' });
     },
@@ -134,14 +138,7 @@ export default function Treinos() {
   const lastSession = Array.isArray(completedSessions) ? completedSessions[0] || null : null;
 
   return (
-    <div className="praxis-page space-y-6 pb-24">
-      <PageHero
-        kicker="Corpo"
-        kickerIcon={Dumbbell}
-        title="Jota Fit"
-        description="Treino de hoje."
-      />
-
+    <div className="praxis-page space-y-6">
       {isLoading ? <PraxisListSkeleton rows={4} /> : null}
 
       {isError && !summary ? (
@@ -175,36 +172,7 @@ export default function Treinos() {
             </Card>
           ) : null}
 
-          <div
-            className="grid grid-cols-5 gap-1 rounded-full bg-secondary/40 p-1"
-            role="tablist"
-            aria-label="Seções do Jota Fit"
-          >
-            {TABS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === item.id}
-                  onClick={() => setTab(item.id)}
-                  className={cn(
-                    'flex min-h-10 items-center justify-center gap-1 rounded-full px-1.5 py-1.5 text-[11px] font-medium transition-colors sm:min-h-11 sm:gap-1.5 sm:px-2 sm:py-2 sm:text-sm',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    tab === item.id
-                      ? 'bg-background text-foreground shadow-sm font-semibold'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div role="tabpanel" className="space-y-5">
+          <div className="space-y-5">
             {tab === 'hoje' ? (
               program ? (
                 <TodayWorkout
@@ -216,8 +184,8 @@ export default function Treinos() {
                   starting={startSession.isPending}
                   onAdvanceRest={() => advanceRest.mutate({ programId: program.id, dayId: currentDay.id })}
                   advancingRest={advanceRest.isPending}
-                  onOpenProgram={() => setTab('programa')}
-                  onOpenLast={() => setTab('progresso')}
+                  onOpenProgram={() => goTab('programa')}
+                  onOpenLast={() => goTab('progresso')}
                   onStartFreestyle={() => startSession.mutate({ kind: 'freestyle', name: 'Treino Livre' })}
                 />
               ) : (
@@ -256,7 +224,7 @@ export default function Treinos() {
                       )}
                     />
                   )}
-                  <LastWorkoutCard session={lastSession} onOpen={() => setTab('progresso')} />
+                  <LastWorkoutCard session={lastSession} onOpen={() => goTab('progresso')} />
                   <WorkoutProgramDialog
                     open={programDialogOpen}
                     onOpenChange={setProgramDialogOpen}
@@ -302,7 +270,7 @@ export default function Treinos() {
             {tab === 'biblioteca' ? (
               <WorkoutLibrary
                 summary={summary}
-                onOpenProgram={() => setTab('programa')}
+                onOpenProgram={() => goTab('programa')}
               />
             ) : null}
 
@@ -317,8 +285,8 @@ export default function Treinos() {
               <div className="space-y-5">
                 <BodyWeightReadCard />
                 <WorkoutMuscleMap
-                  onNavigateToLibrary={() => setTab('biblioteca')}
-                  onNavigateToProgram={() => setTab('programa')}
+                  onNavigateToLibrary={() => goTab('biblioteca')}
+                  onNavigateToProgram={() => goTab('programa')}
                 />
               </div>
             ) : null}
