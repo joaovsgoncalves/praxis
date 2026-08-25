@@ -340,7 +340,7 @@ function BodyWeightReadCard() {
             <p className="mt-1.5 text-sm text-muted-foreground">Peso vive em Nutrição</p>
           </div>
           <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full">
-            <Link to="/nutricao">Nutrição</Link>
+            <Link to="/jota-fit/nutricao">Nutrição</Link>
           </Button>
         </CardContent>
       </Card>

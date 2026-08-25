@@ -74,13 +74,13 @@ export default function NutritionTodayCard() {
 
         <div className="flex items-center gap-2 border-t border-white/[0.05] pt-3">
           <Button asChild size="sm" className="h-9 flex-1 rounded-full bg-domain-wellness/90 text-black hover:bg-domain-wellness">
-            <Link to="/nutricao">
+            <Link to="/jota-fit/nutricao">
               <Plus className="mr-1 h-3.5 w-3.5" />
               Comida
             </Link>
           </Button>
           <Button asChild size="sm" variant="ghost" className="h-9 rounded-full px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground">
-            <Link to="/nutricao">
+            <Link to="/jota-fit/nutricao">
               Diário
               <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden />
             </Link>

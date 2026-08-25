@@ -248,7 +248,7 @@ export default function WeeklyReview() {
                         </p>
                       ) : null}
                       <Link
-                        to="/nutricao"
+                        to="/jota-fit/nutricao"
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline pt-1"
                       >
                         <UtensilsCrossed className="h-3 w-3" />
@@ -258,7 +258,7 @@ export default function WeeklyReview() {
                   ) : (
                     <p className="text-muted-foreground">
                       Sem refeições logadas nesta semana.{' '}
-                      <Link to="/nutricao" className="text-primary hover:underline">
+                      <Link to="/jota-fit/nutricao" className="text-primary hover:underline">
                         Registrar
                       </Link>
                     </p>
