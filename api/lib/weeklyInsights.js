@@ -376,7 +376,7 @@ const AREA_OF_CATEGORY = {
   nutricao: 'saude',
   fitness: 'saude',
   gofluxo: 'gofluxo',
-  animalia: 'animalia',
+  animalia: 'gofluxo',
   projeto: 'projetos',
   tecnologia: 'projetos',
   site: 'projetos',
@@ -391,8 +391,8 @@ function areaFor(category, slug = '') {
   if (AREA_OF_CATEGORY[cat]) return AREA_OF_CATEGORY[cat];
   if (!slug) return 'projetos';
   if (['rca', 'fidelize', 'opella', 'nazaria'].some((k) => slug.includes(k))) return 'rca';
-  if (['gofluxo'].includes(slug)) return 'gofluxo';
-  if (['animalia'].includes(slug)) return 'animalia';
+  // Animália é serviço de implementação da GoFluxo → agrupa na área GoFluxo.
+  if (['gofluxo', 'animalia'].some((k) => slug.includes(k))) return 'gofluxo';
   if (['facul', 'unifacex', 'estudo'].some((k) => slug.includes(k))) return 'faculdade';
   return 'projetos';
 }

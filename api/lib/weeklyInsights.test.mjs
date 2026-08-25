@@ -256,6 +256,21 @@ test('life_history counts distinct deliverables when no overlap', () => {
   assert.equal(rca.count, 2);
 });
 
+test('life_history agrupa Animália dentro da área GoFluxo (serviço da GoFluxo)', () => {
+  const db = createTestDb({ withProjects: true });
+  db.prepare("INSERT INTO projects (id, slug, name) VALUES ('p1', 'animalia', 'Animália')").run();
+  db.prepare(
+    "INSERT INTO project_updates (id, project_id, date, summary, source) VALUES ('u1', 'p1', '2026-07-14', 'Check-in com a Ester e ajuste do hub', 'seneca')",
+  ).run();
+  const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
+  const areas = weekly.life_history.completed_by_area;
+  // Animália não pode virar área própria: deve entrar em 'gofluxo'.
+  assert.equal(areas.find((a) => a.area === 'animalia'), undefined);
+  const gofluxo = areas.find((a) => a.area === 'gofluxo');
+  assert.ok(gofluxo);
+  assert.equal(gofluxo.count, 1);
+});
+
 test('life_history is safe when projects tables are absent', () => {
   const db = createTestDb();
   const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
