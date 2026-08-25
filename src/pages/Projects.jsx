@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Check, Layers, Pin } from 'lucide-react';
+import { ArrowRight, Check, Layers, Pin, Timer } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import { praxisApi } from '@/api/praxisClient';
 import { PageHero, PraxisEmptyState, PraxisColumnsSkeleton } from '@/components/layout/PraxisPage';
 import ProjectBoard from '@/components/projects/ProjectBoard';
 import ProjectDetailDialog from '@/components/projects/ProjectDetailDialog';
 import { PROJECT_KIND_LABELS } from '@/lib/projects';
+import { fortalezaDateKey } from '@/lib/dates';
 
-function FocusNow({ projects, onOpen, onComplete, completingId }) {
+function FocusNow({ projects, onOpen, onComplete, completingId, onStartFocus, focusingId }) {
   const focused = useMemo(() => projects.filter((item) => item.focus).slice(0, 2), [projects]);
   if (!focused.length) return null;
 
@@ -31,6 +33,7 @@ function FocusNow({ projects, onOpen, onComplete, completingId }) {
           const nextStep = hasNextStep ? project.next_step : 'Próximo passo pendente de revisão';
           const slice = project.current_slice || project.status_summary || '';
           const isCompleting = String(completingId || '') === String(project.id);
+          const isStartingFocus = String(focusingId || '') === String(project.id);
 
           return (
             <div
@@ -63,12 +66,21 @@ function FocusNow({ projects, onOpen, onComplete, completingId }) {
               </button>
 
               {hasNextStep ? (
-                <div className="mt-3 flex justify-end border-t border-white/[0.05] pt-3">
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.05] pt-3">
+                  <button
+                    type="button"
+                    disabled={isStartingFocus}
+                    onClick={() => onStartFocus?.(project)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-domain-gold px-3 text-[11px] font-semibold text-black transition-colors hover:bg-domain-gold/90 disabled:opacity-50"
+                  >
+                    <Timer className="h-3.5 w-3.5" />
+                    {isStartingFocus ? 'Abrindo…' : 'Modo foco'}
+                  </button>
                   <button
                     type="button"
                     disabled={isCompleting}
                     onClick={() => onComplete?.(project)}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-domain-gold/20 bg-domain-gold/[0.04] px-3 text-[11px] font-medium text-domain-gold transition-colors hover:bg-domain-gold/[0.08] disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.025] px-3 text-[11px] font-medium text-stone-300 transition-colors hover:bg-white/[0.05] disabled:opacity-50"
                   >
                     <Check className="h-3.5 w-3.5" />
                     {isCompleting ? 'Registrando…' : 'Fiz isso'}
@@ -85,6 +97,7 @@ function FocusNow({ projects, onOpen, onComplete, completingId }) {
 
 export default function Projects() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [openProject, setOpenProject] = useState(null);
 
   const { data: projects = [], isLoading } = useQuery({
@@ -158,6 +171,54 @@ export default function Projects() {
     },
   });
 
+  const startProjectFocus = useMutation({
+    mutationFn: async (project) => {
+      const title = String(project?.next_step || '').trim();
+      if (!title) throw new Error('Essa frente ainda não tem próximo passo.');
+
+      const source = `project_focus:${project.slug}`;
+      const pending = await praxisApi.tasks.list({ status: 'pending', limit: 100 });
+      let task = Array.isArray(pending)
+        ? pending.find((item) => item.source === source && String(item.title || '').trim() === title)
+        : null;
+
+      if (!task) {
+        const category = project.slug === 'rca'
+          ? 'farmacia'
+          : project.kind === 'estudo'
+            ? 'estudo'
+            : (project.slug === 'gofluxo' || project.slug === 'animalia' ? 'gofluxo' : 'pessoal');
+
+        const descriptionBits = [
+          `Frente: ${project.name}`,
+          project.current_slice ? `Agora: ${project.current_slice}` : null,
+          'Criada pela Continuidade para uma sessão de foco.',
+        ].filter(Boolean);
+
+        task = await praxisApi.tasks.create({
+          title,
+          description: descriptionBits.join('\n'),
+          date: fortalezaDateKey(),
+          status: 'pending',
+          priority: project.focus ? 'high' : 'medium',
+          category,
+          source,
+          duration_minutes: 25,
+        });
+      }
+
+      return { task, project };
+    },
+    onSuccess: ({ task, project }) => {
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      navigate(`/foco?taskId=${encodeURIComponent(task.id)}&project=${encodeURIComponent(project.slug)}`);
+    },
+    onError: (err) => {
+      toast.error('Não deu pra abrir o Modo Foco', { description: err?.message || 'Tenta de novo.' });
+    },
+  });
+
   const handleMove = (project, column) => {
     if (!project || project.column === column) return;
     updateProject.mutate({ id: project.id, data: { column } }, {
@@ -199,6 +260,16 @@ export default function Projects() {
     }
   };
 
+  const handleStartFocus = async (project) => {
+    if (!project?.next_step) return false;
+    try {
+      await startProjectFocus.mutateAsync(project);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleCompleteNextStep = async (project) => {
     if (!project?.next_step) return false;
     try {
@@ -219,7 +290,7 @@ export default function Projects() {
       />
 
       <div className="mt-6 space-y-5">
-        {!isLoading && projects.length > 0 ? <FocusNow projects={projects} onOpen={setOpenProject} onComplete={handleCompleteNextStep} completingId={completeNextStep.variables?.id} /> : null}
+        {!isLoading && projects.length > 0 ? <FocusNow projects={projects} onOpen={setOpenProject} onComplete={handleCompleteNextStep} completingId={completeNextStep.variables?.id} onStartFocus={handleStartFocus} focusingId={startProjectFocus.variables?.id} /> : null}
 
         {isLoading ? (
           <PraxisColumnsSkeleton columns={3} rowsPerColumn={2} />
@@ -262,6 +333,8 @@ export default function Projects() {
         addingUpdate={addUpdate.isPending}
         onCompleteNextStep={handleCompleteNextStep}
         completingNextStep={completeNextStep.isPending}
+        onStartFocus={handleStartFocus}
+        startingFocus={startProjectFocus.isPending}
       />
     </div>
   );

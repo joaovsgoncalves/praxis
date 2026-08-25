@@ -172,3 +172,28 @@ test('Fiz isso recusa frente sem próximo passo para não criar conclusão falsa
   const body = await res.json();
   assert.equal(body.error, 'no next step');
 });
+
+
+test('Fiz isso com expected_step não apaga um próximo passo que mudou no meio da sessão', async (t) => {
+  const { server } = await mountProjects(t);
+  const before = await requestJson(server.base, '/api/projects/carteirazap');
+  const antigo = before.next_step;
+
+  await requestJson(server.base, '/api/projects/carteirazap', {
+    method: 'PATCH',
+    body: { next_step: 'Revisar o fluxo novo antes de mexer em Clientes' },
+  });
+
+  const res = await fetch(`${server.base}/api/projects/carteirazap/complete-next-step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expected_step: antigo }),
+  });
+
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.error, 'NEXT_STEP_CHANGED');
+
+  const after = await requestJson(server.base, '/api/projects/carteirazap');
+  assert.equal(after.next_step, 'Revisar o fluxo novo antes de mexer em Clientes');
+});

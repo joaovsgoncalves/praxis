@@ -81,6 +81,11 @@ function remainingFromEndsAt(endsAt) {
   return Math.max(0, Math.ceil((Number(endsAt) - Date.now()) / 1000));
 }
 
+function projectSlugFromTaskSource(source) {
+  const value = String(source || '');
+  return value.startsWith('project_focus:') ? value.slice('project_focus:'.length).trim() : '';
+}
+
 export default function Focus() {
   const urlParams = new URLSearchParams(window.location.search);
   const initialTaskId = urlParams.get('taskId') || '';
@@ -211,15 +216,52 @@ export default function Focus() {
   });
 
   const completeTaskMutation = useMutation({
-    mutationFn: (taskId) => praxisApi.tasks.update(taskId, { status: 'completed' }),
-    onSuccess: (task) => {
+    mutationFn: async (taskId) => {
+      const originalTask = tasks.find((item) => item.id === taskId) || postSession?.task || null;
+      const task = await praxisApi.tasks.update(taskId, { status: 'completed' });
+      const projectSlug = projectSlugFromTaskSource(originalTask?.source);
+      let projectSync = null;
+      let projectSyncError = null;
+
+      if (projectSlug && originalTask?.title) {
+        try {
+          projectSync = await praxisApi.projects.completeNextStep(projectSlug, {
+            expected_step: originalTask.title,
+            summary: originalTask.title,
+            source: 'conclusao',
+            created_by: 'joao',
+          });
+        } catch (err) {
+          projectSyncError = err;
+        }
+      }
+
+      return { task, projectSlug, projectSync, projectSyncError };
+    },
+    onSuccess: (result) => {
+      const task = result?.task;
       queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      if (result?.projectSlug) {
+        queryClient.invalidateQueries({ queryKey: ['project-updates'] });
+      }
       dispatchPraxisLevelUpFromResponse(task);
       setPostSessionOpen(false);
-      toast.success('Tarefa concluída', { description: task?.title || 'Marcada como feita no Praxis.' });
+
+      if (result?.projectSync) {
+        toast.success('Tarefa e avanço concluídos', {
+          description: 'A Continuidade já registrou esse passo. O Sêneca recalcula o próximo no ciclo seguinte.',
+        });
+      } else if (result?.projectSlug && result?.projectSyncError) {
+        toast.success('Tarefa concluída', {
+          description: 'O passo mudou na Continuidade enquanto você focava. O Sêneca reconcilia sem apagar o estado novo.',
+        });
+      } else {
+        toast.success('Tarefa concluída', { description: task?.title || 'Marcada como feita no Praxis.' });
+      }
     },
   });
 

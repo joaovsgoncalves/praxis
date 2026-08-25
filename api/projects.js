@@ -281,6 +281,13 @@ function badRequest(message) {
   return err;
 }
 
+function conflict(message) {
+  const err = new Error(message);
+  err.status = 409;
+  err.code = message;
+  return err;
+}
+
 export function getProject(db, idOrSlug) {
   const row = db.prepare('SELECT * FROM projects WHERE id = ? OR slug = ?').get(idOrSlug, idOrSlug);
   return mapRow(row);
@@ -473,6 +480,11 @@ export function completeProjectNextStep(db, idOrSlug, body = {}) {
 
   const currentNextStep = String(project.next_step || '').trim();
   if (!currentNextStep) throw badRequest('no next step');
+
+  const expectedStep = String(body.expected_step || '').trim();
+  if (expectedStep && expectedStep !== currentNextStep) {
+    throw conflict('NEXT_STEP_CHANGED');
+  }
 
   const date = todayFortaleza();
   const rawSummary = String(body.summary || currentNextStep).trim() || currentNextStep;

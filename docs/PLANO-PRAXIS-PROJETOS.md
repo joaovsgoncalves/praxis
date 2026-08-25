@@ -145,3 +145,22 @@ Endpoint: `POST /api/projects/:id/complete-next-step`.
 - **18:30 Fortaleza — `seneca:fechamento-de-progresso`**: estritamente read-only; lê conclusões, tarefas, timeline e evidências reais para devolver um espelho factual do que avançou. Não vira checklist nem plano de amanhã.
 
 Regra de produto: o fechamento deve reduzir distorção de percepção, não aumentar cobrança. Frente quieta por bloqueio ou por escolha de prioridade não vira falha automaticamente.
+
+## Decisão 2026-08-25 — Modo Foco + refresh intradiário
+
+A Continuidade pode iniciar execução, sem virar uma segunda lista de tarefas.
+
+- `Modo foco` transforma o `next_step` atual em uma tarefa normal da Praxis e abre `/foco` com ela vinculada.
+- A tarefa recebe `source=project_focus:<slug>` para preservar a origem.
+- Se já existir uma tarefa pendente da mesma frente com o mesmo próximo passo, ela é reutilizada em vez de duplicada.
+- Ao concluir a tarefa pelo Modo Foco, a Praxis tenta fechar exatamente o `next_step` que originou a sessão e registrar a conclusão na timeline.
+- A API protege contra corrida: se o `next_step` mudou enquanto a sessão estava aberta, retorna `NEXT_STEP_CHANGED` e não apaga o estado novo. O Sêneca reconcilia depois pela evidência da tarefa concluída.
+- `Fiz isso` continua existindo para avanços feitos fora do timer.
+
+Cadência canônica do Sêneca:
+
+- 07:50 Fortaleza: revisão de continuidade e plano de retomada.
+- 13:50 Fortaleza: refresh intradiário para incorporar a manhã e recalcular próximos passos.
+- 18:30 Fortaleza: fechamento de progresso read-only, sem reordenar a vida nem criar cobrança nova.
+
+Regra de UX: `Modo foco` aparece no bloco **Foco agora** e no drawer da frente. Não adicionar CTA operacional em todos os cards do mapa; o mapa continua sendo leitura rápida.

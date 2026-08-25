@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,6 +85,8 @@ export default function ProjectDetailDialog({
   addingUpdate = false,
   onCompleteNextStep,
   completingNextStep = false,
+  onStartFocus,
+  startingFocus = false,
 }) {
   const [form, setForm] = useState({
     kind: 'produto',
@@ -218,20 +220,31 @@ export default function ProjectDetailDialog({
             </Field>
 
             {String(project.next_step || '').trim() ? (
-              <div className="flex flex-col gap-2 rounded-xl border border-domain-gold/15 bg-black/15 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="rounded-xl border border-domain-gold/15 bg-black/15 px-3 py-3">
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Terminou esse passo? Registre a conclusão sem encerrar a frente inteira.
+                  Você pode transformar este próximo passo em uma sessão real ou só registrar quando terminar.
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 shrink-0 rounded-full border-domain-gold/25 bg-domain-gold/[0.04] text-domain-gold hover:bg-domain-gold/[0.08] hover:text-domain-gold"
-                  disabled={completingNextStep || form.next_step.trim() !== String(project.next_step || '').trim()}
-                  onClick={() => onCompleteNextStep?.(project)}
-                >
-                  <Check className="mr-1.5 h-3.5 w-3.5" />
-                  {completingNextStep ? 'Registrando…' : 'Fiz isso'}
-                </Button>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    className="h-9 flex-1 rounded-full"
+                    disabled={startingFocus || form.next_step.trim() !== String(project.next_step || '').trim()}
+                    onClick={() => onStartFocus?.(project)}
+                  >
+                    <Timer className="mr-1.5 h-3.5 w-3.5" />
+                    {startingFocus ? 'Abrindo…' : 'Começar no Modo Foco'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 flex-1 rounded-full border-domain-gold/25 bg-domain-gold/[0.04] text-domain-gold hover:bg-domain-gold/[0.08] hover:text-domain-gold"
+                    disabled={completingNextStep || form.next_step.trim() !== String(project.next_step || '').trim()}
+                    onClick={() => onCompleteNextStep?.(project)}
+                  >
+                    <Check className="mr-1.5 h-3.5 w-3.5" />
+                    {completingNextStep ? 'Registrando…' : 'Fiz isso'}
+                  </Button>
+                </div>
               </div>
             ) : (
               <p className="rounded-xl border border-white/[0.05] bg-black/10 px-3 py-2.5 text-xs text-muted-foreground/60">
