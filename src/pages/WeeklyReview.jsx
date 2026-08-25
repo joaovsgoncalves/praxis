@@ -4,7 +4,7 @@ import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2, ListChecks, UtensilsCrossed } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight, Save, Trash2, BarChart3, Wand2, ListChecks, UtensilsCrossed, History, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -37,6 +37,28 @@ const empty = {
   next_week_focus: '',
   overall_score: 3,
 };
+
+const AREA_LABELS = {
+  rca: 'RCA / trabalho',
+  faculdade: 'Faculdade',
+  saude: 'Saúde / treino',
+  gofluxo: 'GoFluxo',
+  animalia: 'Animália',
+  projetos: 'Projetos',
+  'vida-pratica': 'Vida prática',
+};
+
+function areaLabel(area) {
+  return AREA_LABELS[area] || area;
+}
+
+function formatDateShort(ymd) {
+  try {
+    return format(new Date(`${ymd}T12:00:00`), 'dd MMM', { locale: ptBR });
+  } catch {
+    return ymd;
+  }
+}
 
 export default function WeeklyReview() {
   const queryClient = useQueryClient();
@@ -299,6 +321,70 @@ export default function WeeklyReview() {
           )}
         </CardContent>
       </Card>
+
+      {auto?.life_history && (
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <History className="h-4 w-4 text-primary" />
+              Andamento da sua vida
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <p className="text-muted-foreground leading-relaxed">{auto.life_history.summary}</p>
+
+            {auto.life_history.completed_by_area.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Áreas com movimento
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {auto.life_history.completed_by_area.map((a) => (
+                    <span
+                      key={a.area}
+                      className="inline-flex items-center gap-1 rounded-full bg-secondary/60 px-2.5 py-1 text-xs"
+                    >
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {areaLabel(a.area)}
+                      </span>
+                      <span className="tabular-nums text-foreground">{a.count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {auto.life_history.timeline.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Linha do tempo
+                </p>
+                <ul className="space-y-2 border-l border-border pl-3">
+                  {auto.life_history.timeline.map((ev, i) => (
+                    <li key={i} className="relative">
+                      <span className="absolute -left-[13px] top-1.5 h-2 w-2 rounded-full bg-primary/60" />
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>{formatDateShort(ev.date)}</span>
+                        {ev.source === 'conclusao' && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-500">
+                            <CheckCircle2 className="h-3 w-3" /> concluído
+                          </span>
+                        )}
+                        {ev.name && <span className="font-medium text-foreground">{ev.name}</span>}
+                      </div>
+                      {ev.text && <p className="mt-0.5 text-sm text-muted-foreground">{ev.text}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {auto.life_history.completed_by_area.length === 0 && auto.life_history.timeline.length === 0 && (
+              <p className="text-muted-foreground">Sem movimento registrado nesta semana.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-border bg-card">
         <CardHeader className="pb-2">

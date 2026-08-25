@@ -154,7 +154,7 @@ export function createInsightsRouter({ db, getLocalDateString }) {
   router.get('/weekly', (req, res) => {
     try {
       const weekStart = mondayOf(req.query.week_start || req.query.date);
-      const payload = buildWeeklyInsights(db, weekStart);
+      const payload = buildWeeklyInsights(db, weekStart, { today: getLocalDateString() });
       res.json(payload);
     } catch (error) {
       console.error('Weekly insights error:', error);

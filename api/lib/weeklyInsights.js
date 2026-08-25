@@ -47,11 +47,19 @@ function cleanTitle(title) {
 /**
  * @param {import('better-sqlite3').Database} db
  * @param {string} weekStart YYYY-MM-DD (segunda)
+ * @param {{ today?: string }} [options] today = 'YYYY-MM-DD' (default: data local)
  */
-export function buildWeeklyInsights(db, weekStart) {
+export function buildWeeklyInsights(db, weekStart, options = {}) {
   const weekEnd = addDaysYmd(weekStart, 6);
+  const today = String(options.today || localYmd());
+  // Semana em andamento: só conta dias já transcorridos (não pune o futuro).
+  const effEnd = today < weekEnd ? today : weekEnd;
   const days = [];
-  for (let i = 0; i < 7; i++) days.push(addDaysYmd(weekStart, i));
+  for (let i = 0; i < 7; i++) {
+    const d = addDaysYmd(weekStart, i);
+    if (d > effEnd) break;
+    days.push(d);
+  }
 
   const completedTasks = db.prepare(`
     SELECT id, title, priority, category, date, completed_date
@@ -336,5 +344,189 @@ export function buildWeeklyInsights(db, weekStart) {
       learnings: draft_learnings,
       next_week_focus: draft_next_week_focus,
     },
+    life_history: buildLifeHistory(db, weekStart, weekEnd),
+  };
+}
+
+/** Data local YYYY-MM-DD (evita depender do fuso UTC na ausência de options.today). */
+function localYmd() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Normaliza título removendo prefixos P1/P2/P3 usados pelo app. */
+function cleanTitleSafe(title) {
+  return String(title || '').replace(/^P\d+\s*[-–—:]?\s*/i, '').trim();
+}
+
+const AREA_OF_CATEGORY = {
+  rca: 'rca',
+  trabalho: 'rca',
+  comercial: 'rca',
+  whatsapp: 'rca',
+  farmacia: 'rca',
+  facul: 'faculdade',
+  estudo: 'faculdade',
+  educacao: 'faculdade',
+  treino: 'saude',
+  saude: 'saude',
+  nutricao: 'saude',
+  fitness: 'saude',
+  gofluxo: 'gofluxo',
+  animalia: 'animalia',
+  projeto: 'projetos',
+  tecnologia: 'projetos',
+  site: 'projetos',
+  catalogo: 'projetos',
+  pessoal: 'vida-pratica',
+  rotina: 'vida-pratica',
+  familia: 'vida-pratica',
+};
+
+function areaFor(category, slug = '') {
+  const cat = (category || '').toLowerCase().trim();
+  if (AREA_OF_CATEGORY[cat]) return AREA_OF_CATEGORY[cat];
+  if (!slug) return 'projetos';
+  if (['rca', 'fidelize', 'opella', 'nazaria'].some((k) => slug.includes(k))) return 'rca';
+  if (['gofluxo'].includes(slug)) return 'gofluxo';
+  if (['animalia'].includes(slug)) return 'animalia';
+  if (['facul', 'unifacex', 'estudo'].some((k) => slug.includes(k))) return 'faculdade';
+  return 'projetos';
+}
+
+function tableHas(table, db) {
+  try {
+    const row = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
+      .get(table);
+    return !!row;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Camada factual da semana: não é opinião nem cobrança. Junta avanços reais da
+ * continuidade (project_updates) e tarefas concluídas, agrupando por área e em
+ * uma timeline curta. Nunca muda a frente; apenas lê o que já aconteceu.
+ */
+function buildLifeHistory(db, weekStart, weekEnd) {
+  const updates = [];
+  const projectName = new Map();
+
+  if (tableHas('projects', db)) {
+    try {
+      const projects = db
+        .prepare('SELECT id, slug, name FROM projects')
+        .all();
+      for (const p of projects) projectName.set(p.id, { slug: p.slug, name: p.name });
+    } catch {
+      projectName.clear();
+    }
+  }
+
+  if (tableHas('project_updates', db)) {
+    try {
+      const rows = db
+        .prepare(
+          `SELECT date, project_id, summary, source
+           FROM project_updates
+           WHERE date BETWEEN ? AND ?
+           ORDER BY date ASC, created_at ASC`,
+        )
+        .all(weekStart, weekEnd);
+      for (const r of rows) {
+        const meta = projectName.get(r.project_id) || { slug: String(r.project_id), name: '' };
+        updates.push({
+          date: r.date,
+          front: meta.slug,
+          name: meta.name || meta.slug,
+          summary: String(r.summary || '').trim(),
+          source: r.source || 'manual',
+          kind: 'continuidade',
+        });
+      }
+    } catch {
+      // tabela presente mas consulta falhou: não derruba o resumo
+    }
+  }
+
+  // Tarefas concluídas na semana, excluídas ideias (fontes e amostras honestas).
+  let completed = [];
+  try {
+    completed = db
+      .prepare(
+        `SELECT title, category
+         FROM tasks
+         WHERE status IN ('completed','done')
+           AND category != 'ideias'
+           AND (
+             (date IS NOT NULL AND date BETWEEN ? AND ?)
+             OR (completed_date IS NOT NULL AND completed_date BETWEEN ? AND ?)
+           )
+         ORDER BY COALESCE(completed_date, date) DESC
+         LIMIT 80`,
+      )
+      .all(weekStart, weekEnd, weekStart, weekEnd);
+  } catch {
+    completed = [];
+  }
+
+  const byArea = {};
+  const timeline = [];
+  const seen = new Set();
+
+  for (const u of updates) {
+    const area = areaFor('', u.front);
+    byArea[area] = byArea[area] || { area, count: 0, samples: [] };
+    byArea[area].count += 1;
+    if (byArea[area].samples.length < 4) {
+      byArea[area].samples.push(u.summary || u.name);
+    }
+    if (timeline.length < 10) {
+      timeline.push({
+        date: u.date,
+        front: u.front,
+        name: u.name,
+        text: u.summary,
+        kind: u.kind,
+        source: u.source,
+      });
+    }
+  }
+
+  for (const t of completed) {
+    const area = areaFor(t.category);
+    const sample = cleanTitleSafe(t.title);
+    if (!sample) continue;
+    const key = `${area}|${sample.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    byArea[area] = byArea[area] || { area, count: 0, samples: [] };
+    byArea[area].count += 1;
+    if (byArea[area].samples.length < 4) byArea[area].samples.push(sample);
+  }
+
+  const summaryParts = [];
+  const overallUpdates = updates.length;
+  const overallTasks = completed.length;
+  if (overallUpdates > 0) {
+    summaryParts.push(`${overallUpdates} avanço(s) registrado(s) na continuidade`);
+  }
+  if (overallTasks > 0) {
+    summaryParts.push(`${overallTasks} tarefa(s) concluída(s)`);
+  }
+  const summary =
+    summaryParts.length > 0
+      ? `Semana com ${summaryParts.join(' e ')}.`
+      : 'Sem movimento registrado nesta semana.';
+  return {
+    summary,
+    project_updates: updates,
+    completed_by_area: Object.values(byArea).sort((a, b) => b.count - a.count),
+    timeline,
   };
 }

@@ -158,3 +158,74 @@ test('drafts fall back to placeholder strings for an empty week', () => {
   assert.ok(weekly.drafts.highlights.length > 0);
   assert.equal(typeof weekly.drafts.blockers, 'string');
 });
+
+test('in-progress week excludes future days (habit window)', () => {
+  const db = createTestDb();
+  db.prepare("INSERT INTO habits (id, title, status, frequency) VALUES ('h1', 'Água', 'active', 'daily')").run();
+  const weekStart = '2026-07-13'; // segunda
+  // options.today = quarta (2026-07-15): só seg, ter, qua contam.
+  const weekly = buildWeeklyInsights(db, weekStart, { today: '2026-07-15' });
+  assert.equal(weekly.victories.habits_target, 3);
+  assert.equal(weekly.victories.habits_open_slots, 3);
+  // Só os dias transcorridos (seg, ter, qua) podem contar como abertos; nunca o futuro.
+  assert.equal(weekly.bottlenecks.missed_habits.length, 1);
+  assert.equal(weekly.bottlenecks.missed_habits[0].title, 'Água');
+  assert.equal(weekly.bottlenecks.missed_habits[0].misses, 3);
+});
+
+test('future week has zero habit slots (no denominator)', () => {
+  const db = createTestDb();
+  db.prepare("INSERT INTO habits (id, title, status, frequency) VALUES ('h1', 'Treino', 'active', 'daily')").run();
+  const weekStart = '2026-07-27'; // semana futura
+  const weekly = buildWeeklyInsights(db, weekStart, { today: '2026-07-15' });
+  assert.equal(weekly.victories.habits_target, 0);
+  assert.equal(weekly.victories.habits_done, 0);
+  assert.equal(weekly.victories.habits_open_slots, 0);
+});
+
+test('life_history includes in-week project_updates and excludes out-of-week', () => {
+  const db = createTestDb({ withProjects: true });
+  db.prepare(
+    "INSERT INTO projects (id, slug, name) VALUES ('p1', 'rca', 'RCA')",
+  ).run();
+  db.prepare(
+    "INSERT INTO project_updates (id, project_id, date, summary, source) VALUES ('u1', 'p1', '2026-07-14', 'Avanço no RCA', 'conclusao')",
+  ).run();
+  db.prepare(
+    "INSERT INTO project_updates (id, project_id, date, summary, source) VALUES ('u2', 'p1', '2026-06-01', 'Fora da semana', 'seneca')",
+  ).run();
+  const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
+  assert.equal(weekly.life_history.project_updates.length, 1);
+  assert.equal(weekly.life_history.project_updates[0].summary, 'Avanço no RCA');
+  assert.equal(weekly.life_history.project_updates[0].front, 'rca');
+});
+
+test('life_history groups completed tasks by area', () => {
+  const db = createTestDb();
+  db.prepare(
+    "INSERT INTO tasks (id, title, status, category, date, completed_date) VALUES ('t1', 'Fechar pedido', 'completed', 'rca', '2026-07-13', '2026-07-13')",
+  ).run();
+  db.prepare(
+    "INSERT INTO tasks (id, title, status, category, date, completed_date) VALUES ('t2', 'Estudar anatomia', 'completed', 'estudo', '2026-07-14', '2026-07-14')",
+  ).run();
+  db.prepare(
+    "INSERT INTO tasks (id, title, status, category, date, completed_date) VALUES ('t3', 'Ideia solta', 'completed', 'ideias', '2026-07-13', '2026-07-13')",
+  ).run();
+  const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
+  const areas = weekly.life_history.completed_by_area;
+  const rca = areas.find((a) => a.area === 'rca');
+  const fac = areas.find((a) => a.area === 'faculdade');
+  assert.ok(rca);
+  assert.ok(fac);
+  assert.equal(rca.count, 1);
+  assert.equal(fac.count, 1);
+  // ideias nunca entram na área de vida.
+  assert.equal(areas.find((a) => a.area === 'ideias'), undefined);
+});
+
+test('life_history is safe when projects tables are absent', () => {
+  const db = createTestDb();
+  const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
+  assert.deepEqual(weekly.life_history.project_updates, []);
+  assert.equal(typeof weekly.life_history.summary, 'string');
+});
