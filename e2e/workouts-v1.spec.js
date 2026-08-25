@@ -327,7 +327,7 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   await expect(page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true })).toHaveValue('2.5');
   await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('5');
   await page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true }).fill('40');
-  await page.getByRole('button', { name: /Registrar aquecimento A1/i }).click();
+  await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await expect(page.getByText('40 kg', { exact: true })).toBeVisible();
 
   // Série de trabalho 1 — com RIR e qualidade técnica.
@@ -336,7 +336,7 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   await page.getByRole('button', { name: 'Mais', exact: true }).click();
   await page.getByRole('group', { name: 'RIR da série' }).getByRole('button', { name: '2', exact: true }).click();
   await page.getByRole('group', { name: 'Qualidade técnica' }).getByRole('button', { name: 'Limpa', exact: true }).click();
-  await page.getByRole('button', { name: /Registrar série 1/i }).click();
+  await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await expect(page.getByText('RIR 2', { exact: true })).toBeVisible();
   await expect(page.getByText('Limpa', { exact: true })).toBeVisible();
   await expect(page.getByText('Descanso', { exact: true })).toBeVisible();
@@ -347,16 +347,15 @@ test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico 
   // Série de trabalho 2.
   await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('5');
   await page.getByRole('spinbutton', { name: 'Carga (kg)', exact: true }).fill('60');
-  await page.getByRole('button', { name: /Registrar série 2/i }).click();
+  await page.getByRole('button', { name: 'Registrar', exact: true }).click();
 
-  // Reps + elástico: fica em Mais no primeiro uso e reaparece sozinho depois de registrado.
+  // Reps + elástico: visível no fold quando o exercício usa banda.
   await page.getByRole('button', { name: /Próximo/i }).click();
   await expect(page.getByRole('heading', { name: 'Barra fixa' })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Elástico da série' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Mais', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Elástico da série' })).toBeVisible();
   await page.getByRole('group', { name: 'Elástico da série' }).getByRole('button', { name: 'Médio', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Repetições', exact: true }).fill('6');
-  await page.getByRole('button', { name: /Registrar série 1/i }).click();
+  await page.getByRole('button', { name: 'Registrar', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Elástico da série' })).toBeVisible();
 
   // Progresso é só-trabalho: 3/3 planejadas = 100%, com o aquecimento contado à parte.
