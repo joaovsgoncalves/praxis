@@ -42,6 +42,11 @@ api/praxis.db
 api/*.db
 api/*.db-shm
 api/*.db-wal
+api/*.bak*
+api/*.db.bak*
 api/backups/
 api/uploads/
+
+# Generated architecture diagrams (archify visual-check)
+docs/diagrams/
 .agent-context/
