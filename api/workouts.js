@@ -1641,6 +1641,26 @@ export function registerWorkoutRoutes(app, db) {
     const session = db.prepare('SELECT * FROM workout_sessions WHERE id = ?').get(existing.session_id);
     if (session?.status !== 'active') return res.status(400).json({ error: 'Essa sessão já foi encerrada.' });
 
+    let exerciseId = existing.exercise_id;
+    let exerciseNameSnapshot = existing.exercise_name_snapshot;
+    let trackingType = existing.tracking_type;
+
+    const requestedExerciseId = req.body?.exercise_id;
+    if (requestedExerciseId !== undefined && requestedExerciseId !== existing.exercise_id) {
+      const workSetsCount = db.prepare(`
+        SELECT COUNT(*) AS count FROM workout_session_sets
+        WHERE session_exercise_id = ? AND (set_role IS NULL OR set_role != 'warmup')
+      `).get(existing.id)?.count || 0;
+      if (workSetsCount > 0) {
+        return res.status(400).json({ error: 'já tem série nesse exercício' });
+      }
+      const exercise = db.prepare("SELECT * FROM workout_exercises WHERE id = ? AND status = 'active'").get(requestedExerciseId);
+      if (!exercise) return res.status(404).json({ error: 'Exercício não encontrado.' });
+      exerciseId = exercise.id;
+      exerciseNameSnapshot = exercise.name;
+      trackingType = exercise.tracking_type || 'reps';
+    }
+
     const targetSets = req.body?.target_sets !== undefined
       ? (intOrNull(req.body.target_sets, { min: 1, max: 20 }) ?? existing.target_sets)
       : existing.target_sets;
@@ -1654,9 +1674,19 @@ export function registerWorkoutRoutes(app, db) {
 
     db.prepare(`
       UPDATE workout_session_exercises
-      SET target_sets = ?, rest_seconds = ?, superset_group = ?, notes = ?
+      SET target_sets = ?, rest_seconds = ?, superset_group = ?, notes = ?,
+          exercise_id = ?, exercise_name_snapshot = ?, tracking_type = ?
       WHERE id = ?
-    `).run(targetSets, restSeconds, supersetGroup, notes, existing.id);
+    `).run(
+      targetSets,
+      restSeconds,
+      supersetGroup,
+      notes,
+      exerciseId,
+      exerciseNameSnapshot,
+      trackingType,
+      existing.id,
+    );
 
     res.json(getSessionDetail(db, existing.session_id));
   }));

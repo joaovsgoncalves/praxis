@@ -20,7 +20,12 @@ const EMPTY_CUSTOM = {
   instructions: '',
 };
 
-export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
+export default function ExercisePickerDialog({
+  open,
+  onOpenChange,
+  onSelect,
+  title = 'Adicionar exercício',
+}) {
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [custom, setCustom] = useState(EMPTY_CUSTOM);
@@ -76,7 +81,7 @@ export default function ExercisePickerDialog({ open, onOpenChange, onSelect }) {
       <DialogContent className="w-[calc(100%-1.25rem)] max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl p-0 gap-0">
         <div className="sticky top-0 z-10 border-b border-border/70 bg-background/95 px-5 pb-4 pt-5 backdrop-blur">
           <DialogHeader className="pr-8">
-            <DialogTitle>{creating ? 'Criar exercício' : 'Adicionar exercício'}</DialogTitle>
+            <DialogTitle>{creating ? 'Criar exercício' : title}</DialogTitle>
             <DialogDescription>
               {creating ? 'Define como esse movimento será acompanhado nos teus treinos.' : 'Escolhe um existente ou cria um exercício teu.'}
             </DialogDescription>

@@ -193,6 +193,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
   const [showDetails, setShowDetails] = useState(false);
   const [restTimer, setRestTimer] = useState(() => loadRestTimer(sessionId));
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState('add');
   const toastedPrSetIds = useRef(new Set());
   const lastExerciseIdRef = useRef(null);
   const lastSetsCountRef = useRef(null);
@@ -240,7 +241,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
       setIsFormDirty(false);
       setShowDetails(false);
     }
-  }, [currentExercise?.id, currentExercise?.sets?.length]);
+  }, [currentExercise?.id, currentExercise?.exercise_id, currentExercise?.sets?.length]);
 
   const updateFormField = (field, value) => {
     setIsFormDirty(true);
@@ -342,6 +343,57 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
     },
     onError: (mutationError) => toast.error("Não deu pra adicionar o exercício", { description: mutationError?.message }),
   });
+
+  const swapSessionExercise = useMutation({
+    mutationFn: (payload) => praxisApi.workouts.sessions.updateExercise(currentExercise.id, payload),
+    onSuccess: (updated) => {
+      updateSessionCache(updated);
+      setPickerOpen(false);
+      const updatedExercise = updated.exercises?.find((exercise) => exercise.id === currentExercise?.id);
+      if (updatedExercise) {
+        lastExerciseIdRef.current = updatedExercise.id;
+        lastSetsCountRef.current = updatedExercise.sets?.length ?? 0;
+        setSetForm(computeSetPrefill(updatedExercise, 'work'));
+        setIsFormDirty(false);
+        setShowDetails(false);
+      }
+      toast.success('Exercício trocado');
+    },
+    onError: (mutationError) => toast.error(mutationError?.message || 'já tem série nesse exercício'),
+  });
+
+  const openAddPicker = () => {
+    setPickerMode('add');
+    setPickerOpen(true);
+  };
+
+  const openSwapPicker = () => {
+    if (!currentExercise || swapSessionExercise.isPending) return;
+    if (workSetsOf(currentExercise).length > 0) {
+      toast.error('já tem série nesse exercício');
+      return;
+    }
+    setPickerMode('swap');
+    setPickerOpen(true);
+  };
+
+  const handlePickerSelect = (exercise) => {
+    if (pickerMode === 'swap') {
+      if (!currentExercise) return;
+      if (workSetsOf(currentExercise).length > 0) {
+        toast.error('já tem série nesse exercício');
+        setPickerOpen(false);
+        return;
+      }
+      if (exercise.id === currentExercise.exercise_id) {
+        setPickerOpen(false);
+        return;
+      }
+      swapSessionExercise.mutate({ exercise_id: exercise.id });
+      return;
+    }
+    addSessionExercise.mutate({ exercise_id: exercise.id });
+  };
 
   const addSet = useMutation({
     mutationFn: (payload) => praxisApi.workouts.sessions.addSet(sessionId, payload),
@@ -601,7 +653,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
           variant="outline"
           size="sm"
           className="h-8 shrink-0 rounded-full border-dashed px-3 text-xs"
-          onClick={() => setPickerOpen(true)}
+          onClick={openAddPicker}
         >
           <Plus className="mr-1 h-3.5 w-3.5" /> Exercício
         </Button>
@@ -617,7 +669,7 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
             <p className="mt-1 text-xs text-muted-foreground">
               Adiciona os exercícios que você vai executar hoje.
             </p>
-            <Button type="button" className="mt-5 rounded-full" onClick={() => setPickerOpen(true)}>
+            <Button type="button" className="mt-5 rounded-full" onClick={openAddPicker}>
               <Plus className="mr-1.5 h-4 w-4" /> Adicionar primeiro exercício
             </Button>
           </CardContent>
@@ -650,7 +702,19 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
                       </span>
                     ) : null}
                   </div>
-                  <h2 className="mt-2 text-xl font-semibold leading-tight tracking-tight">{currentExercise.exercise_name_snapshot}</h2>
+                  <div className="mt-2 flex items-start justify-between gap-2">
+                    <h2 className="text-xl font-semibold leading-tight tracking-tight">{currentExercise.exercise_name_snapshot}</h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 rounded-full px-3 text-xs"
+                      disabled={swapSessionExercise.isPending}
+                      onClick={openSwapPicker}
+                    >
+                      Trocar
+                    </Button>
+                  </div>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {isSkill
                       ? 'Skill · tentativas de qualidade · parar por técnica'
@@ -1048,7 +1112,8 @@ export default function WorkoutSessionView({ sessionId, onExit }) {
       <ExercisePickerDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}
-        onSelect={(exercise) => addSessionExercise.mutate({ exercise_id: exercise.id })}
+        title={pickerMode === 'swap' ? 'Trocar exercício' : 'Adicionar exercício'}
+        onSelect={handlePickerSelect}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import { after, before, describe, test } from 'node:test';
 import express from 'express';
 import { registerWorkoutRoutes, initWorkoutSchema } from './workouts.js';
 import { createTestDb, startTestServer, requestJson } from './test-support/helpers.mjs';
+import { sessionStartBody, workoutsApiModule } from '../src/api/workoutsApi.js';
 
 describe('workout routes', () => {
   let db;
@@ -1950,6 +1951,182 @@ describe("Treinos V4 Fase 12 — Superset & Freestyle session", () => {
 
     // Abandon session
     await request(`/api/workouts/sessions/${session.id}/abandon`, { method: "POST", body: {} });
+  });
+
+  test("sessions.start serializes freestyle as kind/name, not nested workout_day_id", async () => {
+    assert.deepEqual(sessionStartBody({ kind: "freestyle", name: "Treino Livre" }), {
+      kind: "freestyle",
+      name: "Treino Livre",
+    });
+    assert.deepEqual(sessionStartBody("day-abc"), { workout_day_id: "day-abc" });
+    assert.equal("workout_day_id" in sessionStartBody({ kind: "freestyle", name: "Treino Livre" }), false);
+
+    let captured = null;
+    const api = workoutsApiModule(async (_path, options = {}) => {
+      captured = options;
+      return { id: "sess-1" };
+    });
+    assert.equal(typeof api.workouts.heatmap, "function");
+    assert.equal(typeof api.workouts.sessions.addExercise, "function");
+    assert.equal(typeof api.workouts.agentSnapshot, "function");
+    assert.equal(typeof api.workouts.exercises.stats, "function");
+
+    await api.workouts.sessions.start({ kind: "freestyle", name: "Treino Livre" });
+    const body = JSON.parse(captured.body);
+    assert.equal(body.kind, "freestyle");
+    assert.equal(body.name, "Treino Livre");
+    assert.equal(body.workout_day_id, undefined);
+    assert.equal(typeof body.workout_day_id, "undefined");
+
+    await api.workouts.sessions.start("day-xyz");
+    const dayBody = JSON.parse(captured.body);
+    assert.equal(dayBody.workout_day_id, "day-xyz");
+    assert.equal(dayBody.kind, undefined);
+  });
+
+  test("PATCH session-exercises swaps exercise_id when there are no work sets", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const first = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Swap From A", category: "strength", tracking_type: "reps" },
+    });
+    const second = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Swap To B", category: "strength", tracking_type: "weight_reps" },
+    });
+
+    const session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Treino Swap" },
+    });
+    const withEx = await request(`/api/workouts/sessions/${session.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: first.id },
+    });
+    const seId = withEx.exercises[0].id;
+    assert.equal(withEx.exercises[0].exercise_name_snapshot, "Swap From A");
+    assert.equal(withEx.exercises[0].tracking_type, "reps");
+    assert.equal(withEx.exercises[0].sets.length, 0);
+
+    const swapped = await request(`/api/workouts/session-exercises/${seId}`, {
+      method: "PATCH",
+      body: { exercise_id: second.id },
+    });
+    assert.equal(swapped.exercises.length, 1);
+    assert.equal(swapped.exercises[0].id, seId);
+    assert.equal(swapped.exercises[0].exercise_id, second.id);
+    assert.equal(swapped.exercises[0].exercise_name_snapshot, "Swap To B");
+    assert.equal(swapped.exercises[0].tracking_type, "weight_reps");
+    assert.equal(swapped.exercises[0].sets.length, 0);
+
+    await request(`/api/workouts/sessions/${session.id}/abandon`, { method: "POST", body: {} });
+  });
+
+  test("PATCH session-exercises refuses swap when the slot already has a work set", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const first = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Swap Locked A", category: "strength", tracking_type: "weight_reps" },
+    });
+    const second = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Swap Locked B", category: "strength", tracking_type: "reps" },
+    });
+
+    const session = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Treino Swap Locked" },
+    });
+    const withEx = await request(`/api/workouts/sessions/${session.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: first.id },
+    });
+    const seId = withEx.exercises[0].id;
+
+    await request(`/api/workouts/sessions/${session.id}/sets`, {
+      method: "POST",
+      body: { session_exercise_id: seId, weight_kg: 40, reps: 8, set_role: "work" },
+    });
+
+    await assert.rejects(
+      () => request(`/api/workouts/session-exercises/${seId}`, {
+        method: "PATCH",
+        body: { exercise_id: second.id },
+      }),
+      /400.*já tem série nesse exercício/,
+    );
+
+    const still = await request(`/api/workouts/sessions/${session.id}`);
+    assert.equal(still.exercises[0].exercise_id, first.id);
+    assert.equal(still.exercises[0].exercise_name_snapshot, "Swap Locked A");
+    assert.equal(still.exercises[0].sets.length, 1);
+    assert.equal(still.exercises[0].sets[0].weight_kg, 40);
+
+    await request(`/api/workouts/sessions/${session.id}/abandon`, { method: "POST", body: {} });
+  });
+
+  test("PATCH session-exercises swap does not reassign sets from the replacement exercise", async () => {
+    const request = (path, opts) => requestJson(server.base, path, opts);
+
+    const source = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Swap Source", category: "strength", tracking_type: "reps" },
+    });
+    const replacement = await request("/api/workouts/exercises", {
+      method: "POST",
+      body: { name: "Swap Replacement", category: "strength", tracking_type: "weight_reps" },
+    });
+
+    const history = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Histórico Replacement" },
+    });
+    const historyEx = await request(`/api/workouts/sessions/${history.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: replacement.id },
+    });
+    await request(`/api/workouts/sessions/${history.id}/sets`, {
+      method: "POST",
+      body: {
+        session_exercise_id: historyEx.exercises[0].id,
+        weight_kg: 90,
+        reps: 5,
+        set_role: "work",
+      },
+    });
+    await request(`/api/workouts/sessions/${history.id}/finish`, { method: "POST", body: {} });
+
+    const live = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { kind: "freestyle", name: "Live Swap" },
+    });
+    const liveEx = await request(`/api/workouts/sessions/${live.id}/exercises`, {
+      method: "POST",
+      body: { exercise_id: source.id },
+    });
+    const seId = liveEx.exercises[0].id;
+
+    await request(`/api/workouts/sessions/${live.id}/sets`, {
+      method: "POST",
+      body: { session_exercise_id: seId, reps: 12, set_role: "warmup" },
+    });
+
+    const swapped = await request(`/api/workouts/session-exercises/${seId}`, {
+      method: "PATCH",
+      body: { exercise_id: replacement.id },
+    });
+    assert.equal(swapped.exercises[0].exercise_id, replacement.id);
+    assert.equal(swapped.exercises[0].exercise_name_snapshot, "Swap Replacement");
+    assert.equal(swapped.exercises[0].sets.length, 1);
+    assert.equal(swapped.exercises[0].sets[0].set_role, "warmup");
+    assert.equal(swapped.exercises[0].sets[0].weight_kg, null);
+    assert.equal(swapped.exercises[0].sets.some((set) => Number(set.weight_kg) === 90), false);
+    assert.equal(swapped.exercises[0].previous_sets.length >= 1, true);
+    assert.equal(swapped.exercises[0].previous_sets[0].weight_kg, 90);
+
+    await request(`/api/workouts/sessions/${live.id}/abandon`, { method: "POST", body: {} });
   });
 });
 
