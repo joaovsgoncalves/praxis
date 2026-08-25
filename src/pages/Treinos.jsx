@@ -4,12 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   ChevronRight,
-  Clock3,
   Dumbbell,
   ListChecks,
   Play,
   Plus,
-  RotateCcw,
   Scale,
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
@@ -29,12 +27,12 @@ import MacroBars from '@/components/nutrition/MacroBars';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { thumbUrl } from '@/lib/workoutV4';
 import {
   formatSeconds,
   formatSessionDuration,
-  formatWorkoutTarget,
   workoutDateLabel,
-  workoutDayShortLabel,
 } from '@/lib/workouts';
 
 const HOME_CTA_CLASS = 'h-14 min-h-14 w-full rounded-xl text-lg [&_svg]:size-5';
@@ -485,6 +483,85 @@ function FreestyleLink({ onClick, disabled }) {
   );
 }
 
+function formatScheme(exercise = {}) {
+  const sets = Number(exercise.target_sets) || 1;
+  const tracking = exercise.tracking_type || 'reps';
+  if (tracking === 'duration') {
+    const dur = exercise.target_duration_seconds ? formatSeconds(exercise.target_duration_seconds) : 'tempo';
+    return `${sets}× ${dur}`;
+  }
+  if (exercise.rep_min != null && exercise.rep_max != null) {
+    const reps = exercise.rep_min === exercise.rep_max
+      ? String(exercise.rep_min)
+      : `${exercise.rep_min}–${exercise.rep_max}`;
+    return `${sets}×${reps}`;
+  }
+  if (exercise.rep_min != null) return `${sets}×${exercise.rep_min}+`;
+  if (exercise.rep_max != null) return `${sets}×${exercise.rep_max}`;
+  return `${sets}×`;
+}
+
+function dayProgressPct(currentDay, activeSession) {
+  if (!activeSession) return 0;
+  const planned = (currentDay?.exercises || []).reduce((sum, item) => sum + (Number(item.target_sets) || 0), 0);
+  if (!planned) return 0;
+  return Math.min(100, Math.round((Number(activeSession.completed_work_sets || 0) / planned) * 100));
+}
+
+function DayProgressRing({ pct }) {
+  const size = 52;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.max(0, Math.min(100, pct)) / 100) * c;
+  return (
+    <div className="relative h-[52px] w-[52px] shrink-0" aria-hidden>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--border))" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold tabular-nums text-primary">
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+function TodayExerciseRow({ exercise }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const img = !imgFailed ? thumbUrl(exercise) : null;
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-secondary/40">
+        {img ? (
+          <img
+            src={img}
+            alt=""
+            className="h-full w-full object-cover object-center"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <Dumbbell className="h-5 w-5 text-muted-foreground" aria-hidden />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-medium leading-snug text-foreground">{exercise.exercise_name}</p>
+        <p className="mt-0.5 text-sm tabular-nums text-muted-foreground">{formatScheme(exercise)}</p>
+      </div>
+    </div>
+  );
+}
+
 function TodayWorkout({
   currentDay,
   activeSession,
@@ -514,107 +591,74 @@ function TodayWorkout({
   }
 
   const hasActiveSession = Boolean(activeSession);
-  const dayMeta = currentDay.day_type === 'rest'
-    ? 'Dia de recuperação'
-    : workoutDayShortLabel(currentDay);
+  const exercises = currentDay.exercises || [];
+  const isRest = currentDay.day_type === 'rest';
+  const pct = dayProgressPct(currentDay, activeSession);
+  const duration = currentDay.estimated_duration_minutes
+    ? `~${currentDay.estimated_duration_minutes} min`
+    : null;
+
+  const cta = hasActiveSession ? (
+    <Button type="button" className={HOME_CTA_CLASS} onClick={onContinue}>
+      <Play className="mr-2 h-5 w-5 fill-current" /> Continuar
+    </Button>
+  ) : isRest ? (
+    <Button type="button" className={HOME_CTA_CLASS} onClick={onAdvanceRest} disabled={advancingRest}>
+      <CheckCircle2 className="mr-2 h-5 w-5" />
+      {advancingRest ? 'Avançando...' : 'Concluir descanso'}
+    </Button>
+  ) : exercises.length ? (
+    <Button
+      type="button"
+      className={HOME_CTA_CLASS}
+      onClick={() => onStart(currentDay.id)}
+      disabled={starting}
+    >
+      <Play className="mr-2 h-5 w-5 fill-current" />
+      {starting ? 'Começando...' : 'Começar treino'}
+    </Button>
+  ) : (
+    <Button type="button" variant="outline" className={HOME_CTA_CLASS} onClick={onOpenProgram}>
+      <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
+    </Button>
+  );
 
   return (
-    <div className="space-y-5">
-      <Card className="overflow-hidden border-border/80 bg-card/35 shadow-none">
-        <CardContent className="p-0">
-          <div className="px-5 py-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                  {hasActiveSession ? 'Treino em andamento' : currentDay.day_type === 'rest' ? 'Hoje é descanso' : 'Treino de hoje'}
-                </p>
-                <h2 className="mt-2 text-3xl font-semibold leading-tight tracking-tight">{currentDay.name}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {hasActiveSession
-                    ? `${activeSession.completed_sets || 0} séries registradas`
-                    : dayMeta}
-                </p>
-              </div>
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-                {hasActiveSession ? <Play className="h-5 w-5 fill-current" /> : currentDay.day_type === 'rest' ? <RotateCcw className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
-              </div>
-            </div>
+    <div className={cn('space-y-5', !isRest && exercises.length ? 'pb-24' : null)}>
+      <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card/30 px-3 py-3">
+        <DayProgressRing pct={pct} />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">
+            {hasActiveSession ? 'Em andamento' : isRest ? 'Descanso' : 'Treino de hoje'}
+          </p>
+          <p className="truncate text-base font-semibold leading-tight">{currentDay.name}</p>
+        </div>
+        {duration ? (
+          <p className="shrink-0 text-xs tabular-nums text-muted-foreground">{duration}</p>
+        ) : null}
+      </div>
 
-            {currentDay.notes && !hasActiveSession ? (
-              <details className="group mt-3 rounded-xl bg-background/35 px-3 py-2">
-                <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-muted-foreground marker:content-none">
-                  <span>Nota</span>
-                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden />
-                </summary>
-                <p className="pb-1 pt-1.5 text-xs leading-relaxed text-muted-foreground">{currentDay.notes}</p>
-              </details>
-            ) : null}
+      {!isRest && exercises.length ? (
+        <div className="divide-y divide-border/50">
+          {exercises.map((exercise) => (
+            <TodayExerciseRow key={exercise.id} exercise={exercise} />
+          ))}
+        </div>
+      ) : null}
 
-            {hasActiveSession ? (
-              <Button type="button" className={`mt-5 ${HOME_CTA_CLASS}`} onClick={onContinue}>
-                <Play className="mr-2 h-5 w-5 fill-current" /> Continuar
-              </Button>
-            ) : currentDay.day_type === 'rest' ? (
-              <Button type="button" className={`mt-5 ${HOME_CTA_CLASS}`} onClick={onAdvanceRest} disabled={advancingRest}>
-                <CheckCircle2 className="mr-2 h-5 w-5" />
-                {advancingRest ? 'Avançando...' : 'Concluir descanso'}
-              </Button>
-            ) : currentDay.exercises?.length ? (
-              <div className="mt-5 flex flex-col gap-1">
-                <Button
-                  type="button"
-                  className={HOME_CTA_CLASS}
-                  onClick={() => onStart(currentDay.id)}
-                  disabled={starting}
-                >
-                  <Play className="mr-2 h-5 w-5 fill-current" />
-                  {starting ? 'Começando...' : 'Começar treino'}
-                </Button>
-                <FreestyleLink onClick={onStartFreestyle} disabled={starting} />
-              </div>
-            ) : (
-              <div className="mt-5 flex flex-col gap-1">
-                <Button type="button" variant="outline" className={HOME_CTA_CLASS} onClick={onOpenProgram}>
-                  <Plus className="mr-2 h-5 w-5" /> Adicionar exercícios
-                </Button>
-                <FreestyleLink onClick={onStartFreestyle} disabled={starting} />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {currentDay.notes && !hasActiveSession ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">{currentDay.notes}</p>
+      ) : null}
 
       <DietaHojeCard />
-
       <LastWorkoutCard session={lastSession} onOpen={onOpenLast} />
+      {!hasActiveSession ? <FreestyleLink onClick={onStartFreestyle} disabled={starting} /> : null}
 
-      {currentDay.day_type === 'training' && currentDay.exercises?.length ? (
-        <details className="group rounded-2xl border border-border/80 bg-card/35">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 marker:content-none sm:px-5">
-            <p className="text-sm font-semibold">Exercícios de hoje</p>
-            <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-              {currentDay.exercises.length}
-              <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" aria-hidden />
-            </span>
-          </summary>
-          <div className="divide-y divide-border/60 border-t border-border/70">
-            {currentDay.exercises.map((exercise, index) => (
-              <div key={exercise.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary/55 text-xs font-semibold tabular-nums text-muted-foreground">
-                  {index + 1}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{exercise.exercise_name}</p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                    <span>{formatWorkoutTarget(exercise).replace(/^(\d+) séries? · /, '$1×')}</span>
-                    <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> {formatSeconds(exercise.rest_seconds)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </details>
-      ) : null}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 px-4">
+        <div className="mx-auto max-w-lg">
+          {cta}
+        </div>
+      </div>
     </div>
   );
 }

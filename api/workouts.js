@@ -406,9 +406,13 @@ function exerciseRowsForDay(db, dayId) {
       e.name AS exercise_name,
       e.category AS exercise_category,
       e.muscle_group AS muscle_group,
+      e.target_muscle AS target_muscle,
+      e.body_part AS body_part,
       e.equipment AS equipment,
       e.tracking_type AS tracking_type,
-      e.instructions AS instructions
+      e.instructions AS instructions,
+      e.thumb_path AS thumb_path,
+      e.gif_path AS gif_path
     FROM workout_day_exercises wde
     JOIN workout_exercises e ON e.id = wde.exercise_id
     WHERE wde.workout_day_id = ?
