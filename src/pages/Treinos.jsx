@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -11,6 +12,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Scale,
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import {
@@ -312,15 +314,94 @@ export default function Treinos() {
             ) : null}
 
             {tab === 'corpo' ? (
-              <WorkoutMuscleMap
-                onNavigateToLibrary={() => setTab('biblioteca')}
-                onNavigateToProgram={() => setTab('programa')}
-              />
+              <div className="space-y-5">
+                <BodyWeightReadCard />
+                <WorkoutMuscleMap
+                  onNavigateToLibrary={() => setTab('biblioteca')}
+                  onNavigateToProgram={() => setTab('programa')}
+                />
+              </div>
             ) : null}
           </div>
         </>
       ) : null}
     </div>
+  );
+}
+
+function formatBodyWeightDate(value) {
+  if (!value) return '';
+  const iso = String(value).slice(0, 10);
+  const [year, month, day] = iso.split('-').map(Number);
+  if (!year || !month || !day) return iso;
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function BodyWeightReadCard() {
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ['nutrition', 'weight', 'list', { limit: 1 }],
+    queryFn: () => praxisApi.nutrition.weight.list({ limit: 1 }),
+    retry: 1,
+  });
+  const log = Array.isArray(logs) ? logs[0] || null : null;
+
+  if (isLoading) {
+    return (
+      <Card className="border-border/80 bg-card/35 shadow-none">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Carregando peso…</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!log) {
+    return (
+      <Card className="border-border/80 bg-card/35 shadow-none">
+        <CardContent className="flex items-center justify-between gap-3 p-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Peso</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">Peso vive em Nutrição</p>
+          </div>
+          <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full">
+            <Link to="/nutricao">Nutrição</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const kg = Number(log.weight_kg);
+  const kgLabel = Number.isFinite(kg)
+    ? kg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+    : '—';
+
+  return (
+    <Card className="border-border/80 bg-card/35 shadow-none">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Peso</p>
+            <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">
+              {kgLabel}{' '}
+              <span className="text-sm font-normal text-muted-foreground">kg</span>
+            </p>
+            {log.date ? (
+              <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                {formatBodyWeightDate(log.date)}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+            <Scale className="h-5 w-5" aria-hidden />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
