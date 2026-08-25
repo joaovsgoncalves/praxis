@@ -4,6 +4,7 @@ import { praxisApi } from "@/api/praxisClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import HeroDay from "@/components/dashboard/HeroDay";
 import NowBlock from "@/components/dashboard/NowBlock";
+import TodayPriorities from "@/components/dashboard/TodayPriorities";
 import TodayTasks from "@/components/dashboard/TodayTasks";
 import TodayHabits from "@/components/dashboard/TodayHabits";
 import WellnessWidget from "@/components/dashboard/WellnessWidget";
@@ -31,6 +32,7 @@ import TaskForm from "@/components/habits-tasks/TaskForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from "@/lib/dates";
 import { pickNowTask } from "@/lib/nowTask";
+import { pickTodayPriorities } from "@/lib/todayPriorities";
 import { isHabitDueOnDate } from "@/lib/habits";
 import { buildDragOrder } from "@/lib/taskReorder";
 import { dispatchPraxisLevelUpFromResponse } from "@/lib/praxisLevelUp";
@@ -553,6 +555,10 @@ export default function Dashboard() {
   });
 
   const nowTask = React.useMemo(() => pickNowTask(allTasks, today), [allTasks, today]);
+  const todayPriorities = React.useMemo(
+    () => pickTodayPriorities(allTasks, today),
+    [allTasks, today],
+  );
 
   const compoundHabits = React.useMemo(
     () => habits.filter((habit) => habit.kind === "compound"),
@@ -646,6 +652,10 @@ export default function Dashboard() {
           onSnoozeTomorrow={handleSnoozeTomorrow}
           onAddTask={() => setShowNewTaskForm(true)}
         />
+      </div>
+
+      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "45ms" }}>
+        <TodayPriorities priorities={todayPriorities} />
       </div>
 
       <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "70ms" }}>
