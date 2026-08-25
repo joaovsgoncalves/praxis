@@ -416,7 +416,7 @@ function DietaHojeCard() {
         <CardContent className="flex items-center justify-between gap-3 p-4">
           <p className="text-sm text-muted-foreground">Dieta na Nutrição</p>
           <Button asChild size="sm" variant="outline" className="shrink-0 rounded-full">
-            <Link to="/nutricao">Nutrição</Link>
+            <Link to="/jota-fit/nutricao">Nutrição</Link>
           </Button>
         </CardContent>
       </Card>
@@ -425,7 +425,7 @@ function DietaHojeCard() {
 
   return (
     <Link
-      to="/nutricao"
+      to="/jota-fit/nutricao"
       className="block rounded-2xl border border-border/70 bg-card/35 p-4 text-left transition-colors hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="flex items-start justify-between gap-3">

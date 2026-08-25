@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { praxisApi } from '@/api/praxisClient';
 import {
@@ -44,6 +45,8 @@ function needsOnboarding(profile) {
 }
 
 export default function Nutricao() {
+  const { pathname } = useLocation();
+  const inJotaFit = pathname.startsWith('/jota-fit');
   const [tab, setTab] = useState('diario');
   const [maisPanel, setMaisPanel] = useState('alimentos');
   const [diaryDate, setDiaryDate] = useState(null);
@@ -101,11 +104,13 @@ export default function Nutricao() {
 
   return (
     <div className="praxis-page space-y-6 pb-24">
-      <PageHero
-        kicker="Ferramentas"
-        title="Nutrição"
-        description="Loga a refeição em poucos toques — diário, rotina e peso."
-      />
+      {inJotaFit ? null : (
+        <PageHero
+          kicker="Ferramentas"
+          title="Nutrição"
+          description="Loga a refeição em poucos toques — diário, rotina e peso."
+        />
+      )}
 
       {showOnboarding ? (
         <NutritionOnboarding

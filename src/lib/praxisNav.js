@@ -9,7 +9,6 @@ import {
   Trophy,
   BarChart3,
   Settings,
-  UtensilsCrossed,
   Dumbbell,
   Wallet,
 } from "lucide-react";
@@ -29,7 +28,6 @@ export const secondaryNavItems = [
   { path: "/compras", label: "Compras", icon: ShoppingBag },
   { path: "/financas", label: "Finanças", icon: Wallet },
   { path: "/jota-fit", label: "Jota Fit", icon: Dumbbell },
-  { path: "/nutricao", label: "Nutrição", icon: UtensilsCrossed },
   // /capturas fica acessível por links diretos — fora do menu (João 2026-07-16)
   { path: "/metas", label: "Metas", icon: Target },
   { path: "/conquistas", label: "Conquistas", icon: Trophy, requiresUnlockedAchievements: true },

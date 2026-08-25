@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { Activity, Dumbbell, History, ListChecks, Play } from 'lucide-react';
+import { Activity, Dumbbell, History, ListChecks, Play, Utensils } from 'lucide-react';
 import { useWorkoutSessionActive } from '@/components/layout/AppLayout';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/jota-fit/biblioteca', label: 'Biblioteca', icon: Dumbbell },
   { to: '/jota-fit/progresso', label: 'Progresso', icon: History },
   { to: '/jota-fit/corpo', label: 'Corpo', icon: Activity },
+  { to: '/jota-fit/nutricao', label: 'Dieta', icon: Utensils },
 ];
 
 const linkClass = ({ isActive }) =>
