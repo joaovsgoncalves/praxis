@@ -406,13 +406,37 @@ function exerciseRowsForDay(db, dayId) {
       e.name AS exercise_name,
       e.category AS exercise_category,
       e.muscle_group AS muscle_group,
-      e.target_muscle AS target_muscle,
-      e.body_part AS body_part,
       e.equipment AS equipment,
       e.tracking_type AS tracking_type,
       e.instructions AS instructions,
-      e.thumb_path AS thumb_path,
-      e.gif_path AS gif_path
+      COALESCE(NULLIF(e.target_muscle, ''), (
+        SELECT c.target_muscle FROM workout_exercises c
+        WHERE c.source = 'catalog' AND c.status = 'active'
+          AND (lower(c.name) = lower(e.name) OR lower(c.name_pt) = lower(e.name))
+          AND c.target_muscle IS NOT NULL AND c.target_muscle != ''
+        LIMIT 1
+      )) AS target_muscle,
+      COALESCE(NULLIF(e.body_part, ''), (
+        SELECT c.body_part FROM workout_exercises c
+        WHERE c.source = 'catalog' AND c.status = 'active'
+          AND (lower(c.name) = lower(e.name) OR lower(c.name_pt) = lower(e.name))
+          AND c.body_part IS NOT NULL AND c.body_part != ''
+        LIMIT 1
+      )) AS body_part,
+      COALESCE(NULLIF(e.thumb_path, ''), (
+        SELECT c.thumb_path FROM workout_exercises c
+        WHERE c.source = 'catalog' AND c.status = 'active'
+          AND (lower(c.name) = lower(e.name) OR lower(c.name_pt) = lower(e.name))
+          AND c.thumb_path IS NOT NULL AND c.thumb_path != ''
+        LIMIT 1
+      )) AS thumb_path,
+      COALESCE(NULLIF(e.gif_path, ''), (
+        SELECT c.gif_path FROM workout_exercises c
+        WHERE c.source = 'catalog' AND c.status = 'active'
+          AND (lower(c.name) = lower(e.name) OR lower(c.name_pt) = lower(e.name))
+          AND c.gif_path IS NOT NULL AND c.gif_path != ''
+        LIMIT 1
+      )) AS gif_path
     FROM workout_day_exercises wde
     JOIN workout_exercises e ON e.id = wde.exercise_id
     WHERE wde.workout_day_id = ?

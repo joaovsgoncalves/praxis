@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { thumbUrl } from '@/lib/workoutV4';
+import { thumbUrl, gifUrl } from '@/lib/workoutV4';
 import {
   formatSeconds,
   formatSessionDuration,
@@ -539,7 +539,7 @@ function DayProgressRing({ pct }) {
 
 function TodayExerciseRow({ exercise }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const img = !imgFailed ? thumbUrl(exercise) : null;
+  const img = !imgFailed ? (gifUrl(exercise) || thumbUrl(exercise)) : null;
   return (
     <div className="flex items-center gap-3 py-3">
       <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-secondary/40">
@@ -547,7 +547,8 @@ function TodayExerciseRow({ exercise }) {
           <img
             src={img}
             alt=""
-            className="h-full w-full object-cover object-center"
+            loading="lazy"
+            className="h-full w-full object-contain"
             onError={() => setImgFailed(true)}
           />
         ) : (
