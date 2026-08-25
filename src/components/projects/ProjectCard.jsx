@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Pin } from 'lucide-react';
+import { ArrowRight, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -28,11 +28,9 @@ export default function ProjectCard({
   onMoveToColumn,
 }) {
   const focused = Boolean(project.focus);
-  const moveDate = formatProjectMoveDate(project.last_move_at || project.last_reviewed_at);
-  const moveNote = String(project.last_move_note || '').trim();
+  const moveDate = formatProjectMoveDate(project.last_reviewed_at || project.last_move_at);
   const slice = String(project.current_slice || '').trim();
   const nextStep = String(project.next_step || '').trim();
-  const prodUrl = String(project.prod_url || '').trim();
 
   return (
     <div
@@ -60,24 +58,28 @@ export default function ProjectCard({
     >
       <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-1 text-sm font-semibold leading-snug text-stone-100">
-            {project.name}
-          </p>
-          {project.tagline ? (
-            <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
-              {project.tagline}
-            </p>
-          ) : null}
+          <p className="line-clamp-1 text-sm font-semibold leading-snug text-stone-100">{project.name}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="h-5 border-white/10 bg-white/[0.03] px-1.5 text-[9px] font-medium text-muted-foreground">
+              {PROJECT_KIND_LABELS[project.kind] || 'Frente'}
+            </Badge>
+            {project.live ? (
+              <Badge variant="outline" className="h-5 border-emerald-400/20 bg-emerald-400/[0.06] px-1.5 text-[9px] font-medium text-emerald-300/80">
+                No ar
+              </Badge>
+            ) : null}
+          </div>
         </div>
+
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className={cn(
-            'h-9 w-9 shrink-0 rounded-full touch-manipulation',
+            'h-8 w-8 shrink-0 rounded-full touch-manipulation',
             focused
               ? 'text-domain-gold hover:text-domain-gold'
-              : 'text-muted-foreground/60 hover:text-foreground',
+              : 'text-muted-foreground/45 hover:text-foreground',
           )}
           aria-label={focused ? `Tirar ${project.name} do foco` : `Fixar ${project.name} no foco`}
           aria-pressed={focused}
@@ -86,65 +88,26 @@ export default function ProjectCard({
             onToggleFocus?.(project);
           }}
         >
-          <Pin className={cn('h-4 w-4', focused && 'fill-current')} />
+          <Pin className={cn('h-3.5 w-3.5', focused && 'fill-current')} />
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge variant="outline" className="border-white/10 bg-white/[0.03] text-[10px] font-medium text-muted-foreground">
-          {PROJECT_KIND_LABELS[project.kind] || 'Frente'}
-        </Badge>
-        {project.live ? (
-          <Badge variant="outline" className="border-emerald-400/20 bg-emerald-400/[0.06] text-[10px] font-medium text-emerald-300/80">
-            No ar
-          </Badge>
-        ) : null}
-        {focused ? (
-          <Badge className="border-transparent bg-primary/15 text-[10px] font-medium text-primary">
-            Foco
-          </Badge>
-        ) : null}
-      </div>
-
-      <div className="space-y-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/55">Agora</p>
-          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-stone-200/90">
-            {slice || 'Sem fatia definida'}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-domain-gold/70">Próximo</p>
-          <p className="mt-0.5 line-clamp-3 text-xs leading-snug text-stone-100/90">
-            {nextStep || 'Definir o próximo passo'}
-          </p>
-        </div>
-      </div>
-
-      <p className="text-[11px] leading-snug text-muted-foreground/70">
-        {moveDate || moveNote ? (
-          <>
-            {moveDate ? <span className="tabular-nums">{moveDate}</span> : null}
-            {moveDate && moveNote ? ' · ' : null}
-            {moveNote || 'revisado'}
-          </>
-        ) : (
-          'Ainda sem revisão registrada'
-        )}
-      </p>
-
-      {prodUrl ? (
-        <a
-          href={prodUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] text-primary/90 hover:text-primary"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <ExternalLink className="h-3 w-3" />
-          Abrir
-        </a>
+      {slice ? (
+        <p className="line-clamp-1 text-[11px] leading-snug text-muted-foreground/70">
+          <span className="text-muted-foreground/45">Agora:</span> {slice}
+        </p>
       ) : null}
+
+      <div className="flex items-start gap-1.5 rounded-lg bg-black/15 px-2.5 py-2">
+        <ArrowRight className="mt-0.5 h-3 w-3 shrink-0 text-domain-gold/85" />
+        <p className="line-clamp-2 text-xs font-medium leading-snug text-stone-100/90">
+          {nextStep || 'Definir o próximo passo'}
+        </p>
+      </div>
+
+      <p className="text-[10px] tabular-nums text-muted-foreground/45">
+        {moveDate ? `Atualizado ${moveDate}` : 'Ainda sem revisão'}
+      </p>
 
       {isDragDisabled ? (
         <div onClick={(event) => event.stopPropagation()}>
@@ -155,10 +118,10 @@ export default function ProjectCard({
             }}
           >
             <SelectTrigger
-              className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] text-xs"
+              className="h-9 w-full rounded-full border-white/10 bg-white/[0.025] text-[11px]"
               aria-label={`Mover ${project.name}`}
             >
-              <SelectValue placeholder="Mover para" />
+              <SelectValue placeholder="Mover" />
             </SelectTrigger>
             <SelectContent>
               {PROJECT_COLUMNS.map((column) => (

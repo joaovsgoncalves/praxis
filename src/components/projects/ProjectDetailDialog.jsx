@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  PROJECT_COLUMNS,
   PROJECT_COLUMN_LABELS,
   PROJECT_KIND_LABELS,
   formatProjectUpdateDate,
@@ -77,6 +78,7 @@ export default function ProjectDetailDialog({
 }) {
   const [form, setForm] = useState({
     kind: 'produto',
+    column: 'radar',
     live: false,
     objective: '',
     status_summary: '',
@@ -92,6 +94,7 @@ export default function ProjectDetailDialog({
     if (!project) return;
     setForm({
       kind: project.kind || 'produto',
+      column: project.column || 'radar',
       live: Boolean(project.live),
       objective: project.objective || '',
       status_summary: project.status_summary || '',
@@ -149,10 +152,10 @@ export default function ProjectDetailDialog({
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-6">
           <section className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field id="project-kind" label="Tipo">
                 <Select value={form.kind} onValueChange={(value) => setForm((prev) => ({ ...prev, kind: value }))}>
-                  <SelectTrigger id="project-kind" className="w-full border-white/10 bg-black/20 sm:w-[180px]">
+                  <SelectTrigger id="project-kind" className="w-full border-white/10 bg-black/20">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -163,10 +166,24 @@ export default function ProjectDetailDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2.5 sm:min-w-[180px]">
+
+              <Field id="project-column" label="Estado no quadro">
+                <Select value={form.column} onValueChange={(value) => setForm((prev) => ({ ...prev, column: value }))}>
+                  <SelectTrigger id="project-column" className="w-full border-white/10 bg-black/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_COLUMNS.map((column) => (
+                      <SelectItem key={column} value={column}>{PROJECT_COLUMN_LABELS[column]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2.5">
                 <div>
                   <p className="text-xs font-medium text-stone-200">No ar</p>
-                  <p className="text-[10px] text-muted-foreground/60">Estado do produto, não coluna.</p>
+                  <p className="text-[10px] text-muted-foreground/60">Independente do quadro.</p>
                 </div>
                 <Switch checked={form.live} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, live: checked }))} />
               </div>

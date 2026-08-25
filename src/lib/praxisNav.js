@@ -25,7 +25,7 @@ export const primaryNavItems = [
 /** Ferramentas na aba lateral (sidebar / menu hambúrguer) — sem página hub */
 export const secondaryNavItems = [
   { path: "/jota-fit", label: "Jota Fit", icon: Dumbbell },
-  { path: "/projetos", label: "Projetos", icon: Layers },
+  { path: "/projetos", label: "Continuidade", icon: Layers },
   { path: "/ideias", label: "Ideias", icon: Lightbulb },
   { path: "/metas", label: "Metas", icon: Target },
   { path: "/financas", label: "Finanças", icon: Wallet },

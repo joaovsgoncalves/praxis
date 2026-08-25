@@ -108,3 +108,17 @@ Tarefa bloqueada por evento externo não deve ocupar o Top 3 como se fosse execu
 ## Critério de sucesso
 
 A tela está funcionando quando João consegue abrir `/projetos` depois de horas ou dias longe de uma frente e retomar sem perguntar “onde eu parei?”.
+
+## UX pass — 2026-08-25
+
+Objetivo: a tela precisa responder em poucos segundos duas perguntas diferentes sem misturá-las: **o que fazer agora?** e **onde cada frente ficou?**
+
+Decisões aplicadas:
+- A experiência passa a se chamar **Continuidade**; a rota `/projetos` permanece por compatibilidade.
+- **Foco agora** ganha hierarquia própria e mostra só a ação mais importante das até 2 frentes fixadas pelo João.
+- O quadro vira **Mapa das frentes**: serve para localização de estado, não para contar a história inteira.
+- Cards do quadro foram podados para: nome, tipo, `No ar` quando aplicável, fatia atual em uma linha, próximo passo em até duas linhas e data de revisão.
+- Tagline, texto redundante de coluna, badge `Foco` e link de produção saem do card para reduzir carga visual.
+- Colunas vazias ficam escondidas no estado normal. Durante drag no desktop, todas reaparecem para preservar a possibilidade de mover para uma coluna vazia. No mobile, o seletor de estado continua disponível no card.
+- O drawer agora também permite alterar explicitamente o estado da frente no quadro, então coluna vazia escondida nunca bloqueia operação.
+- Regra de UX: o card deve ser entendido em aproximadamente 3 segundos; contexto completo fica no drawer.
