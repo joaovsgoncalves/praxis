@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { praxisApi } from '@/api/praxisClient';
 import {
   Dumbbell,
-  ExternalLink,
   Flame,
   Layers,
   ListOrdered,
@@ -22,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   aliasMuscle,
-  MEDIA_ATTRIBUTION,
+  gifUrl,
   MUSCLE_LABEL_PT,
   thumbUrl,
   format1rm,
@@ -33,7 +32,7 @@ import {
   TRACKING_LABELS,
   WORKOUT_CATEGORY_LABELS,
 } from '@/lib/workouts';
-import { cn } from '@/lib/utils';
+import ExerciseMedia from './ExerciseMedia';
 
 export const BODY_PART_LABEL_PT = {
   chest: 'Peitoral',
@@ -120,8 +119,6 @@ export default function ExerciseDetailSheet({
   canAddToDay = false,
   currentDayName = null,
 }) {
-  const [imgError, setImgError] = useState(false);
-
   const { data: stats } = useQuery({
     queryKey: ['workouts', 'exercises', exercise?.id, 'stats'],
     queryFn: () => praxisApi.workouts.exercises.stats(exercise.id),
@@ -131,7 +128,7 @@ export default function ExerciseDetailSheet({
 
   if (!exercise) return null;
 
-  const imageUrl = !imgError ? thumbUrl(exercise) : null;
+  const hasMedia = Boolean(gifUrl(exercise) || thumbUrl(exercise));
   const isCatalog = exercise.source === 'catalog' || (!exercise.is_custom && exercise.catalog_external_id);
   const targetMuscleDisplay =
     formatMuscleName(exercise.target_muscle) ||
@@ -146,22 +143,41 @@ export default function ExerciseDetailSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1.25rem)] max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-0 gap-0 border border-border/80 bg-background/98 shadow-2xl">
-        {/* Sticky Header */}
-        <div className="sticky top-0 z-10 border-b border-border/70 bg-background/95 px-5 pb-3.5 pt-5 backdrop-blur">
+      <DialogContent className="w-[calc(100%-1.25rem)] max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-0 gap-0 border border-border/80 bg-background/98 shadow-2xl [&>button]:z-20 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1.5">
+        {hasMedia ? (
+          <ExerciseMedia
+            exercise={exercise}
+            variant="encyclopedia"
+            className="border-b border-border/70"
+          />
+        ) : (
+          <div className="flex min-h-[200px] flex-col items-center justify-center gap-2.5 border-b border-border/70 bg-secondary/20 p-8 text-center text-muted-foreground">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border/70 bg-card/40 text-primary/80">
+              <Dumbbell className="h-7 w-7" aria-hidden />
+            </div>
+            <span className="text-xs font-medium">Exercício sem prévia de mídia</span>
+          </div>
+        )}
+
+        <div className="border-b border-border/70 px-5 pb-3.5 pt-4">
           <DialogHeader className="pr-7 text-left">
-            <div className="flex flex-wrap items-center gap-1.5 pb-1">
-              <Badge
-                variant="outline"
-                className={cn(
-                  'text-[10px] uppercase tracking-wider font-semibold',
-                  isCatalog
-                    ? 'border-primary/40 bg-primary/10 text-primary'
-                    : 'border-border bg-secondary/50 text-muted-foreground',
-                )}
-              >
-                {isCatalog ? 'Catálogo' : 'Personalizado'}
-              </Badge>
+            <DialogTitle className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              {displayExerciseName(exercise)}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground/90">{targetMuscleDisplay}</span>
+              {' · '}
+              {equipmentDisplay}
+            </DialogDescription>
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {!isCatalog ? (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase tracking-wider font-semibold border-primary/40 bg-primary/10 text-primary"
+                >
+                  Personalizado
+                </Badge>
+              ) : null}
               {exercise.category ? (
                 <Badge variant="secondary" className="text-[10px] font-medium">
                   {WORKOUT_CATEGORY_LABELS[exercise.category] || exercise.category}
@@ -173,50 +189,11 @@ export default function ExerciseDetailSheet({
                 </Badge>
               ) : null}
             </div>
-            <DialogTitle className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              {displayExerciseName(exercise)}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              {targetMuscleDisplay} · {equipmentDisplay}
-            </DialogDescription>
           </DialogHeader>
         </div>
 
         {/* Scrollable Content Body */}
         <div className="space-y-5 p-5">
-          {/* Media Frame */}
-          <div className="group relative overflow-hidden rounded-2xl border border-border/70 bg-secondary/20 flex flex-col items-center justify-center min-h-[200px] sm:min-h-[230px]">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt={displayExerciseName(exercise)}
-                loading="lazy"
-                onError={() => setImgError(true)}
-                className="max-h-56 sm:max-h-64 w-auto object-contain p-3 transition-transform duration-300 group-hover:scale-105"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground gap-2.5">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border/70 bg-card/40 text-primary/80">
-                  <Dumbbell className="h-7 w-7" aria-hidden />
-                </div>
-                <span className="text-xs font-medium">Exercício sem prévia de mídia</span>
-              </div>
-            )}
-
-            {/* Attribution Footer */}
-            <div className="w-full border-t border-border/60 bg-background/60 px-3.5 py-1.5 text-center">
-              <a
-                href="https://gymvisual.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/80 transition-colors hover:text-primary"
-              >
-                <span>{MEDIA_ATTRIBUTION}</span>
-                <ExternalLink className="h-2.5 w-2.5" aria-hidden />
-              </a>
-            </div>
-          </div>
-
           {/* Anatomy & Target Grid */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             <div className="rounded-xl border border-border/70 bg-card/30 p-3">

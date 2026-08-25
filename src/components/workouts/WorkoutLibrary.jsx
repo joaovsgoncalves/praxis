@@ -17,7 +17,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { thumbUrl, displayExerciseName } from '@/lib/workoutV4';
 import ExerciseDetailSheet, {
-  formatBodyPart,
   formatEquipment,
   formatMuscleName,
 } from './ExerciseDetailSheet';
@@ -67,7 +66,6 @@ function ExerciseRowItem({ exercise, onSelect }) {
     exercise.target_muscle ||
     exercise.muscle_group ||
     'Geral';
-  const bodyPart = formatBodyPart(exercise.body_part);
   const equipment = formatEquipment(exercise.equipment || exercise.equipment_key) || exercise.equipment || 'Livre';
 
   return (
@@ -75,13 +73,12 @@ function ExerciseRowItem({ exercise, onSelect }) {
       type="button"
       onClick={() => onSelect(exercise)}
       className={cn(
-        'group flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/35 p-3 text-left transition-all',
+        'group flex w-full items-center gap-3.5 rounded-2xl border border-border/70 bg-card/35 p-3 text-left transition-all',
         'hover:border-primary/40 hover:bg-primary/5 active:scale-[0.99]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
       )}
     >
-      {/* Thumbnail */}
-      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-secondary/30 sm:h-16 sm:w-16">
+      <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-secondary/30">
         {img ? (
           <img
             src={img}
@@ -91,14 +88,14 @@ function ExerciseRowItem({ exercise, onSelect }) {
             className="h-full w-full object-contain p-1 transition-transform duration-200 group-hover:scale-105"
           />
         ) : (
-          <Dumbbell className="h-6 w-6 text-muted-foreground/60 transition-transform duration-200 group-hover:scale-110 group-hover:text-primary" aria-hidden />
+          <Dumbbell className="h-7 w-7 text-muted-foreground/60 transition-transform duration-200 group-hover:scale-110 group-hover:text-primary" aria-hidden />
         )}
       </div>
 
       {/* Details */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+          <p className="truncate text-base font-semibold leading-snug tracking-tight text-foreground group-hover:text-primary transition-colors">
             {displayExerciseName(exercise)}
           </p>
           {!isCatalog ? (
@@ -108,21 +105,15 @@ function ExerciseRowItem({ exercise, onSelect }) {
           ) : null}
         </div>
 
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground/80">{targetMuscle}</span>
-          {bodyPart ? (
-            <>
-              <span className="text-muted-foreground/40" aria-hidden>·</span>
-              <span>{bodyPart}</span>
-            </>
-          ) : null}
+        <p className="mt-1 truncate text-sm text-muted-foreground">
+          <span className="font-medium text-foreground/85">{targetMuscle}</span>
           {equipment ? (
             <>
-              <span className="text-muted-foreground/40" aria-hidden>·</span>
-              <span className="truncate max-w-[120px]">{equipment}</span>
+              <span className="text-muted-foreground/40" aria-hidden> · </span>
+              <span>{equipment}</span>
             </>
           ) : null}
-        </div>
+        </p>
       </div>
 
       {/* Action indicator */}
@@ -386,10 +377,10 @@ export default function WorkoutLibrary({
               key={item}
               className="flex items-center gap-3 rounded-2xl border border-border/40 bg-card/20 p-3"
             >
-              <div className="h-14 w-14 sm:h-16 sm:w-16 animate-pulse rounded-xl bg-secondary/40 shrink-0" />
+              <div className="h-[72px] w-[72px] animate-pulse rounded-xl bg-secondary/40 shrink-0" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-secondary/50" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-secondary/30" />
+                <div className="h-5 w-3/4 animate-pulse rounded bg-secondary/50" />
+                <div className="h-3.5 w-1/2 animate-pulse rounded bg-secondary/30" />
               </div>
             </div>
           ))}

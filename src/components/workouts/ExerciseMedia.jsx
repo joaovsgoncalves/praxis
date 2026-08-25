@@ -50,6 +50,7 @@ export function setStoredMediaMode(mode) {
  * - Error fallback from GIF to thumbnail, and from thumbnail to placeholder
  * - Discrete Gym visual attribution line
  * - Clean null state for custom exercises without media
+ * - variant="encyclopedia": always-full GIF, no mini toggle, no session mediaMode write
  */
 export default function ExerciseMedia({
   exercise,
@@ -58,9 +59,13 @@ export default function ExerciseMedia({
   mode: controlledMode,
   onModeChange,
   showAttribution = true,
+  variant = "session",
 }) {
-  const [internalMode, setInternalMode] = useState(() => defaultMode || getStoredMediaMode());
-  const mode = controlledMode || internalMode;
+  const isEncyclopedia = variant === "encyclopedia";
+  const [internalMode, setInternalMode] = useState(() =>
+    isEncyclopedia ? "full" : (defaultMode || getStoredMediaMode())
+  );
+  const mode = isEncyclopedia ? "full" : (controlledMode || internalMode);
 
   const [isPaused, setIsPaused] = useState(false);
   const [gifError, setGifError] = useState(false);
@@ -108,6 +113,7 @@ export default function ExerciseMedia({
   }, [exerciseKey]);
 
   const handleToggleMode = () => {
+    if (isEncyclopedia) return;
     const nextMode = mode === "full" ? "mini" : "full";
     if (!controlledMode) {
       setInternalMode(nextMode);
@@ -150,9 +156,9 @@ export default function ExerciseMedia({
   const hasError = (isDisplayingGif && gifError && thumbError) || (!activeSrc);
 
   // ---------------------------------------------------------------------------
-  // Mini / Collapsed Mode
+  // Mini / Collapsed Mode (session only — encyclopedia stays full)
   // ---------------------------------------------------------------------------
-  if (mode === "mini") {
+  if (mode === "mini" && !isEncyclopedia) {
     return (
       <div
         className={cn(
@@ -215,66 +221,74 @@ export default function ExerciseMedia({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border/75 bg-card/45 shadow-sm transition-all",
+        "overflow-hidden bg-card/45 shadow-sm transition-all",
+        isEncyclopedia
+          ? "rounded-none border-0"
+          : "rounded-xl border border-border/75",
         className
       )}
     >
-      {/* Media Header Controls */}
-      <div className="flex items-center justify-between border-b border-border/60 bg-background/50 px-3 py-1.5">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              "h-2 w-2 rounded-full",
-              isDisplayingGif && !isPaused ? "bg-emerald-500 animate-pulse" : "bg-primary/70"
-            )}
-            aria-hidden
-          />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {isDisplayingGif ? (isPaused ? "GIF Pausado" : "Execução") : "Prévia"}
-          </span>
-        </div>
+      {/* Media Header Controls — session only */}
+      {isEncyclopedia ? null : (
+        <div className="flex items-center justify-between border-b border-border/60 bg-background/50 px-3 py-1.5">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                isDisplayingGif && !isPaused ? "bg-emerald-500 animate-pulse" : "bg-primary/70"
+              )}
+              aria-hidden
+            />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {isDisplayingGif ? (isPaused ? "GIF Pausado" : "Execução") : "Prévia"}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-1">
-          {fullGifUrl && (
+          <div className="flex items-center gap-1">
+            {fullGifUrl && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleTogglePause}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                aria-label={isPaused ? "Reproduzir GIF animado" : "Pausar animação"}
+              >
+                {isPaused ? (
+                  <>
+                    <Play className="mr-1 h-3 w-3 text-primary" />
+                    <span>Play</span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="mr-1 h-3 w-3" />
+                    <span>Pausar</span>
+                  </>
+                )}
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={handleTogglePause}
+              onClick={handleToggleMode}
               className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              aria-label={isPaused ? "Reproduzir GIF animado" : "Pausar animação"}
+              aria-label="Minimizar demonstração"
             >
-              {isPaused ? (
-                <>
-                  <Play className="mr-1 h-3 w-3 text-primary" />
-                  <span>Play</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="mr-1 h-3 w-3" />
-                  <span>Pausar</span>
-                </>
-              )}
+              <Minimize2 className="mr-1 h-3 w-3" />
+              <span>Mini</span>
             </Button>
-          )}
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleMode}
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-            aria-label="Minimizar demonstração"
-          >
-            <Minimize2 className="mr-1 h-3 w-3" />
-            <span>Mini</span>
-          </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Media Frame */}
       <div
-        className="relative flex min-h-[190px] sm:min-h-[220px] items-center justify-center bg-black/40 p-2 select-none cursor-pointer"
+        className={cn(
+          "relative flex items-center justify-center bg-black/40 p-2 select-none",
+          isEncyclopedia ? "min-h-[260px] sm:min-h-[300px] cursor-pointer" : "min-h-[190px] sm:min-h-[220px] cursor-pointer",
+        )}
         onClick={fullGifUrl ? handleTogglePause : undefined}
         title={fullGifUrl ? (isPaused ? "Clique para reproduzir" : "Clique para pausar") : undefined}
         role={fullGifUrl ? "button" : undefined}
@@ -307,7 +321,8 @@ export default function ExerciseMedia({
                 }
               }}
               className={cn(
-                "max-h-52 sm:max-h-60 w-auto object-contain transition-opacity duration-200",
+                "w-auto object-contain transition-opacity duration-200",
+                isEncyclopedia ? "max-h-72 sm:max-h-80" : "max-h-52 sm:max-h-60",
                 isLoading ? "opacity-0" : "opacity-100"
               )}
             />
