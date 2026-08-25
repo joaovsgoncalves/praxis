@@ -2,7 +2,9 @@ import { Router } from 'express';
 import {
   applyProjectPatch,
   createProject,
+  createProjectUpdate,
   getProject,
+  listProjectUpdates,
   listProjects,
 } from '../projects.js';
 
@@ -21,6 +23,22 @@ export function createProjectsRouter({ db }) {
 
   router.get('/', (_req, res) => {
     res.json(listProjects(db));
+  });
+
+  router.get('/:id/updates', (req, res) => {
+    const rows = listProjectUpdates(db, req.params.id, req.query.limit);
+    if (!rows) return res.status(404).json({ error: 'Not found' });
+    res.json(rows);
+  });
+
+  router.post('/:id/updates', (req, res) => {
+    try {
+      const row = createProjectUpdate(db, req.params.id, req.body || {});
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      res.status(201).json(row);
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.get('/:id', (req, res) => {

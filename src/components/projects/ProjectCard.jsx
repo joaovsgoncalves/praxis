@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, ExternalLink } from 'lucide-react';
+import { ExternalLink, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import {
   PROJECT_COLUMNS,
   PROJECT_COLUMN_LABELS,
+  PROJECT_KIND_LABELS,
   formatProjectMoveDate,
 } from '@/lib/projects';
 
@@ -27,9 +28,10 @@ export default function ProjectCard({
   onMoveToColumn,
 }) {
   const focused = Boolean(project.focus);
-  const moveDate = formatProjectMoveDate(project.last_move_at);
+  const moveDate = formatProjectMoveDate(project.last_move_at || project.last_reviewed_at);
   const moveNote = String(project.last_move_note || '').trim();
   const slice = String(project.current_slice || '').trim();
+  const nextStep = String(project.next_step || '').trim();
   const prodUrl = String(project.prod_url || '').trim();
 
   return (
@@ -48,7 +50,7 @@ export default function ProjectCard({
         }
       }}
       className={cn(
-        'group relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-xl border px-3 py-3 text-left transition-all select-none',
+        'group relative flex min-w-0 flex-col gap-2.5 overflow-hidden rounded-xl border px-3 py-3 text-left transition-all select-none',
         snapshot?.isDragging
           ? 'z-50 border-domain-gold/40 bg-card shadow-2xl shadow-black/80 ring-1 ring-domain-gold/30'
           : 'border-white/[0.06] bg-[#161a23]/90 hover:border-white/[0.12] hover:bg-[#1c212c]',
@@ -56,13 +58,13 @@ export default function ProjectCard({
         isDragDisabled && 'cursor-pointer',
       )}
     >
-      <div className="flex items-start gap-2 min-w-0">
+      <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-snug text-stone-100 line-clamp-1">
+          <p className="line-clamp-1 text-sm font-semibold leading-snug text-stone-100">
             {project.name}
           </p>
           {project.tagline ? (
-            <p className="mt-0.5 text-xs leading-snug text-muted-foreground line-clamp-2">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
               {project.tagline}
             </p>
           ) : null}
@@ -77,7 +79,7 @@ export default function ProjectCard({
               ? 'text-domain-gold hover:text-domain-gold'
               : 'text-muted-foreground/60 hover:text-foreground',
           )}
-          aria-label={focused ? `Tirar ${project.name} do foco` : `Pin ${project.name} no foco`}
+          aria-label={focused ? `Tirar ${project.name} do foco` : `Fixar ${project.name} no foco`}
           aria-pressed={focused}
           onClick={(event) => {
             event.stopPropagation();
@@ -89,12 +91,14 @@ export default function ProjectCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <Badge
-          variant="outline"
-          className="border-white/10 bg-white/[0.03] text-[10px] font-medium text-muted-foreground"
-        >
-          {PROJECT_COLUMN_LABELS[currentColumn] || currentColumn}
+        <Badge variant="outline" className="border-white/10 bg-white/[0.03] text-[10px] font-medium text-muted-foreground">
+          {PROJECT_KIND_LABELS[project.kind] || 'Frente'}
         </Badge>
+        {project.live ? (
+          <Badge variant="outline" className="border-emerald-400/20 bg-emerald-400/[0.06] text-[10px] font-medium text-emerald-300/80">
+            No ar
+          </Badge>
+        ) : null}
         {focused ? (
           <Badge className="border-transparent bg-primary/15 text-[10px] font-medium text-primary">
             Foco
@@ -102,23 +106,30 @@ export default function ProjectCard({
         ) : null}
       </div>
 
-      {slice ? (
-        <p className="text-xs leading-snug text-stone-200/90 line-clamp-2">
-          {slice}
-        </p>
-      ) : (
-        <p className="text-xs leading-snug text-muted-foreground/55">Sem fatia agora</p>
-      )}
+      <div className="space-y-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/55">Agora</p>
+          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-stone-200/90">
+            {slice || 'Sem fatia definida'}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-domain-gold/70">Próximo</p>
+          <p className="mt-0.5 line-clamp-3 text-xs leading-snug text-stone-100/90">
+            {nextStep || 'Definir o próximo passo'}
+          </p>
+        </div>
+      </div>
 
-      <p className="text-[11px] leading-snug text-muted-foreground/80">
+      <p className="text-[11px] leading-snug text-muted-foreground/70">
         {moveDate || moveNote ? (
           <>
             {moveDate ? <span className="tabular-nums">{moveDate}</span> : null}
             {moveDate && moveNote ? ' · ' : null}
-            {moveNote || null}
+            {moveNote || 'revisado'}
           </>
         ) : (
-          'Ainda sem movimento'
+          'Ainda sem revisão registrada'
         )}
       </p>
 
@@ -131,7 +142,7 @@ export default function ProjectCard({
           onClick={(event) => event.stopPropagation()}
         >
           <ExternalLink className="h-3 w-3" />
-          Abrir no ar
+          Abrir
         </a>
       ) : null}
 

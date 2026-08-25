@@ -1,57 +1,110 @@
-# Praxis — Projetos (v1)
+# Praxis — Projetos v2: continuidade
 
-Kanban de **produtos vivos**, não de tarefa do dia.
+Data: 2026-08-25
 
-Pedido: `shared/coordenação/outbox/2026-08-25-seneca-to-ana-praxis-kanban-projetos.md`.
-Decisão João 2026-08-25: **Foco não é coluna**. É pin (máx. 2). Colunas: Radar / Andando / No ar / Parado.
+## Problema que esta tela resolve
 
-## Promessa (10s)
+A aba não é portfólio, roadmap nem lista de tarefas. Ela existe para responder em poucos segundos:
 
-1. Quais produtos existem
-2. Qual está na mesa (pin Foco) e qual tem fatia em curso (Andando)
-3. Qual está parado de propósito
-4. Qual fatia cada um carrega agora
+1. Onde cada frente ficou?
+2. O que está na mesa agora?
+3. Qual é o próximo passo executável?
+4. Existe algum bloqueio real?
+5. O que já avançou ao longo do tempo?
 
-## Entidade
+A regra central é: **projeto guarda continuidade; tarefa guarda execução do dia**.
 
-Tabela `projects`. Proibido reusar `tasks` ou `goals`. Sem tabela `project_slices` na v1.
+## Escopo canônico
 
-| Campo | Uso |
-|-------|-----|
-| slug, name | identidade |
-| tagline | o que o produto faz no mundo (1 linha) |
-| column | `radar` \| `andando` \| `no_ar` \| `parado` |
-| focus | 0/1, no máximo 2 linhas com 1 |
-| current_slice | fatia atual, texto curto |
-| last_move_at, last_move_note | último movimento humano |
-| notes, shipped_note, blocked_note | detalhe do card |
-| prod_url, repo_path | opcional |
-| sort_order | ordem estável |
+A tabela `projects` pode representar frentes de tipos diferentes:
 
-## Seed (criar estes 4, não inventar outros)
+- `produto`: Praxis, CatálogoZap, CarteiraZap, EncarteZap, site pessoal;
+- `cliente`: Animália;
+- `trabalho`: RCA, GoFluxo;
+- `estudo`: Faculdade.
 
-| slug | coluna | foco | fatia | URL |
-|------|--------|------|-------|-----|
-| praxis | andando | sim | Jota Fit sessão academia | https://dopraxis.vercel.app |
-| catalogozap | radar | não | (vazio) | https://catalogo-zap.vercel.app |
-| encartezap | parado | não | pausa consciente | (vazio ok) |
-| carteirazap | radar | não | (vazio) | (vazio ok) |
+Jota Fit não vira card separado enquanto for a experiência de treino canônica dentro da Praxis.
 
-Animalia, GoFluxo, site pessoal: fora.
+## Kanban
 
-## UI
+Colunas:
 
-- Rota `/projetos`, secondary nav depois de Jota Fit / antes de Metas
-- Copy: **Projetos**. Sem portfolio, roadmap, OKR
-- Quadro no padrão real de `TaskBoard`: scroll horizontal no mobile, drag só desktop (`lg+`). Mobile move por seletor no card
-- Pin Foco no card. 3º pin: toast, não grava. API 409 `FOCUS_LIMIT`
-- Clique abre detalhe: notas da fatia, o que está no ar, o que está travado
-- Sem card no Hoje. Sem bottom nav. Sem Image2
+- `andando`: existe uma fatia real em curso;
+- `radar`: existe, mas não é prioridade de execução agora;
+- `aguardando`: depende de algo externo ou de uma decisão;
+- `pausado`: pausa consciente.
 
-## Fora da v1
+`No ar` não é coluna. É propriedade (`live`) porque uma frente pode estar no ar e continuar sendo desenvolvida.
 
-Git scrape, barras de commit, webhook do cron Sêneca, substituir Metas/Quadro, hub Mais.
+`Foco` continua sendo pin independente, máximo 2. **Só João muda foco e coluna.**
 
-## Done
+## Estado de continuidade
 
-`/projetos` no ar em `dopraxis.vercel.app` com 4 cards, drag persiste, pin máx. 2, testes API, ship `main`.
+Cada frente guarda:
+
+- `objective`: por que existe;
+- `status_summary`: onde ficou de verdade;
+- `current_slice`: fatia em curso;
+- `next_step`: uma ação executável;
+- `blocked_note`: impedimento real, se houver;
+- `shipped_note`: capacidades/entregas já existentes;
+- `last_reviewed_at`: última revisão de continuidade;
+- `last_move_at` / `last_move_note`: mudança de coluna;
+- `kind` e `live`.
+
+O card mostra principalmente **Agora** e **Próximo**. O detalhe abre em drawer lateral.
+
+## Linha do tempo
+
+Tabela `project_updates` registra movimentos importantes sem sobrescrever a história.
+
+Campos:
+
+- `project_id`
+- `date`
+- `summary`
+- `source`
+- `created_by`
+- `created_at`
+
+Mudança de coluna registra evento automaticamente. João pode registrar avanço manual. Sêneca pode registrar avanço pela ponte estreita quando houver evidência real.
+
+## Sêneca
+
+Sêneca é o mantenedor de continuidade, não o executor geral.
+
+Ele pode:
+
+- ler `projects` e tarefas da Praxis;
+- ler sinais de Git e evidências específicas de GoFluxo/Animália;
+- atualizar `status_summary`, `current_slice`, `next_step`, `blocked_note` e `last_reviewed_at`;
+- adicionar `project_updates` quando houve avanço real;
+- escolher até 3 ações executáveis para o dia.
+
+Ele não pode:
+
+- mudar `focus` ou `column`;
+- mudar `live`, `kind` ou `objective`;
+- criar tarefas automaticamente;
+- executar CRM, campanha, deploy, código, dinheiro ou ação comercial como parte do cron de continuidade.
+
+A ponte permitida é `/root/.hermes/scripts/seneca-praxis-project-sync.py`, que rejeita campos reservados.
+
+O contexto read-only é coletado por `/root/.hermes/scripts/seneca-continuity-context.py`.
+
+## Prioridade diária
+
+O cron do Sêneca escolhe ações executáveis, não projetos abstratos. Ordem de desempate:
+
+1. obrigação com prazo/horário ou necessidade básica que não pode escorregar;
+2. RCA que protege renda, cliente ou fechamento;
+3. faculdade com prazo real;
+4. entrega de cliente/GoFluxo já assumida;
+5. produto próprio em andamento;
+6. exploração/feature nova.
+
+Tarefa bloqueada por evento externo não deve ocupar o Top 3 como se fosse executável.
+
+## Critério de sucesso
+
+A tela está funcionando quando João consegue abrir `/projetos` depois de horas ou dias longe de uma frente e retomar sem perguntar “onde eu parei?”.

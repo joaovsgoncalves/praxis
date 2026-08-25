@@ -8,5 +8,12 @@ export const projectsApiModule = (request) => ({
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    listUpdates: (id, limit = 40) =>
+      request(`/api/projects/${encodeURIComponent(id)}/updates?limit=${encodeURIComponent(limit)}`),
+    addUpdate: (id, data) =>
+      request(`/api/projects/${encodeURIComponent(id)}/updates`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 });

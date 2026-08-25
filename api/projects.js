@@ -1,37 +1,38 @@
-/** Projetos — produtos vivos (não tarefa do dia). */
+/** Projetos — memória operacional das frentes do João. */
 
 import { randomUUID } from 'crypto';
 
-export const PROJECT_COLUMNS = ['radar', 'andando', 'no_ar', 'parado'];
+export const PROJECT_COLUMNS = ['andando', 'radar', 'aguardando', 'pausado'];
+export const PROJECT_KINDS = ['produto', 'cliente', 'trabalho', 'estudo'];
 export const FOCUS_LIMIT = 2;
 
 export const PROJECT_COLUMN_LABELS = {
-  radar: 'Radar',
   andando: 'Andando',
-  no_ar: 'No ar',
-  parado: 'Parado',
+  radar: 'Radar',
+  aguardando: 'Aguardando',
+  pausado: 'Pausado',
 };
 
 const COLUMN_MOVE_NOTES = {
-  radar: 'Foi pro radar',
-  andando: 'Entrou em andando',
-  no_ar: 'Foi pro ar',
-  parado: 'Pausou de propósito',
+  andando: 'Voltou para a mesa',
+  radar: 'Foi para o radar',
+  aguardando: 'Ficou aguardando',
+  pausado: 'Pausa consciente',
 };
 
 const SEED_PROJECTS = [
   {
     slug: 'praxis',
     name: 'Praxis',
-    tagline: 'O app do dia: hábitos, tarefas e treino.',
+    tagline: 'O app do dia: hábitos, tarefas, treino e continuidade.',
+    kind: 'produto',
     column: 'andando',
     focus: 1,
-    current_slice: 'Jota Fit sessão academia',
-    last_move_at: '',
-    last_move_note: '',
-    notes: '',
-    shipped_note: '',
-    blocked_note: '',
+    live: 1,
+    objective: 'Ser o cockpit simples do dia a dia do João, sem virar uma lista infinita de coisas.',
+    status_summary: 'Produto ativo e em evolução contínua para uso próprio.',
+    current_slice: 'Jota Fit + continuidade das frentes',
+    next_step: 'Usar a nova visão de Projetos no fluxo real e corrigir o que atrapalhar a retomada.',
     prod_url: 'https://dopraxis.vercel.app',
     repo_path: 'apps/praxis',
     sort_order: 1,
@@ -39,55 +40,144 @@ const SEED_PROJECTS = [
   {
     slug: 'catalogozap',
     name: 'CatálogoZap',
-    tagline: 'Catálogo no WhatsApp pra vender na farmácia.',
+    tagline: 'Catálogo no WhatsApp para vender na farmácia.',
+    kind: 'produto',
     column: 'radar',
     focus: 0,
+    live: 1,
+    objective: 'Simplificar catálogo, proposta e pedido do RCA com uma experiência rápida pelo WhatsApp.',
+    status_summary: 'Produto funcional e em uso, com melhorias recentes no checkout e histórico.',
     current_slice: '',
-    last_move_at: '',
-    last_move_note: '',
-    notes: '',
-    shipped_note: '',
-    blocked_note: '',
+    next_step: 'Validar o fluxo real em campo antes de abrir nova frente de produto.',
     prod_url: 'https://catalogo-zap.vercel.app',
     repo_path: 'apps/catalogozap',
     sort_order: 2,
   },
   {
-    slug: 'encartezap',
-    name: 'EncarteZap',
-    tagline: 'Encarte da farmácia no Zap do cliente.',
-    column: 'parado',
+    slug: 'carteirazap',
+    name: 'CarteiraZap',
+    tagline: 'CRM operacional do RCA no WhatsApp.',
+    kind: 'produto',
+    column: 'andando',
     focus: 0,
-    current_slice: 'pausa consciente',
-    last_move_at: '',
-    last_move_note: '',
-    notes: '',
-    shipped_note: '',
-    blocked_note: '',
+    live: 0,
+    objective: 'Dar ao RCA uma visão simples de clientes, positivação, follow-up e ações comerciais.',
+    status_summary: 'Projeto em retomada; estrutura antiga ainda precisa convergir para o padrão do CatálogoZap.',
+    current_slice: 'Auditoria e simplificação das abas',
+    next_step: 'Auditar Clientes contra os dados reais e definir o modelo canônico antes de refatorar o restante.',
     prod_url: '',
-    repo_path: 'apps/encartezap',
+    repo_path: 'apps/carteirazap',
     sort_order: 3,
   },
   {
-    slug: 'carteirazap',
-    name: 'CarteiraZap',
-    tagline: 'CRM do RCA no WhatsApp.',
+    slug: 'encartezap',
+    name: 'EncarteZap',
+    tagline: 'Encarte da farmácia no WhatsApp do cliente.',
+    kind: 'produto',
+    column: 'pausado',
+    focus: 0,
+    live: 1,
+    objective: 'Permitir que a farmácia publique e distribua ofertas com o mínimo de operação manual.',
+    status_summary: 'Produto existente, pausado de propósito enquanto outras frentes têm mais alavancagem.',
+    current_slice: 'Pausa consciente',
+    next_step: 'Retomar apenas com hipótese comercial ou validação real de lojista.',
+    prod_url: '',
+    repo_path: 'apps/encartezap',
+    sort_order: 4,
+  },
+  {
+    slug: 'site-pessoal',
+    name: 'Site pessoal',
+    tagline: 'Hub vivo do que João vende, constrói e pratica.',
+    kind: 'produto',
     column: 'radar',
     focus: 0,
-    current_slice: '',
-    last_move_at: '',
-    last_move_note: '',
-    notes: '',
-    shipped_note: '',
-    blocked_note: '',
+    live: 1,
+    objective: 'Explicar de forma humana quem João é e provar o que está construindo sem virar brochure genérica.',
+    status_summary: 'Projeto ativo em retomada, com copy e posicionamento sendo refinados.',
+    current_slice: 'Copy e estrutura dos projetos',
+    next_step: 'Fechar a narrativa da home e publicar apenas projetos que representam o momento atual.',
+    prod_url: 'https://jotavictor.com',
+    repo_path: 'apps/jotavictor-site',
+    sort_order: 5,
+  },
+  {
+    slug: 'gofluxo',
+    name: 'GoFluxo',
+    tagline: 'Automação e agentes aplicados a operações reais.',
+    kind: 'trabalho',
+    column: 'radar',
+    focus: 0,
+    live: 0,
+    objective: 'Transformar automação e agentes em entregas confiáveis para empresas, com escopo e valor claros.',
+    status_summary: 'Frente em construção com Breno, com oportunidades além da Animália ainda em estágio inicial.',
+    current_slice: 'Estruturação comercial e de entrega',
+    next_step: 'Consolidar o que a GoFluxo vende, como entrega e qual é o próximo projeto realmente iniciado.',
     prod_url: '',
-    repo_path: 'apps/carteirazap',
-    sort_order: 4,
+    repo_path: '',
+    sort_order: 6,
+  },
+  {
+    slug: 'animalia',
+    name: 'Animália',
+    tagline: 'Projeto cliente-piloto da GoFluxo.',
+    kind: 'cliente',
+    column: 'andando',
+    focus: 0,
+    live: 1,
+    objective: 'Entregar automações úteis para a operação da clínica e transformar o piloto em prova concreta de valor.',
+    status_summary: 'Cliente-piloto ativo; estado é distribuído entre agente, infraestrutura GoFluxo e site oficial.',
+    current_slice: 'Piloto operacional',
+    next_step: 'Avançar somente a próxima entrega validada com o cliente e manter produção, lab e documentação coerentes.',
+    prod_url: 'https://animalia.gofluxo.com.br',
+    repo_path: 'apps/animalia',
+    sort_order: 7,
+  },
+  {
+    slug: 'rca',
+    name: 'RCA',
+    tagline: 'Trabalho comercial que sustenta o resto.',
+    kind: 'trabalho',
+    column: 'andando',
+    focus: 1,
+    live: 1,
+    objective: 'Cumprir bem o trabalho comercial, proteger renda e manter a carteira de clientes em movimento.',
+    status_summary: 'Frente prioritária do dia a dia; o próximo passo deve vir das tarefas e pendências reais da Praxis.',
+    current_slice: 'Execução comercial da semana',
+    next_step: 'Resolver a ação comercial mais urgente e executável registrada na Praxis.',
+    prod_url: '',
+    repo_path: '',
+    sort_order: 8,
+  },
+  {
+    slug: 'faculdade',
+    name: 'Faculdade',
+    tagline: 'Obrigações e avanço acadêmico sem acúmulo desnecessário.',
+    kind: 'estudo',
+    column: 'andando',
+    focus: 0,
+    live: 1,
+    objective: 'Manter presença, pagamentos, trabalhos e estudo em dia com o mínimo de carga mental acumulada.',
+    status_summary: 'Frente contínua; deve refletir as pendências acadêmicas reais, não metas abstratas de produtividade.',
+    current_slice: 'Semana acadêmica atual',
+    next_step: 'Executar a pendência acadêmica mais próxima ou preparar a próxima aula/prova relevante.',
+    prod_url: '',
+    repo_path: '',
+    sort_order: 9,
   },
 ];
 
 export function todayFortaleza(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(date);
+}
+
+function tableColumns(db, table) {
+  return new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name));
+}
+
+function ensureColumn(db, table, name, definition) {
+  const columns = tableColumns(db, table);
+  if (!columns.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
 }
 
 export function initProjectsSchema(db) {
@@ -97,11 +187,17 @@ export function initProjectsSchema(db) {
       slug TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       tagline TEXT DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'produto',
       column TEXT NOT NULL DEFAULT 'radar',
       focus INTEGER NOT NULL DEFAULT 0,
+      live INTEGER NOT NULL DEFAULT 0,
+      objective TEXT DEFAULT '',
+      status_summary TEXT DEFAULT '',
       current_slice TEXT DEFAULT '',
+      next_step TEXT DEFAULT '',
       last_move_at TEXT DEFAULT '',
       last_move_note TEXT DEFAULT '',
+      last_reviewed_at TEXT DEFAULT '',
       notes TEXT DEFAULT '',
       shipped_note TEXT DEFAULT '',
       blocked_note TEXT DEFAULT '',
@@ -111,7 +207,34 @@ export function initProjectsSchema(db) {
       created_date TEXT DEFAULT (datetime('now')),
       updated_date TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS project_updates (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      source TEXT DEFAULT 'manual',
+      created_by TEXT DEFAULT 'joao',
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_project_updates_project_date
+      ON project_updates(project_id, date DESC, created_at DESC);
   `);
+
+  // Compatibilidade com a v1 já em produção.
+  ensureColumn(db, 'projects', 'kind', "TEXT NOT NULL DEFAULT 'produto'");
+  ensureColumn(db, 'projects', 'live', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'projects', 'objective', "TEXT DEFAULT ''");
+  ensureColumn(db, 'projects', 'status_summary', "TEXT DEFAULT ''");
+  ensureColumn(db, 'projects', 'next_step', "TEXT DEFAULT ''");
+  ensureColumn(db, 'projects', 'last_reviewed_at', "TEXT DEFAULT ''");
+
+  // "No ar" é uma característica do projeto, não uma etapa de trabalho.
+  db.exec("UPDATE projects SET live = 1 WHERE column = 'no_ar'");
+  db.exec("UPDATE projects SET column = 'andando' WHERE column = 'no_ar'");
+  db.exec("UPDATE projects SET column = 'pausado' WHERE column = 'parado'");
 }
 
 function mapRow(row) {
@@ -119,6 +242,7 @@ function mapRow(row) {
   return {
     ...row,
     focus: row.focus ? 1 : 0,
+    live: row.live ? 1 : 0,
   };
 }
 
@@ -163,46 +287,86 @@ export function getProject(db, idOrSlug) {
 }
 
 export function listProjects(db) {
-  return db.prepare('SELECT * FROM projects ORDER BY sort_order ASC, name ASC').all().map(mapRow);
+  return db.prepare('SELECT * FROM projects ORDER BY focus DESC, sort_order ASC, name ASC').all().map(mapRow);
 }
 
-/** Insert the 4 seed products if missing. Never overwrites an existing slug. */
+/** Insere frentes canônicas ausentes. Nunca sobrescreve conteúdo já editado pelo João. */
 export function seedProjectsIfEmpty(db) {
   const insert = db.prepare(`
     INSERT INTO projects (
-      id, slug, name, tagline, column, focus, current_slice,
-      last_move_at, last_move_note, notes, shipped_note, blocked_note,
-      prod_url, repo_path, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, slug, name, tagline, kind, column, focus, live, objective, status_summary,
+      current_slice, next_step, last_move_at, last_move_note, last_reviewed_at,
+      notes, shipped_note, blocked_note, prod_url, repo_path, sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   let inserted = 0;
+  let hydrated = 0;
   const run = db.transaction(() => {
     for (const seed of SEED_PROJECTS) {
-      const exists = db.prepare('SELECT 1 AS ok FROM projects WHERE slug = ?').get(seed.slug);
-      if (exists) continue;
-      insert.run(
-        seed.slug,
-        seed.slug,
-        seed.name,
-        seed.tagline,
-        seed.column,
-        seed.focus ? 1 : 0,
-        seed.current_slice,
-        seed.last_move_at,
-        seed.last_move_note,
-        seed.notes,
-        seed.shipped_note,
-        seed.blocked_note,
-        seed.prod_url,
-        seed.repo_path,
-        seed.sort_order,
+      const current = db.prepare('SELECT * FROM projects WHERE slug = ?').get(seed.slug);
+      if (!current) {
+        insert.run(
+          seed.slug,
+          seed.slug,
+          seed.name,
+          seed.tagline,
+          seed.kind,
+          seed.column,
+          seed.focus ? 1 : 0,
+          seed.live ? 1 : 0,
+          seed.objective || '',
+          seed.status_summary || '',
+          seed.current_slice || '',
+          seed.next_step || '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          seed.prod_url || '',
+          seed.repo_path || '',
+          seed.sort_order,
+        );
+        inserted += 1;
+        continue;
+      }
+
+      // Migração v1 → v2: preenche somente os novos metadados ainda vazios.
+      // Depois que o João/Sêneca escreverem objetivo/estado, o seed para de interferir.
+      const needsHydration = !String(current.objective || '').trim();
+      if (!needsHydration) continue;
+      db.prepare(`
+        UPDATE projects SET
+          tagline = CASE WHEN TRIM(COALESCE(tagline, '')) = '' THEN ? ELSE tagline END,
+          kind = ?,
+          live = ?,
+          objective = ?,
+          status_summary = ?,
+          current_slice = CASE WHEN TRIM(COALESCE(current_slice, '')) = '' THEN ? ELSE current_slice END,
+          next_step = ?,
+          prod_url = CASE WHEN TRIM(COALESCE(prod_url, '')) = '' THEN ? ELSE prod_url END,
+          repo_path = CASE WHEN TRIM(COALESCE(repo_path, '')) = '' THEN ? ELSE repo_path END,
+          updated_date = datetime('now')
+        WHERE id = ?
+      `).run(
+        seed.tagline || '',
+        seed.kind,
+        seed.live ? 1 : 0,
+        seed.objective || '',
+        seed.status_summary || '',
+        seed.current_slice || '',
+        seed.next_step || '',
+        seed.prod_url || '',
+        seed.repo_path || '',
+        current.id,
       );
-      inserted += 1;
+      hydrated += 1;
     }
   });
   run();
-  return { seeded: inserted > 0, inserted };
+  return { seeded: inserted > 0, inserted, hydrated };
 }
 
 export function createProject(db, body) {
@@ -216,6 +380,7 @@ export function createProject(db, body) {
   if (existing) throw badRequest('slug already exists');
 
   const column = PROJECT_COLUMNS.includes(body.column) ? body.column : 'radar';
+  const kind = PROJECT_KINDS.includes(body.kind) ? body.kind : 'produto';
   const focus = body.focus ? 1 : 0;
   if (focus && countFocused(db) >= FOCUS_LIMIT) throw focusLimitError();
 
@@ -224,20 +389,26 @@ export function createProject(db, body) {
 
   db.prepare(`
     INSERT INTO projects (
-      id, slug, name, tagline, column, focus, current_slice,
-      last_move_at, last_move_note, notes, shipped_note, blocked_note,
-      prod_url, repo_path, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, slug, name, tagline, kind, column, focus, live, objective, status_summary,
+      current_slice, next_step, last_move_at, last_move_note, last_reviewed_at,
+      notes, shipped_note, blocked_note, prod_url, repo_path, sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     slug,
     name,
     String(body.tagline || ''),
+    kind,
     column,
     focus,
+    body.live ? 1 : 0,
+    String(body.objective || ''),
+    String(body.status_summary || ''),
     String(body.current_slice || ''),
+    String(body.next_step || ''),
     String(body.last_move_at || ''),
     String(body.last_move_note || ''),
+    String(body.last_reviewed_at || ''),
     String(body.notes || ''),
     String(body.shipped_note || ''),
     String(body.blocked_note || ''),
@@ -267,6 +438,34 @@ export function setProjectFocus(db, idOrSlug, focus) {
   return getProject(db, existing.id);
 }
 
+export function createProjectUpdate(db, idOrSlug, body = {}) {
+  const project = getProject(db, idOrSlug);
+  if (!project) return null;
+  const summary = String(body.summary || '').trim();
+  if (!summary) throw badRequest('summary required');
+  const id = body.id || randomUUID();
+  const date = String(body.date || todayFortaleza()).slice(0, 10);
+  const source = String(body.source || 'manual').trim() || 'manual';
+  const createdBy = String(body.created_by || 'joao').trim() || 'joao';
+  db.prepare(`
+    INSERT INTO project_updates (id, project_id, date, summary, source, created_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, project.id, date, summary, source, createdBy);
+  return db.prepare('SELECT * FROM project_updates WHERE id = ?').get(id);
+}
+
+export function listProjectUpdates(db, idOrSlug, limit = 40) {
+  const project = getProject(db, idOrSlug);
+  if (!project) return null;
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 40));
+  return db.prepare(`
+    SELECT * FROM project_updates
+    WHERE project_id = ?
+    ORDER BY date DESC, created_at DESC
+    LIMIT ?
+  `).all(project.id, safeLimit);
+}
+
 export function moveProjectColumn(db, idOrSlug, column, { note } = {}) {
   const existing = getProject(db, idOrSlug);
   if (!existing) return null;
@@ -276,6 +475,7 @@ export function moveProjectColumn(db, idOrSlug, column, { note } = {}) {
   const moveNote = note != null && String(note).trim()
     ? String(note).trim()
     : (COLUMN_MOVE_NOTES[column] || '');
+  const date = todayFortaleza();
 
   db.prepare(`
     UPDATE projects SET
@@ -284,7 +484,14 @@ export function moveProjectColumn(db, idOrSlug, column, { note } = {}) {
       last_move_note = ?,
       updated_date = datetime('now')
     WHERE id = ?
-  `).run(column, todayFortaleza(), moveNote, existing.id);
+  `).run(column, date, moveNote, existing.id);
+
+  createProjectUpdate(db, existing.id, {
+    date,
+    summary: moveNote,
+    source: 'praxis',
+    created_by: 'joao',
+  });
 
   return getProject(db, existing.id);
 }
@@ -292,9 +499,14 @@ export function moveProjectColumn(db, idOrSlug, column, { note } = {}) {
 const TEXT_FIELDS = [
   'name',
   'tagline',
+  'kind',
+  'objective',
+  'status_summary',
   'current_slice',
+  'next_step',
   'last_move_at',
   'last_move_note',
+  'last_reviewed_at',
   'notes',
   'shipped_note',
   'blocked_note',
@@ -314,15 +526,23 @@ export function updateProject(db, idOrSlug, body = {}) {
     if (field === 'name') continue;
     if (body[field] !== undefined) next[field] = String(body[field]);
   }
+  if (!PROJECT_KINDS.includes(next.kind)) next.kind = existing.kind || 'produto';
+  if (body.live !== undefined) next.live = body.live ? 1 : 0;
   if (body.sort_order !== undefined) next.sort_order = Number(body.sort_order);
 
   db.prepare(`
     UPDATE projects SET
       name = ?,
       tagline = ?,
+      kind = ?,
+      live = ?,
+      objective = ?,
+      status_summary = ?,
       current_slice = ?,
+      next_step = ?,
       last_move_at = ?,
       last_move_note = ?,
+      last_reviewed_at = ?,
       notes = ?,
       shipped_note = ?,
       blocked_note = ?,
@@ -334,9 +554,15 @@ export function updateProject(db, idOrSlug, body = {}) {
   `).run(
     next.name,
     next.tagline,
+    next.kind,
+    next.live ? 1 : 0,
+    next.objective,
+    next.status_summary,
     next.current_slice,
+    next.next_step,
     next.last_move_at,
     next.last_move_note,
+    next.last_reviewed_at,
     next.notes,
     next.shipped_note,
     next.blocked_note,

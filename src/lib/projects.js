@@ -1,17 +1,24 @@
-export const PROJECT_COLUMNS = ['radar', 'andando', 'no_ar', 'parado'];
+export const PROJECT_COLUMNS = ['andando', 'radar', 'aguardando', 'pausado'];
 
 export const PROJECT_COLUMN_LABELS = {
-  radar: 'Radar',
   andando: 'Andando',
-  no_ar: 'No ar',
-  parado: 'Parado',
+  radar: 'Radar',
+  aguardando: 'Aguardando',
+  pausado: 'Pausado',
 };
 
 export const PROJECT_COLUMN_EMPTY = {
-  radar: 'Nada no radar.',
   andando: 'Nada andando agora.',
-  no_ar: 'Nada no ar.',
-  parado: 'Nada parado.',
+  radar: 'Nada no radar.',
+  aguardando: 'Nada aguardando.',
+  pausado: 'Nada pausado.',
+};
+
+export const PROJECT_KIND_LABELS = {
+  produto: 'Produto',
+  cliente: 'Cliente',
+  trabalho: 'Trabalho',
+  estudo: 'Faculdade',
 };
 
 export function formatProjectMoveDate(value) {
@@ -22,4 +29,12 @@ export function formatProjectMoveDate(value) {
   const [y, m, d] = parts;
   if (!y || !m || !d) return null;
   return `${d}/${m}`;
+}
+
+export function formatProjectUpdateDate(value) {
+  if (!value) return '';
+  const key = String(value).slice(0, 10);
+  const [y, m, d] = key.split('-');
+  if (!y || !m || !d) return key;
+  return `${d}/${m}/${y}`;
 }
