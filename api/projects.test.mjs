@@ -130,3 +130,45 @@ test('máximo de dois focos continua protegido', async (t) => {
   const after = await requestJson(server.base, '/api/projects');
   assert.equal(after.filter((p) => p.focus === 1).length, 2);
 });
+
+test('Fiz isso registra o próximo passo na timeline e mantém a frente aberta', async (t) => {
+  const { server } = await mountProjects(t);
+  const before = await requestJson(server.base, '/api/projects/carteirazap');
+  assert.match(before.next_step, /Auditar Clientes/i);
+  const originalColumn = before.column;
+  const originalFocus = before.focus;
+
+  const result = await requestJson(server.base, '/api/projects/carteirazap/complete-next-step', {
+    method: 'POST',
+    body: {},
+  });
+
+  assert.equal(result.project.next_step, '');
+  assert.equal(result.project.column, originalColumn);
+  assert.equal(result.project.focus, originalFocus);
+  assert.equal(result.project.last_move_note, 'Próximo passo concluído');
+  assert.match(result.update.summary, /^Concluído:/i);
+  assert.equal(result.update.source, 'conclusao');
+  assert.match(result.completed_step, /Auditar Clientes/i);
+
+  const updates = await requestJson(server.base, '/api/projects/carteirazap/updates');
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].summary, /Auditar Clientes/i);
+});
+
+test('Fiz isso recusa frente sem próximo passo para não criar conclusão falsa', async (t) => {
+  const { server } = await mountProjects(t);
+  await requestJson(server.base, '/api/projects/carteirazap/complete-next-step', {
+    method: 'POST',
+    body: {},
+  });
+
+  const res = await fetch(`${server.base}/api/projects/carteirazap/complete-next-step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error, 'no next step');
+});

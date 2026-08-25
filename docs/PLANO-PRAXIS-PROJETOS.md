@@ -122,3 +122,26 @@ Decisões aplicadas:
 - Colunas vazias ficam escondidas no estado normal. Durante drag no desktop, todas reaparecem para preservar a possibilidade de mover para uma coluna vazia. No mobile, o seletor de estado continua disponível no card.
 - O drawer agora também permite alterar explicitamente o estado da frente no quadro, então coluna vazia escondida nunca bloqueia operação.
 - Regra de UX: o card deve ser entendido em aproximadamente 3 segundos; contexto completo fica no drawer.
+
+## Fechar o ciclo de execução — 2026-08-25
+
+Continuidade não usa coluna `Concluído`. O que conclui no dia é o **próximo passo**, não a frente inteira.
+
+Fluxo canônico:
+
+1. João executa o `next_step`.
+2. Clica em **Fiz isso** no Foco agora ou no drawer da frente.
+3. A API registra atomicamente `Concluído: <passo>` em `project_updates` com source `conclusao`.
+4. `next_step` é limpo; foco e coluna permanecem exatamente como estavam.
+5. A UI mostra **Próximo passo pendente de revisão** em vez de manter instrução velha.
+6. Sêneca reconhece `[conclusao]` como evidência explícita e nunca ressuscita o passo concluído.
+7. No próximo ciclo, Sêneca pode propor a menor continuação seguinte, sem mover a frente.
+
+Endpoint: `POST /api/projects/:id/complete-next-step`.
+
+### Dois ciclos do Sêneca
+
+- **07:50 Fortaleza — `seneca:continuidade-do-dia`**: orienta o dia, atualiza continuidade e propõe próximos passos com limite de escrita já existente.
+- **18:30 Fortaleza — `seneca:fechamento-de-progresso`**: estritamente read-only; lê conclusões, tarefas, timeline e evidências reais para devolver um espelho factual do que avançou. Não vira checklist nem plano de amanhã.
+
+Regra de produto: o fechamento deve reduzir distorção de percepção, não aumentar cobrança. Frente quieta por bloqueio ou por escolha de prioridade não vira falha automaticamente.

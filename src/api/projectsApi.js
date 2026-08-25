@@ -15,5 +15,10 @@ export const projectsApiModule = (request) => ({
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    completeNextStep: (id, data = {}) =>
+      request(`/api/projects/${encodeURIComponent(id)}/complete-next-step`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 });

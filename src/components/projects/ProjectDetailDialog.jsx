@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +41,13 @@ function Field({ id, label, hint, children }) {
   );
 }
 
+const UPDATE_SOURCE_LABELS = {
+  conclusao: 'feito',
+  seneca: 'Sêneca',
+  praxis: 'Praxis',
+  manual: 'manual',
+};
+
 function Timeline({ updates = [] }) {
   if (!updates.length) {
     return <p className="text-xs text-muted-foreground/60">Ainda não há avanços registrados.</p>;
@@ -55,7 +63,7 @@ function Timeline({ updates = [] }) {
               {formatProjectUpdateDate(update.date)}
             </span>
             <Badge variant="outline" className="h-5 border-white/10 bg-white/[0.03] px-1.5 text-[9px] font-medium text-muted-foreground/70">
-              {update.source || 'manual'}
+              {UPDATE_SOURCE_LABELS[update.source] || update.source || 'manual'}
             </Badge>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-stone-200/90">{update.summary}</p>
@@ -75,6 +83,8 @@ export default function ProjectDetailDialog({
   updatesLoading = false,
   onAddUpdate,
   addingUpdate = false,
+  onCompleteNextStep,
+  completingNextStep = false,
 }) {
   const [form, setForm] = useState({
     kind: 'produto',
@@ -206,6 +216,28 @@ export default function ProjectDetailDialog({
             <Field id="project-next" label="Próximo passo" hint="Uma ação executável">
               <Textarea id="project-next" value={form.next_step} onChange={setField('next_step')} placeholder="A menor próxima ação que realmente move esta frente" className="min-h-[92px] border-domain-gold/20 bg-black/20 text-stone-100" />
             </Field>
+
+            {String(project.next_step || '').trim() ? (
+              <div className="flex flex-col gap-2 rounded-xl border border-domain-gold/15 bg-black/15 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Terminou esse passo? Registre a conclusão sem encerrar a frente inteira.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 shrink-0 rounded-full border-domain-gold/25 bg-domain-gold/[0.04] text-domain-gold hover:bg-domain-gold/[0.08] hover:text-domain-gold"
+                  disabled={completingNextStep || form.next_step.trim() !== String(project.next_step || '').trim()}
+                  onClick={() => onCompleteNextStep?.(project)}
+                >
+                  <Check className="mr-1.5 h-3.5 w-3.5" />
+                  {completingNextStep ? 'Registrando…' : 'Fiz isso'}
+                </Button>
+              </div>
+            ) : (
+              <p className="rounded-xl border border-white/[0.05] bg-black/10 px-3 py-2.5 text-xs text-muted-foreground/60">
+                Próximo passo pendente de revisão. Você pode definir um acima ou deixar o Sêneca propor no próximo ciclo.
+              </p>
+            )}
 
             <Field id="project-blocked" label="Travado por" hint="Vazio se não houver bloqueio">
               <Textarea id="project-blocked" value={form.blocked_note} onChange={setField('blocked_note')} placeholder="Dependência, decisão ou impedimento real" className="min-h-[72px] border-white/10 bg-black/20" />

@@ -101,7 +101,7 @@ export default function ProjectCard({
       <div className="flex items-start gap-1.5 rounded-lg bg-black/15 px-2.5 py-2">
         <ArrowRight className="mt-0.5 h-3 w-3 shrink-0 text-domain-gold/85" />
         <p className="line-clamp-2 text-xs font-medium leading-snug text-stone-100/90">
-          {nextStep || 'Definir o próximo passo'}
+          {nextStep || 'Próximo passo pendente de revisão'}
         </p>
       </div>
 

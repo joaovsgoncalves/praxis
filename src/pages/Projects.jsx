@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Layers, Pin } from 'lucide-react';
+import { ArrowRight, Check, Layers, Pin } from 'lucide-react';
 import { toast } from 'sonner';
 import { praxisApi } from '@/api/praxisClient';
 import { PageHero, PraxisEmptyState, PraxisColumnsSkeleton } from '@/components/layout/PraxisPage';
@@ -8,7 +8,7 @@ import ProjectBoard from '@/components/projects/ProjectBoard';
 import ProjectDetailDialog from '@/components/projects/ProjectDetailDialog';
 import { PROJECT_KIND_LABELS } from '@/lib/projects';
 
-function FocusNow({ projects, onOpen }) {
+function FocusNow({ projects, onOpen, onComplete, completingId }) {
   const focused = useMemo(() => projects.filter((item) => item.focus).slice(0, 2), [projects]);
   if (!focused.length) return null;
 
@@ -27,37 +27,55 @@ function FocusNow({ projects, onOpen }) {
 
       <div className="grid gap-2.5 md:grid-cols-2">
         {focused.map((project, index) => {
-          const nextStep = project.next_step || 'Definir o próximo passo.';
+          const hasNextStep = Boolean(String(project.next_step || '').trim());
+          const nextStep = hasNextStep ? project.next_step : 'Próximo passo pendente de revisão';
           const slice = project.current_slice || project.status_summary || '';
+          const isCompleting = String(completingId || '') === String(project.id);
 
           return (
-            <button
+            <div
               key={project.id}
-              type="button"
-              onClick={() => onOpen?.(project)}
-              className="group min-w-0 rounded-xl border border-white/[0.07] bg-[#161a23]/90 p-4 text-left transition-colors hover:border-domain-gold/25 hover:bg-[#1b202a]"
+              className="min-w-0 rounded-xl border border-white/[0.07] bg-[#161a23]/90 p-4 transition-colors hover:border-domain-gold/25 hover:bg-[#1b202a]"
             >
-              <div className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-domain-gold/20 bg-domain-gold/[0.06] text-[10px] font-semibold tabular-nums text-domain-gold">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-stone-100">{project.name}</p>
-                    <span className="text-[10px] font-medium text-muted-foreground/60">
-                      {PROJECT_KIND_LABELS[project.kind] || 'Frente'}
-                    </span>
-                  </div>
-                  {slice ? (
-                    <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground/70">{slice}</p>
-                  ) : null}
-                  <div className="mt-3 flex items-start gap-2">
-                    <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-domain-gold" />
-                    <p className="line-clamp-2 text-sm font-medium leading-snug text-stone-100/95">{nextStep}</p>
+              <button type="button" onClick={() => onOpen?.(project)} className="group block w-full text-left">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-domain-gold/20 bg-domain-gold/[0.06] text-[10px] font-semibold tabular-nums text-domain-gold">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-stone-100">{project.name}</p>
+                      <span className="text-[10px] font-medium text-muted-foreground/60">
+                        {PROJECT_KIND_LABELS[project.kind] || 'Frente'}
+                      </span>
+                    </div>
+                    {slice ? (
+                      <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground/70">{slice}</p>
+                    ) : null}
+                    <div className="mt-3 flex items-start gap-2">
+                      <ArrowRight className={hasNextStep ? 'mt-0.5 h-3.5 w-3.5 shrink-0 text-domain-gold' : 'mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/35'} />
+                      <p className={hasNextStep ? 'line-clamp-2 text-sm font-medium leading-snug text-stone-100/95' : 'line-clamp-2 text-sm leading-snug text-muted-foreground/55'}>
+                        {nextStep}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </button>
+              </button>
+
+              {hasNextStep ? (
+                <div className="mt-3 flex justify-end border-t border-white/[0.05] pt-3">
+                  <button
+                    type="button"
+                    disabled={isCompleting}
+                    onClick={() => onComplete?.(project)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-domain-gold/20 bg-domain-gold/[0.04] px-3 text-[11px] font-medium text-domain-gold transition-colors hover:bg-domain-gold/[0.08] disabled:opacity-50"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    {isCompleting ? 'Registrando…' : 'Fiz isso'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -123,6 +141,23 @@ export default function Projects() {
     },
   });
 
+  const completeNextStep = useMutation({
+    mutationFn: ({ id }) => praxisApi.projects.completeNextStep(id),
+    onSuccess: (result, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project-updates', vars.id] });
+      if (openProject && result?.project && String(openProject.id) === String(vars.id)) {
+        setOpenProject(result.project);
+      }
+      toast.success('Feito e registrado', {
+        description: 'Esse avanço entra no fechamento do Sêneca e o próximo passo fica pendente de revisão.',
+      });
+    },
+    onError: (err) => {
+      toast.error('Não deu pra concluir', { description: err?.message || 'Tenta de novo.' });
+    },
+  });
+
   const handleMove = (project, column) => {
     if (!project || project.column === column) return;
     updateProject.mutate({ id: project.id, data: { column } }, {
@@ -164,6 +199,16 @@ export default function Projects() {
     }
   };
 
+  const handleCompleteNextStep = async (project) => {
+    if (!project?.next_step) return false;
+    try {
+      await completeNextStep.mutateAsync({ id: project.id });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   return (
     <div className="praxis-page">
       <PageHero
@@ -174,7 +219,7 @@ export default function Projects() {
       />
 
       <div className="mt-6 space-y-5">
-        {!isLoading && projects.length > 0 ? <FocusNow projects={projects} onOpen={setOpenProject} /> : null}
+        {!isLoading && projects.length > 0 ? <FocusNow projects={projects} onOpen={setOpenProject} onComplete={handleCompleteNextStep} completingId={completeNextStep.variables?.id} /> : null}
 
         {isLoading ? (
           <PraxisColumnsSkeleton columns={3} rowsPerColumn={2} />
@@ -215,6 +260,8 @@ export default function Projects() {
         updatesLoading={updatesLoading}
         onAddUpdate={handleAddUpdate}
         addingUpdate={addUpdate.isPending}
+        onCompleteNextStep={handleCompleteNextStep}
+        completingNextStep={completeNextStep.isPending}
       />
     </div>
   );

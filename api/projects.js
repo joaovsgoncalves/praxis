@@ -466,6 +466,48 @@ export function listProjectUpdates(db, idOrSlug, limit = 40) {
   `).all(project.id, safeLimit);
 }
 
+/** Fecha apenas o próximo passo, não a frente inteira. Mantém foco/coluna intactos. */
+export function completeProjectNextStep(db, idOrSlug, body = {}) {
+  const project = getProject(db, idOrSlug);
+  if (!project) return null;
+
+  const currentNextStep = String(project.next_step || '').trim();
+  if (!currentNextStep) throw badRequest('no next step');
+
+  const date = todayFortaleza();
+  const rawSummary = String(body.summary || currentNextStep).trim() || currentNextStep;
+  const summary = /^conclu[ií]do:/i.test(rawSummary) ? rawSummary : `Concluído: ${rawSummary}`;
+  const source = String(body.source || 'conclusao').trim() || 'conclusao';
+  const createdBy = String(body.created_by || 'joao').trim() || 'joao';
+
+  const run = db.transaction(() => {
+    const update = createProjectUpdate(db, project.id, {
+      date,
+      summary,
+      source,
+      created_by: createdBy,
+    });
+
+    db.prepare(`
+      UPDATE projects SET
+        next_step = '',
+        last_reviewed_at = ?,
+        last_move_at = ?,
+        last_move_note = 'Próximo passo concluído',
+        updated_date = datetime('now')
+      WHERE id = ?
+    `).run(date, date, project.id);
+
+    return {
+      project: getProject(db, project.id),
+      update,
+      completed_step: currentNextStep,
+    };
+  });
+
+  return run();
+}
+
 export function moveProjectColumn(db, idOrSlug, column, { note } = {}) {
   const existing = getProject(db, idOrSlug);
   if (!existing) return null;

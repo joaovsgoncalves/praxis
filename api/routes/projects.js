@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   applyProjectPatch,
+  completeProjectNextStep,
   createProject,
   createProjectUpdate,
   getProject,
@@ -36,6 +37,16 @@ export function createProjectsRouter({ db }) {
       const row = createProjectUpdate(db, req.params.id, req.body || {});
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.status(201).json(row);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.post('/:id/complete-next-step', (req, res) => {
+    try {
+      const result = completeProjectNextStep(db, req.params.id, req.body || {});
+      if (!result) return res.status(404).json({ error: 'Not found' });
+      res.json(result);
     } catch (err) {
       sendError(res, err);
     }
