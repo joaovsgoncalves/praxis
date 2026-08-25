@@ -12,6 +12,7 @@ import HabitsTasks from '@/pages/HabitsTasks';
 import Ideas from '@/pages/Ideas';
 import Compras from '@/pages/Compras';
 import Financas from '@/pages/Financas';
+import Projects from '@/pages/Projects';
 import Nutricao from '@/pages/Nutricao';
 import Treinos from '@/pages/Treinos';
 import Focus from '@/pages/Focus';
@@ -98,6 +99,7 @@ const AuthenticatedApp = () => {
         <Route path="/ideias" element={<Ideas />} />
         <Route path="/compras" element={<Compras />} />
         <Route path="/financas" element={<Financas />} />
+        <Route path="/projetos" element={<Projects />} />
         <Route path="/jota-fit" element={<JotaFitLayout />}>
           <Route index element={<Treinos />} />
           <Route path="programa" element={<Treinos />} />

@@ -11,6 +11,7 @@ import {
   Settings,
   Dumbbell,
   Wallet,
+  Layers,
 } from "lucide-react";
 
 /** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
@@ -28,6 +29,7 @@ export const secondaryNavItems = [
   { path: "/compras", label: "Compras", icon: ShoppingBag },
   { path: "/financas", label: "Finanças", icon: Wallet },
   { path: "/jota-fit", label: "Jota Fit", icon: Dumbbell },
+  { path: "/projetos", label: "Projetos", icon: Layers },
   // /capturas fica acessível por links diretos — fora do menu (João 2026-07-16)
   { path: "/metas", label: "Metas", icon: Target },
   { path: "/conquistas", label: "Conquistas", icon: Trophy, requiresUnlockedAchievements: true },

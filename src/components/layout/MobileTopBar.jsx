@@ -11,6 +11,7 @@ const ROUTE_TITLES = [
   { prefix: '/compras', title: 'Compras' },
   { prefix: '/financas', title: 'Finanças' },
   { prefix: '/jota-fit', title: 'Jota Fit' },
+  { prefix: '/projetos', title: 'Projetos' },
   { prefix: '/treinos', title: 'Jota Fit' },
   { prefix: '/jota-fit/nutricao', title: 'Jota Fit' },
   { prefix: '/nutricao', title: 'Jota Fit' },

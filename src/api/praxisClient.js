@@ -3,6 +3,7 @@ import { tasksApiModule } from './tasksApi';
 import { nutritionApiModule } from './nutritionApi';
 import { workoutsApiModule } from './workoutsApi';
 import { financeApiModule } from './financeApi';
+import { projectsApiModule } from './projectsApi';
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
 // Em dev local, .env define VITE_PRAXIS_API/VITE_FORJA_API para o backend da Praxis.
@@ -31,6 +32,7 @@ const OFFLINE_CACHEABLE = [
   '/api/workouts/heatmap',
   '/api/weekly-reviews',
   '/api/finance/overview',
+  '/api/projects',
 ];
 
 const OFFLINE_KEY_PREFIX = 'praxis:offline:';
@@ -175,6 +177,7 @@ export const praxisApi = {
   // Workouts live only in workoutsApiModule. Do not redeclare `workouts` here — it drops heatmap, agentSnapshot, exercises.stats, and sessions.addExercise.
   ...workoutsApiModule(request),
   ...financeApiModule(request),
+  ...projectsApiModule(request),
 
 
   ideas: {
