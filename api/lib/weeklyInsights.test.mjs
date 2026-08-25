@@ -223,6 +223,39 @@ test('life_history groups completed tasks by area', () => {
   assert.equal(areas.find((a) => a.area === 'ideias'), undefined);
 });
 
+test('life_history dedups a conclusão (update) contra a tarefa do mesmo entregável', () => {
+  const db = createTestDb({ withProjects: true });
+  db.prepare("INSERT INTO projects (id, slug, name) VALUES ('p1', 'rca', 'RCA')").run();
+  // Registro de conclusão na continuidade (Fiz isso) para o pedido Gabriela.
+  db.prepare(
+    "INSERT INTO project_updates (id, project_id, date, summary, source) VALUES ('u1', 'p1', '2026-07-14', 'Concluído: Fechar o pedido da Gabriela na Medfarma Extremoz', 'conclusao')",
+  ).run();
+  // Tarefa concluída que representa o MESMO entregável.
+  db.prepare(
+    "INSERT INTO tasks (id, title, status, category, date, completed_date) VALUES ('t1', 'Fechar pedido Gabriela — Medfarma Extremoz', 'completed', 'farmacia', '2026-07-14', '2026-07-14')",
+  ).run();
+  const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
+  const rca = weekly.life_history.completed_by_area.find((a) => a.area === 'rca');
+  // A conclusão e a tarefa são a mesma coisa: conta 1, não 2.
+  assert.equal(rca.count, 1);
+  assert.equal(weekly.life_history.project_updates.length, 1);
+});
+
+test('life_history counts distinct deliverables when no overlap', () => {
+  const db = createTestDb({ withProjects: true });
+  db.prepare("INSERT INTO projects (id, slug, name) VALUES ('p1', 'rca', 'RCA')").run();
+  db.prepare(
+    "INSERT INTO project_updates (id, project_id, date, summary, source) VALUES ('u1', 'p1', '2026-07-14', 'Retorno Isabelita / Bezerra foi concluído hoje.', 'seneca')",
+  ).run();
+  db.prepare(
+    "INSERT INTO tasks (id, title, status, category, date, completed_date) VALUES ('t1', 'Preparar RCA de seg-qua', 'completed', 'farmacia', '2026-07-14', '2026-07-14')",
+  ).run();
+  const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });
+  const rca = weekly.life_history.completed_by_area.find((a) => a.area === 'rca');
+  // Assuntos distintos: contam 2 (1 update + 1 tarefa).
+  assert.equal(rca.count, 2);
+});
+
 test('life_history is safe when projects tables are absent', () => {
   const db = createTestDb();
   const weekly = buildWeeklyInsights(db, '2026-07-13', { today: '2026-07-20' });

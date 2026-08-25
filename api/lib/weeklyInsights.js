@@ -397,6 +397,34 @@ function areaFor(category, slug = '') {
   return 'projetos';
 }
 
+const STOP_WORDS = new Set([
+  'e', 'de', 'da', 'do', 'das', 'dos', 'para', 'com', 'ou', 'se', 'hoje',
+  'quando', 'foi', 'o', 'a', 'os', 'as', 'um', 'uma', 'um', 'ter', 'quando',
+]);
+
+/** Normaliza o texto para um conjunto de tokens significativos (sem acentos/pontuação). */
+function sigTokens(text) {
+  let t = String(text || '')
+    .toLowerCase()
+    .normalize('NFD');
+  t = t.replace(/[\u0300-\u036f]/g, '');
+  t = t.replace(/^P\d+\s*[-–—:]?\s*/i, '');
+  t = t.replace(/conclu[ií]do[:.-]?/g, ' ');
+  t = t.replace(/[^\p{L}\p{N}\s]/gu, ' ');
+  return new Set(
+    t.split(/\s+/).filter((w) => w.length > 3 && !STOP_WORDS.has(w)),
+  );
+}
+
+/** Verdadeiro se dois conjuntos de tokens significativos representam a mesma coisa. */
+function sameSig(A, B) {
+  if (!A || !B || !A.size || !B.size) return false;
+  const inter = [...A].filter((t) => B.has(t)).length;
+  const aInB = inter / A.size;
+  const bInA = inter / B.size;
+  return aInB >= 0.8 || bInA >= 0.8;
+}
+
 function tableHas(table, db) {
   try {
     const row = db
@@ -498,12 +526,24 @@ function buildLifeHistory(db, weekStart, weekEnd) {
     }
   }
 
+  const updateItems = updates.map((u) => ({
+    area: areaFor('', u.front),
+    sig: sigTokens(u.summary || u.name),
+  }));
+
   for (const t of completed) {
     const area = areaFor(t.category);
     const sample = cleanTitleSafe(t.title);
     if (!sample) continue;
     const key = `${area}|${sample.toLowerCase()}`;
     if (seen.has(key)) continue;
+    // Dedup: se um update da continuidade (mesma área) já "é" este entregável,
+    // não conta em dobro no chip área.
+    const tSig = sigTokens(sample);
+    const covered = updateItems.some(
+      (u) => u.area === area && u.sig.size && sameSig(u.sig, tSig),
+    );
+    if (covered) continue;
     seen.add(key);
     byArea[area] = byArea[area] || { area, count: 0, samples: [] };
     byArea[area].count += 1;
