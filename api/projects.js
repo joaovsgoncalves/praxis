@@ -230,6 +230,12 @@ export function initProjectsSchema(db) {
   ensureColumn(db, 'projects', 'status_summary', "TEXT DEFAULT ''");
   ensureColumn(db, 'projects', 'next_step', "TEXT DEFAULT ''");
   ensureColumn(db, 'projects', 'last_reviewed_at', "TEXT DEFAULT ''");
+  // Sub-frente: uma frente pode pertencer a outra (ex.: Animália é serviço da GoFluxo).
+  ensureColumn(db, 'projects', 'parent_slug', "TEXT DEFAULT ''");
+  // Migração: Animália é serviço da GoFluxo. Só preenche se estiver vazio, para não sobrescrever o João.
+  db.exec(
+    "UPDATE projects SET parent_slug = 'gofluxo' WHERE slug = 'animalia' AND TRIM(COALESCE(parent_slug, '')) = ''",
+  );
 
   // "No ar" é uma característica do projeto, não uma etapa de trabalho.
   db.exec("UPDATE projects SET live = 1 WHERE column = 'no_ar'");

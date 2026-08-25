@@ -19,6 +19,7 @@ import {
 
 export default function ProjectCard({
   project,
+  subProjects = [],
   currentColumn,
   isDragDisabled = false,
   dragProvided,
@@ -108,6 +109,32 @@ export default function ProjectCard({
       <p className="text-[10px] tabular-nums text-muted-foreground/45">
         {moveDate ? `Atualizado ${moveDate}` : 'Ainda sem revisão'}
       </p>
+
+      {subProjects.length > 0 ? (
+        <div className="mt-1 rounded-lg border border-white/[0.05] bg-black/10 p-2">
+          <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/45">
+            Dentro de {project.name}
+          </p>
+          <div className="space-y-1.5">
+            {subProjects.map((sub) => (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpen?.(sub);
+                }}
+                className="block w-full rounded-md border border-white/[0.04] bg-[#12151c]/70 px-2 py-1.5 text-left transition-colors hover:border-domain-gold/25 hover:bg-[#1a1f2a]"
+              >
+                <p className="line-clamp-1 text-xs font-semibold text-stone-100">{sub.name}</p>
+                <p className="line-clamp-1 text-[10px] text-muted-foreground/60">
+                  {String(sub.next_step || sub.current_slice || 'Próximo passo pendente').trim()}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {isDragDisabled ? (
         <div onClick={(event) => event.stopPropagation()}>

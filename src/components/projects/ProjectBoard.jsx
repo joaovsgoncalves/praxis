@@ -35,11 +35,26 @@ export default function ProjectBoard({
   const isDragDisabled = !isDesktop;
   const [dragging, setDragging] = useState(false);
 
+  // Frentes-raiz = sem parent_slug. Sub-frentes = parent_slug aponta para uma raiz.
+  const roots = useMemo(
+    () => projects.filter((item) => !String(item.parent_slug || '').trim()),
+    [projects],
+  );
+  const childrenBySlug = useMemo(() => {
+    const map = {};
+    for (const item of projects) {
+      const parent = String(item.parent_slug || '').trim();
+      if (!parent) continue;
+      (map[parent] ||= []).push(item);
+    }
+    return map;
+  }, [projects]);
+
   const visibleColumns = useMemo(() => {
     if (dragging) return PROJECT_COLUMNS;
-    const nonEmpty = PROJECT_COLUMNS.filter((columnId) => projects.some((item) => item.column === columnId));
+    const nonEmpty = PROJECT_COLUMNS.filter((columnId) => roots.some((item) => item.column === columnId));
     return nonEmpty.length ? nonEmpty : PROJECT_COLUMNS.slice(0, 1);
-  }, [dragging, projects]);
+  }, [dragging, roots]);
 
   const handleDragEnd = (result) => {
     setDragging(false);
@@ -56,7 +71,7 @@ export default function ProjectBoard({
     <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={handleDragEnd}>
       <div className="praxis-scroll-x flex gap-3 overflow-x-auto pb-4 pt-1 xl:overflow-visible">
         {visibleColumns.map((columnId) => {
-          const columnProjects = projects.filter((item) => item.column === columnId);
+          const columnProjects = roots.filter((item) => item.column === columnId);
 
           return (
             <div
@@ -92,6 +107,7 @@ export default function ProjectBoard({
                         {(draggableProvided, draggableSnapshot) => (
                           <ProjectCard
                             project={project}
+                            subProjects={childrenBySlug[project.slug] || []}
                             currentColumn={columnId}
                             isDragDisabled={isDragDisabled}
                             dragProvided={draggableProvided}
