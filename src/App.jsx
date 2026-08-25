@@ -97,7 +97,8 @@ const AuthenticatedApp = () => {
         <Route path="/ideias" element={<Ideas />} />
         <Route path="/compras" element={<Compras />} />
         <Route path="/financas" element={<Financas />} />
-        <Route path="/treinos" element={<Treinos />} />
+        <Route path="/jota-fit" element={<Treinos />} />
+        <Route path="/treinos" element={<Navigate to="/jota-fit" replace />} />
         <Route path="/nutricao" element={<Nutricao />} />
         <Route path="/foco" element={<Focus />} />
         <Route path="/metas" element={<Goals />} />

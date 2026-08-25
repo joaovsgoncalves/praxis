@@ -76,7 +76,7 @@ const featureCards = [
   },
   {
     icon: Dumbbell,
-    eyebrow: 'Treinos',
+    eyebrow: 'Jota Fit',
     title: 'Seu corpo também faz parte da execução.',
     description: 'Treino, recuperação e rotina física dentro do mesmo sistema que organiza o resto da sua vida.',
     accent: 'domain-ember',

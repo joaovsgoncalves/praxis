@@ -7,7 +7,9 @@
 
 ## Treinos V4 (ago/2026)
 
-No ar em `/treinos`: catálogo 1324 + customs, Biblioteca, GIF CDN (Gym visual), Mapa Balanço/Fadiga/Força, heatmap no Histórico, 1RM, superset, treino livre. Smoke: `scripts/smoke-praxis-treinos.sh`.  
+O módulo Treinos passou a se chamar **Jota Fit**: rota canônica `/jota-fit`; `/treinos` redireciona com replace. Funcionalidade (hoje, sessão, programa, biblioteca, mapa, histórico) e tabelas `workout_*` intactas.
+
+No ar em `/jota-fit`: catálogo 1324 + customs, Biblioteca, GIF CDN (Gym visual), Mapa Balanço/Fadiga/Força, heatmap no Histórico, 1RM, superset, treino livre. Smoke: `scripts/smoke-praxis-treinos.sh`.  
 
 Uso: mapa só fica esperto depois de séries em exercício do catálogo (custom sem alias não pinta).  
 
@@ -58,7 +60,7 @@ Doc antigo parou em 18/07. **Depois** (principalmente 20–22/07, ~22 commits) e
 Nav canônica no código (`src/lib/praxisNav.js`):
 
 - **Primary:** Hoje · Tarefas · Falar · Revisar  
-- **Secondary:** Ideias · Modo Foco · Compras · Treinos · Nutrição · Metas\* · Rituais · Conquistas\* · Histórico · Config  
+- **Secondary:** Ideias · Modo Foco · Compras · Finanças · Jota Fit · Nutrição · Metas\* · Rituais · Conquistas\* · Histórico · Config  
 - **Sem** hub “Mais” e **sem** Fila no menu (`/capturas` existe por rota/banner)
 
 ---

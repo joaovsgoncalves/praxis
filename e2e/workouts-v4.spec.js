@@ -68,7 +68,7 @@ test('Treinos V4: Biblioteca, Mapa e Histórico aparecem no mobile 390', async (
     return json(route, {});
   });
 
-  await page.goto('/treinos');
+  await page.goto('/jota-fit');
   await expect(page.getByRole('button', { name: 'Biblioteca' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mapa' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Histórico' })).toBeVisible();

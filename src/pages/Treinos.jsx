@@ -123,7 +123,7 @@ export default function Treinos() {
       <PageHero
         kicker="Corpo"
         kickerIcon={Dumbbell}
-        title="Treinos"
+        title="Jota Fit"
         description="Teu treino de hoje, sem ruído."
       />
 
@@ -163,7 +163,7 @@ export default function Treinos() {
           <div
             className="grid grid-cols-5 gap-1 rounded-full bg-secondary/40 p-1"
             role="tablist"
-            aria-label="Seções de treinos"
+            aria-label="Seções do Jota Fit"
           >
             {TABS.map((item) => {
               const Icon = item.icon;

@@ -298,9 +298,9 @@ async function mockPraxisApi(page) {
 
 test('treinos v3: aquecimento, carga, elástico, descanso, prefill e histórico em 390px', async ({ page }) => {
   await mockPraxisApi(page);
-  await page.goto('/treinos');
+  await page.goto('/jota-fit');
 
-  await expect(page.getByRole('main').getByRole('heading', { name: 'Treinos' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Jota Fit' })).toBeVisible();
   await expect(page.getByText('Push Força', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /Começar treino/i })).toBeVisible();
   await expectNoHorizontalOverflow(page);

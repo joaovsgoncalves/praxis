@@ -28,7 +28,7 @@ export const secondaryNavItems = [
   { path: "/foco", label: "Modo Foco", icon: Timer },
   { path: "/compras", label: "Compras", icon: ShoppingBag },
   { path: "/financas", label: "Finanças", icon: Wallet },
-  { path: "/treinos", label: "Treinos", icon: Dumbbell },
+  { path: "/jota-fit", label: "Jota Fit", icon: Dumbbell },
   { path: "/nutricao", label: "Nutrição", icon: UtensilsCrossed },
   // /capturas fica acessível por links diretos — fora do menu (João 2026-07-16)
   { path: "/metas", label: "Metas", icon: Target },
