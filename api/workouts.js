@@ -1216,12 +1216,17 @@ export function registerWorkoutRoutes(app, db) {
     }
 
     const best1rm = bestEstimated1rm(workSets);
+    const lastSet = workSets.length ? workSets[workSets.length - 1] : null;
+    const lastWeightRaw = lastSet?.weight_kg != null ? Number(lastSet.weight_kg) : null;
+    const lastRepsRaw = lastSet?.reps != null ? Number(lastSet.reps) : null;
 
     res.json({
       exercise_id: exercise.id,
       best_1rm: best1rm,
       best_weight: bestWeight,
       best_reps: bestReps,
+      last_weight: lastWeightRaw !== null && Number.isFinite(lastWeightRaw) ? lastWeightRaw : null,
+      last_reps: lastRepsRaw !== null && Number.isFinite(lastRepsRaw) ? lastRepsRaw : null,
       last_performed_at: lastPerformedAt,
       total_work_sets: workSets.length,
       total_sessions: sessionIds.size,

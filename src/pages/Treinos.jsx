@@ -23,6 +23,7 @@ import WorkoutProgramDialog from '@/components/workouts/WorkoutProgramDialog';
 import WorkoutProgramEditor from '@/components/workouts/WorkoutProgramEditor';
 import WorkoutSessionView from '@/components/workouts/WorkoutSessionView';
 import WorkoutHistory from '@/components/workouts/WorkoutHistory';
+import WorkoutProgress from '@/components/workouts/WorkoutProgress';
 import WorkoutMuscleMap from '@/components/workouts/WorkoutMuscleMap';
 import WorkoutLibrary from '@/components/workouts/WorkoutLibrary';
 import { Button } from '@/components/ui/button';
@@ -303,7 +304,12 @@ export default function Treinos() {
               />
             ) : null}
 
-            {tab === 'progresso' ? <WorkoutHistory /> : null}
+            {tab === 'progresso' ? (
+              <>
+                <WorkoutProgress />
+                <WorkoutHistory />
+              </>
+            ) : null}
 
             {tab === 'corpo' ? (
               <WorkoutMuscleMap

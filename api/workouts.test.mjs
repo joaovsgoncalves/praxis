@@ -1144,6 +1144,8 @@ describe("Treinos V4 Fase 8 — 1RM API and stats", () => {
     assert.equal(stats.best_1rm, null);
     assert.equal(stats.best_weight, null);
     assert.equal(stats.best_reps, null);
+    assert.equal(stats.last_weight, null);
+    assert.equal(stats.last_reps, null);
     assert.equal(stats.last_performed_at, null);
     assert.equal(stats.total_work_sets, 0);
     assert.equal(stats.total_sessions, 0);
@@ -1247,9 +1249,48 @@ describe("Treinos V4 Fase 8 — 1RM API and stats", () => {
     assert.equal(stats.best_1rm, 105); // 90kg x 5 reps
     assert.equal(stats.best_weight, 90); // 120kg warmup is excluded from work metrics
     assert.equal(stats.best_reps, 8); // 8 reps (warmup 12 reps excluded)
+    assert.equal(stats.last_weight, 90); // last work set, not the 120kg warmup that followed
+    assert.equal(stats.last_reps, 5);
     assert.ok(stats.last_performed_at);
     assert.equal(stats.total_work_sets, 2);
     assert.equal(stats.total_sessions, 1);
+
+    // 5. A later completed session updates last_*, not best_*
+    let session2 = await request("/api/workouts/sessions", {
+      method: "POST",
+      body: { workout_day_id: day.id },
+    });
+    const session2ExerciseId = session2.exercises[0].id;
+    await request("/api/workouts/sessions/" + session2.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: session2ExerciseId,
+        weight_kg: 82.5,
+        reps: 7,
+        set_role: "work",
+      },
+    });
+    await request("/api/workouts/sessions/" + session2.id + "/sets", {
+      method: "POST",
+      body: {
+        session_exercise_id: session2ExerciseId,
+        weight_kg: 40,
+        reps: 10,
+        set_role: "warmup",
+      },
+    });
+    await request("/api/workouts/sessions/" + session2.id + "/finish", {
+      method: "POST",
+      body: {},
+    });
+
+    const statsAfter = await request("/api/workouts/exercises/" + exercise.id + "/stats");
+    assert.equal(statsAfter.last_weight, 82.5);
+    assert.equal(statsAfter.last_reps, 7);
+    assert.equal(statsAfter.best_weight, 90);
+    assert.equal(statsAfter.best_1rm, 105);
+    assert.equal(statsAfter.total_work_sets, 3);
+    assert.equal(statsAfter.total_sessions, 2);
   });
 
   test("GET /api/workouts/muscle-map aggregates balance volume across completed sessions", async () => {
