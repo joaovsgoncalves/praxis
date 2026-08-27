@@ -7,9 +7,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, Pause, Play, Archive, CalendarClock, MinusCircle } from 'lucide-react';
+import { MoreHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, CalendarClock, MinusCircle } from 'lucide-react';
 
-/** Menu ⋯ — reordenar, editar, excluir (hábitos: + ciclo de vida) */
+/** Menu ⋯ — reordenar, editar, excluir */
 export function TaskRowMenu({
   label,
   onMoveUp,
@@ -61,12 +61,10 @@ export function TaskRowMenu({
 
 export function HabitRowMenu({
   label,
-  habit,
   onMoveUp,
   onMoveDown,
   onEdit,
   onDelete,
-  onSetStatus,
   onNaoRolou,
   onUndoDayOutcome,
   dayOutcome,
@@ -95,6 +93,7 @@ export function HabitRowMenu({
         <DropdownMenuItem disabled={busy || disableDown} onClick={onMoveDown}>
           <ArrowDown className="mr-2 h-4 w-4" /> Descer
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>
@@ -109,29 +108,8 @@ export function HabitRowMenu({
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
-        {habit.status === 'active' && (
-          <DropdownMenuItem onClick={() => onSetStatus('paused')}>
-            <Pause className="mr-2 h-4 w-4" /> Pausar
-          </DropdownMenuItem>
-        )}
-        {habit.status === 'paused' && (
-          <DropdownMenuItem onClick={() => onSetStatus('active')}>
-            <Play className="mr-2 h-4 w-4" /> Retomar
-          </DropdownMenuItem>
-        )}
-        {habit.status !== 'archived' && (
-          <DropdownMenuItem onClick={() => onSetStatus('archived')}>
-            <Archive className="mr-2 h-4 w-4" /> Arquivar
-          </DropdownMenuItem>
-        )}
-        {habit.status === 'archived' && (
-          <DropdownMenuItem onClick={() => onSetStatus('active')}>
-            <Play className="mr-2 h-4 w-4" /> Reativar
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onDelete}>
-          <Trash2 className="mr-2 h-4 w-4" /> Excluir definitivo
+          <Trash2 className="mr-2 h-4 w-4" /> Excluir
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

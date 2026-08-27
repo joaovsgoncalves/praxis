@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -19,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
-import { Plus, CheckCircle2, Circle, Clock, Flame, Rows3, AlignJustify, Eraser, Archive, ListTodo, Minus } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Flame, Eraser, Archive, ListTodo, Minus } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
@@ -42,7 +41,6 @@ import { buildMovedOrder } from '@/lib/taskReorder';
 import { isTaskOpen, isTaskDone, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
-  HABIT_STATUS_LABELS,
   SKIP_REASON_LABELS,
   countHabitDayOutcomes,
   formatFrequencyLabel,
@@ -92,8 +90,6 @@ const priorityLabels = {
 export default function HabitsTasks() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState(() => habitTasksTabFromSearchParams(searchParams));
-  const [habitStatusFilter, setHabitStatusFilter] = useState('active');
-  const [statusFilter, setStatusFilter] = useState('pending');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [createTaskInitial, setCreateTaskInitial] = useState(null);
@@ -145,24 +141,13 @@ export default function HabitsTasks() {
     queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
   const { data: habits = [] } = useQuery({
-    queryKey: ['allHabits', habitStatusFilter, today],
-    queryFn: () => praxisApi.habits.list({ status: habitStatusFilter, date: today }),
+    queryKey: ['allHabits', 'active', today],
+    queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
   });
   const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => praxisApi.habitLogs.list({ date: today }) });
   const { data: activeHabitsList = [] } = useQuery({
     queryKey: ['habits', 'active', today],
     queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
-  });
-  const { data: userSettings } = useQuery({
-    queryKey: ['me'],
-    queryFn: () => praxisApi.user.getSettings(),
-    staleTime: 60_000,
-  });
-  const compact = userSettings?.list_density === 'compact';
-
-  const updateListDensity = useMutation({
-    mutationFn: (list_density) => praxisApi.user.updateSettings({ list_density }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
   });
 
   const createTask = useMutation({
@@ -662,13 +647,6 @@ export default function HabitsTasks() {
     return getHabitDayOutcome(log);
   };
 
-  const setHabitStatus = useMutation({
-    mutationFn: ({ id, status }) => praxisApi.habits.update(id, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-    },
-  });
 
   const bulkArchiveTasks = useMutation({
     mutationFn: async (ids) => {
@@ -743,7 +721,7 @@ export default function HabitsTasks() {
 
   const filteredTasks = scopedTasks
     .filter((t) => {
-      if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+      if (!isTaskOpen(t)) return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       return true;
     })
@@ -859,48 +837,37 @@ export default function HabitsTasks() {
       )}
 
       {lens !== 'board' && lens !== 'week' && (
-        <section className="praxis-panel rounded-3xl p-3 sm:p-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <Tabs value={view} onValueChange={handleViewChange}>
-            <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-white/[0.03] p-1 flex-nowrap">
-              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="all">Todos</TabsTrigger>
-              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="tasks">Tarefas ({filteredTasks.length})</TabsTrigger>
-              <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="habits">Hábitos ({habits.length})</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <section className="praxis-panel rounded-3xl p-3 sm:p-4 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Tabs value={view} onValueChange={handleViewChange}>
+              <TabsList className="praxis-scroll-x h-11 w-full max-w-full justify-start rounded-2xl bg-white/[0.03] p-1 flex-nowrap">
+                <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="all">Todos</TabsTrigger>
+                <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="tasks">Tarefas ({filteredTasks.length})</TabsTrigger>
+                <TabsTrigger className="rounded-xl px-3 sm:px-4 shrink-0" value="habits">Hábitos ({habits.length})</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-full gap-1.5"
-              disabled={updateListDensity.isPending}
-              onClick={() => updateListDensity.mutate(compact ? 'comfortable' : 'compact')}
-              title={compact ? 'Modo confortável' : 'Modo compacto'}
-            >
-              {compact ? <AlignJustify className="h-4 w-4" /> : <Rows3 className="h-4 w-4" />}
-              {compact ? 'Confortável' : 'Compacto'}
-            </Button>
             {noiseTasks.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-                onClick={() => setNoiseDialogOpen(true)}
-              >
-                <Eraser className="h-4 w-4" />
-                Limpar ruído ({noiseTasks.length})
-              </Button>
+              <div className="flex items-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  onClick={() => setNoiseDialogOpen(true)}
+                >
+                  <Eraser className="h-4 w-4" />
+                  Limpar ruído ({noiseTasks.length})
+                </Button>
+              </div>
             )}
           </div>
 
-          <div className="praxis-scroll-x flex w-full max-w-full gap-2 pb-1 xl:justify-end">
+          <div className="praxis-scroll-x flex w-full max-w-full items-center gap-2 py-1">
             <button
               onClick={() => setCategoryFilter('all')}
               className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
                 categoryFilter === 'all'
                   ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                   : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -913,7 +880,7 @@ export default function HabitsTasks() {
                 key={key}
                 onClick={() => setCategoryFilter(key)}
                 className={cn(
-                  'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
                   categoryFilter === key
                     ? `${cat.color} ring-1 ring-current`
                     : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -923,7 +890,6 @@ export default function HabitsTasks() {
               </button>
             ))}
           </div>
-        </div>
         </section>
       )}
 
@@ -1095,15 +1061,7 @@ export default function HabitsTasks() {
                       <Archive className="h-4 w-4" />
                       Arquivar
                     </Button>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-40"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="pending">Pendentes</SelectItem>
-                        <SelectItem value="in_progress">Andamento</SelectItem>
-                        <SelectItem value="completed">Concluídas</SelectItem>
-                      </SelectContent>
-                    </Select>
+
                   </>
                 )}
               </div>
@@ -1189,12 +1147,7 @@ export default function HabitsTasks() {
               <div className="space-y-3">
                 {filteredTasks.map((task, index) => (
                   <Card key={task.id} className="border-border/80 bg-card/50 overflow-hidden shadow-none">
-                    <CardContent
-                      className={cn(
-                        'flex items-center gap-2 sm:gap-3',
-                        compact ? 'p-2.5 sm:p-3' : 'flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5',
-                      )}
-                    >
+                    <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
                       {taskSelectionMode && isTaskOpen(task) && (
                         <Checkbox
                           checked={selectedTaskIds.has(task.id)}
@@ -1209,18 +1162,17 @@ export default function HabitsTasks() {
                         aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
                       >
                         {task.status === 'completed' ? (
-                          <CheckCircle2 className={cn(compact ? 'h-4 w-4' : 'h-5 w-5', 'text-accent')} />
+                          <CheckCircle2 className="h-5 w-5 text-accent" />
                         ) : (
-                          <Circle className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+                          <Circle className="h-5 w-5" />
                         )}
                       </button>
 
                       <div className="min-w-0 flex-1">
-                        <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', compact && 'gap-1')}>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <p
                             className={cn(
-                              'font-semibold leading-snug',
-                              compact ? 'text-sm truncate max-w-full' : 'text-base',
+                              'font-semibold leading-snug text-base',
                               task.status === 'completed' && 'line-through opacity-60',
                             )}
                           >
@@ -1253,7 +1205,7 @@ export default function HabitsTasks() {
                             </Badge>
                           )}
                         </div>
-                        {!compact && task.date && (
+                        {task.date && (
                           <div className="mt-1.5 flex flex-wrap gap-2">
                             <Badge variant="outline" className="text-xs">{task.date}</Badge>
                             {task.day_outcome === 'not_today'
@@ -1264,7 +1216,7 @@ export default function HabitsTasks() {
                             )}
                           </div>
                         )}
-                        {!compact && !task.date && task.recurrence && task.recurrence !== 'none' && (
+                        {!task.date && task.recurrence && task.recurrence !== 'none' && (
                           <p className="mt-1 text-xs text-amber-400/90">Defina uma data para a recorrência funcionar.</p>
                         )}
                       </div>
@@ -1305,20 +1257,9 @@ export default function HabitsTasks() {
                   </span>
                 </h2>
               </div>
-              <Select value={habitStatusFilter} onValueChange={setHabitStatusFilter}>
-                <SelectTrigger className="h-10 w-full rounded-full border-white/10 bg-white/[0.03] sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Ativos</SelectItem>
-                  <SelectItem value="paused">Pausados</SelectItem>
-                  <SelectItem value="archived">Arquivados</SelectItem>
-                  <SelectItem value="all">Todos</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
-            {habitStatusFilter === 'active' && activeHabitsDueToday.length > 0 && (
+            {activeHabitsDueToday.length > 0 && (
               <div className="space-y-1.5 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Hábitos de hoje</span>
@@ -1361,7 +1302,7 @@ export default function HabitsTasks() {
                   collapsible
                   compounds={openingCompounds}
                   today={today}
-                  status={habitStatusFilter}
+                  status="active"
                   variant="list"
                   onEditCompound={(compound) => {
                     setShowHabitForm(false);
@@ -1375,11 +1316,9 @@ export default function HabitsTasks() {
                       <SinceHabitCard
                         key={habit.id}
                         habit={habit}
-                        compact={compact}
                         trailing={(
                           <HabitRowMenu
                             label={cleanPriorityPrefix(habit.title)}
-                            habit={habit}
                             busy={reorderHabits.isPending}
                             disableUp
                             disableDown
@@ -1390,7 +1329,6 @@ export default function HabitsTasks() {
                               setEditingHabit(habit);
                             }}
                             onDelete={() => confirmDeleteHabit(habit)}
-                            onSetStatus={(status) => setHabitStatus.mutate({ id: habit.id, status })}
                           />
                         )}
                       />
@@ -1415,15 +1353,10 @@ export default function HabitsTasks() {
                         !isSince && skipped && 'border-amber-500/25 bg-amber-500/[0.08]',
                       )}
                     >
-                      <CardContent
-                        className={cn(
-                          'flex items-center gap-2 sm:gap-3',
-                          compact ? 'p-2.5 sm:p-3' : 'flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5',
-                        )}
-                      >
+                      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
                         {isSince ? (
-                          <div className={cn('flex shrink-0 items-center justify-center rounded-full bg-domain-gold/10 text-domain-gold', compact ? 'h-6 w-6' : 'h-8 w-8')}>
-                            <Clock className={cn(compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} aria-hidden />
+                          <div className="flex shrink-0 items-center justify-center rounded-full bg-domain-gold/10 text-domain-gold h-8 w-8">
+                            <Clock className="h-4 w-4" aria-hidden />
                           </div>
                         ) : canCheckIn ? (
                           <button
@@ -1444,22 +1377,19 @@ export default function HabitsTasks() {
                             }
                           >
                             {done ? (
-                              <CheckCircle2 className={cn(compact ? 'h-4 w-4' : 'h-5 w-5', 'text-domain-wellness')} />
+                              <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
                             ) : skipped ? (
-                              <span className={cn(
-                                'flex items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400',
-                                compact ? 'h-4 w-4' : 'h-5 w-5',
-                              )}>
-                                <Minus className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+                              <span className="flex items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400 h-5 w-5">
+                                <Minus className="h-3 w-3" />
                               </span>
                             ) : (
-                              <Circle className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+                              <Circle className="h-5 w-5" />
                             )}
                           </button>
                         ) : (
-                          <div className={cn('shrink-0', compact ? 'h-4 w-4' : 'h-5 w-5')} aria-hidden />
+                          <div className="shrink-0 h-5 w-5" aria-hidden />
                         )}
-                        {!compact && !isSince && (
+                        {!isSince && (
                           <Flame className={cn(
                             'shrink-0 h-5 w-5 text-primary',
                             done && 'text-domain-wellness',
@@ -1467,11 +1397,10 @@ export default function HabitsTasks() {
                           )} />
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', compact && 'gap-1')}>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <p
                               className={cn(
-                                'font-semibold leading-snug',
-                                compact ? 'text-sm truncate' : 'text-base',
+                                'font-semibold leading-snug text-base',
                                 !isSince && done && 'text-domain-wellness line-through opacity-80',
                                 !isSince && skipped && 'text-muted-foreground opacity-75',
                               )}
@@ -1506,11 +1435,6 @@ export default function HabitsTasks() {
                             {!isSince && habit.current_streak > 0 && (
                               <span className="text-[10px] text-orange-400 shrink-0">🔥{habit.current_streak}</span>
                             )}
-                            {habit.status !== 'active' && (
-                              <Badge variant="outline" className="text-[10px]">
-                                {HABIT_STATUS_LABELS[habit.status]}
-                              </Badge>
-                            )}
                           </div>
                           {isSince && (
                             <p className="mt-1 text-xs text-muted-foreground">
@@ -1523,7 +1447,7 @@ export default function HabitsTasks() {
                               “{todayLog.note}”
                             </p>
                           ) : null}
-                          {!compact && !isSince && (
+                          {!isSince && (
                             <>
                               <Badge variant="outline" className="mt-1.5 text-xs">
                                 {formatFrequencyLabel(habit)}
@@ -1566,7 +1490,6 @@ export default function HabitsTasks() {
                         ) : null}
                         <HabitRowMenu
                           label={cleanPriorityPrefix(habit.title)}
-                          habit={habit}
                           busy={reorderHabits.isPending || skipHabit.isPending}
                           canCheckIn={canCheckIn}
                           dayOutcome={outcome}
@@ -1576,7 +1499,6 @@ export default function HabitsTasks() {
                           onMoveDown={() => moveHabit(habit.id, 1)}
                           onEdit={() => { setShowHabitForm(false); setEditingHabit(habit); }}
                           onDelete={() => confirmDeleteHabit(habit)}
-                          onSetStatus={(status) => setHabitStatus.mutate({ id: habit.id, status })}
                           onNaoRolou={() => setSkipSheetHabit(habit)}
                           onUndoDayOutcome={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
                         />
@@ -1588,7 +1510,7 @@ export default function HabitsTasks() {
                   collapsible
                   compounds={closingCompounds}
                   today={today}
-                  status={habitStatusFilter}
+                  status="active"
                   variant="list"
                   onEditCompound={(compound) => {
                     setShowHabitForm(false);

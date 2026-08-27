@@ -187,29 +187,6 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Listas (Hábitos & Tarefas)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Label className="text-sm text-muted-foreground">Densidade da lista</Label>
-          <Select
-            value={user?.list_density === 'compact' ? 'compact' : 'comfortable'}
-            onValueChange={async (v) => {
-              await praxisApi.user.updateSettings({ list_density: v });
-              queryClient.invalidateQueries({ queryKey: ['me'] });
-              toast.success('Densidade atualizada');
-            }}
-          >
-            <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="comfortable">Confortável</SelectItem>
-              <SelectItem value="compact">Compacto</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
       {/* Notificações */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-3">
