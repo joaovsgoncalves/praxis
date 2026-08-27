@@ -75,12 +75,14 @@ export function StatTile({ label, value, tone = 'neutral', valueClassName, align
 
 export function SectionHeading({ kicker, title, trailing, className }) {
   return (
-    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', className)}>
-      <div className="min-w-0 space-y-1">
-        {kicker ? <p className="praxis-kicker-row text-muted-foreground">{kicker}</p> : null}
-        <h2 className="praxis-title text-xl font-semibold leading-tight sm:text-2xl">{title}</h2>
+    <div className={cn('space-y-2', className)}>
+      {kicker ? <p className="praxis-kicker-row text-muted-foreground">{kicker}</p> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {title ? (
+          <h2 className="praxis-title min-w-0 text-xl font-semibold leading-tight sm:text-2xl">{title}</h2>
+        ) : null}
+        {trailing ? <div className="w-full shrink-0 sm:w-auto">{trailing}</div> : null}
       </div>
-      {trailing ? <div className="w-full shrink-0 sm:w-auto">{trailing}</div> : null}
     </div>
   );
 }
@@ -102,7 +104,7 @@ export function PraxisBand({
   contentClassName,
 }) {
   return (
-    <section className={cn('space-y-4', className)}>
+    <section className={cn('space-y-8', className)}>
       {heading || (title || kicker || trailing ? (
         <SectionHeading kicker={kicker} title={title} trailing={trailing} />
       ) : null)}

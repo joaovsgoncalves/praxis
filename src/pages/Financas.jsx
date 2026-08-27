@@ -238,7 +238,7 @@ export default function Financas() {
   }
 
   return (
-    <div className="praxis-page space-y-6">
+    <div className="praxis-page space-y-8">
       <PageHero
         kicker="Dinheiro"
         kickerIcon={Wallet}
@@ -354,7 +354,7 @@ export default function Financas() {
             ) : (
               <div className="h-[140px] w-full pt-1">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={insights.days} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <BarChart data={insights.days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 4% 18%)" vertical={false} />
                     <XAxis
                       dataKey="date"
@@ -365,12 +365,10 @@ export default function Financas() {
                       }}
                       tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
                       interval="preserveStartEnd"
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis
-                      tickFormatter={(v) => `R$ ${v}`}
-                      tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
-                      width={45}
-                    />
+                    <YAxis hide />
                     <Tooltip
                       contentStyle={{
                         background: "hsl(240 5% 10%)",
@@ -396,8 +394,8 @@ export default function Financas() {
       </div>
 
       {tab === "agora" ? (
-        <div className="space-y-6">
-          <section className="space-y-3">
+        <div className="space-y-8">
+          <section className="space-y-4">
             <SectionHeading title="Reservas deste mês" kicker="Antes de qualquer cartão" />
             <div className="grid gap-3 sm:grid-cols-3">
               <Card className="border-white/10 bg-white/[0.03]">
