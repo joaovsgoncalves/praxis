@@ -32,13 +32,28 @@ function sanitizeError(msg) {
     .slice(0, 500);
 }
 
+function asList(raw, keys = []) {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== 'object') return [];
+  for (const k of keys) {
+    if (Array.isArray(raw[k])) return raw[k];
+  }
+  if (Array.isArray(raw.data)) return raw.data;
+  if (raw.data && typeof raw.data === 'object') {
+    for (const k of keys) {
+      if (Array.isArray(raw.data[k])) return raw.data[k];
+    }
+  }
+  return [];
+}
+
 function normalizeInstitution(raw) {
   const str = String(raw || '').toLowerCase().trim();
   if (str.includes('inter')) return 'inter';
   if (str.includes('c6')) return 'c6';
   if (str.includes('mercado') || str.includes('mp')) return 'mp';
   if (str.includes('santander')) return 'santander';
-  if (str.includes('nubank')) return 'nubank';
+  if (str.includes('nubank') || str.includes('nu pagamentos') || str === 'nu') return 'nubank';
   if (str.includes('picpay')) return 'picpay';
   return str || 'other';
 }
@@ -122,14 +137,12 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
     const existingAccounts = listAccounts(db, { status: 'all' });
     const pierreToLocalAccount = new Map();
 
-    const rawAccounts = Array.isArray(accountsData)
-      ? accountsData
-      : (accountsData?.accounts || accountsData?.data || []);
+    const rawAccounts = asList(accountsData, ['accounts', 'data']);
 
     for (const raw of rawAccounts) {
       const pId = String(raw.id || raw.accountId || raw.account_id || '');
       if (!pId) continue;
-      const inst = normalizeInstitution(raw.institution || raw.bank || raw.name);
+      const inst = normalizeInstitution(raw.connectorName || raw.institution || raw.bank || raw.marketingName || raw.name);
       const kind = normalizeKind(raw.type || raw.kind);
       const mask = String(raw.mask || raw.number || raw.accountNumber || '').slice(-4);
       const name = String(raw.name || raw.accountName || raw.nickname || inst);
@@ -172,9 +185,7 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
       accountsCount++;
     }
 
-    const rawBalances = Array.isArray(balanceData)
-      ? balanceData
-      : (balanceData?.balances || balanceData?.accounts || balanceData?.data || []);
+    const rawBalances = asList(balanceData, ['accounts', 'balances']);
 
     for (const b of rawBalances) {
       const pId = String(b.accountId || b.account_id || b.id || '');
@@ -205,9 +216,7 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
       });
     }
 
-    const rawBills = Array.isArray(billData)
-      ? billData
-      : (billData?.bills || billData?.data || (billData?.amount !== undefined ? [billData] : []));
+    const rawBills = asList(billData, ['accounts', 'bills']);
 
     for (const bill of rawBills) {
       const pId = String(bill.accountId || bill.account_id || bill.id || '');
@@ -253,9 +262,7 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
       }
     }
 
-    const rawTxs = Array.isArray(statementData)
-      ? statementData
-      : (statementData?.transactions || statementData?.statement || statementData?.data || []);
+    const rawTxs = asList(statementData, ['transactions', 'statement', 'items']);
 
     for (const tx of rawTxs) {
       const pTxId = String(tx.id || tx.transactionId || tx.txId || tx.pierre_tx_id || '');
@@ -316,9 +323,7 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
       txCount++;
     }
 
-    const rawInsts = Array.isArray(installmentsData)
-      ? installmentsData
-      : (installmentsData?.installments || installmentsData?.data || []);
+    const rawInsts = asList(installmentsData, ['purchases', 'installments']);
 
     const existingInsts = listInstallments(db, { status: 'all' });
     for (const inst of rawInsts) {
