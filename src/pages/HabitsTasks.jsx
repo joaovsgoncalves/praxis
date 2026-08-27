@@ -981,7 +981,7 @@ export default function HabitsTasks() {
         <div className={cn('grid gap-6', view === 'all' && lens === 'list' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
         {(view === 'all' || view === 'tasks') && (
           <section className="min-w-0 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="praxis-kicker">Execução</p>
                 <h2 className="praxis-title text-2xl font-semibold">
@@ -1247,7 +1247,7 @@ export default function HabitsTasks() {
 
         {(view === 'all' || view === 'habits') && lens === 'list' && (
           <section className="min-w-0 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="praxis-kicker">Consistência</p>
                 <h2 className="praxis-title text-2xl font-semibold">

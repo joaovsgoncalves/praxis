@@ -73,14 +73,66 @@ export function StatTile({ label, value, tone = 'neutral', valueClassName, align
   );
 }
 
-export function SectionHeading({ kicker, title, trailing }) {
+export function SectionHeading({ kicker, title, trailing, className }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', className)}>
       <div className="min-w-0 space-y-1">
         {kicker ? <p className="praxis-kicker-row text-muted-foreground">{kicker}</p> : null}
         <h2 className="praxis-title text-xl font-semibold leading-tight sm:text-2xl">{title}</h2>
       </div>
       {trailing ? <div className="w-full shrink-0 sm:w-auto">{trailing}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Faixa de conteúdo composta — heading 100% largura no topo; grid de conteúdo abaixo.
+ * Garante que o trilho lateral ou colunas comecem abaixo da linha do título,
+ * com topo de card alinhado (items-stretch). Trilho nunca compartilha a row do h2.
+ */
+export function PraxisBand({
+  kicker,
+  title,
+  trailing,
+  heading,
+  aside,
+  asideWidth = 'xl:grid-cols-[minmax(0,1fr)_300px]',
+  children,
+  className,
+  contentClassName,
+}) {
+  return (
+    <section className={cn('space-y-4', className)}>
+      {heading || (title || kicker || trailing ? (
+        <SectionHeading kicker={kicker} title={title} trailing={trailing} />
+      ) : null)}
+      {aside ? (
+        <PraxisSplit aside={aside} asideWidth={asideWidth} className={contentClassName}>
+          {children}
+        </PraxisSplit>
+      ) : (
+        <div className={contentClassName}>{children}</div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Grid de conteúdo principal + trilho lateral.
+ * Começa abaixo do heading, com items-stretch e alinhamento no topo dos cards.
+ * Em viewports estreitas (< xl), o aside empilha abaixo da lista sem esmagar.
+ */
+export function PraxisSplit({
+  children,
+  aside,
+  asideWidth = 'xl:grid-cols-[minmax(0,1fr)_300px]',
+  className,
+}) {
+  if (!aside) return children;
+  return (
+    <div className={cn('grid gap-6 items-stretch', asideWidth, className)}>
+      <div className="min-w-0 space-y-3">{children}</div>
+      <aside className="space-y-4">{aside}</aside>
     </div>
   );
 }

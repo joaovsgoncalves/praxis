@@ -302,7 +302,7 @@ export default function Projects() {
           />
         ) : (
           <section>
-            <div className="mb-3 flex items-end justify-between gap-4 px-0.5">
+            <div className="mb-3 flex items-center justify-between gap-4 px-0.5">
               <div>
                 <p className="text-sm font-semibold text-stone-100">Mapa das frentes</p>
                 <p className="mt-0.5 text-xs text-muted-foreground/65">Aqui é só para saber onde cada coisa está. Clique para ver o contexto.</p>

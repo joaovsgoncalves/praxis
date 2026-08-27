@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ShoppingBag, ExternalLink, Check, Pause, Trash2 } from 'lucide-react';
-import { PageHero, StatGrid, StatTile, SectionHeading, PraxisEmptyState, PraxisColumnsSkeleton } from '@/components/layout/PraxisPage';
+import { PageHero, StatGrid, StatTile, PraxisBand, PraxisEmptyState, PraxisColumnsSkeleton } from '@/components/layout/PraxisPage';
 import PurchaseForm from '@/components/purchases/PurchaseForm';
 import {
   PURCHASE_HORIZON_LABELS,
@@ -106,8 +106,7 @@ export default function Compras() {
         </StatGrid>
       </PageHero>
 
-      <div className="mt-6 space-y-6">
-      <SectionHeading
+      <PraxisBand
         kicker="Filtro"
         title="Sua lista"
         trailing={(
@@ -135,122 +134,122 @@ export default function Compras() {
             </Select>
           </div>
         )}
-      />
-
-      {isLoading ? (
-        <PraxisColumnsSkeleton columns={3} rowsPerColumn={2} />
-      ) : visible.length === 0 ? (
-        <PraxisEmptyState
-          icon={ShoppingBag}
-          title="Lista vazia neste filtro"
-          description="Anote o que quer comprar — curto, médio ou longo prazo. Sem data obrigatória."
-          action={(
-            <Button onClick={() => setShowForm(true)} className="rounded-full praxis-touch-target">
-              <Plus className="mr-1.5 h-4 w-4" /> Novo item
-            </Button>
-          )}
-        />
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {HORIZON_ORDER.map((h) => {
-            const col = grouped[h];
-            if (horizonView !== 'all' && horizonView !== h) return null;
-            if (!col.length && horizonView === 'all') {
+      >
+        {isLoading ? (
+          <PraxisColumnsSkeleton columns={3} rowsPerColumn={2} />
+        ) : visible.length === 0 ? (
+          <PraxisEmptyState
+            icon={ShoppingBag}
+            title="Lista vazia neste filtro"
+            description="Anote o que quer comprar — curto, médio ou longo prazo. Sem data obrigatória."
+            action={(
+              <Button onClick={() => setShowForm(true)} className="rounded-full praxis-touch-target">
+                <Plus className="mr-1.5 h-4 w-4" /> Novo item
+              </Button>
+            )}
+          />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-3 items-stretch">
+            {HORIZON_ORDER.map((h) => {
+              const col = grouped[h];
+              if (horizonView !== 'all' && horizonView !== h) return null;
+              if (!col.length && horizonView === 'all') {
+                return (
+                  <div key={h} className="flex flex-col space-y-3">
+                    <div className="min-h-[2.5rem]">
+                      <p className="praxis-kicker-row">{PURCHASE_HORIZON_LABELS[h]}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{PURCHASE_HORIZON_HINTS[h]}</p>
+                    </div>
+                    <Card className="border-dashed border-white/5 bg-card/30 flex-1">
+                      <CardContent className="px-4 py-5 text-left text-xs leading-relaxed text-muted-foreground">
+                        Nenhum item aqui ainda.
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              }
+              if (!col.length) return null;
               return (
-                <div key={h} className="space-y-2">
-                  <p className="praxis-kicker-row">{PURCHASE_HORIZON_LABELS[h]}</p>
-                  <p className="text-xs text-muted-foreground">{PURCHASE_HORIZON_HINTS[h]}</p>
-                  <Card className="border-dashed border-white/5 bg-card/30">
-                    <CardContent className="px-4 py-5 text-left text-xs leading-relaxed text-muted-foreground">
-                      Nenhum item aqui ainda.
-                    </CardContent>
-                  </Card>
-                </div>
-              );
-            }
-            if (!col.length) return null;
-            return (
-              <div key={h} className="space-y-3">
-                <div>
-                  <p className="praxis-kicker-row">{PURCHASE_HORIZON_LABELS[h]}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{PURCHASE_HORIZON_HINTS[h]}</p>
-                </div>
-                <ul className="space-y-2">
-                  {col.map((item) => (
-                    <li key={item.id}>
-                      <Card className={cn('border-white/8', item.status === 'bought' && 'opacity-70')}>
-                        <CardContent className="space-y-2 p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium leading-snug">{item.title}</p>
-                            <Badge variant="outline" className="shrink-0 text-[10px]">
-                              {PURCHASE_STATUS_LABELS[item.status] || item.status}
-                            </Badge>
-                          </div>
-                          {item.price_estimate ? (
-                            <p className="text-xs text-muted-foreground tabular-nums">{item.price_estimate}</p>
-                          ) : null}
-                          {item.notes ? (
-                            <p className="text-xs text-muted-foreground line-clamp-2">{item.notes}</p>
-                          ) : null}
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {item.url ? (
-                              <Button asChild size="sm" variant="ghost" className="h-8 px-2">
-                                <a href={item.url} target="_blank" rel="noreferrer">
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              </Button>
+                <div key={h} className="flex flex-col space-y-3">
+                  <div className="min-h-[2.5rem]">
+                    <p className="praxis-kicker-row">{PURCHASE_HORIZON_LABELS[h]}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{PURCHASE_HORIZON_HINTS[h]}</p>
+                  </div>
+                  <ul className="space-y-2 flex-1">
+                    {col.map((item) => (
+                      <li key={item.id}>
+                        <Card className={cn('border-white/8', item.status === 'bought' && 'opacity-70')}>
+                          <CardContent className="space-y-2 p-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium leading-snug">{item.title}</p>
+                              <Badge variant="outline" className="shrink-0 text-[10px]">
+                                {PURCHASE_STATUS_LABELS[item.status] || item.status}
+                              </Badge>
+                            </div>
+                            {item.price_estimate ? (
+                              <p className="text-xs text-muted-foreground tabular-nums">{item.price_estimate}</p>
                             ) : null}
-                            {item.status === 'want' ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  className="h-8 rounded-full text-xs"
-                                  onClick={() => updateItem.mutate({ id: item.id, data: { status: 'bought' } })}
-                                >
-                                  <Check className="h-3 w-3 mr-1" /> Comprei
+                            {item.notes ? (
+                              <p className="text-xs text-muted-foreground line-clamp-2">{item.notes}</p>
+                            ) : null}
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {item.url ? (
+                                <Button asChild size="sm" variant="ghost" className="h-8 px-2">
+                                  <a href={item.url} target="_blank" rel="noreferrer">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </a>
                                 </Button>
+                              ) : null}
+                              {item.status === 'want' ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-8 rounded-full text-xs"
+                                    onClick={() => updateItem.mutate({ id: item.id, data: { status: 'bought' } })}
+                                  >
+                                    <Check className="h-3 w-3 mr-1" /> Comprei
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-full text-xs"
+                                    onClick={() => updateItem.mutate({ id: item.id, data: { status: 'paused' } })}
+                                  >
+                                    <Pause className="h-3 w-3 mr-1" /> Pausar
+                                  </Button>
+                                </>
+                              ) : null}
+                              {item.status === 'paused' ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="h-8 rounded-full text-xs"
-                                  onClick={() => updateItem.mutate({ id: item.id, data: { status: 'paused' } })}
+                                  onClick={() => updateItem.mutate({ id: item.id, data: { status: 'want' } })}
                                 >
-                                  <Pause className="h-3 w-3 mr-1" /> Pausar
+                                  Voltar à lista
                                 </Button>
-                              </>
-                            ) : null}
-                            {item.status === 'paused' ? (
+                              ) : null}
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="h-8 rounded-full text-xs"
-                                onClick={() => updateItem.mutate({ id: item.id, data: { status: 'want' } })}
+                                variant="ghost"
+                                className="h-8 text-destructive/80"
+                                onClick={() => deleteItem.mutate(item.id)}
                               >
-                                Voltar à lista
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
-                            ) : null}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 text-destructive/80"
-                              onClick={() => deleteItem.mutate(item.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </PraxisBand>
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)]">

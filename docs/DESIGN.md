@@ -24,7 +24,8 @@ Quando o pedido for **ajuste geral de design**, aplicar o mesmo padrão em **tod
 
 - Container: `.praxis-page` (max-w-6xl).
 - Hero: `PageHero` + `StatGrid` / `StatTile` (`src/components/layout/PraxisPage.jsx`).
-- Seções: `SectionHeading` (kicker + h2 + ação à direita).
+- Seções: `SectionHeading` (kicker + h2 + ação à direita com `sm:items-center` no desktop).
+- Composição (`PraxisBand` / `PraxisSplit`): faixa de título/filtro em 100% de largura; miolo (lista | trilho ou colunas) começa **abaixo**, com topo de cards alinhados (`items-stretch`). Trilho lateral nunca compartilha a row do h2.
 
 ## Cores por área (domain)
 
