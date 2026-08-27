@@ -21,7 +21,6 @@ import {
   listSubscriptions,
   listTransactions,
   payDebt,
-  recordSyncAttempt,
   seedFinanceIfEmpty,
   updateAccount,
   updateDebt,
@@ -31,6 +30,7 @@ import {
   updateSubscription,
   updateTransaction,
 } from '../finance.js';
+import { syncPierre } from '../pierreSync.js';
 
 function sendError(res, err) {
   const status = err.status || 500;
@@ -224,13 +224,32 @@ export function createFinanceRouter({ db, getLocalDateString }) {
     res.json(lastSync(db) || { ok: false, error: 'never' });
   });
 
-  router.post('/sync', (_req, res) => {
-    const log = recordSyncAttempt(db, {
-      ok: false,
-      error: 'pierre_not_configured',
-      actor: 'joao',
-    });
-    res.status(503).json({ error: 'pierre_not_configured', last_sync: log });
+  router.post('/sync', async (req, res) => {
+    try {
+      const actor = req.body?.actor || 'joao';
+      const result = await syncPierre(db, { actor, getLocalDateString });
+      if (!result.configured) {
+        return res.status(503).json({
+          error: 'pierre_not_configured',
+          last_sync: result.last_sync || lastSync(db),
+        });
+      }
+      if (!result.ok) {
+        return res.status(502).json({
+          error: 'pierre_sync_failed',
+          message: result.error || 'sync failed',
+          last_sync: result.last_sync,
+        });
+      }
+      res.json({
+        ok: true,
+        accounts_n: result.accounts_n,
+        tx_n: result.tx_n,
+        last_sync: result.last_sync,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   return router;
