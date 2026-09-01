@@ -57,7 +57,11 @@ export function filterTasksByScope(tasks, scope, today) {
   }
 }
 
-/** Atrasadas no topo; depois data/hora; concluídas por último. */
+/**
+ * Lista = fila de execução. Atrasadas continuam no topo e datas diferentes
+ * continuam cronológicas. Dentro da mesma data, sort_order é canônico.
+ * Horário e prioridade são metadados; não sobrescrevem a ordem do usuário.
+ */
 export function sortTasksForList(a, b, today) {
   const aDone = isTaskDone(a);
   const bDone = isTaskDone(b);
@@ -70,12 +74,16 @@ export function sortTasksForList(a, b, today) {
   const dateCmp = String(a?.date || '9999').localeCompare(String(b?.date || '9999'));
   if (dateCmp !== 0) return dateCmp;
 
-  const timeCmp = String(a?.time || '').localeCompare(String(b?.time || ''));
-  if (timeCmp !== 0) return timeCmp;
-
   const ao = a?.sort_order ?? 9999;
   const bo = b?.sort_order ?? 9999;
-  return ao - bo;
+  if (ao !== bo) return ao - bo;
+
+  const aTime = a?.time ? String(a.time) : '99:99';
+  const bTime = b?.time ? String(b.time) : '99:99';
+  const timeCmp = aTime.localeCompare(bTime);
+  if (timeCmp !== 0) return timeCmp;
+
+  return String(a?.title || '').localeCompare(String(b?.title || ''));
 }
 
 export function sortPendingWithOverdueFirst(pending, today) {

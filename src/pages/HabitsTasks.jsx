@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
-import { Plus, CheckCircle2, Circle, Clock, Flame, Eraser, Archive, ListTodo, Minus } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Clock, Flame, Eraser, Archive, ListTodo, Minus, GripVertical } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
@@ -37,7 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { CATEGORIES, CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
-import { buildMovedOrder } from '@/lib/taskReorder';
+import { buildMovedOrder, buildDragOrder } from '@/lib/taskReorder';
 import { isTaskOpen, isTaskDone, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
@@ -74,6 +74,7 @@ import {
 import { boardColumnForTask, weekRange } from '@/lib/taskLenses';
 import TaskBoard from '@/components/habits-tasks/TaskBoard';
 import TaskWeek from '@/components/habits-tasks/TaskWeek';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 
 const priorityStyles = {
@@ -775,6 +776,17 @@ export default function HabitsTasks() {
     if (orderedIds) reorderTasks.mutate(orderedIds);
   };
 
+  const handleTaskDragEnd = (result) => {
+    if (!result.destination || reorderTasks.isPending) return;
+    const orderedIds = buildDragOrder(
+      tasks,
+      filteredTasks,
+      result.source.index,
+      result.destination.index,
+    );
+    if (orderedIds) reorderTasks.mutate(orderedIds);
+  };
+
   const moveHabit = (habitId, direction) => {
     const orderedIds = buildMovedOrder(habits, flatHabits, habitId, direction);
     if (orderedIds) reorderHabits.mutate(orderedIds);
@@ -1136,10 +1148,21 @@ export default function HabitsTasks() {
                 }
               />
             ) : (
-              <div className="space-y-3">
-                {filteredTasks.map((task, index) => (
-                  <Card key={task.id} className="border-border/80 bg-card/50 overflow-hidden shadow-none">
-                    <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+              <DragDropContext onDragEnd={handleTaskDragEnd}>
+                <Droppable droppableId="task-list">
+                  {(dropProvided) => (
+                    <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-3">
+                      {filteredTasks.map((task, index) => (
+                        <Draggable key={task.id} draggableId={String(task.id)} index={index} isDragDisabled={taskSelectionMode || reorderTasks.isPending}>
+                          {(dragProvided, dragSnapshot) => (
+                            <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} style={dragProvided.draggableProps.style} className={cn(dragSnapshot.isDragging && 'relative z-50')}>
+                              <Card className={cn('border-border/80 bg-card/50 overflow-hidden shadow-none transition-colors', dragSnapshot.isDragging && 'border-primary/40 bg-card shadow-lg')}>
+                                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                                  {!taskSelectionMode && (
+                                    <button type="button" {...dragProvided.dragHandleProps} className="praxis-touch-target shrink-0 cursor-grab rounded-xl p-2 text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing" aria-label="Arrastar tarefa" title="Arraste para mudar a ordem de execução">
+                                      <GripVertical className="h-5 w-5" />
+                                    </button>
+                                  )}
                       {taskSelectionMode && isTaskOpen(task) && (
                         <Checkbox
                           checked={selectedTaskIds.has(task.id)}
@@ -1229,10 +1252,17 @@ export default function HabitsTasks() {
                         }
                         onNotToday={() => notTodayTask.mutate(task.id)}
                       />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {dropProvided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
             )}
           </section>
         )}
