@@ -178,23 +178,25 @@ export default function Compras() {
                   <ul className="space-y-2 flex-1">
                     {col.map((item) => (
                       <li key={item.id}>
-                        <Card className={cn('border-white/8', item.status === 'bought' && 'opacity-70')}>
-                          <CardContent className="space-y-2 p-4">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="font-medium leading-snug">{item.title}</p>
-                              <Badge variant="outline" className="shrink-0 text-[10px]">
-                                {PURCHASE_STATUS_LABELS[item.status] || item.status}
-                              </Badge>
+                        <Card className={cn('border-white/8 flex flex-col min-h-[9.5rem]', item.status === 'bought' && 'opacity-70')}>
+                          <CardContent className="flex flex-1 flex-col justify-between gap-3 p-5 sm:p-5">
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-medium leading-snug">{item.title}</p>
+                                <Badge variant="outline" className="shrink-0 text-[10px]">
+                                  {PURCHASE_STATUS_LABELS[item.status] || item.status}
+                                </Badge>
+                              </div>
+                              {item.price_estimate ? (
+                                <p className="text-xs text-muted-foreground tabular-nums">{item.price_estimate}</p>
+                              ) : null}
+                              {item.notes ? (
+                                <p className="text-xs text-muted-foreground line-clamp-2">{item.notes}</p>
+                              ) : null}
                             </div>
-                            {item.price_estimate ? (
-                              <p className="text-xs text-muted-foreground tabular-nums">{item.price_estimate}</p>
-                            ) : null}
-                            {item.notes ? (
-                              <p className="text-xs text-muted-foreground line-clamp-2">{item.notes}</p>
-                            ) : null}
-                            <div className="flex flex-wrap gap-1.5 pt-1">
+                            <div className="flex items-center flex-wrap gap-1.5 pt-1">
                               {item.url ? (
-                                <Button asChild size="sm" variant="ghost" className="h-8 px-2">
+                                <Button asChild size="sm" variant="ghost" className="h-9 w-9 p-0">
                                   <a href={item.url} target="_blank" rel="noreferrer">
                                     <ExternalLink className="h-3.5 w-3.5" />
                                   </a>
@@ -205,18 +207,18 @@ export default function Compras() {
                                   <Button
                                     size="sm"
                                     variant="secondary"
-                                    className="h-8 rounded-full text-xs"
+                                    className="h-9 rounded-full px-3 text-xs"
                                     onClick={() => updateItem.mutate({ id: item.id, data: { status: 'bought' } })}
                                   >
-                                    <Check className="h-3 w-3 mr-1" /> Comprei
+                                    <Check className="h-3.5 w-3.5 mr-1" /> Comprei
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 rounded-full text-xs"
+                                    className="h-9 rounded-full px-3 text-xs"
                                     onClick={() => updateItem.mutate({ id: item.id, data: { status: 'paused' } })}
                                   >
-                                    <Pause className="h-3 w-3 mr-1" /> Pausar
+                                    <Pause className="h-3.5 w-3.5 mr-1" /> Pausar
                                   </Button>
                                 </>
                               ) : null}
@@ -224,7 +226,7 @@ export default function Compras() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 rounded-full text-xs"
+                                  className="h-9 rounded-full px-3 text-xs"
                                   onClick={() => updateItem.mutate({ id: item.id, data: { status: 'want' } })}
                                 >
                                   Voltar à lista
@@ -233,7 +235,7 @@ export default function Compras() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 text-destructive/80"
+                                className="h-9 w-9 p-0 text-destructive/80"
                                 onClick={() => deleteItem.mutate(item.id)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
