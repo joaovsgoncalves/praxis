@@ -281,7 +281,7 @@ export default function Dashboard() {
   );
 
   const toggleHabitMutation = useMutation({
-    mutationFn: async ({ habitId, isDone }) => {
+    mutationFn: async ({ habitId, isDone, value }) => {
       const logs = habitLogs.filter((l) => l.habit_id === habitId && l.date === today);
       const realLog = logs.find((l) => l.id && !String(l.id).startsWith("temp-"));
       if (isDone && realLog) {
@@ -292,10 +292,11 @@ export default function Dashboard() {
           date: today,
           outcome: "done",
           completed: true,
+          ...(value !== undefined ? { value } : {}),
         });
       }
     },
-    onMutate: async ({ habitId, isDone }) => {
+    onMutate: async ({ habitId, isDone, value }) => {
       await queryClient.cancelQueries({ queryKey: ["habitLogs"] });
       await queryClient.cancelQueries({ queryKey: ["habits"] });
       await queryClient.cancelQueries({ queryKey: ["allHabits"] });
@@ -318,6 +319,7 @@ export default function Dashboard() {
             date: today,
             outcome: "done",
             completed: true,
+            ...(value !== undefined ? { value } : {}),
           },
         ];
       });
@@ -708,7 +710,7 @@ export default function Dashboard() {
                 sinceHabits={sinceHabits}
                 summaryHabits={essentialHabits}
                 habitLogs={habitLogs}
-                onToggleHabit={(habitId, isDone) => toggleHabitMutation.mutate({ habitId, isDone })}
+                onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
                 onSkipHabit={(habitId, skipReason, skipNote) =>
                   skipHabitMutation.mutate({ habitId, skipReason, skipNote })
                 }

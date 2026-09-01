@@ -9,9 +9,11 @@ import {
   countHabitDayOutcomes,
   formatPreferredTime,
   getHabitDayOutcome,
+  isQuantitativeHabit,
   SKIP_REASON_LABELS,
   todayLogForHabit,
 } from '@/lib/habits';
+import QuantLogSheet from '@/components/habits-tasks/QuantLogSheet';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
 import CompoundHabitsWidget from '@/components/dashboard/CompoundHabitsWidget';
 import SinceHabitCard from '@/components/dashboard/SinceHabitCard';
@@ -43,6 +45,7 @@ export default function TodayHabits({
   const longPressTimer = useRef(null);
   const longPressFired = useRef(false);
   const [skipSheetHabit, setSkipSheetHabit] = useState(null);
+  const [quantSheetHabit, setQuantSheetHabit] = useState(null);
 
   const habitsForSummary = summaryHabits || habits;
   const { beforeChecks, afterChecks } = partitionCompoundHabitsForDay(compounds);
@@ -85,6 +88,10 @@ export default function TodayHabits({
       return;
     }
     // open → done
+    if (isQuantitativeHabit(habit)) {
+      setQuantSheetHabit(habit);
+      return;
+    }
     const target = rowRefs.current.get(habit.id);
     const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
     if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
@@ -118,11 +125,16 @@ export default function TodayHabits({
 
   const markDoneFromSheet = () => {
     if (!skipSheetHabit) return;
-    const target = rowRefs.current.get(skipSheetHabit.id);
+    const h = skipSheetHabit;
+    setSkipSheetHabit(null);
+    if (isQuantitativeHabit(h)) {
+      setQuantSheetHabit(h);
+      return;
+    }
+    const target = rowRefs.current.get(h.id);
     const rect = target?.getBoundingClientRect?.();
     if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
-    onToggleHabit?.(skipSheetHabit.id, false);
-    setSkipSheetHabit(null);
+    onToggleHabit?.(h.id, false);
   };
 
   const sheetLog = skipSheetHabit
@@ -360,6 +372,25 @@ export default function TodayHabits({
         onConfirm={confirmSkip}
         onUndo={undoFromSheet}
         onMarkDone={markDoneFromSheet}
+      />
+
+      <QuantLogSheet
+        open={Boolean(quantSheetHabit)}
+        onOpenChange={(open) => {
+          if (!open) setQuantSheetHabit(null);
+        }}
+        habit={quantSheetHabit}
+        currentValue={
+          quantSheetHabit
+            ? todayLogForHabit(habitLogs, quantSheetHabit.id, today)?.value
+            : undefined
+        }
+        onConfirm={(value) => {
+          if (!quantSheetHabit) return;
+          const habitId = quantSheetHabit.id;
+          setQuantSheetHabit(null);
+          onToggleHabit?.(habitId, false, value);
+        }}
       />
     </Card>
   );

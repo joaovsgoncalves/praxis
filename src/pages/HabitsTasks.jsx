@@ -52,6 +52,7 @@ import {
   todayLogForHabit,
 } from '@/lib/habits';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
+import QuantLogSheet from '@/components/habits-tasks/QuantLogSheet';
 import { partitionCompoundHabitsForDay } from '@/lib/compoundHabitOrder';
 import {
   TASK_SCOPE_CHIPS,
@@ -103,6 +104,7 @@ export default function HabitsTasks() {
   const [taskScope, setTaskScope] = useState(() => taskScopeFromSearchParams(searchParams));
   const [lens, setLens] = useState(() => taskLensFromSearchParams(searchParams));
   const [skipSheetHabit, setSkipSheetHabit] = useState(null);
+  const [quantSheetHabit, setQuantSheetHabit] = useState(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState(null);
   const [habitPendingDelete, setHabitPendingDelete] = useState(null);
   const queryClient = useQueryClient();
@@ -680,17 +682,7 @@ export default function HabitsTasks() {
 
   const handleToggleHabit = (habit, isDone, evt) => {
     if (isQuantitativeHabit(habit) && !isDone) {
-      const current = todayLogForHabit(habitLogs, habit.id, today);
-      const target = Number(habit.target_value);
-      const nextDefault = current?.value != null ? Number(current.value) + 1 : 1;
-      const raw = window.prompt(
-        `Quanto registrou hoje? (meta: ${target}${habit.unit ? ` ${habit.unit}` : ''})`,
-        String(nextDefault)
-      );
-      if (raw === null) return;
-      const value = Number(raw);
-      if (Number.isNaN(value) || value < 0) return;
-      toggleHabit.mutate({ habitId: habit.id, isDone: false, value });
+      setQuantSheetHabit(habit);
       return;
     }
     if (!isDone) {
@@ -1687,8 +1679,33 @@ export default function HabitsTasks() {
         }}
         onMarkDone={() => {
           if (!skipSheetHabit) return;
-          toggleHabit.mutate({ habitId: skipSheetHabit.id, isDone: false });
+          const h = skipSheetHabit;
           setSkipSheetHabit(null);
+          if (isQuantitativeHabit(h)) {
+            setQuantSheetHabit(h);
+            return;
+          }
+          toggleHabit.mutate({ habitId: h.id, isDone: false });
+        }}
+      />
+
+      <QuantLogSheet
+        open={Boolean(quantSheetHabit)}
+        onOpenChange={(open) => {
+          if (!open) setQuantSheetHabit(null);
+        }}
+        habit={quantSheetHabit}
+        currentValue={
+          quantSheetHabit
+            ? todayLogForHabit(habitLogs, quantSheetHabit.id, today)?.value
+            : undefined
+        }
+        busy={toggleHabit.isPending}
+        onConfirm={(value) => {
+          if (!quantSheetHabit) return;
+          const habitId = quantSheetHabit.id;
+          setQuantSheetHabit(null);
+          toggleHabit.mutate({ habitId, isDone: false, value });
         }}
       />
 

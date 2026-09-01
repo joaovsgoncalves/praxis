@@ -10,7 +10,8 @@ import { praxisApi } from '@/api/praxisClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { fortalezaDateKey } from '@/lib/dates';
-import { formatPreferredTime } from '@/lib/habits';
+import { formatPreferredTime, isQuantitativeHabit } from '@/lib/habits';
+import QuantLogSheet from '@/components/habits-tasks/QuantLogSheet';
 import { sortCompoundHabitsForDay } from '@/lib/compoundHabitOrder';
 import { toast } from 'sonner';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
@@ -172,7 +173,7 @@ function CompoundHabitItem({
                   'shrink-0 text-gold hover:text-gold',
                   listItem ? 'h-9 px-2.5 text-xs' : 'h-7 px-2 text-[11px]',
                 )}
-                onClick={() => onCompleteMinimum(nextStep.id)}
+                onClick={() => onCompleteMinimum(nextStep)}
               >
                 <Flame className="h-3 w-3" />
                 Mínimo
@@ -211,7 +212,7 @@ function CompoundHabitItem({
                     <Checkbox
                       id={checkboxId}
                       checked={done}
-                      onCheckedChange={() => onToggleHabit(step.id, done)}
+                      onCheckedChange={() => onToggleHabit(step, done)}
                       className={cn(
                         'shrink-0',
                         listItem ? 'h-5 w-5' : 'h-4 w-4',
@@ -325,6 +326,7 @@ export default function CompoundHabitsWidget({
   const habitParams = { date: today, status };
   const compoundQueryKey = ['habits', 'compounds', habitParams];
   const [skipHabitTarget, setSkipHabitTarget] = useState(null);
+  const [quantHabitTarget, setQuantHabitTarget] = useState(null);
   const [editingCompound, setEditingCompound] = useState(null);
 
   const { data: queriedHabits = [], isLoading, isError } = useQuery({
@@ -338,7 +340,7 @@ export default function CompoundHabitsWidget({
   const compounds = sortCompoundHabitsForDay(compoundsRaw);
 
   const toggleHabitMutation = useMutation({
-    mutationFn: async ({ habitId, isDone }) => {
+    mutationFn: async ({ habitId, isDone, value }) => {
       if (isDone) {
         const logs = await praxisApi.habitLogs.list({ habit_id: habitId, date: today });
         if (logs.length > 0) await praxisApi.habitLogs.delete(logs[0].id);
@@ -348,10 +350,11 @@ export default function CompoundHabitsWidget({
           date: today,
           outcome: 'done',
           completed: true,
+          ...(value !== undefined ? { value } : {}),
         });
       }
     },
-    onMutate: async ({ habitId, isDone }) => {
+    onMutate: async ({ habitId, isDone, value }) => {
       await queryClient.cancelQueries({ queryKey: ['habits'] });
       await queryClient.cancelQueries({ queryKey: ['allHabits'] });
       await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
@@ -406,6 +409,7 @@ export default function CompoundHabitsWidget({
             date: today,
             outcome: 'done',
             completed: true,
+            ...(value !== undefined ? { value } : {}),
           },
         ];
       });
@@ -549,14 +553,26 @@ export default function CompoundHabitsWidget({
               compound={compound}
               collapsible={collapsible}
               listItem={variant !== 'card'}
-              onToggleHabit={(habitId, isDone) =>
-                toggleHabitMutation.mutate({ habitId, isDone })
-              }
+              onToggleHabit={(stepOrId, isDone) => {
+                const step = typeof stepOrId === 'object' ? stepOrId : compound.children?.find((c) => c.id === stepOrId);
+                if (step && isQuantitativeHabit(step) && !isDone) {
+                  setQuantHabitTarget(step);
+                  return;
+                }
+                const habitId = typeof stepOrId === 'object' ? stepOrId.id : stepOrId;
+                toggleHabitMutation.mutate({ habitId, isDone });
+              }}
               onOpenSkip={setSkipHabitTarget}
               onEditCompound={openCompoundEditor}
-              onCompleteMinimum={(habitId) =>
-                toggleHabitMutation.mutate({ habitId, isDone: false })
-              }
+              onCompleteMinimum={(stepOrId) => {
+                const step = typeof stepOrId === 'object' ? stepOrId : compound.children?.find((c) => c.id === stepOrId);
+                if (step && isQuantitativeHabit(step)) {
+                  setQuantHabitTarget(step);
+                  return;
+                }
+                const habitId = typeof stepOrId === 'object' ? stepOrId.id : stepOrId;
+                toggleHabitMutation.mutate({ habitId, isDone: false });
+              }}
             />
           ))}
         </div>
@@ -607,8 +623,33 @@ export default function CompoundHabitsWidget({
         }}
         onMarkDone={() => {
           if (!skipHabitTarget) return;
-          toggleHabitMutation.mutate({ habitId: skipHabitTarget.id, isDone: false });
+          const target = skipHabitTarget;
           setSkipHabitTarget(null);
+          if (isQuantitativeHabit(target)) {
+            setQuantHabitTarget(target);
+            return;
+          }
+          toggleHabitMutation.mutate({ habitId: target.id, isDone: false });
+        }}
+      />
+
+      <QuantLogSheet
+        open={Boolean(quantHabitTarget)}
+        onOpenChange={(open) => {
+          if (!open) setQuantHabitTarget(null);
+        }}
+        habit={quantHabitTarget}
+        currentValue={
+          quantHabitTarget
+            ? (quantHabitTarget.value_today ?? quantHabitTarget.value ?? undefined)
+            : undefined
+        }
+        busy={toggleHabitMutation.isPending}
+        onConfirm={(value) => {
+          if (!quantHabitTarget) return;
+          const habitId = quantHabitTarget.id;
+          setQuantHabitTarget(null);
+          toggleHabitMutation.mutate({ habitId, isDone: false, value });
         }}
       />
 
