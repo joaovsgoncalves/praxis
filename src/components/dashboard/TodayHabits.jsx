@@ -103,7 +103,13 @@ export default function TodayHabits({
     clearLongPress();
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;
-      openSkipSheet(habit);
+      const log = todayLogForHabit(habitLogs, habit.id, today);
+      const outcome = getHabitDayOutcome(log);
+      if (outcome === 'skipped') {
+        onToggleHabit?.(habit.id, true);
+      } else {
+        onSkipHabit?.(habit.id);
+      }
     }, LONG_PRESS_MS);
   };
 
@@ -277,17 +283,30 @@ export default function TodayHabits({
 
               <div className="flex items-center gap-1 shrink-0">
                 {skipped ? (
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground touch-manipulation"
-                    aria-label={`Abrir não rolou — ${habit.title}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openSkipSheet(habit);
-                    }}
-                  >
-                    Nomear
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground touch-manipulation"
+                      aria-label={`Nomear motivo — ${habit.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openSkipSheet(habit);
+                      }}
+                    >
+                      Nomear
+                    </button>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground touch-manipulation"
+                      aria-label={`Desfazer não rolou — ${habit.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleHabit?.(habit.id, true);
+                      }}
+                    >
+                      Desfazer
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -295,7 +314,7 @@ export default function TodayHabits({
                     aria-label={`Não rolou — ${habit.title}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      openSkipSheet(habit);
+                      onSkipHabit?.(habit.id);
                     }}
                   >
                     Não rolou
@@ -314,19 +333,29 @@ export default function TodayHabits({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44">
                     {skipped ? (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleHabit?.(habit.id, true);
-                        }}
-                      >
-                        Desfazer não rolou
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSkipSheet(habit);
+                          }}
+                        >
+                          Nomear falha
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleHabit?.(habit.id, true);
+                          }}
+                        >
+                          Desfazer não rolou
+                        </DropdownMenuItem>
+                      </>
                     ) : (
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
-                          openSkipSheet(habit);
+                          onSkipHabit?.(habit.id);
                         }}
                       >
                         <Minus className="mr-2 h-4 w-4" /> Não rolou

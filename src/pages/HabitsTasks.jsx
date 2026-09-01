@@ -1463,22 +1463,34 @@ export default function HabitsTasks() {
                             size="sm"
                             className="shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 text-[11px] text-amber-100 hover:bg-amber-500/20"
                             disabled={skipHabit.isPending}
-                            onClick={() => setSkipSheetHabit(habit)}
+                            onClick={() => skipHabit.mutate({ habitId: habit.id })}
                           >
                             Não rolou
                           </Button>
                         ) : null}
                         {!isSince && canCheckIn && outcome === 'skipped' ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0 rounded-full text-[11px]"
-                            disabled={toggleHabit.isPending}
-                            onClick={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
-                          >
-                            Desfazer
-                          </Button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="shrink-0 rounded-full text-[11px] text-muted-foreground hover:text-foreground"
+                              disabled={skipHabit.isPending}
+                              onClick={() => setSkipSheetHabit(habit)}
+                            >
+                              Nomear
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 rounded-full text-[11px]"
+                              disabled={toggleHabit.isPending}
+                              onClick={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
+                            >
+                              Desfazer
+                            </Button>
+                          </div>
                         ) : null}
                         <HabitRowMenu
                           label={cleanPriorityPrefix(habit.title)}
@@ -1491,7 +1503,8 @@ export default function HabitsTasks() {
                           onMoveDown={() => moveHabit(habit.id, 1)}
                           onEdit={() => { setShowHabitForm(false); setEditingHabit(habit); }}
                           onDelete={() => confirmDeleteHabit(habit)}
-                          onNaoRolou={() => setSkipSheetHabit(habit)}
+                          onNaoRolou={() => skipHabit.mutate({ habitId: habit.id })}
+                          onNomear={() => setSkipSheetHabit(habit)}
                           onUndoDayOutcome={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
                         />
                       </CardContent>

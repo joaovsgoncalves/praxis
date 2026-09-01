@@ -66,6 +66,7 @@ export function HabitRowMenu({
   onEdit,
   onDelete,
   onNaoRolou,
+  onNomear,
   onUndoDayOutcome,
   dayOutcome,
   canCheckIn = false,
@@ -100,6 +101,11 @@ export function HabitRowMenu({
         {canCheckIn && dayOutcome !== 'skipped' && onNaoRolou ? (
           <DropdownMenuItem onClick={onNaoRolou}>
             <MinusCircle className="mr-2 h-4 w-4" /> Não rolou
+          </DropdownMenuItem>
+        ) : null}
+        {canCheckIn && dayOutcome === 'skipped' && onNomear ? (
+          <DropdownMenuItem onClick={onNomear}>
+            Nomear falha
           </DropdownMenuItem>
         ) : null}
         {canCheckIn && (dayOutcome === 'done' || dayOutcome === 'skipped') && onUndoDayOutcome ? (

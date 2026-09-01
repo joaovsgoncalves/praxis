@@ -35,6 +35,7 @@ function ConfettiOverlay() {
 function CompoundHabitItem({
   compound,
   onToggleHabit,
+  onSkipHabit,
   onOpenSkip,
   onCompleteMinimum,
   onEditCompound,
@@ -277,18 +278,32 @@ function CompoundHabitItem({
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   {skipped ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className={cn(
-                        'shrink-0 text-muted-foreground',
-                        listItem ? 'h-11 min-w-[4.5rem] px-3 text-xs' : 'h-7 px-2 text-[11px]',
-                      )}
-                      onClick={() => onOpenSkip(step)}
-                    >
-                      Nomear
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className={cn(
+                          'shrink-0 text-muted-foreground hover:text-foreground',
+                          listItem ? 'h-11 px-2.5 text-xs' : 'h-7 px-2 text-[11px]',
+                        )}
+                        onClick={() => onOpenSkip(step)}
+                      >
+                        Nomear
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={cn(
+                          'shrink-0 rounded-full text-muted-foreground hover:text-foreground',
+                          listItem ? 'h-11 px-3 text-xs' : 'h-7 px-2 text-[11px]',
+                        )}
+                        onClick={() => onToggleHabit(step, true)}
+                      >
+                        Desfazer
+                      </Button>
+                    </div>
                   ) : !done ? (
                     <Button
                       type="button"
@@ -298,7 +313,7 @@ function CompoundHabitItem({
                         'shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20',
                         listItem ? 'h-11 min-w-[5.5rem] px-3 text-xs font-medium' : 'h-7 px-2 text-[11px]',
                       )}
-                      onClick={() => onOpenSkip(step)}
+                      onClick={() => onSkipHabit?.(step)}
                     >
                       Não rolou
                     </Button>
@@ -561,6 +576,10 @@ export default function CompoundHabitsWidget({
                 }
                 const habitId = typeof stepOrId === 'object' ? stepOrId.id : stepOrId;
                 toggleHabitMutation.mutate({ habitId, isDone });
+              }}
+              onSkipHabit={(stepOrId) => {
+                const habitId = typeof stepOrId === 'object' ? stepOrId.id : stepOrId;
+                skipHabitMutation.mutate({ habitId });
               }}
               onOpenSkip={setSkipHabitTarget}
               onEditCompound={openCompoundEditor}
