@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
-import { seedFinanceIfEmpty } from './finance.js';
+import { detectAmountKind, seedFinanceIfEmpty } from './finance.js';
 import { createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
 
 async function mountFinance(t, { seed = true, today = '2026-08-12' } = {}) {
@@ -415,4 +415,123 @@ test('sync with Pierre failure returns 502 without leaking secret or crashing', 
   // Overview still responds normally
   const overview = await requestJson(server.base, '/api/finance/overview');
   assert.equal(overview.caixa, 1103.62);
+});
+
+test('sync imports invested balance even when available=0 is locked by joao', async (t) => {
+  const prevKey = process.env.PIERRE_API_KEY;
+  process.env.PIERRE_API_KEY = 'mock-test-key-123';
+  t.after(() => {
+    if (prevKey !== undefined) process.env.PIERRE_API_KEY = prevKey;
+    else delete process.env.PIERRE_API_KEY;
+  });
+
+  mockPierreFetch(t, {
+    balances: {
+      balances: [
+        { accountId: 'p-acc-inter', amount: 0, date: '2026-08-27' },
+        {
+          accountId: 'p-acc-inter',
+          amount: 1882.94,
+          name: 'Inter auto-invest',
+          type: 'auto-invest',
+          date: '2026-08-27',
+        },
+      ],
+    },
+  });
+
+  const { server } = await mountFinance(t);
+
+  // POST balance Inter available=0 locked joao
+  await requestJson(server.base, '/api/finance/balances', {
+    method: 'POST',
+    body: {
+      account_id: 'acc-inter',
+      amount: 0,
+      amount_kind: 'available',
+      as_of: '2026-08-27',
+      source: 'joao',
+      locked: true,
+      note: 'Saldo zerado no app Inter pelo Joao',
+    },
+  });
+
+  // POST sync
+  const syncRes = await requestJson(server.base, '/api/finance/sync', { method: 'POST' });
+  assert.equal(syncRes.ok, true);
+
+  // overview.caixa === 0
+  const overview = await requestJson(server.base, '/api/finance/overview');
+  assert.equal(overview.caixa, 0);
+
+  // overview.invested === 1882.94
+  assert.equal(overview.invested, 1882.94);
+
+  // listAccounts also has invested on Inter
+  const accounts = await requestJson(server.base, '/api/finance/accounts');
+  const inter = accounts.find((a) => a.id === 'acc-inter');
+  assert.ok(inter);
+  assert.equal(inter.invested, 1882.94);
+  assert.equal(inter.available, 0);
+
+  // Nubank debt ainda existe
+  const debts = await requestJson(server.base, '/api/finance/debts');
+  const nubank = debts.find((d) => d.id === 'debt-nubank');
+  assert.ok(nubank);
+  assert.equal(nubank.balance, 3227);
+});
+
+test('detectAmountKind recognizes invested and bill kinds', () => {
+  assert.equal(detectAmountKind({ name: 'Inter Auto-invest' }), 'invested');
+  assert.equal(detectAmountKind({ type: 'auto-invest' }), 'invested');
+  assert.equal(detectAmountKind({ product: 'CDB Limite' }), 'invested');
+  assert.equal(detectAmountKind({ subtype: 'aplicação' }), 'invested');
+  assert.equal(detectAmountKind({ kind: 'investimento' }), 'invested');
+  assert.equal(detectAmountKind({ isOfficialBillAmount: true }), 'official_bill');
+  assert.equal(detectAmountKind({ isOfficialBillAmount: false }), 'projected_bill');
+  assert.equal(detectAmountKind({ amount: 100 }), 'available');
+  assert.equal(detectAmountKind(null), 'available');
+});
+
+test('sync handles combined available and autoInvest in same balance object', async (t) => {
+  const prevKey = process.env.PIERRE_API_KEY;
+  process.env.PIERRE_API_KEY = 'mock-test-key-123';
+  t.after(() => {
+    if (prevKey !== undefined) process.env.PIERRE_API_KEY = prevKey;
+    else delete process.env.PIERRE_API_KEY;
+  });
+
+  mockPierreFetch(t, {
+    balances: {
+      balances: [
+        {
+          accountId: 'p-acc-inter',
+          available: 0,
+          autoInvest: 1882.94,
+          date: '2026-08-27',
+        },
+      ],
+    },
+  });
+
+  const { server } = await mountFinance(t);
+
+  await requestJson(server.base, '/api/finance/balances', {
+    method: 'POST',
+    body: {
+      account_id: 'acc-inter',
+      amount: 0,
+      amount_kind: 'available',
+      as_of: '2026-08-27',
+      source: 'joao',
+      locked: true,
+    },
+  });
+
+  const syncRes = await requestJson(server.base, '/api/finance/sync', { method: 'POST' });
+  assert.equal(syncRes.ok, true);
+
+  const overview = await requestJson(server.base, '/api/finance/overview');
+  assert.equal(overview.caixa, 0);
+  assert.equal(overview.invested, 1882.94);
 });

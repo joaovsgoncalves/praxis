@@ -3,7 +3,7 @@
 import { randomUUID } from 'crypto';
 
 export const ACCOUNT_KINDS = ['checking', 'prepaid', 'credit', 'cash', 'other'];
-export const AMOUNT_KINDS = ['available', 'used_limit', 'official_bill', 'projected_bill'];
+export const AMOUNT_KINDS = ['available', 'invested', 'used_limit', 'official_bill', 'projected_bill'];
 export const SOURCES = ['pierre', 'joao', 'agent', 'seed'];
 export const DEBT_KINDS = ['card', 'loan', 'installment', 'family', 'other'];
 export const DEBT_STATUSES = ['open', 'min_paid', 'clean', 'waiting', 'blocked'];
@@ -35,6 +35,48 @@ export const FINANCE_CATEGORIES = [
 ];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+const INVEST_PATTERN = /invest|auto-?invest|cdb|aplic[aäã]?[çc]|aplic[aä]c|investimento/i;
+
+export function detectAmountKind(balanceOrAccount) {
+  if (!balanceOrAccount || typeof balanceOrAccount !== 'object') {
+    return 'available';
+  }
+  const fields = [
+    balanceOrAccount.type,
+    balanceOrAccount.name,
+    balanceOrAccount.product,
+    balanceOrAccount.subtype,
+    balanceOrAccount.kind,
+    balanceOrAccount.amount_kind,
+  ];
+  for (const f of fields) {
+    if (f && typeof f === 'string' && INVEST_PATTERN.test(f)) {
+      return 'invested';
+    }
+  }
+  if (
+    balanceOrAccount.isOfficialBillAmount ||
+    balanceOrAccount.valueIsExact ||
+    balanceOrAccount.is_official ||
+    balanceOrAccount.official ||
+    balanceOrAccount.amount_kind === 'official_bill'
+  ) {
+    return 'official_bill';
+  }
+  if (
+    balanceOrAccount.isOfficialBillAmount === false ||
+    balanceOrAccount.projected_bill !== undefined ||
+    balanceOrAccount.calculated_bill_amount !== undefined ||
+    balanceOrAccount.amount_kind === 'projected_bill'
+  ) {
+    return 'projected_bill';
+  }
+  if (balanceOrAccount.amount_kind === 'used_limit') {
+    return 'used_limit';
+  }
+  return 'available';
+}
 
 export function isValidDateString(date) {
   if (typeof date !== 'string' || !DATE_RE.test(date)) return false;
@@ -525,6 +567,7 @@ export function listAccounts(db, { status = 'active' } = {}) {
   const rows = db.prepare(q).all(...params);
   return rows.map((acc) => {
     const available = latestBalance(db, acc.id, 'available');
+    const invested = latestBalance(db, acc.id, 'invested');
     const official = latestBalance(db, acc.id, 'official_bill');
     const projected = latestBalance(db, acc.id, 'projected_bill');
     return {
@@ -533,6 +576,9 @@ export function listAccounts(db, { status = 'active' } = {}) {
       available: available ? money(available.amount) : 0,
       available_as_of: available?.as_of || null,
       available_source: available?.source || null,
+      invested: invested ? money(invested.amount) : 0,
+      invested_as_of: invested?.as_of || null,
+      invested_source: invested?.source || null,
       official_bill: official ? money(official.amount) : null,
       projected_bill: projected ? money(projected.amount) : null,
     };
@@ -1278,6 +1324,11 @@ export function getOverview(db, { today } = {}) {
       .filter((a) => a.is_operational && a.status === 'active')
       .reduce((sum, a) => sum + Number(a.available || 0), 0),
   );
+  const invested = money(
+    accounts
+      .filter((a) => a.status === 'active')
+      .reduce((sum, a) => sum + Number(a.invested || 0), 0),
+  );
   const reservedCar = money(settings.reserved_car);
   const reservedLive = money(settings.reserved_live);
   const reserved = money(reservedCar + reservedLive);
@@ -1311,6 +1362,8 @@ export function getOverview(db, { today } = {}) {
     today: day,
     snapshot_label: settings.snapshot_label || '',
     caixa,
+    invested,
+    patrimonio_liquido_curto: money(caixa + invested),
     reserved_car: reservedCar,
     reserved_live: reservedLive,
     reserved,

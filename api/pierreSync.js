@@ -11,6 +11,7 @@ import {
   createBalance,
   createInstallment,
   createTransaction,
+  detectAmountKind,
   latestBalance,
   listAccounts,
   listDebts,
@@ -23,6 +24,8 @@ import {
   updateInstallment,
   updateSettings,
 } from './finance.js';
+
+export { detectAmountKind } from './finance.js';
 
 function sanitizeError(msg) {
   if (typeof msg !== 'string') return 'unknown_error';
@@ -197,23 +200,62 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
       }
       if (!localId) continue;
 
-      const amt = money(b.amount ?? b.available ?? b.balance ?? b.availableBalance ?? 0);
       const asOf = b.as_of || b.date || today;
+      const detectedKind = detectAmountKind(b);
 
-      const latest = latestBalance(db, localId, 'available');
-      if (latest && (Number(latest.locked) === 1 || latest.source === 'joao')) {
-        continue;
+      const hasSeparateInvested =
+        b.invested !== undefined ||
+        b.autoInvest !== undefined ||
+        b.auto_invest !== undefined ||
+        b.blocked !== undefined ||
+        b.investment !== undefined;
+
+      const separateInvestedAmount = hasSeparateInvested
+        ? money(b.invested ?? b.autoInvest ?? b.auto_invest ?? b.blocked ?? b.investment)
+        : null;
+
+      const hasSeparateAvailable =
+        b.available !== undefined || b.availableBalance !== undefined;
+
+      const entriesToRecord = [];
+
+      if (
+        hasSeparateInvested &&
+        (hasSeparateAvailable ||
+          (b.amount !== undefined && money(b.amount) !== separateInvestedAmount) ||
+          (b.balance !== undefined && money(b.balance) !== separateInvestedAmount))
+      ) {
+        const availAmt = hasSeparateAvailable
+          ? money(b.available ?? b.availableBalance)
+          : money(b.amount ?? b.balance ?? 0);
+        entriesToRecord.push({ kind: 'available', amount: availAmt });
+        entriesToRecord.push({ kind: 'invested', amount: separateInvestedAmount });
+      } else if (hasSeparateInvested) {
+        entriesToRecord.push({ kind: 'invested', amount: separateInvestedAmount });
+      } else if (detectedKind === 'invested') {
+        const amt = money(b.amount ?? b.available ?? b.balance ?? b.availableBalance ?? 0);
+        entriesToRecord.push({ kind: 'invested', amount: amt });
+      } else {
+        const amt = money(b.amount ?? b.available ?? b.balance ?? b.availableBalance ?? 0);
+        entriesToRecord.push({ kind: detectedKind, amount: amt });
       }
 
-      createBalance(db, {
-        account_id: localId,
-        amount: amt,
-        amount_kind: 'available',
-        source: 'pierre',
-        as_of: asOf,
-        locked: false,
-        note: 'Sync Pierre',
-      });
+      for (const entry of entriesToRecord) {
+        const latest = latestBalance(db, localId, entry.kind);
+        if (latest && (Number(latest.locked) === 1 || latest.source === 'joao')) {
+          continue;
+        }
+
+        createBalance(db, {
+          account_id: localId,
+          amount: entry.amount,
+          amount_kind: entry.kind,
+          source: 'pierre',
+          as_of: asOf,
+          locked: false,
+          note: 'Sync Pierre',
+        });
+      }
     }
 
     const rawBills = asList(billData, ['accounts', 'bills']);
