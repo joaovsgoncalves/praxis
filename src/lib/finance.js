@@ -55,3 +55,18 @@ export function debtTone(status, apr) {
   if (status === 'waiting') return 'text-muted-foreground';
   return 'text-foreground';
 }
+
+export function financeSummaryPhrase(caixa, invested) {
+  const c = Number(caixa || 0);
+  const inv = Number(invested || 0);
+  if (c > 0 && inv > 0) {
+    return `Livre ${formatBrl(c)} no Inter. Outros ${formatBrl(inv)} em auto-invest.`;
+  }
+  if (c === 0 && inv > 0) {
+    return `Caixa livre zerado. Tem ${formatBrl(inv)} em auto-invest. Não misture com o que vence.`;
+  }
+  if (c === 0 && inv === 0) {
+    return "Caixa e investimento zerados neste recorte.";
+  }
+  return `Caixa livre ${formatBrl(c)}.`;
+}

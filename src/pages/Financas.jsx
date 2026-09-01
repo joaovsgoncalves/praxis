@@ -30,6 +30,7 @@ import {
   LANE_LABELS,
   SUB_STATUS_LABELS,
   debtTone,
+  financeSummaryPhrase,
   formatBrl,
   formatDay,
 } from "@/lib/finance";
@@ -201,6 +202,53 @@ export default function Financas() {
     : transactions;
   const maxCat = insights?.categories?.[0]?.amount || 1;
 
+  const topCategories = useMemo(
+    () => (insights?.categories || []).slice(0, 5),
+    [insights],
+  );
+  const topCategoriesMax = useMemo(
+    () => topCategories[0]?.amount || 1,
+    [topCategories],
+  );
+
+  const syncedAccounts = useMemo(() => {
+    const accounts = overview?.accounts || [];
+    const fromPierre = accounts.filter(
+      (a) => a.available_source === "pierre" || a.invested_source === "pierre" || a.pierre_account_id,
+    );
+    if (fromPierre.length > 0) return fromPierre;
+    return accounts.filter((a) => (a.available || 0) > 0 || (a.invested || 0) > 0);
+  }, [overview]);
+
+  const bankEntries = useMemo(() => {
+    const list = [];
+    for (const acc of syncedAccounts) {
+      if (acc.available !== undefined && acc.available !== null) {
+        list.push({
+          id: `${acc.id}-available`,
+          name: acc.name,
+          kind: "available",
+          kindLabel: "livre",
+          amount: acc.available,
+          source: acc.available_source || "pierre",
+          asOf: acc.available_as_of,
+        });
+      }
+      if (Number(acc.invested || 0) > 0) {
+        list.push({
+          id: `${acc.id}-invested`,
+          name: acc.name,
+          kind: "invested",
+          kindLabel: "auto-invest",
+          amount: acc.invested,
+          source: acc.invested_source || "pierre",
+          asOf: acc.invested_as_of,
+        });
+      }
+    }
+    return list;
+  }, [syncedAccounts]);
+
   function openPay(debt) {
     setPayDebt(debt);
     setPayAmount(String(debt.balance ?? ""));
@@ -243,11 +291,7 @@ export default function Financas() {
         kicker="Dinheiro"
         kickerIcon={Wallet}
         title="Finanças"
-        description={
-          overview.snapshot_label
-            ? `Mapa da conversa (${overview.snapshot_label}). Confere o Inter no app e atualiza se mudou.`
-            : "Caixa, fila e o próximo passo. Número que você travou não some no sync."
-        }
+        description={financeSummaryPhrase(overview.caixa, overview.invested)}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -297,104 +341,78 @@ export default function Financas() {
 
       <TabChips tab={tab} onChange={setTab} />
 
-      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:gap-6">
-        <Card className="flex h-full flex-col justify-between border-white/10 bg-white/[0.03]">
-          <CardContent className="flex h-full flex-col justify-between space-y-4 p-5">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  Resultado do mês
-                </p>
-                {overview.snapshot_label ? (
-                  <SourceChip label={`Foto ${overview.snapshot_label}`} />
-                ) : null}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Caixa disponível (Inter)</p>
-                <p className="text-3xl font-bold tracking-tight text-foreground tabular-nums sm:text-4xl">
-                  {formatBrl(overview.caixa)}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Entradas (30d)</p>
-                <p className="text-lg font-semibold tabular-nums text-foreground">
-                  {insights ? formatBrl(insights.inflow) : "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Saídas (30d)</p>
-                <p className="text-lg font-semibold tabular-nums text-foreground">
-                  {insights ? formatBrl(insights.outflow) : "—"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="flex h-full flex-col justify-between border-white/10 bg-white/[0.03]">
-          <CardContent className="flex h-full flex-col justify-between space-y-3 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Fluxo (30 dias)
-              </p>
-              {insights && insights.outflow > 0 ? (
-                <span className="text-xs font-medium tabular-nums text-muted-foreground">
-                  Total: {formatBrl(insights.outflow)}
-                </span>
-              ) : null}
-            </div>
-
-            {!insights || !insights.days || insights.days.length === 0 ? (
-              <div className="flex min-h-[140px] flex-1 items-center justify-center p-4 text-center">
-                <p className="text-sm text-muted-foreground">Sem movimento neste recorte</p>
-              </div>
-            ) : (
-              <div className="h-[140px] w-full pt-1">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={insights.days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 4% 18%)" vertical={false} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(v) => {
-                        if (!v || typeof v !== "string") return "";
-                        const parts = v.split("-");
-                        return parts.length === 3 ? `${parts[2]}/${parts[1]}` : v;
-                      }}
-                      tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
-                      interval="preserveStartEnd"
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis hide />
-                    <Tooltip
-                      contentStyle={{
-                        background: "hsl(240 5% 10%)",
-                        border: "1px solid hsl(240 4% 18%)",
-                        borderRadius: "8px",
-                        color: "hsl(0 0% 95%)",
-                        fontSize: "12px",
-                      }}
-                      formatter={(value) => [formatBrl(value), "Saída"]}
-                      labelFormatter={(label) => formatDay(label)}
-                    />
-                    <Bar
-                      dataKey="amount"
-                      fill="hsl(38 85% 52%)"
-                      radius={[3, 3, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
       {tab === "agora" ? (
         <div className="space-y-8">
+          <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:gap-6">
+            <Card className="flex h-full flex-col justify-between border-white/10 bg-white/[0.03]">
+              <CardContent className="flex h-full flex-col justify-between space-y-4 p-5">
+                <div className="space-y-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Resultado do mês
+                  </p>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Caixa disponível (Inter)</p>
+                    <p className="text-3xl font-bold tracking-tight text-foreground tabular-nums sm:text-4xl">
+                      {formatBrl(overview.caixa)}
+                    </p>
+                    {overview.invested > 0 ? (
+                      <p className="text-xs tabular-nums text-muted-foreground">
+                        em auto-invest {formatBrl(overview.invested)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entradas (30d)</p>
+                    <p className="text-lg font-semibold tabular-nums text-foreground">
+                      {insights ? formatBrl(insights.inflow) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Saídas (30d)</p>
+                    <p className="text-lg font-semibold tabular-nums text-foreground">
+                      {insights ? formatBrl(insights.outflow) : "—"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="flex h-full flex-col justify-between border-white/10 bg-white/[0.03]">
+              <CardContent className="flex h-full flex-col justify-between space-y-3 p-5">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Categorias (30 dias)
+                  </p>
+                  {insights && insights.outflow > 0 ? (
+                    <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                      Total: {formatBrl(insights.outflow)}
+                    </span>
+                  ) : null}
+                </div>
+
+                {!topCategories.length ? (
+                  <div className="flex min-h-[140px] flex-1 items-center justify-center p-4 text-center">
+                    <p className="text-sm text-muted-foreground">Sem movimento neste recorte</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 pt-1">
+                    {topCategories.map((cat) => (
+                      <div key={cat.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="truncate text-foreground">{cat.name}</span>
+                          <span className="tabular-nums text-muted-foreground">{formatBrl(cat.amount)}</span>
+                        </div>
+                        <ProgressBar value={cat.amount} max={topCategoriesMax} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
           <section className="space-y-4">
             <SectionHeading title="Reservas deste mês" kicker="Antes de qualquer cartão" />
             <div className="grid gap-3 sm:grid-cols-3">
@@ -444,6 +462,44 @@ export default function Financas() {
               ))}
             </div>
           </section>
+
+          {overview.last_sync && Boolean(overview.last_sync.ok) ? (
+            <section className="space-y-3">
+              <SectionHeading
+                title="O banco mostrou"
+                kicker={
+                  overview.last_sync.finished_at || overview.last_sync.started_at
+                    ? `Sync ${formatDay((overview.last_sync.finished_at || overview.last_sync.started_at).slice(0, 10))}`
+                    : "Sincronizado"
+                }
+              />
+              <div className="space-y-2">
+                {bankEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{entry.name}</p>
+                        <Badge variant="outline" className="border-white/10 text-[10px] uppercase text-muted-foreground">
+                          {entry.kindLabel}
+                        </Badge>
+                        <SourceChip source={entry.source} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.kind === "invested" ? "Investimento / auto-invest" : "Saldo em conta"}
+                        {entry.asOf ? ` · ${formatDay(entry.asOf)}` : ""}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-base font-semibold tabular-nums">
+                      {formatBrl(entry.amount)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {(overview.installments_n || 0) > 0 ? (
             <section className="space-y-3">
@@ -678,25 +734,78 @@ export default function Financas() {
       {tab === "graficos" ? (
         <div className="space-y-6">
           <SectionHeading title="30 dias" kicker={insights ? formatBrl(insights.outflow) : "…"} />
-          {!insights || !insights.categories.length ? (
+          {!insights || (!insights.categories.length && (!insights.days || !insights.days.length)) ? (
             <PraxisEmptyState
               title="Ainda sem gasto pra desenhar"
               description="Registre um pagamento ou um lançamento que o gráfico aparece."
             />
           ) : (
-            <div className="space-y-3">
-              {insights.categories.map((cat) => (
-                <div key={cat.name} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{cat.name}</span>
-                    <span className="tabular-nums text-muted-foreground">{formatBrl(cat.amount)}</span>
-                  </div>
-                  <ProgressBar value={cat.amount} max={maxCat} />
+            <div className="space-y-6">
+              {insights.days && insights.days.length > 0 ? (
+                <Card className="border-white/10 bg-white/[0.03]">
+                  <CardContent className="space-y-3 p-5">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                      Fluxo diário (30 dias)
+                    </p>
+                    <div className="h-[160px] w-full pt-1">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={insights.days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 4% 18%)" vertical={false} />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(v) => {
+                              if (!v || typeof v !== "string") return "";
+                              const parts = v.split("-");
+                              return parts.length === 3 ? `${parts[2]}/${parts[1]}` : v;
+                            }}
+                            tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
+                            interval="preserveStartEnd"
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis hide />
+                          <Tooltip
+                            contentStyle={{
+                              background: "hsl(240 5% 10%)",
+                              border: "1px solid hsl(240 4% 18%)",
+                              borderRadius: "8px",
+                              color: "hsl(0 0% 95%)",
+                              fontSize: "12px",
+                            }}
+                            formatter={(value) => [formatBrl(value), "Saída"]}
+                            labelFormatter={(label) => formatDay(label)}
+                          />
+                          <Bar
+                            dataKey="amount"
+                            fill="hsl(38 85% 52%)"
+                            radius={[3, 3, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {insights.categories && insights.categories.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Por categoria
+                  </p>
+                  {insights.categories.map((cat) => (
+                    <div key={cat.name} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{cat.name}</span>
+                        <span className="tabular-nums text-muted-foreground">{formatBrl(cat.amount)}</span>
+                      </div>
+                      <ProgressBar value={cat.amount} max={maxCat} />
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Cartão {formatBrl(insights.card_outflow)} · conta {formatBrl(insights.cash_outflow)}. Transferência interna não entra.
+                  </p>
                 </div>
-              ))}
-              <p className="text-xs text-muted-foreground">
-                Cartão {formatBrl(insights.card_outflow)} · conta {formatBrl(insights.cash_outflow)}. Transferência interna não entra.
-              </p>
+              ) : null}
             </div>
           )}
         </div>
