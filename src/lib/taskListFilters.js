@@ -1,4 +1,4 @@
-import { isTaskDone, isTaskOpen, isTaskClosed, isTaskForToday, isInboxTask } from './tasks.js';
+import { isTaskDone, isTaskOpen, isTaskClosed, isTaskForToday, isInboxTask, isTaskCompletedForToday } from './tasks.js';
 
 export const TASK_SCOPE_CHIPS = [
   { id: 'today', label: 'Hoje' },
@@ -55,6 +55,20 @@ export function filterTasksByScope(tasks, scope, today) {
         return isTaskDone(t) && (t.completed_date || '').slice(0, 10) === today;
       });
   }
+}
+
+/**
+ * Lista visível: abertas do recorte + concluídas de hoje (check verde).
+ * Não esconde o que o João acabou de marcar.
+ */
+export function filterTasksForListPresentation(tasks, categoryFilter = 'all', today) {
+  if (!Array.isArray(tasks)) return [];
+  return tasks.filter((t) => {
+    if (t.status === 'cancelled') return false;
+    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+    if (isTaskOpen(t)) return true;
+    return isTaskCompletedForToday(t, today);
+  });
 }
 
 /**

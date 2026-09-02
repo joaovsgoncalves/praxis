@@ -57,6 +57,7 @@ import { partitionCompoundHabitsForDay } from '@/lib/compoundHabitOrder';
 import {
   TASK_SCOPE_CHIPS,
   filterTasksByScope,
+  filterTasksForListPresentation,
   sortTasksForList,
   countOpenOverdue,
   countOpenInbox,
@@ -712,12 +713,7 @@ export default function HabitsTasks() {
   const overdueInScope = countOpenOverdue(scopedTasks, today);
   const overdueOpenTotal = countOpenOverdue(tasks, today);
 
-  const filteredTasks = scopedTasks
-    .filter((t) => {
-      if (!isTaskOpen(t)) return false;
-      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-      return true;
-    })
+  const filteredTasks = filterTasksForListPresentation(scopedTasks, categoryFilter, today)
     .sort((a, b) => sortTasksForList(a, b, today));
 
   const archivableTasks = filteredTasks.filter((t) => isTaskOpen(t));
@@ -1176,7 +1172,7 @@ export default function HabitsTasks() {
                         className="praxis-touch-target shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"
                         aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
                       >
-                        {task.status === 'completed' ? (
+                        {isTaskDone(task) ? (
                           <CheckCircle2 className="h-5 w-5 text-accent" />
                         ) : (
                           <Circle className="h-5 w-5" />
@@ -1188,7 +1184,7 @@ export default function HabitsTasks() {
                           <p
                             className={cn(
                               'font-semibold leading-snug text-base',
-                              task.status === 'completed' && 'line-through opacity-60',
+                              isTaskDone(task) && 'line-through opacity-60',
                             )}
                           >
                             {cleanPriorityPrefix(task.title)}

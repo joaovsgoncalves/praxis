@@ -14,6 +14,7 @@ import {
   TASK_SCOPE_CHIPS,
   filterTasksByScope,
   countOpenInbox,
+  filterTasksForListPresentation,
 } from '../src/lib/taskListFilters.js';
 import {
   taskScopeFromSearchParams,
@@ -166,6 +167,21 @@ describe('taskLenses - PRD Fase 0', () => {
     const inboxTasks = filterTasksByScope(sampleTasks, 'inbox', '2026-08-24');
     assert.deepEqual(inboxTasks.map(t => t.id), ['inbox-1']);
     assert.equal(countOpenInbox(sampleTasks), 1);
+  });
+
+  it('today list keeps tasks completed today instead of dropping the green check', () => {
+    const today = '2026-09-02';
+    const tasks = [
+      { id: 'open', status: 'pending', date: today, category: 'farmacia' },
+      { id: 'done-today', status: 'completed', date: today, completed_date: today, category: 'pessoal' },
+      { id: 'done-yesterday', status: 'completed', date: '2026-09-01', completed_date: '2026-09-01', category: 'pessoal' },
+      { id: 'cancelled', status: 'cancelled', date: today, category: 'pessoal' },
+    ];
+
+    const scoped = filterTasksByScope(tasks, 'today', today);
+    const visible = filterTasksForListPresentation(scoped, 'all', today);
+
+    assert.deepEqual(visible.map((t) => t.id).sort(), ['done-today', 'open']);
   });
 
   // urlDeepLinks extensions
