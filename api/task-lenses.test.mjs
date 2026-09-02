@@ -15,6 +15,7 @@ import {
   filterTasksByScope,
   countOpenInbox,
   filterTasksForListPresentation,
+  sortTasksForList,
 } from '../src/lib/taskListFilters.js';
 import {
   taskScopeFromSearchParams,
@@ -182,6 +183,19 @@ describe('taskLenses - PRD Fase 0', () => {
     const visible = filterTasksForListPresentation(scoped, 'all', today);
 
     assert.deepEqual(visible.map((t) => t.id).sort(), ['done-today', 'open']);
+  });
+
+  it('completed tasks stay in list order instead of sinking to the bottom', () => {
+    const today = '2026-09-02';
+    const tasks = [
+      { id: 'nota', status: 'completed', date: today, completed_date: today, sort_order: 1, time: '14:10' },
+      { id: 'email', status: 'pending', date: today, sort_order: 2, time: '14:35' },
+      { id: 'gofluxo', status: 'completed', date: today, completed_date: today, sort_order: 3, time: '15:00' },
+      { id: 'rca', status: 'pending', date: today, sort_order: 4, time: '15:10' },
+    ];
+
+    const ordered = [...tasks].sort((a, b) => sortTasksForList(a, b, today));
+    assert.deepEqual(ordered.map((t) => t.id), ['nota', 'email', 'gofluxo', 'rca']);
   });
 
   // urlDeepLinks extensions

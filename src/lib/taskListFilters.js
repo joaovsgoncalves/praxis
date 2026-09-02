@@ -72,15 +72,11 @@ export function filterTasksForListPresentation(tasks, categoryFilter = 'all', to
 }
 
 /**
- * Lista = fila de execução. Atrasadas continuam no topo e datas diferentes
- * continuam cronológicas. Dentro da mesma data, sort_order é canônico.
- * Horário e prioridade são metadados; não sobrescrevem a ordem do usuário.
+ * Lista = fila de execução. Concluída de hoje fica no lugar (verde),
+ * como hábito. Atrasadas no topo; datas cronológicas; sort_order canônico.
+ * Horário e prioridade não sobrescrevem a ordem do usuário.
  */
 export function sortTasksForList(a, b, today) {
-  const aDone = isTaskDone(a);
-  const bDone = isTaskDone(b);
-  if (aDone !== bDone) return aDone ? 1 : -1;
-
   const aOver = isTaskOverdue(a, today);
   const bOver = isTaskOverdue(b, today);
   if (aOver !== bOver) return aOver ? -1 : 1;
