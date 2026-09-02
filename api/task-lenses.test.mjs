@@ -185,7 +185,7 @@ describe('taskLenses - PRD Fase 0', () => {
     assert.deepEqual(visible.map((t) => t.id).sort(), ['done-today', 'open']);
   });
 
-  it('completed tasks stay in list order instead of sinking to the bottom', () => {
+  it('completed tasks group at the top in green, open tasks stay below', () => {
     const today = '2026-09-02';
     const tasks = [
       { id: 'nota', status: 'completed', date: today, completed_date: today, sort_order: 1, time: '14:10' },
@@ -195,7 +195,7 @@ describe('taskLenses - PRD Fase 0', () => {
     ];
 
     const ordered = [...tasks].sort((a, b) => sortTasksForList(a, b, today));
-    assert.deepEqual(ordered.map((t) => t.id), ['nota', 'email', 'gofluxo', 'rca']);
+    assert.deepEqual(ordered.map((t) => t.id), ['nota', 'gofluxo', 'email', 'rca']);
   });
 
   // urlDeepLinks extensions
