@@ -1152,7 +1152,13 @@ export default function HabitsTasks() {
                         <Draggable key={task.id} draggableId={String(task.id)} index={index} isDragDisabled={taskSelectionMode || reorderTasks.isPending}>
                           {(dragProvided, dragSnapshot) => (
                             <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} style={dragProvided.draggableProps.style} className={cn(dragSnapshot.isDragging && 'relative z-50')}>
-                              <Card className={cn('border-border/80 bg-card/50 overflow-hidden shadow-none transition-colors', dragSnapshot.isDragging && 'border-primary/40 bg-card shadow-lg')}>
+                              <Card className={cn(
+                                'overflow-hidden shadow-none transition-colors',
+                                isTaskDone(task)
+                                  ? 'card-domain domain-wellness border-domain-wellness/30 bg-domain-wellness/10'
+                                  : 'border-border/80 bg-card/50',
+                                dragSnapshot.isDragging && 'border-primary/40 bg-card shadow-lg',
+                              )}>
                                 <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
                                   {!taskSelectionMode && (
                                     <button type="button" {...dragProvided.dragHandleProps} className="praxis-touch-target shrink-0 cursor-grab rounded-xl p-2 text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing" aria-label="Arrastar tarefa" title="Arraste para mudar a ordem de execução">
@@ -1173,7 +1179,7 @@ export default function HabitsTasks() {
                         aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
                       >
                         {isTaskDone(task) ? (
-                          <CheckCircle2 className="h-5 w-5 text-accent" />
+                          <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
                         ) : (
                           <Circle className="h-5 w-5" />
                         )}
@@ -1184,7 +1190,7 @@ export default function HabitsTasks() {
                           <p
                             className={cn(
                               'font-semibold leading-snug text-base',
-                              isTaskDone(task) && 'line-through opacity-60',
+                              isTaskDone(task) && 'text-domain-wellness line-through opacity-80',
                             )}
                           >
                             {cleanPriorityPrefix(task.title)}
