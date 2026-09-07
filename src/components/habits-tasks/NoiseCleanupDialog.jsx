@@ -45,9 +45,9 @@ export default function NoiseCleanupDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Limpar ruído</DialogTitle>
+          <DialogTitle>Limpar atrasadas</DialogTitle>
           <DialogDescription>
-            Cancelar tarefas pendentes com data no passado. Nada é apagado — só muda o status para cancelada.
+            Cancele as tarefas pendentes com data no passado. Nada é apagado: elas ficam registradas como canceladas.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 py-2">

@@ -847,20 +847,6 @@ export default function HabitsTasks() {
               </TabsList>
             </Tabs>
 
-            {noiseTasks.length > 0 && (
-              <div className="flex items-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  onClick={() => setNoiseDialogOpen(true)}
-                >
-                  <Eraser className="h-4 w-4" />
-                  Limpar ruído ({noiseTasks.length})
-                </Button>
-              </div>
-            )}
           </div>
 
           <div className="praxis-scroll-x flex w-full max-w-full items-center gap-2 py-1">
@@ -1061,7 +1047,18 @@ export default function HabitsTasks() {
                       <Archive className="h-4 w-4" />
                       Arquivar
                     </Button>
-
+                    {taskScope === 'overdue' && noiseTasks.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                        onClick={() => setNoiseDialogOpen(true)}
+                      >
+                        <Eraser className="h-4 w-4" />
+                        Limpar atrasadas ({noiseTasks.length})
+                      </Button>
+                    )}
                   </>
                 )}
               </div>
