@@ -49,6 +49,10 @@ import {
   getHabitDayOutcome,
   isHabitDueOnDate,
   isQuantitativeHabit,
+  isQuickIncrementHabit,
+  formatHabitProgress,
+  formatQuickIncrementButtonLabel,
+  formatQuickIncrementAriaLabel,
   todayLogForHabit,
 } from '@/lib/habits';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
@@ -99,6 +103,7 @@ export default function HabitsTasks() {
   const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
+  const [savingHabitId, setSavingHabitId] = useState(null);
   const [noiseDialogOpen, setNoiseDialogOpen] = useState(false);
   const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
   const [taskSelectionMode, setTaskSelectionMode] = useState(false);
@@ -444,7 +449,12 @@ export default function HabitsTasks() {
       const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
       const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
 
-      if (!isDone) hapticLight();
+      const allActive = queryClient.getQueryData(['habits', 'active', today]) || [];
+      const targetHabit = allActive.find((h) => h.id === habitId);
+      const targetVal = Number(targetHabit?.target_value) || 0;
+      const isCompleted = isDone ? false : (value !== undefined && targetVal > 0 ? value >= targetVal : true);
+
+      if (!isDone && isCompleted) hapticLight();
 
       queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) => {
         if (!Array.isArray(old)) return old;
@@ -458,9 +468,9 @@ export default function HabitsTasks() {
             id: `temp-${Date.now()}`,
             habit_id: habitId,
             date: today,
-            outcome: 'done',
-            completed: true,
-            ...(value !== undefined ? { value } : {}),
+            outcome: isCompleted ? 'done' : null,
+            completed: isCompleted ? 1 : 0,
+            value: isDone ? null : (value !== undefined ? value : (targetVal > 0 ? targetVal : null)),
           },
         ];
       });
@@ -471,9 +481,10 @@ export default function HabitsTasks() {
           if (h.id === habitId) {
             return {
               ...h,
-              completed_today: !isDone,
+              value_today: isDone ? null : (value !== undefined ? value : (targetVal > 0 ? targetVal : null)),
+              completed_today: isCompleted,
               skipped_today: false,
-              day_outcome: isDone ? 'open' : 'done',
+              day_outcome: isDone ? 'open' : (isCompleted ? 'done' : 'open'),
             };
           }
           if (h.children && Array.isArray(h.children)) {
@@ -483,9 +494,10 @@ export default function HabitsTasks() {
                 child.id === habitId
                   ? {
                       ...child,
-                      completed_today: !isDone,
+                      value_today: isDone ? null : (value !== undefined ? value : (targetVal > 0 ? targetVal : null)),
+                      completed_today: isCompleted,
                       skipped_today: false,
-                      day_outcome: isDone ? 'open' : 'done',
+                      day_outcome: isDone ? 'open' : (isCompleted ? 'done' : 'open'),
                     }
                   : child
               ),
@@ -508,6 +520,104 @@ export default function HabitsTasks() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+    },
+  });
+
+  const quickIncrementHabit = useMutation({
+    mutationFn: async ({ habit, increment }) => {
+      return praxisApi.habitLogs.create({
+        habit_id: habit.id,
+        date: today,
+        increment: increment ?? habit.quick_increment ?? 0.5,
+      });
+    },
+    onMutate: async ({ habit, increment }) => {
+      await queryClient.cancelQueries({ queryKey: ['habitLogs'] });
+      await queryClient.cancelQueries({ queryKey: ['allHabits'] });
+      await queryClient.cancelQueries({ queryKey: ['habits'] });
+
+      const prevLogs = queryClient.getQueriesData({ queryKey: ['habitLogs'] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ['allHabits'] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ['habits'] });
+
+      const currentLog = habitLogs.find((l) => l.habit_id === habit.id && l.date === today);
+      const prevVal = (currentLog && currentLog.value != null && Number.isFinite(Number(currentLog.value)))
+        ? Number(currentLog.value)
+        : 0;
+      const inc = Number(increment ?? habit.quick_increment ?? 0.5);
+      const nextVal = Math.round((prevVal + inc) * 1000) / 1000;
+      const target = Number(habit.target_value) || 0;
+      const willBeDone = target > 0 && nextVal >= target;
+
+      if (willBeDone) hapticLight();
+
+      queryClient.setQueriesData({ queryKey: ['habitLogs'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        const filtered = old.filter((l) => !(l.habit_id === habit.id && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: currentLog?.id || `temp-${Date.now()}`,
+            habit_id: habit.id,
+            date: today,
+            outcome: willBeDone ? 'done' : null,
+            completed: willBeDone ? 1 : 0,
+            value: nextVal,
+          },
+        ];
+      });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habit.id) {
+            return {
+              ...h,
+              value_today: nextVal,
+              completed_today: willBeDone,
+              skipped_today: false,
+              day_outcome: willBeDone ? 'done' : 'open',
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habit.id
+                  ? {
+                      ...child,
+                      value_today: nextVal,
+                      completed_today: willBeDone,
+                      skipped_today: false,
+                      day_outcome: willBeDone ? 'done' : 'open',
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ['allHabits'] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ['habits'] }, updateHabitItems);
+
+      return { prevLogs, prevAllHabits, prevHabits };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Erro ao registrar incremento');
+    },
+    onSuccess: (data) => {
+      dispatchPraxisLevelUpFromResponse(data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['habitLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['allHabits'] });
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
@@ -682,7 +792,29 @@ export default function HabitsTasks() {
     },
   });
 
+  const handleQuickIncrement = async (habit, evt) => {
+    if (savingHabitId === habit.id) return;
+    setSavingHabitId(habit.id);
+
+    const target = habitRowRefs.current.get(habit.id);
+    const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
+    if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+
+    try {
+      await quickIncrementHabit.mutateAsync({
+        habit,
+        increment: habit.quick_increment ?? 0.5,
+      });
+    } finally {
+      setSavingHabitId(null);
+    }
+  };
+
   const handleToggleHabit = (habit, isDone, evt) => {
+    if (isQuickIncrementHabit(habit) && !isDone) {
+      handleQuickIncrement(habit, evt);
+      return;
+    }
     if (isQuantitativeHabit(habit) && !isDone) {
       setQuantSheetHabit(habit);
       return;
@@ -1394,7 +1526,9 @@ export default function HabitsTasks() {
                             aria-label={
                               skipped
                                 ? `Desfazer não rolou — ${cleanPriorityPrefix(habit.title)}`
-                                : `${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`
+                                : isQuickIncrementHabit(habit) && !done
+                                  ? formatQuickIncrementAriaLabel(habit)
+                                  : `${done ? 'Desmarcar' : 'Concluir'} ${cleanPriorityPrefix(habit.title)}`
                             }
                           >
                             {done ? (
@@ -1429,6 +1563,25 @@ export default function HabitsTasks() {
                               {cleanPriorityPrefix(habit.title)}
                             </p>
                             <CategoryBadge category={habit.category} />
+                            {!isSince && isQuickIncrementHabit(habit) ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setQuantSheetHabit(habit);
+                                }}
+                                className={cn(
+                                  'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums transition-colors',
+                                  done
+                                    ? 'border-domain-wellness/30 bg-domain-wellness/10 text-domain-wellness'
+                                    : 'border-domain-wellness/30 bg-domain-wellness/10 text-domain-wellness hover:bg-domain-wellness/20 hover:border-domain-wellness/50 cursor-pointer',
+                                )}
+                                title="Clique para ajustar quantidade"
+                                aria-label={`Progresso: ${formatHabitProgress(todayLog?.value, habit.target_value, habit.unit)}. Clique para ajustar.`}
+                              >
+                                {formatHabitProgress(todayLog?.value, habit.target_value, habit.unit)}
+                              </button>
+                            ) : null}
                             {isSince && (
                               <>
                                 <Badge variant="outline" className="border-domain-gold/30 bg-domain-gold/10 text-[11px] font-semibold tabular-nums text-domain-gold">
@@ -1485,7 +1638,26 @@ export default function HabitsTasks() {
                             </>
                           )}
                         </div>
-                        {!isSince && canCheckIn && outcome !== 'skipped' ? (
+                        {!isSince && canCheckIn && !done && !skipped && isQuickIncrementHabit(habit) ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="praxis-touch-target min-h-[44px] min-w-[72px] px-4 font-bold rounded-full bg-domain-wellness/20 text-domain-wellness border border-domain-wellness/30 hover:bg-domain-wellness/30 active:scale-95 transition-all touch-manipulation"
+                            disabled={savingHabitId === habit.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQuickIncrement(habit, e);
+                            }}
+                            aria-label={formatQuickIncrementAriaLabel(habit)}
+                          >
+                            {savingHabitId === habit.id ? (
+                              <span className="animate-pulse">…</span>
+                            ) : (
+                              formatQuickIncrementButtonLabel(habit)
+                            )}
+                          </Button>
+                        ) : null}
+                        {!isSince && canCheckIn && outcome !== 'skipped' && !isQuickIncrementHabit(habit) ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -1523,7 +1695,7 @@ export default function HabitsTasks() {
                         ) : null}
                         <HabitRowMenu
                           label={cleanPriorityPrefix(habit.title)}
-                          busy={reorderHabits.isPending || skipHabit.isPending}
+                          busy={reorderHabits.isPending || skipHabit.isPending || savingHabitId === habit.id}
                           canCheckIn={canCheckIn}
                           dayOutcome={outcome}
                           disableUp={index === 0}
@@ -1535,6 +1707,8 @@ export default function HabitsTasks() {
                           onNaoRolou={() => skipHabit.mutate({ habitId: habit.id })}
                           onNomear={() => setSkipSheetHabit(habit)}
                           onUndoDayOutcome={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
+                          onAdjustQuantity={isQuantitativeHabit(habit) ? () => setQuantSheetHabit(habit) : undefined}
+                          hasValue={todayLog?.value != null && Number(todayLog.value) > 0}
                         />
                       </CardContent>
                     </Card>

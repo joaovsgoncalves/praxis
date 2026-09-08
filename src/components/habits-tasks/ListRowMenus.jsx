@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, CalendarClock, MinusCircle } from 'lucide-react';
+import { MoreHorizontal, ArrowUp, ArrowDown, Pencil, Trash2, CalendarClock, MinusCircle, Sliders } from 'lucide-react';
 
 /** Menu ⋯ — reordenar, editar, excluir */
 export function TaskRowMenu({
@@ -68,6 +68,8 @@ export function HabitRowMenu({
   onNaoRolou,
   onNomear,
   onUndoDayOutcome,
+  onAdjustQuantity,
+  hasValue = false,
   dayOutcome,
   canCheckIn = false,
   disableUp,
@@ -98,6 +100,11 @@ export function HabitRowMenu({
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>
+        {canCheckIn && onAdjustQuantity ? (
+          <DropdownMenuItem onClick={onAdjustQuantity}>
+            <Sliders className="mr-2 h-4 w-4" /> Ajustar quantidade
+          </DropdownMenuItem>
+        ) : null}
         {canCheckIn && dayOutcome !== 'skipped' && onNaoRolou ? (
           <DropdownMenuItem onClick={onNaoRolou}>
             <MinusCircle className="mr-2 h-4 w-4" /> Não rolou
@@ -108,7 +115,7 @@ export function HabitRowMenu({
             Nomear falha
           </DropdownMenuItem>
         ) : null}
-        {canCheckIn && (dayOutcome === 'done' || dayOutcome === 'skipped') && onUndoDayOutcome ? (
+        {canCheckIn && (dayOutcome === 'done' || dayOutcome === 'skipped' || hasValue) && onUndoDayOutcome ? (
           <DropdownMenuItem onClick={onUndoDayOutcome}>
             Desfazer registro do dia
           </DropdownMenuItem>

@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Flame, Minus, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Flame, Minus, MoreHorizontal, Sliders, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryBadge } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
@@ -10,6 +10,10 @@ import {
   formatPreferredTime,
   getHabitDayOutcome,
   isQuantitativeHabit,
+  isQuickIncrementHabit,
+  formatHabitProgress,
+  formatQuickIncrementButtonLabel,
+  formatQuickIncrementAriaLabel,
   SKIP_REASON_LABELS,
   todayLogForHabit,
 } from '@/lib/habits';
@@ -35,11 +39,13 @@ export default function TodayHabits({
   summaryHabits,
   habitLogs,
   onToggleHabit,
+  onQuickIncrement,
   onSkipHabit,
   onDeleteHabit,
   title = 'Hábitos de Hoje',
   today: todayProp,
 }) {
+  const [savingHabitId, setSavingHabitId] = useState(null);
   const today = todayProp || new Date().toISOString().split('T')[0];
   const rowRefs = useRef(new Map());
   const longPressTimer = useRef(null);
@@ -70,6 +76,32 @@ export default function TodayHabits({
     setSkipSheetHabit(habit);
   };
 
+  const handleIncrement = async (habit, evt) => {
+    if (savingHabitId === habit.id) return;
+    setSavingHabitId(habit.id);
+
+    const log = todayLogForHabit(habitLogs, habit.id, today);
+    const prevVal = (log && log.value != null && Number.isFinite(Number(log.value)))
+      ? Number(log.value)
+      : 0;
+    const inc = Number(habit.quick_increment) || 0.5;
+    const nextVal = Math.round((prevVal + inc) * 1000) / 1000;
+
+    const target = rowRefs.current.get(habit.id);
+    const rect = (evt?.currentTarget || target)?.getBoundingClientRect?.();
+    if (rect) sparkAt(rect.left + 28, rect.top + rect.height / 2);
+
+    try {
+      if (onQuickIncrement) {
+        await onQuickIncrement(habit, inc);
+      } else {
+        await onToggleHabit?.(habit.id, false, nextVal);
+      }
+    } finally {
+      setSavingHabitId(null);
+    }
+  };
+
   const handlePrimaryTap = (habit, evt) => {
     if (longPressFired.current) {
       longPressFired.current = false;
@@ -88,6 +120,10 @@ export default function TodayHabits({
       return;
     }
     // open → done
+    if (isQuickIncrementHabit(habit)) {
+      handleIncrement(habit, evt);
+      return;
+    }
     if (isQuantitativeHabit(habit)) {
       setQuantSheetHabit(habit);
       return;
@@ -221,7 +257,9 @@ export default function TodayHabits({
                 onPointerUp={handlePointerUp}
                 onPointerLeave={handlePointerUp}
                 onPointerCancel={handlePointerUp}
-                aria-label={`Alternar conclusão do hábito: ${habit.title}`}
+                aria-label={isQuickIncrementHabit(habit)
+                  ? formatQuickIncrementAriaLabel(habit)
+                  : `Alternar conclusão do hábito: ${habit.title}`}
               >
                 {skipped ? (
                   <span
@@ -255,6 +293,18 @@ export default function TodayHabits({
                       {habit.title}
                     </p>
                     <CategoryBadge category={habit.category} />
+                    {isQuickIncrementHabit(habit) ? (
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums',
+                          done
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                            : 'border-domain-wellness/30 bg-domain-wellness/10 text-domain-wellness',
+                        )}
+                      >
+                        {formatHabitProgress(log?.value, habit.target_value, habit.unit)}
+                      </span>
+                    ) : null}
                     {formatPreferredTime(habit.preferred_time) ? (
                       <span className="inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-domain-gold">
                         {formatPreferredTime(habit.preferred_time)}
@@ -282,6 +332,24 @@ export default function TodayHabits({
                             ) : null}
 
               <div className="flex items-center gap-1 shrink-0">
+                {isQuickIncrementHabit(habit) && !done && !skipped ? (
+                  <button
+                    type="button"
+                    className="flex min-h-[44px] min-w-[72px] items-center justify-center rounded-full border border-domain-wellness/40 bg-domain-wellness/15 px-3.5 text-xs font-bold text-domain-wellness shadow-sm transition-transform hover:bg-domain-wellness/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-domain-wellness focus-visible:ring-offset-2 active:scale-95 disabled:opacity-50 touch-manipulation"
+                    disabled={savingHabitId === habit.id}
+                    aria-label={formatQuickIncrementAriaLabel(habit)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleIncrement(habit, e);
+                    }}
+                  >
+                    {savingHabitId === habit.id ? (
+                      <span className="animate-pulse">…</span>
+                    ) : (
+                      formatQuickIncrementButtonLabel(habit)
+                    )}
+                  </button>
+                ) : null}
                 {skipped ? (
                   <>
                     <button
@@ -307,7 +375,7 @@ export default function TodayHabits({
                       Desfazer
                     </button>
                   </>
-                ) : (
+                ) : !isQuickIncrementHabit(habit) ? (
                   <button
                     type="button"
                     className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-100/95 transition-colors hover:bg-amber-500/20 touch-manipulation"
@@ -319,7 +387,7 @@ export default function TodayHabits({
                   >
                     Não rolou
                   </button>
-                )}
+                ) : null}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -331,7 +399,17 @@ export default function TodayHabits({
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuContent align="end" className="w-48">
+                    {isQuantitativeHabit(habit) ? (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuantSheetHabit(habit);
+                        }}
+                      >
+                        <Sliders className="mr-2 h-4 w-4" /> Ajustar quantidade
+                      </DropdownMenuItem>
+                    ) : null}
                     {skipped ? (
                       <>
                         <DropdownMenuItem
@@ -352,14 +430,26 @@ export default function TodayHabits({
                         </DropdownMenuItem>
                       </>
                     ) : (
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSkipHabit?.(habit.id);
-                        }}
-                      >
-                        <Minus className="mr-2 h-4 w-4" /> Não rolou
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSkipHabit?.(habit.id);
+                          }}
+                        >
+                          <Minus className="mr-2 h-4 w-4" /> Não rolou
+                        </DropdownMenuItem>
+                        {(done || (log?.value != null && Number(log.value) > 0)) ? (
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleHabit?.(habit.id, true);
+                            }}
+                          >
+                            {done ? "Desfazer conclusão" : "Zerar registro de hoje"}
+                          </DropdownMenuItem>
+                        ) : null}
+                      </>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

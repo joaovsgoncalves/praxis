@@ -31,7 +31,10 @@ export default function QuantLogSheet({
   const handleStep = (delta) => {
     const currentNum = Number(value);
     const base = Number.isFinite(currentNum) ? currentNum : 0;
-    const next = Math.max(0, Math.round((base + delta) * 100) / 100);
+    const step = habit?.quick_increment != null && Number(habit.quick_increment) > 0
+      ? Number(habit.quick_increment)
+      : 1;
+    const next = Math.max(0, Math.round((base + delta * step) * 1000) / 1000);
     setValue(String(next));
   };
 

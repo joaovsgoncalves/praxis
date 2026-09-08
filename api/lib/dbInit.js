@@ -184,6 +184,7 @@ export function initializeDatabase(db) {
     emoji TEXT DEFAULT '',
     tracking_mode TEXT DEFAULT 'check',
     since_date TEXT DEFAULT '',
+    quick_increment REAL,
     created_date TEXT DEFAULT (datetime('now'))
   );
 
@@ -367,6 +368,10 @@ if (!habitsCols2.includes('tracking_mode')) {
 if (!habitsCols2.includes('since_date')) {
   db.exec("ALTER TABLE habits ADD COLUMN since_date TEXT DEFAULT ''");
 }
+const addedQuickIncrement = !habitsCols2.includes('quick_increment');
+if (addedQuickIncrement) {
+  db.exec('ALTER TABLE habits ADD COLUMN quick_increment REAL');
+}
 db.prepare(`
   UPDATE habits SET tracking_mode = 'check'
   WHERE tracking_mode IS NULL OR tracking_mode = ''
@@ -384,6 +389,13 @@ db.prepare(`
   WHERE kind IS NULL OR kind NOT IN ('simple', 'compound')
 `).run();
 db.exec('CREATE INDEX IF NOT EXISTS idx_habits_parent_position ON habits(parent_id, position_in_parent)');
+if (addedQuickIncrement) {
+  db.prepare(`
+    UPDATE habits
+    SET target_value = 3, unit = 'L', quick_increment = 0.5
+    WHERE id = '67c2b8d7-2bf1-466c-a37d-20545fac594c'
+  `).run();
+}
 
 migrateActiveRitualsToCompoundHabits(db);
 

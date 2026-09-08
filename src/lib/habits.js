@@ -80,6 +80,40 @@ export function isQuantitativeHabit(habit) {
   return habit?.target_value != null && Number(habit.target_value) > 0;
 }
 
+export function isQuickIncrementHabit(habit) {
+  return isQuantitativeHabit(habit) && habit?.quick_increment != null && Number(habit.quick_increment) > 0;
+}
+
+export function formatHabitProgress(currentValue, targetValue, unit = "") {
+  const current = Number(currentValue) || 0;
+  const target = Number(targetValue) || 0;
+  const cleanCurrent = Math.round(current * 1000) / 1000;
+  const cleanTarget = Math.round(target * 1000) / 1000;
+  const formattedCurrent = String(cleanCurrent).replace(".", ",");
+  const formattedTarget = String(cleanTarget).replace(".", ",");
+  return formattedCurrent + " / " + formattedTarget + (unit ? " " + unit : "");
+}
+
+export function formatQuickIncrementButtonLabel(habit) {
+  if (!habit?.quick_increment) return "";
+  const inc = Number(habit.quick_increment);
+  const unit = String(habit.unit || "").trim();
+  if ((unit === "L" || unit === "l") && inc === 0.5) {
+    return "+500 ml";
+  }
+  if ((unit === "L" || unit === "l") && inc < 1) {
+    return "+" + Math.round(inc * 1000) + " ml";
+  }
+  const clean = Math.round(inc * 1000) / 1000;
+  return "+" + String(clean).replace(".", ",") + (unit ? " " + unit : "");
+}
+
+export function formatQuickIncrementAriaLabel(habit) {
+  const label = formatQuickIncrementButtonLabel(habit);
+  const title = habit?.title || "";
+  return "Adicionar " + label.replace("+", "") + " — " + title;
+}
+
 /** Normalize / display preferred clock time (HH:MM). */
 export function normalizePreferredTime(value) {
   if (value == null || value === '') return '';

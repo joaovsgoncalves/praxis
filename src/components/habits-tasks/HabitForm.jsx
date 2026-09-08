@@ -47,6 +47,7 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
     recurrence_days: parseRecurrenceDays(initial),
     target_value: initial.target_value ?? '',
     unit: initial.unit || '',
+    quick_increment: initial.quick_increment ?? '',
     preferred_time: normalizePreferredTime(initial.preferred_time) || '',
     children: initialSteps(initial),
   });
@@ -148,6 +149,7 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
         ? null
         : Number(form.target_value),
       unit: form.unit?.trim() || '',
+      quick_increment: form.quick_increment === '' || form.quick_increment == null ? null : Number(form.quick_increment),
       preferred_time: normalizePreferredTime(form.preferred_time) || '',
     });
   };
@@ -380,12 +382,24 @@ export default function HabitForm({ onSubmit, onCancel, goals = [], initial = {}
             />
           </div>
           {form.target_value !== '' && form.target_value != null && (
-            <Input
-              placeholder="Unidade (ex: copos, min, km)"
-              value={form.unit}
-              onChange={(event) => setForm((current) => ({ ...current, unit: event.target.value }))}
-              className="bg-secondary/50"
-            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                placeholder="Unidade (ex: copos, min, km, L)"
+                value={form.unit}
+                onChange={(event) => setForm((current) => ({ ...current, unit: event.target.value }))}
+                className="bg-secondary/50"
+              />
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Passo rápido (opcional, ex: 0.5)"
+                aria-label="Passo rápido para somar à meta"
+                value={form.quick_increment}
+                onChange={(event) => setForm((current) => ({ ...current, quick_increment: event.target.value }))}
+                className="bg-secondary/50"
+              />
+            </div>
           )}
         </>
       )}

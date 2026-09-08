@@ -305,6 +305,13 @@ export default function Dashboard() {
       const prevHabits = queryClient.getQueriesData({ queryKey: ["habits"] });
       const prevAllHabits = queryClient.getQueriesData({ queryKey: ["allHabits"] });
 
+      const allActive = queryClient.getQueryData(["habits", "active", today]) || [];
+      const targetHabit = allActive.find((h) => h.id === habitId);
+      const targetVal = Number(targetHabit?.target_value) || 0;
+      const isCompleted = isDone ? false : (value !== undefined && targetVal > 0 ? value >= targetVal : true);
+
+      if (!isDone && isCompleted) hapticLight();
+
       queryClient.setQueriesData({ queryKey: ["habitLogs"] }, (old) => {
         if (!Array.isArray(old)) return old;
         if (isDone) {
@@ -317,9 +324,9 @@ export default function Dashboard() {
             id: `temp-${Date.now()}`,
             habit_id: habitId,
             date: today,
-            outcome: "done",
-            completed: true,
-            ...(value !== undefined ? { value } : {}),
+            outcome: isCompleted ? "done" : null,
+            completed: isCompleted ? 1 : 0,
+            value: isDone ? null : (value !== undefined ? value : (targetVal > 0 ? targetVal : null)),
           },
         ];
       });
@@ -330,9 +337,10 @@ export default function Dashboard() {
           if (h.id === habitId) {
             return {
               ...h,
-              completed_today: !isDone,
+              value_today: isDone ? null : (value !== undefined ? value : (targetVal > 0 ? targetVal : null)),
+              completed_today: isCompleted,
               skipped_today: false,
-              day_outcome: isDone ? "open" : "done",
+              day_outcome: isDone ? "open" : (isCompleted ? "done" : "open"),
             };
           }
           if (h.children && Array.isArray(h.children)) {
@@ -342,9 +350,10 @@ export default function Dashboard() {
                 child.id === habitId
                   ? {
                       ...child,
-                      completed_today: !isDone,
+                      value_today: isDone ? null : (value !== undefined ? value : (targetVal > 0 ? targetVal : null)),
+                      completed_today: isCompleted,
                       skipped_today: false,
-                      day_outcome: isDone ? "open" : "done",
+                      day_outcome: isDone ? "open" : (isCompleted ? "done" : "open"),
                     }
                   : child
               ),
@@ -367,6 +376,104 @@ export default function Dashboard() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
+      queryClient.invalidateQueries({ queryKey: ["gamification"] });
+    },
+  });
+
+  const quickIncrementMutation = useMutation({
+    mutationFn: async ({ habit, increment }) => {
+      return praxisApi.habitLogs.create({
+        habit_id: habit.id,
+        date: today,
+        increment: increment ?? habit.quick_increment ?? 0.5,
+      });
+    },
+    onMutate: async ({ habit, increment }) => {
+      await queryClient.cancelQueries({ queryKey: ["habitLogs"] });
+      await queryClient.cancelQueries({ queryKey: ["habits"] });
+      await queryClient.cancelQueries({ queryKey: ["allHabits"] });
+
+      const prevLogs = queryClient.getQueriesData({ queryKey: ["habitLogs"] });
+      const prevHabits = queryClient.getQueriesData({ queryKey: ["habits"] });
+      const prevAllHabits = queryClient.getQueriesData({ queryKey: ["allHabits"] });
+
+      const currentLog = habitLogs.find((l) => l.habit_id === habit.id && l.date === today);
+      const prevVal = (currentLog && currentLog.value != null && Number.isFinite(Number(currentLog.value)))
+        ? Number(currentLog.value)
+        : 0;
+      const inc = Number(increment ?? habit.quick_increment ?? 0.5);
+      const nextVal = Math.round((prevVal + inc) * 1000) / 1000;
+      const target = Number(habit.target_value) || 0;
+      const willBeDone = target > 0 && nextVal >= target;
+
+      if (willBeDone) hapticLight();
+
+      queryClient.setQueriesData({ queryKey: ["habitLogs"] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        const filtered = old.filter((l) => !(l.habit_id === habit.id && l.date === today));
+        return [
+          ...filtered,
+          {
+            id: currentLog?.id || `temp-${Date.now()}`,
+            habit_id: habit.id,
+            date: today,
+            outcome: willBeDone ? "done" : null,
+            completed: willBeDone ? 1 : 0,
+            value: nextVal,
+          },
+        ];
+      });
+
+      const updateHabitItems = (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((h) => {
+          if (h.id === habit.id) {
+            return {
+              ...h,
+              value_today: nextVal,
+              completed_today: willBeDone,
+              skipped_today: false,
+              day_outcome: willBeDone ? "done" : "open",
+            };
+          }
+          if (h.children && Array.isArray(h.children)) {
+            return {
+              ...h,
+              children: h.children.map((child) =>
+                child.id === habit.id
+                  ? {
+                      ...child,
+                      value_today: nextVal,
+                      completed_today: willBeDone,
+                      skipped_today: false,
+                      day_outcome: willBeDone ? "done" : "open",
+                    }
+                  : child
+              ),
+            };
+          }
+          return h;
+        });
+      };
+
+      queryClient.setQueriesData({ queryKey: ["habits"] }, updateHabitItems);
+      queryClient.setQueriesData({ queryKey: ["allHabits"] }, updateHabitItems);
+
+      return { prevLogs, prevHabits, prevAllHabits };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error("Erro ao registrar incremento");
+    },
+    onSuccess: (data) => {
+      dispatchPraxisLevelUpFromResponse(data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["allHabits"] });
       queryClient.invalidateQueries({ queryKey: ["gamification"] });
     },
   });
@@ -711,6 +818,7 @@ export default function Dashboard() {
                 summaryHabits={essentialHabits}
                 habitLogs={habitLogs}
                 onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
+                onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
                 onSkipHabit={(habitId, skipReason, skipNote) =>
                   skipHabitMutation.mutate({ habitId, skipReason, skipNote })
                 }

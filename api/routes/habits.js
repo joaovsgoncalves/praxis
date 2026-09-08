@@ -349,6 +349,7 @@ export function createHabitsRouter(ctx) {
       emoji,
       tracking_mode,
       since_date,
+      quick_increment,
     } = req.body;
 
     const normTrackingMode = normalizeTrackingMode(tracking_mode);
@@ -364,6 +365,9 @@ export function createHabitsRouter(ctx) {
       return res.status(400).json({ error: 'Valid since_date is required for tracking_mode=since' });
     }
     const habitSinceDate = normSinceDate || '';
+    const habitQuickIncrement = quick_increment !== undefined && quick_increment !== null && quick_increment !== ''
+      ? Number(quick_increment)
+      : null;
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
     if (!HABIT_KINDS.has(kind)) return res.status(400).json({ error: 'Invalid habit kind' });
@@ -389,15 +393,15 @@ export function createHabitsRouter(ctx) {
         INSERT INTO habits (
           id, title, description, emoji, frequency, category, streak_target, goal_id, source,
           sort_order, recurrence_days, target_value, unit, preferred_time, kind,
-          parent_id, position_in_parent, tracking_mode, since_date
+          parent_id, position_in_parent, tracking_mode, since_date, quick_increment
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, habitTitle, description, kind === 'compound' ? String(emoji || '') : '', freq,
         category, Number(streak_target) || 30,
         goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || '',
         prefTime || '', kind, parent_id || null, childPosition,
-        habitTrackingMode, habitSinceDate
+        habitTrackingMode, habitSinceDate, habitQuickIncrement
       );
 
       const requestedChildren = children_ids ?? children;
@@ -443,7 +447,7 @@ export function createHabitsRouter(ctx) {
       title, description, frequency, category, streak_target, goal_id, source, status,
       sort_order, recurrence_days, target_value, unit, preferred_time, kind,
       parent_id, position_in_parent, children_ids, children, emoji,
-      tracking_mode, since_date,
+      tracking_mode, since_date, quick_increment,
     } = req.body;
 
     let normTrackingMode;
@@ -491,6 +495,9 @@ export function createHabitsRouter(ctx) {
         return res.status(400).json({ error: 'preferred_time must be HH:MM or empty' });
       }
     }
+    const habitQuickIncrement = quick_increment !== undefined
+      ? (quick_increment === null || quick_increment === '' ? null : Number(quick_increment))
+      : undefined;
     const shouldUpdatePosition = position_in_parent !== undefined || parent_id !== undefined;
     const nextPosition = position_in_parent !== undefined
       ? (position_in_parent === null ? null : Number(position_in_parent))
@@ -520,7 +527,8 @@ export function createHabitsRouter(ctx) {
           parent_id = CASE WHEN ? = 1 THEN ? ELSE parent_id END,
           position_in_parent = CASE WHEN ? = 1 THEN ? ELSE position_in_parent END,
           tracking_mode = COALESCE(?, tracking_mode),
-          since_date = COALESCE(?, since_date)
+          since_date = COALESCE(?, since_date),
+          quick_increment = CASE WHEN ? = 1 THEN ? ELSE quick_increment END
         WHERE id = ?
       `).run(
         title !== undefined ? stripPriorityPrefix(title) : null,
@@ -545,6 +553,8 @@ export function createHabitsRouter(ctx) {
         nextPosition,
         normTrackingMode ?? null,
         normSinceDate ?? null,
+        quick_increment !== undefined ? 1 : 0,
+        habitQuickIncrement !== undefined ? habitQuickIncrement : null,
         req.params.id
       );
 
@@ -715,6 +725,16 @@ export function registerHabitLogRoutes(app, ctx) {
     let logValue = normalized.value === undefined || normalized.value === null || normalized.value === ''
       ? null
       : Number(normalized.value);
+
+    const inc = req.body?.increment ?? req.body?.delta;
+    if (inc !== undefined && inc !== null && inc !== '') {
+      const existingRow = db.prepare('SELECT value FROM habit_logs WHERE habit_id = ? AND date = ?').get(habit_id, date);
+      const baseVal = (existingRow && existingRow.value != null && Number.isFinite(Number(existingRow.value)))
+        ? Number(existingRow.value)
+        : 0;
+      logValue = Math.round((baseVal + Number(inc)) * 1000) / 1000;
+    }
+
     let outcome = normalized.outcome;
     let skipReason = normalized.skip_reason;
     let note = normalized.note || '';
@@ -722,18 +742,24 @@ export function registerHabitLogRoutes(app, ctx) {
     if (outcome === 'done' && habit.target_value != null && Number(habit.target_value) > 0) {
       if (logValue == null || Number.isNaN(logValue)) {
         logValue = Number(habit.target_value);
-      }
-      if (logValue >= Number(habit.target_value)) {
         completedFlag = 1;
         outcome = 'done';
+      } else if (logValue >= Number(habit.target_value)) {
+        completedFlag = 1;
+        outcome = 'done';
+      } else {
+        completedFlag = 0;
+        outcome = null;
       }
     }
 
     if (outcome === 'skipped') {
       completedFlag = 0;
       logValue = null;
+    } else if (completedFlag === 1) {
+      skipReason = null;
+      note = '';
     } else {
-      completedFlag = 1;
       skipReason = null;
       note = '';
     }
