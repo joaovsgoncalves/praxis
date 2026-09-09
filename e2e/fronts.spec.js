@@ -178,37 +178,139 @@ const FRESH_GUIDANCE = {
   ],
 };
 
-async function setupMocks(page, { guidance = FRESH_GUIDANCE, guidanceStatus = 200, projects = CANONICAL_PROJECTS } = {}) {
+async function setupMocks(page, {
+  guidance = FRESH_GUIDANCE,
+  guidanceStatus = 200,
+  projects = CANONICAL_PROJECTS,
+  initialUpdates = {},
+  initialTasks = [],
+  onCompleteNextStepOverride = null,
+} = {}) {
+  const currentProjects = JSON.parse(JSON.stringify(projects));
+  const updatesState = { ...initialUpdates };
+  const tasksState = [...initialTasks];
+  const capturedCalls = {
+    completeNextStep: [],
+    createdTasks: [],
+    patchedProjects: [],
+  };
+
   await page.route('**/api/**', async (route) => {
-    const url = new URL(route.request().url());
+    const req = route.request();
+    const method = req.method();
+    const url = new URL(req.url());
     const path = url.pathname;
 
     if (path === '/api/auth/config') {
       return json(route, { webAuthEnabled: false, loginAvailable: true });
     }
+
     if (path === '/api/projects/guidance/today') {
       if (guidanceStatus !== 200) {
         return route.fulfill({ status: guidanceStatus, body: 'Server Error' });
       }
       return json(route, guidance);
     }
-    if (path === '/api/projects') {
-      return json(route, projects);
+
+    if (path === '/api/projects' && method === 'GET') {
+      return json(route, currentProjects);
     }
-    if (path.startsWith('/api/projects/') && path.endsWith('/updates')) {
-      return json(route, []);
-    }
-    if (path.startsWith('/api/projects/')) {
+
+    if (path.startsWith('/api/projects/') && path.endsWith('/complete-next-step') && method === 'POST') {
       const slugOrId = path.split('/')[3];
-      const found = projects.find((p) => p.slug === slugOrId || p.id === slugOrId);
+      const project = currentProjects.find((p) => p.slug === slugOrId || p.id === slugOrId);
+      const postData = req.postDataJSON() || {};
+      capturedCalls.completeNextStep.push({ slugOrId, postData });
+
+      if (onCompleteNextStepOverride) {
+        return onCompleteNextStepOverride(route, { project, postData, currentProjects, updatesState });
+      }
+
+      if (!project) return route.fulfill({ status: 404, body: 'Not found' });
+
+      const oldStep = project.next_step;
+      project.next_step = '';
+      const update = {
+        id: `up-${Date.now()}`,
+        project_id: project.id,
+        date: '2026-09-09',
+        summary: `Concluído: ${oldStep}`,
+        source: 'conclusao',
+        created_by: 'joao',
+        created_at: new Date().toISOString(),
+      };
+      if (!updatesState[project.id]) updatesState[project.id] = [];
+      if (!updatesState[project.slug]) updatesState[project.slug] = updatesState[project.id];
+      updatesState[project.id].unshift(update);
+
+      return json(route, {
+        project,
+        update,
+        completed_step: oldStep,
+      });
+    }
+
+    if (path.startsWith('/api/projects/') && path.endsWith('/updates')) {
+      const slugOrId = path.split('/')[3];
+      const project = currentProjects.find((p) => p.slug === slugOrId || p.id === slugOrId);
+      const projKey = project?.id || slugOrId;
+
+      if (method === 'GET') {
+        return json(route, updatesState[projKey] || []);
+      }
+      if (method === 'POST') {
+        const body = req.postDataJSON() || {};
+        const update = {
+          id: `up-${Date.now()}`,
+          project_id: projKey,
+          date: '2026-09-09',
+          summary: body.summary || 'Avanço',
+          source: body.source || 'manual',
+          created_by: body.created_by || 'joao',
+          created_at: new Date().toISOString(),
+        };
+        if (!updatesState[projKey]) updatesState[projKey] = [];
+        updatesState[projKey].unshift(update);
+        return json(route, update, 201);
+      }
+    }
+
+    if (path.startsWith('/api/projects/') && method === 'PATCH') {
+      const slugOrId = path.split('/')[3];
+      const project = currentProjects.find((p) => p.slug === slugOrId || p.id === slugOrId);
+      if (!project) return route.fulfill({ status: 404, body: 'Not found' });
+      const patchData = req.postDataJSON() || {};
+      Object.assign(project, patchData);
+      capturedCalls.patchedProjects.push({ slugOrId, patchData });
+      return json(route, project);
+    }
+
+    if (path.startsWith('/api/projects/') && method === 'GET') {
+      const slugOrId = path.split('/')[3];
+      const found = currentProjects.find((p) => p.slug === slugOrId || p.id === slugOrId);
       if (found) return json(route, found);
       return route.fulfill({ status: 404, body: 'Not found' });
     }
+
+    if (path === '/api/tasks' && method === 'GET') {
+      return json(route, tasksState);
+    }
+
+    if (path === '/api/tasks' && method === 'POST') {
+      const taskBody = req.postDataJSON() || {};
+      const newTask = {
+        id: `task-${Date.now()}`,
+        ...taskBody,
+      };
+      tasksState.push(newTask);
+      capturedCalls.createdTasks.push(newTask);
+      return json(route, newTask, 201);
+    }
+
     if (path === '/api/gamification') {
       return json(route, { level: 1, level_name: 'Iniciante', xp_total: 0, next_level_xp: 100, progress_pct: 0, achievements: [] });
     }
     if (path === '/api/captures/pending-count') return json(route, { count: 0 });
-    if (path === '/api/tasks' || path.startsWith('/api/tasks?')) return json(route, []);
     if (path === '/api/habits' || path.startsWith('/api/habits?')) return json(route, []);
     if (path === '/api/habit-logs' || path.startsWith('/api/habit-logs?')) return json(route, []);
     if (path === '/api/wellness' || path.startsWith('/api/wellness?')) return json(route, []);
@@ -216,6 +318,13 @@ async function setupMocks(page, { guidance = FRESH_GUIDANCE, guidanceStatus = 20
 
     return route.continue();
   });
+
+  return {
+    currentProjects,
+    updatesState,
+    tasksState,
+    capturedCalls,
+  };
 }
 
 test.describe('Frentes - Fase 2 E2E', () => {
@@ -232,10 +341,10 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("sem overflow horizontal em 390, 768, 1024, 1365 e 1440", async ({ page }) => {
+  test('sem overflow horizontal em 390, 768, 1024, 1365 e 1440', async ({ page }) => {
     await setupMocks(page);
-    await page.goto("/frentes");
-    await page.waitForLoadState("domcontentloaded");
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
 
     const viewports = [
       { width: 390, height: 844 },
@@ -286,13 +395,11 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
-    // Clicar em "Abrir frente" na prioridade 1 (Praxis) dentro do painel de prioridades
     const priorityPanel = page.locator('section').filter({ hasText: 'O que vem primeiro' });
     const abrirBtn = priorityPanel.getByRole('button', { name: 'Abrir frente Praxis' });
     await expect(abrirBtn).toBeVisible();
     await abrirBtn.click();
 
-    // Drawer abre exibindo detalhes da Praxis
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Praxis' })).toBeVisible();
     await expect(page.getByText('O app do dia.')).toBeVisible();
   });
@@ -302,12 +409,10 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
-    // Mensagem de empty exata do plano
     await expect(
       page.getByText('O Sêneca ainda não atualizou a ordem de hoje. Suas frentes continuam disponíveis abaixo.')
     ).toBeVisible();
 
-    // Lista de frentes continua presente e visível
     await expect(page.getByRole('heading', { name: 'Suas frentes' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir frente Praxis' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir frente GoFluxo' })).toBeVisible();
@@ -318,12 +423,10 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
-    // Mensagem de erro visível
     await expect(
       page.getByText('Não foi possível carregar a recomendação do dia. Suas frentes continuam disponíveis abaixo.')
     ).toBeVisible();
 
-    // Lista de frentes CONTINUA visível
     await expect(page.getByRole('heading', { name: 'Suas frentes' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir frente Praxis' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir frente RCA' })).toBeVisible();
@@ -334,14 +437,12 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
-    // Verifica que Animália aparece com relação a GoFluxo e tag Bloqueada na lista
     const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
     const animaliaRow = frontsList.getByRole('button', { name: 'Abrir frente Animália' });
     await expect(animaliaRow).toBeVisible();
     await expect(animaliaRow.getByText('Cliente · GoFluxo')).toBeVisible();
     await expect(animaliaRow.getByText('Bloqueada')).toBeVisible();
 
-    // Abre o drawer da Animália
     await animaliaRow.click();
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Animália' })).toBeVisible();
   });
@@ -357,11 +458,9 @@ test.describe('Frentes - Fase 2 E2E', () => {
 
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Praxis' })).toBeVisible();
 
-    // Fechar drawer
     const closeBtn = page.getByRole('button', { name: 'Close' });
     await closeBtn.click();
 
-    // Sheet fechou
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
@@ -370,19 +469,272 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
-    // Textos proibidos na lista
     await expect(page.getByText('Arraste para mudar o estado')).not.toBeVisible();
     await expect(page.getByText('máx. 2')).not.toBeVisible();
     await expect(page.getByText('Foco agora')).not.toBeVisible();
 
-    // Campos restritos da frente NÃO podem estar visíveis na lista padrão antes de abrir drawer
     await expect(page.getByText('Ser o cockpit simples do dia a dia do João.')).not.toBeVisible();
     await expect(page.getByText('Jota Fit + continuidade das frentes')).not.toBeVisible();
     await expect(page.getByText('Usar a nova visão de Frentes no fluxo real.')).not.toBeVisible();
 
-    // Rótulos visuais de estado em PT
     await expect(page.getByText('Em curso').first()).toBeVisible();
     await expect(page.getByText('Depois').first()).toBeVisible();
     await expect(page.getByText('Pausado').first()).toBeVisible();
+  });
+});
+
+test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', () => {
+  test('modo leitura padrão: drawer abre sem formulário completo e com primeira dobra clara', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Abre drawer da Praxis
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    // Título e subtítulo em linguagem natural
+    await expect(dialog.getByRole('heading', { name: 'Praxis' })).toBeVisible();
+    await expect(dialog.getByText(/Produto · Em curso · Foco · No ar/)).toBeVisible();
+
+    // Primeira dobra em linguagem natural
+    await expect(dialog.getByRole('heading', { name: 'Situação atual' })).toBeVisible();
+    await expect(dialog.getByText('Produto ativo e em evolução.')).toBeVisible();
+
+    await expect(dialog.getByRole('heading', { name: 'Fatia atual' })).toBeVisible();
+    await expect(dialog.getByText('Jota Fit + continuidade das frentes')).toBeVisible();
+
+    await expect(dialog.getByRole('heading', { name: 'Próximo passo' })).toBeVisible();
+    await expect(dialog.getByText('Usar a nova visão de Frentes no fluxo real.')).toBeVisible();
+
+    // Ações operacionais presentes no detalhe
+    await expect(dialog.getByRole('button', { name: 'Começar no Modo Foco' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Fiz isso' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Editar estado' })).toBeVisible();
+
+    // Formulário completo de edição NÃO deve estar aberto por padrão
+    await expect(dialog.locator('#project-kind')).not.toBeVisible();
+    await expect(dialog.locator('#project-column')).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Salvar estado' })).not.toBeVisible();
+  });
+
+  test('campos vazios são omitidos honestamente no modo leitura', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    // CatálogoZap tem blocked_note e current_slice vazios
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente CatálogoZap' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    // Bloqueio real não existe na frente -> não deve ser renderizado
+    await expect(dialog.getByRole('heading', { name: 'Bloqueio real' })).not.toBeVisible();
+  });
+
+  test('bloqueio real é exibido em destaque quando presente', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Animália tem blocked_note: "Aguardando aprovação do cliente"
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Animália' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    await expect(dialog.getByRole('heading', { name: 'Bloqueio real' })).toBeVisible();
+    await expect(dialog.getByText('Aguardando aprovação do cliente')).toBeVisible();
+  });
+
+  test('editar estado: revela formulário com seletor de coluna e cancelar restaura estado sem apagar dados', async ({ page }) => {
+    const { capturedCalls } = await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+
+    // Clica em "Editar estado"
+    await dialog.getByRole('button', { name: 'Editar estado' }).click();
+
+    // Formulário revelado
+    await expect(dialog.getByText('Editando estado da frente')).toBeVisible();
+    await expect(dialog.locator('#project-column')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Salvar estado' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancelar' })).toBeVisible();
+
+    // Altera o campo de objetivo provisoriamente
+    const objField = dialog.locator('#project-objective');
+    await objField.fill('Texto provisório não salvo');
+
+    // Clica em Cancelar
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+
+    // Volta ao modo leitura
+    await expect(dialog.locator('#project-column')).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Editar estado' })).toBeVisible();
+
+    // Estado original foi preservado
+    await expect(dialog.getByText('Ser o cockpit simples do dia a dia do João.')).toBeVisible();
+    await expect(dialog.getByText('Texto provisório não salvo')).not.toBeVisible();
+    expect(capturedCalls.patchedProjects.length).toBe(0);
+
+    // Agora edita e salva de verdade
+    await dialog.getByRole('button', { name: 'Editar estado' }).click();
+    await dialog.locator('#project-column').click();
+    await page.getByRole('option', { name: 'Pausado' }).click();
+    await dialog.getByRole('button', { name: 'Salvar estado' }).click();
+
+    // Verifica que enviou PATCH
+    await expect(dialog.getByText('Editando estado da frente')).not.toBeVisible();
+    expect(capturedCalls.patchedProjects.length).toBe(1);
+    expect(capturedCalls.patchedProjects[0].patchData.column).toBe('pausado');
+  });
+
+  test('foco manual: Começar no Modo Foco cria tarefa com copy Frentes apenas sob demanda e navega para /foco', async ({ page }) => {
+    const { capturedCalls } = await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Antes do clique, nenhuma tarefa foi criada automaticamente
+    expect(capturedCalls.createdTasks.length).toBe(0);
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+    const startFocusBtn = dialog.getByRole('button', { name: 'Começar no Modo Foco' });
+    await expect(startFocusBtn).toBeVisible();
+    await startFocusBtn.click();
+
+    // Navega para /foco após criar a tarefa sob demanda
+    await expect(page).toHaveURL(/.*\/foco\?taskId=.+&project=praxis/);
+
+    // Tarefa foi criada com copy correta
+    expect(capturedCalls.createdTasks.length).toBe(1);
+    const createdTask = capturedCalls.createdTasks[0];
+    expect(createdTask.source).toBe('project_focus:praxis');
+    expect(createdTask.title).toBe('Usar a nova visão de Frentes no fluxo real.');
+    expect(createdTask.description).toContain('Criada por Frentes para uma sessão de foco.');
+    expect(createdTask.description).not.toContain('Criada pela Continuidade');
+  });
+
+  test('Fiz isso: envia expected_step, registra timeline, mantém frente aberta e preserva coluna/foco/live', async ({ page }) => {
+    const { capturedCalls } = await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+    const completeBtn = dialog.getByRole('button', { name: 'Fiz isso' });
+    await expect(completeBtn).toBeVisible();
+    await completeBtn.click();
+
+    // Envia expected_step correto
+    expect(capturedCalls.completeNextStep.length).toBe(1);
+    expect(capturedCalls.completeNextStep[0].postData.expected_step).toBe('Usar a nova visão de Frentes no fluxo real.');
+
+    // Toast de sucesso
+    await expect(page.getByText('Feito e registrado')).toBeVisible();
+
+    // Drawer permanece aberto
+    await expect(dialog).toBeVisible();
+
+    // Próximo passo concluído exibe fallback
+    await expect(dialog.getByText('Próximo passo pendente de revisão.')).toBeVisible();
+
+    // Subtítulo mantém coluna, foco e live intactos
+    await expect(dialog.getByText(/Produto · Em curso · Foco · No ar/)).toBeVisible();
+
+    // Timeline agora exibe a conclusão
+    await expect(dialog.getByText('Concluído: Usar a nova visão de Frentes no fluxo real.')).toBeVisible();
+  });
+
+  test('conflito 409 NEXT_STEP_CHANGED: exibe mensagem clara, não apaga passo novo e atualiza o drawer', async ({ page }) => {
+    await setupMocks(page, {
+      onCompleteNextStepOverride: (route, { project }) => {
+        // Simula que o Sêneca alterou o próximo passo em background
+        project.next_step = 'Passo novo definido pelo Sêneca';
+        return route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'NEXT_STEP_CHANGED' }),
+        });
+      },
+    });
+
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Fiz isso' }).click();
+
+    // Mensagem clara de conflito
+    await expect(page.getByText('O próximo passo mudou')).toBeVisible();
+    await expect(page.getByText('Feito e registrado')).not.toBeVisible();
+
+    // Drawer permanece aberto e exibe o passo novo sem apagá-lo
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Passo novo definido pelo Sêneca')).toBeVisible();
+  });
+
+  test('timeline: avanço manual é registrado via POST e exibido na lista', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+    const updateInput = dialog.getByPlaceholder('Registrar um avanço curto…');
+    await updateInput.fill('Validamos o piloto comercial em campo');
+
+    await dialog.getByRole('button', { name: 'Registrar' }).click();
+
+    // Avanço registrado é exibido
+    await expect(dialog.getByText('Validamos o piloto comercial em campo')).toBeVisible();
+  });
+
+  test('persistência e reload: alteração de estado no drawer permanece após recarregar a página', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Editar estado' }).click();
+    await dialog.locator('#project-column').click();
+    await page.getByRole('option', { name: 'Pausado' }).click();
+    await dialog.getByRole('button', { name: 'Salvar estado' }).click();
+
+    // Recarrega a página
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+
+    // Na lista, Praxis agora aparece como Pausado
+    const updatedFrontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    const praxisRow = updatedFrontsList.getByRole('button', { name: 'Abrir frente Praxis' });
+    await expect(praxisRow.getByText('Pausado')).toBeVisible();
+
+    // No drawer, o estado persiste como Pausado
+    await praxisRow.click();
+    await expect(page.getByRole('dialog').getByText(/Pausado/)).toBeVisible();
   });
 });

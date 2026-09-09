@@ -196,4 +196,75 @@ test('Fiz isso com expected_step não apaga um próximo passo que mudou no meio 
 
   const after = await requestJson(server.base, '/api/projects/carteirazap');
   assert.equal(after.next_step, 'Revisar o fluxo novo antes de mexer em Clientes');
+  assert.equal(after.column, before.column);
+  assert.equal(after.focus, before.focus);
+  assert.equal(after.live, before.live);
+
+  const updates = await requestJson(server.base, '/api/projects/carteirazap/updates');
+  assert.equal(updates.length, 0);
+});
+
+test('Fiz isso com expected_step exato conclui, registra timeline e preserva column, focus e live', async (t) => {
+  const { server } = await mountProjects(t);
+  const before = await requestJson(server.base, '/api/projects/praxis');
+  assert.ok(before.next_step);
+  assert.equal(before.focus, 1);
+  assert.equal(before.column, 'andando');
+  assert.equal(before.live, 1);
+
+  const res = await fetch(`${server.base}/api/projects/praxis/complete-next-step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expected_step: before.next_step }),
+  });
+
+  assert.equal(res.status, 200);
+  const result = await res.json();
+  assert.equal(result.project.next_step, '');
+  assert.equal(result.project.column, 'andando');
+  assert.equal(result.project.focus, 1);
+  assert.equal(result.project.live, 1);
+  assert.equal(result.update.source, 'conclusao');
+  assert.match(result.update.summary, new RegExp(`Concluído: ${before.next_step.slice(0, 20)}`, 'i'));
+
+  const after = await requestJson(server.base, '/api/projects/praxis');
+  assert.equal(after.next_step, '');
+  assert.equal(after.column, 'andando');
+  assert.equal(after.focus, 1);
+  assert.equal(after.live, 1);
+
+  const updates = await requestJson(server.base, '/api/projects/praxis/updates');
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].source, 'conclusao');
+});
+
+test('concluir próximo passo nunca move nem altera frentes em radar ou pausado', async (t) => {
+  const { server } = await mountProjects(t);
+  const catalog = await requestJson(server.base, '/api/projects/catalogozap');
+  assert.equal(catalog.column, 'radar');
+  assert.ok(catalog.next_step);
+
+  const resCatalog = await fetch(`${server.base}/api/projects/catalogozap/complete-next-step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expected_step: catalog.next_step }),
+  });
+  assert.equal(resCatalog.status, 200);
+  const afterCatalog = await requestJson(server.base, '/api/projects/catalogozap');
+  assert.equal(afterCatalog.column, 'radar');
+  assert.equal(afterCatalog.next_step, '');
+
+  const encarte = await requestJson(server.base, '/api/projects/encartezap');
+  assert.equal(encarte.column, 'pausado');
+  assert.ok(encarte.next_step);
+
+  const resEncarte = await fetch(`${server.base}/api/projects/encartezap/complete-next-step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expected_step: encarte.next_step }),
+  });
+  assert.equal(resEncarte.status, 200);
+  const afterEncarte = await requestJson(server.base, '/api/projects/encartezap');
+  assert.equal(afterEncarte.column, 'pausado');
+  assert.equal(afterEncarte.next_step, '');
 });

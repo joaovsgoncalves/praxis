@@ -164,3 +164,18 @@ Cadência canônica do Sêneca:
 - 18:30 Fortaleza: fechamento de progresso read-only, sem reordenar a vida nem criar cobrança nova.
 
 Regra de UX: `Modo foco` aparece no bloco **Foco agora** e no drawer da frente. Não adicionar CTA operacional em todos os cards do mapa; o mapa continua sendo leitura rápida.
+
+
+## Evolução Frentes v3 — 2026-09-09 (Fases 1, 2 e 3 entregues)
+
+- Nome de produto consolidado como **Frentes** (rota canônica `/frentes`, redirect transparente `/projetos` -> `/frentes`).
+- Sem Kanban, sem drag and drop e sem pins manuais como fonte de verdade da ordem.
+- **O que vem primeiro**: orientação diária estruturada gerada pelo Sêneca (`continuity_guidance`), com prioridade 1 dominante e até 3 itens com motivo explícito.
+- **Suas frentes**: lista vertical compacta organizada em três grupos (Trabalho e compromissos, Formação, Construção própria) mostrando somente nome, tipo, estado curto, indicador de bloqueio e chevron.
+- **Detalhe sob demanda (`ProjectDetailDialog`)**:
+  - Abre sempre em **modo leitura simples**, nunca como formulário completo.
+  - Primeira dobra em linguagem natural: Situação atual, Fatia atual, Próximo passo e Bloqueio real (campos vazios omitidos honestamente).
+  - Execução protegida: `Modo Foco` (cria tarefa `source=project_focus:<slug>` apenas sob demanda manual com copy `Criada por Frentes`) e `Fiz isso` (envia `expected_step`, trata `409 NEXT_STEP_CHANGED` sem sobrescrever o passo novo e mantém a frente aberta sem mover/pausar).
+  - Botão `Editar estado` revela o formulário completo existente; cancelar restaura o estado sem apagar dados persistidos.
+  - Seletor de estado (coluna) existe unicamente dentro do drawer em modo de edição.
+  - Linha do tempo (`project_updates`) e registro manual de avanços posicionados abaixo do contexto operacional.

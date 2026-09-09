@@ -82,18 +82,34 @@ export default function Projects() {
   });
 
   const completeNextStep = useMutation({
-    mutationFn: ({ id }) => praxisApi.projects.completeNextStep(id),
+    mutationFn: ({ id, expectedStep }) => praxisApi.projects.completeNextStep(id, { expected_step: expectedStep }),
     onSuccess: (result, vars) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['project-updates', vars.id] });
-      if (openProject && result?.project && String(openProject.id) === String(vars.id)) {
+      if (openProject && result?.project && (String(openProject.id) === String(vars.id) || String(openProject.slug) === String(vars.id))) {
         setOpenProject(result.project);
       }
       toast.success('Feito e registrado', {
         description: 'Esse avanço entra no fechamento do Sêneca e o próximo passo fica pendente de revisão.',
       });
     },
-    onError: (err) => {
+    onError: async (err, vars) => {
+      if (err?.status === 409 || err?.body?.error === 'NEXT_STEP_CHANGED' || err?.message === 'NEXT_STEP_CHANGED') {
+        await queryClient.invalidateQueries({ queryKey: ['projects'] });
+        await queryClient.invalidateQueries({ queryKey: ['project-updates', vars.id] });
+        try {
+          const fresh = await praxisApi.projects.get(vars.id);
+          if (fresh && openProject && (fresh.id === openProject.id || fresh.slug === openProject.slug)) {
+            setOpenProject(fresh);
+          }
+        } catch {
+          // ignore
+        }
+        toast.error('O próximo passo mudou', {
+          description: 'O Sêneca ou outra sessão atualizou esta frente. O novo passo foi carregado e não foi sobrescrito.',
+        });
+        return;
+      }
       toast.error('Não deu pra concluir', { description: err?.message || 'Tenta de novo.' });
     },
   });
@@ -119,7 +135,7 @@ export default function Projects() {
         const descriptionBits = [
           `Frente: ${project.name}`,
           project.current_slice ? `Agora: ${project.current_slice}` : null,
-          'Criada pela Continuidade para uma sessão de foco.',
+          'Criada por Frentes para uma sessão de foco.',
         ].filter(Boolean);
 
         task = await praxisApi.tasks.create({
@@ -186,9 +202,10 @@ export default function Projects() {
   };
 
   const handleCompleteNextStep = async (project) => {
-    if (!project?.next_step) return false;
+    const expectedStep = String(project?.next_step || '').trim();
+    if (!expectedStep) return false;
     try {
-      await completeNextStep.mutateAsync({ id: project.id });
+      await completeNextStep.mutateAsync({ id: project.id, expectedStep });
       return true;
     } catch {
       return false;
