@@ -99,7 +99,8 @@ const AuthenticatedApp = () => {
         <Route path="/ideias" element={<Ideas />} />
         <Route path="/compras" element={<Compras />} />
         <Route path="/financas" element={<Financas />} />
-        <Route path="/projetos" element={<Projects />} />
+        <Route path="/frentes" element={<Projects />} />
+        <Route path="/projetos" element={<Navigate to="/frentes" replace />} />
         <Route path="/jota-fit" element={<JotaFitLayout />}>
           <Route index element={<Treinos />} />
           <Route path="programa" element={<Treinos />} />

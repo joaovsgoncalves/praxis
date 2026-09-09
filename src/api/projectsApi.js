@@ -1,6 +1,7 @@
 export const projectsApiModule = (request) => ({
   projects: {
     list: () => request('/api/projects'),
+    guidanceToday: () => request('/api/projects/guidance/today'),
     get: (id) => request(`/api/projects/${encodeURIComponent(id)}`),
     create: (data) => request('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) =>

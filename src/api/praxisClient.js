@@ -38,6 +38,7 @@ const OFFLINE_CACHEABLE = [
 const OFFLINE_KEY_PREFIX = 'praxis:offline:';
 
 function isCacheable(path) {
+  if (path.startsWith('/api/projects/guidance')) return false;
   return OFFLINE_CACHEABLE.some(p => path === p || path.startsWith(p + '?') || path.startsWith(p + '/'));
 }
 
