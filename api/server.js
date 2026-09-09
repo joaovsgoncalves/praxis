@@ -36,6 +36,7 @@ import { initNutritionSchema } from './nutrition.js';
 import { initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
 import { createFinanceRouter } from './routes/finance.js';
 import { initProjectsSchema, seedProjectsIfEmpty } from './projects.js';
+import { initContinuityGuidanceSchema } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -140,6 +141,7 @@ initWorkoutSchema(db);
 initFinanceSchema(db);
 seedFinanceIfEmpty(db);
 initProjectsSchema(db);
+initContinuityGuidanceSchema(db);
 seedProjectsIfEmpty(db);
 ensureDefaultUser(db);
 
@@ -194,7 +196,7 @@ const routeCtx = {
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
 registerOpsRoutes(app, { apiDir: __dirname });
 app.use('/api/purchases', createPurchasesRouter({ db }));
-app.use('/api/projects', createProjectsRouter({ db }));
+app.use('/api/projects', createProjectsRouter({ db, getLocalDateString }));
 app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
 app.use('/api/nutrition', createNutritionRouter({ db, getLocalDateString }));
 registerWorkoutRoutes(app, db);

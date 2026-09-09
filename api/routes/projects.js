@@ -7,7 +7,9 @@ import {
   getProject,
   listProjectUpdates,
   listProjects,
+  todayFortaleza,
 } from '../projects.js';
+import { getContinuityGuidance } from '../continuityGuidance.js';
 
 function sendError(res, err) {
   const status = err.status || 500;
@@ -19,7 +21,7 @@ function sendError(res, err) {
 }
 
 /** Projects — mounted at /api/projects */
-export function createProjectsRouter({ db }) {
+export function createProjectsRouter({ db, getLocalDateString = todayFortaleza }) {
   const router = Router();
 
   router.get('/', (_req, res) => {
@@ -47,6 +49,18 @@ export function createProjectsRouter({ db }) {
       const result = completeProjectNextStep(db, req.params.id, req.body || {});
       if (!result) return res.status(404).json({ error: 'Not found' });
       res.json(result);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.get('/guidance/today', (_req, res) => {
+    try {
+      const today = typeof getLocalDateString === 'function'
+        ? getLocalDateString()
+        : todayFortaleza();
+      const guidance = getContinuityGuidance(db, today);
+      res.json(guidance);
     } catch (err) {
       sendError(res, err);
     }

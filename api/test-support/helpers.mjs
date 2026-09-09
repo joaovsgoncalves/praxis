@@ -11,9 +11,10 @@ import { initPurchaseSchema } from '../purchaseList.js';
 import { initWorkoutSchema } from '../workouts.js';
 import { initFinanceSchema } from '../finance.js';
 import { initProjectsSchema } from '../projects.js';
+import { initContinuityGuidanceSchema } from '../continuityGuidance.js';
 
 /**
- * @param {{ withCaptureQueue?: boolean, withNutrition?: boolean, withPurchases?: boolean, withWorkouts?: boolean, withFinance?: boolean, withProjects?: boolean }} [options]
+ * @param {{ withCaptureQueue?: boolean, withNutrition?: boolean, withPurchases?: boolean, withWorkouts?: boolean, withFinance?: boolean, withProjects?: boolean, withContinuityGuidance?: boolean }} [options]
  */
 export function createTestDb(options = {}) {
   const db = new Database(':memory:');
@@ -23,7 +24,13 @@ export function createTestDb(options = {}) {
   if (options.withPurchases) initPurchaseSchema(db);
   if (options.withWorkouts) initWorkoutSchema(db);
   if (options.withFinance) initFinanceSchema(db);
-  if (options.withProjects) initProjectsSchema(db);
+  if (options.withProjects) {
+    initProjectsSchema(db);
+    initContinuityGuidanceSchema(db);
+  }
+  if (options.withContinuityGuidance && !options.withProjects) {
+    initContinuityGuidanceSchema(db);
+  }
   return db;
 }
 
