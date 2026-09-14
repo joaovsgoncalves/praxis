@@ -8,6 +8,7 @@ import {
 } from './nutritionOpenFoodFacts.js';
 import { seedBrazilianFoods } from './nutritionSeedBr.js';
 import { initRegimenSchema } from './nutritionRegimen.js';
+import { resolveFoodQuantity, rescaleRecordedQuantity, quantityBasis, positiveQuantity } from './nutritionQuantities.js';
 
 /** Slots canônicos do diário (ordem de exibição). */
 export const MEAL_SLOTS = [
@@ -152,6 +153,12 @@ export function initNutritionSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_food_meals_status ON food_meals(status);
     CREATE INDEX IF NOT EXISTS idx_body_weight_date ON body_weight_logs(date);
   `);
+
+  // Keep an immutable numeric basis for quantity edits (old logs migrate lazily).
+  const logCols = db.prepare('PRAGMA table_info(food_logs)').all().map((column) => column.name);
+  if (!logCols.includes('quantity_basis_json')) {
+    db.exec('ALTER TABLE food_logs ADD COLUMN quantity_basis_json TEXT');
+  }
 
   // fase 12: barcode no catálogo (cache OFF)
   const foodCols = db.prepare('PRAGMA table_info(food_items)').all().map((c) => c.name);
@@ -621,29 +628,15 @@ export function scaleFoodToSnapshot(food, { servings, grams } = {}) {
     err.status = 404;
     throw err;
   }
-  let scale = 1;
-  const g = logNumOrNull(grams);
-  const s = logNumOrNull(servings);
-  if (g != null && g > 0 && food.serving_grams != null && Number(food.serving_grams) > 0) {
-    scale = g / Number(food.serving_grams);
-  } else if (s != null && s > 0) {
-    scale = s;
-  } else if (s === 0 || g === 0) {
-    scale = 0;
-  }
-
-  const servingsOut =
-    s != null
-      ? s
-      : g != null && food.serving_grams && Number(food.serving_grams) > 0
-        ? g / Number(food.serving_grams)
-        : 1;
+  const quantity = resolveFoodQuantity(food, { servings, grams });
+  const scale = quantity.servings;
 
   return {
     name_snapshot: food.name + (food.brand ? ` (${food.brand})` : ''),
     food_item_id: food.id,
-    servings: servingsOut,
-    grams: g,
+    servings: quantity.servings,
+    grams: quantity.grams,
+    quantity_basis_json: quantityBasis({ ...food, servings: 1, grams: food.serving_grams }),
     kcal: Math.round(logNum(food.kcal) * scale),
     protein_g: round1(logNum(food.protein_g) * scale),
     carbs_g: round1(logNum(food.carbs_g) * scale),
@@ -679,8 +672,8 @@ export function createLog(db, body = {}, { today } = {}) {
     snapshot = {
       name_snapshot: name,
       food_item_id: null,
-      servings: logNum(body.servings, 1),
-      grams: logNumOrNull(body.grams),
+      servings: body.servings === undefined ? 1 : positiveQuantity(body.servings, 'porções'),
+      grams: body.grams == null ? null : positiveQuantity(body.grams, 'gramas'),
       kcal: Math.round(logNum(body.kcal, 0)),
       protein_g: round1(logNum(body.protein_g, 0)),
       carbs_g: round1(logNum(body.carbs_g, 0)),
@@ -693,8 +686,8 @@ export function createLog(db, body = {}, { today } = {}) {
   db.prepare(`
     INSERT INTO food_logs (
       id, date, meal_slot, food_item_id, meal_id, name_snapshot,
-      servings, grams, kcal, protein_g, carbs_g, fat_g, fiber_g, note, source
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      servings, grams, kcal, protein_g, carbs_g, fat_g, fiber_g, note, source, quantity_basis_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     dateStr,
@@ -711,6 +704,7 @@ export function createLog(db, body = {}, { today } = {}) {
     snapshot.fiber_g,
     String(body.note || ''),
     body.source || 'manual',
+    snapshot.quantity_basis_json || quantityBasis(snapshot),
   );
   return getLog(db, id);
 }
@@ -723,7 +717,6 @@ export function updateLog(db, id, body = {}) {
     body.food_item_id !== undefined ? body.food_item_id : existing.food_item_id;
   const servings =
     body.servings !== undefined ? body.servings : existing.servings;
-  const grams = body.grams !== undefined ? body.grams : existing.grams;
   const rescale =
     body.servings !== undefined ||
     body.grams !== undefined ||
@@ -757,33 +750,29 @@ export function updateLog(db, id, body = {}) {
     throw err;
   }
 
-  if (rescale && foodId) {
+  if (rescale && foodId && foodId !== existing.food_item_id) {
     const food = getFood(db, foodId);
-    const snap = scaleFoodToSnapshot(food, { servings, grams });
+    const snap = scaleFoodToSnapshot(food, {
+      servings: body.grams != null && body.servings === undefined ? undefined : servings,
+      grams: body.grams,
+    });
     next = { ...next, ...snap, food_item_id: foodId };
-  } else if (rescale && !foodId) {
-    const oldS = Number(existing.servings) || 1;
-    const newS = logNum(servings, oldS);
-    const ratio = oldS > 0 ? newS / oldS : 1;
-    next.servings = newS;
-    next.grams = logNumOrNull(grams);
-    if (body.kcal !== undefined || body.protein_g !== undefined) {
-      next.kcal = Math.round(logNum(body.kcal, existing.kcal));
-      next.protein_g = round1(logNum(body.protein_g, existing.protein_g));
-      next.carbs_g = round1(logNum(body.carbs_g, existing.carbs_g));
-      next.fat_g = round1(logNum(body.fat_g, existing.fat_g));
-      next.fiber_g = round1(logNum(body.fiber_g, existing.fiber_g));
-    } else {
-      next.kcal = Math.round(logNum(existing.kcal) * ratio);
-      next.protein_g = round1(logNum(existing.protein_g) * ratio);
-      next.carbs_g = round1(logNum(existing.carbs_g) * ratio);
-      next.fat_g = round1(logNum(existing.fat_g) * ratio);
-      next.fiber_g = round1(logNum(existing.fiber_g) * ratio);
-    }
-    if (body.name_snapshot !== undefined || body.name !== undefined) {
-      next.name_snapshot = String(
-        body.name_snapshot || body.name || existing.name_snapshot,
-      ).trim();
+  } else if (rescale) {
+    // Rescale the recorded snapshot even if its catalogue item changed or was deleted.
+    // Only explicitly submitted grams may override an explicitly submitted serving count.
+    next = { ...next, ...rescaleRecordedQuantity(existing, {
+      servings: body.servings,
+      grams: body.grams,
+    }) };
+    if (!foodId) {
+      for (const key of ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g']) {
+        if (body[key] !== undefined) {
+          next[key] = key === 'kcal' ? Math.round(logNum(body[key])) : round1(logNum(body[key]));
+        }
+      }
+      if (body.name_snapshot !== undefined || body.name !== undefined) {
+        next.name_snapshot = String(body.name_snapshot || body.name || existing.name_snapshot).trim();
+      }
     }
   } else {
     if (body.name_snapshot !== undefined || body.name !== undefined) {
@@ -796,6 +785,10 @@ export function updateLog(db, id, body = {}) {
     if (body.carbs_g !== undefined) next.carbs_g = round1(logNum(body.carbs_g));
     if (body.fat_g !== undefined) next.fat_g = round1(logNum(body.fat_g));
     if (body.fiber_g !== undefined) next.fiber_g = round1(logNum(body.fiber_g));
+  }
+
+  if ((!rescale || !foodId) && ['kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g'].some((key) => body[key] !== undefined)) {
+    next.quantity_basis_json = quantityBasis(next);
   }
 
   db.prepare(`
@@ -812,7 +805,8 @@ export function updateLog(db, id, body = {}) {
       carbs_g = ?,
       fat_g = ?,
       fiber_g = ?,
-      note = ?
+      note = ?,
+      quantity_basis_json = ?
     WHERE id = ?
   `).run(
     next.date,
@@ -828,6 +822,7 @@ export function updateLog(db, id, body = {}) {
     next.fat_g,
     next.fiber_g,
     next.note,
+    next.quantity_basis_json || existing.quantity_basis_json || null,
     id,
   );
   return getLog(db, id);

@@ -161,10 +161,9 @@ export default function NutritionBarcodeEntry({
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Cola o número do pacote (EAN). Busca no teu catálogo e, se precisar, no{' '}
-              <span className="text-foreground">Open Food Facts</span> (internet). O
-              produto fica salvo pra próxima. Câmera nativa fica pra depois — no celular
-              dá pra colar do leitor.
+              Digite ou cole o código de barras. A busca consulta o seu catálogo e o{' '}
+              <span className="text-foreground">Open Food Facts</span>. Confira o produto
+              e a porção antes de salvar.
             </p>
             <div className="space-y-1.5">
               <Label htmlFor="barcode-code">Código</Label>
@@ -290,7 +289,11 @@ export default function NutritionBarcodeEntry({
                   className="w-full rounded-full"
                   disabled={logMut.isPending}
                   onClick={() => {
-                    const s = Number(String(servings).replace(',', '.')) || 1;
+                    const s = Number(String(servings).replace(',', '.'));
+                    if (!Number.isFinite(s) || s <= 0 || s > 1_000_000) {
+                      toast.error('Informe uma quantidade válida, maior que zero');
+                      return;
+                    }
                     logMut.mutate({
                       foodId: food.id,
                       meal_slot: slot,

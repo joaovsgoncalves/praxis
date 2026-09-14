@@ -8,7 +8,6 @@ import {
   Search,
   Star,
   Clock,
-  Minus,
   Copy,
   UtensilsCrossed,
   Type,
@@ -39,14 +38,12 @@ import NutritionTextEntry from '@/components/nutrition/NutritionTextEntry';
 import NutritionBarcodeEntry from '@/components/nutrition/NutritionBarcodeEntry';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import NutritionQuantityField from '@/components/nutrition/NutritionQuantityField';
+import { nutritionQuantityPayload, parseNutritionQuantity, recordedFoodReference } from '@/lib/nutritionQuantity';
 
-function todayLocalISO() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+import { fortalezaDateKey, fortalezaNowTimeHHMM } from '@/lib/dates';
+
+const todayLocalISO = fortalezaDateKey;
 
 function shiftDate(iso, delta) {
   const [y, m, d] = iso.split('-').map(Number);
@@ -68,61 +65,12 @@ function formatDateLabel(iso) {
 }
 
 function defaultSlotForHour() {
-  const h = new Date().getHours();
+  const h = Number(fortalezaNowTimeHHMM().split(':')[0]);
   if (h < 10) return 'breakfast';
   if (h < 12) return 'snack_morning';
   if (h < 15) return 'lunch';
   if (h < 18) return 'snack_afternoon';
   return 'dinner';
-}
-
-function parseServings(v) {
-  const n = Number(String(v).replace(',', '.'));
-  if (!Number.isFinite(n) || n <= 0) return 1;
-  return Math.round(n * 100) / 100;
-}
-
-function stepServings(current, delta) {
-  const n = parseServings(current);
-  const next = Math.max(0.5, Math.round((n + delta) * 2) / 2);
-  return String(next);
-}
-
-function ServingsStepper({ value, onChange, id }) {
-  return (
-    <div className="flex items-center gap-2">
-      <Button
-        type="button"
-        size="icon"
-        variant="outline"
-        className="h-10 w-10 rounded-full shrink-0"
-        onClick={() => onChange(stepServings(value, -0.5))}
-        aria-label="Menos meia porção"
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
-      <Input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        step="0.5"
-        min="0.5"
-        className="tabular-nums bg-secondary/40 text-center"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <Button
-        type="button"
-        size="icon"
-        variant="outline"
-        className="h-10 w-10 rounded-full shrink-0"
-        onClick={() => onChange(stepServings(value, 0.5))}
-        aria-label="Mais meia porção"
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-    </div>
-  );
 }
 
 const PICKER_TABS = [
@@ -134,8 +82,8 @@ const PICKER_TABS = [
 
 export default function DayDiary({ date: controlledDate, onDateChange }) {
   const queryClient = useQueryClient();
-  const [internalDate, setInternalDate] = useState(todayLocalISO);
-  const date = controlledDate || internalDate;
+  const [internalDate, setInternalDate] = useState(null);
+  const date = controlledDate || internalDate || todayLocalISO();
   const setDate = (d) => {
     if (onDateChange) onDateChange(d);
     else setInternalDate(d);
@@ -147,8 +95,10 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   const [foodQ, setFoodQ] = useState('');
   const [selectedFood, setSelectedFood] = useState(null);
   const [servings, setServings] = useState('1');
+  const [quantityUnit, setQuantityUnit] = useState('servings');
   const [editLog, setEditLog] = useState(null);
   const [editServings, setEditServings] = useState('1');
+  const [editQuantityUnit, setEditQuantityUnit] = useState('servings');
   const [textOpen, setTextOpen] = useState(false);
   const [barcodeOpen, setBarcodeOpen] = useState(false);
 
@@ -310,20 +260,21 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
 
   const submitAdd = () => {
     if (!selectedFood) return;
+    const quantity = nutritionQuantityPayload(servings, quantityUnit);
+    if (!quantity) return toast.error('Informe uma quantidade maior que zero');
     createMut.mutate({
       date,
       meal_slot: addSlot,
       food_item_id: selectedFood.id,
-      servings: parseServings(servings),
+      ...quantity,
     });
   };
 
   const submitEdit = () => {
     if (!editLog) return;
-    updateMut.mutate({
-      id: editLog.id,
-      data: { servings: parseServings(editServings) },
-    });
+    const quantity = nutritionQuantityPayload(editServings, editQuantityUnit);
+    if (!quantity) return toast.error('Informe uma quantidade maior que zero');
+    updateMut.mutate({ id: editLog.id, data: quantity });
   };
 
   const isMealsTab = pickerTab === 'meals';
@@ -418,23 +369,20 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               {remaining && remaining.kcal != null ? (
-                Number(remaining.kcal) < 0 ||
-                (remaining.protein_g != null && Number(remaining.protein_g) < 0) ? (
-                  <p className="text-xs tabular-nums text-amber-400/95">
-                    Passou{' '}
-                    {formatKcal(Math.abs(Math.min(0, Number(remaining.kcal))))}
-                    {remaining.protein_g != null && Number(remaining.protein_g) < 0
-                      ? ` · P ${formatGrams(Math.abs(Number(remaining.protein_g)))}`
-                      : ''}
+                <div className="space-y-1 text-xs tabular-nums">
+                  <p className={Number(remaining.kcal) < 0 ? 'text-amber-400/95' : 'text-muted-foreground'}>
+                    {Number(remaining.kcal) < 0
+                      ? `Acima da meta: ${formatKcal(Math.abs(remaining.kcal))}`
+                      : `Restam ${formatKcal(remaining.kcal)}`}
                   </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    Faltam {formatKcal(Math.max(0, remaining.kcal))}
-                    {remaining.protein_g != null
-                      ? ` · P ${formatGrams(Math.max(0, remaining.protein_g))}`
-                      : ''}
-                  </p>
-                )
+                  {remaining.protein_g != null ? (
+                    <p className="text-muted-foreground">
+                      {Number(remaining.protein_g) <= 0
+                        ? 'Proteína: meta atingida'
+                        : `Proteína: faltam ${formatGrams(remaining.protein_g)}`}
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <p className="text-xs text-muted-foreground">Diário do dia</p>
               )}
@@ -471,20 +419,24 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
             </div>
           </div>
 
-          <NutritionTextEntry
-            date={date}
-            defaultSlot={addSlot}
-            showTrigger={false}
-            open={textOpen}
-            onOpenChange={setTextOpen}
-          />
-          <NutritionBarcodeEntry
-            date={date}
-            defaultSlot={addSlot}
-            showTrigger={false}
-            open={barcodeOpen}
-            onOpenChange={setBarcodeOpen}
-          />
+          {textOpen ? (
+            <NutritionTextEntry
+              date={date}
+              defaultSlot={addSlot}
+              showTrigger={false}
+              open={textOpen}
+              onOpenChange={setTextOpen}
+            />
+          ) : null}
+          {barcodeOpen ? (
+            <NutritionBarcodeEntry
+              date={date}
+              defaultSlot={addSlot}
+              showTrigger={false}
+              open={barcodeOpen}
+              onOpenChange={setBarcodeOpen}
+            />
+          ) : null}
 
           {MEAL_SLOTS.map((slot) => {
             const items = bySlot?.[slot] || [];
@@ -516,7 +468,9 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                               className="min-w-0 flex-1 text-left"
                               onClick={() => {
                                 setEditLog(log);
-                                setEditServings(String(log.servings ?? 1));
+                                const grams = parseNutritionQuantity(log.grams);
+                                setEditQuantityUnit(grams ? 'grams' : 'servings');
+                                setEditServings(String(grams || log.servings || 1));
                               }}
                             >
                               <div className="flex min-w-0 items-baseline justify-between gap-2">
@@ -722,7 +676,12 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                     >
                       <button
                         type="button"
-                        onClick={() => setSelectedFood(f)}
+                        onClick={() => {
+                          const grams = parseNutritionQuantity(f.serving_grams);
+                          setSelectedFood(f);
+                          setQuantityUnit(grams ? 'grams' : 'servings');
+                          setServings(String(grams || 1));
+                        }}
                         className={cn(
                           'min-w-0 flex-1 text-left rounded-md px-3 py-2 text-sm transition-colors',
                           selectedFood?.id === f.id
@@ -760,18 +719,19 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
             {!isMealsTab && selectedFood ? (
               <div className="space-y-2 rounded-xl border border-border/60 bg-secondary/20 p-3">
                 <p className="text-sm font-medium truncate">{selectedFood.name}</p>
-                <Label className="text-xs text-muted-foreground">Porções</Label>
-                <ServingsStepper value={servings} onChange={setServings} id="add-servings" />
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  Preview ≈{' '}
-                  {formatKcal(
-                    (Number(selectedFood.kcal) || 0) * parseServings(servings),
-                  )}
-                </p>
+                <NutritionQuantityField
+                  id="add-quantity"
+                  value={servings}
+                  unit={quantityUnit}
+                  onChange={setServings}
+                  onUnitChange={setQuantityUnit}
+                  reference={selectedFood}
+                  disabled={createMut.isPending}
+                />
                 <Button
                   type="button"
-                  className="w-full rounded-full"
-                  disabled={createMut.isPending}
+                  className="w-full rounded-full min-h-11"
+                  disabled={createMut.isPending || !nutritionQuantityPayload(servings, quantityUnit)}
                   onClick={submitAdd}
                 >
                   {createMut.isPending ? 'Salvando…' : 'Salvar no diário'}
@@ -795,18 +755,19 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
           {editLog ? (
             <div className="space-y-4">
               <p className="text-sm font-medium">{editLog.name_snapshot}</p>
-              <div className="space-y-1.5">
-                <Label>Porções</Label>
-                <ServingsStepper
-                  value={editServings}
-                  onChange={setEditServings}
-                  id="edit-servings"
-                />
-              </div>
+              <NutritionQuantityField
+                id="edit-quantity"
+                value={editServings}
+                unit={editQuantityUnit}
+                onChange={setEditServings}
+                onUnitChange={setEditQuantityUnit}
+                reference={recordedFoodReference(editLog)}
+                disabled={updateMut.isPending}
+              />
               <Button
                 type="button"
-                className="w-full rounded-full"
-                disabled={updateMut.isPending}
+                className="w-full rounded-full min-h-11"
+                disabled={updateMut.isPending || !nutritionQuantityPayload(editServings, editQuantityUnit)}
                 onClick={submitEdit}
               >
                 {updateMut.isPending ? 'Salvando…' : 'Atualizar'}

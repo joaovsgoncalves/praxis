@@ -9,7 +9,8 @@ import {
 } from '@/components/layout/PraxisPage';
 import NutritionMetaForm from '@/components/nutrition/NutritionMetaForm';
 import NutritionOnboarding from '@/components/nutrition/NutritionOnboarding';
-import WaterTracker from '@/components/dashboard/WaterTracker';
+import NutritionWaterPanel from '@/components/nutrition/NutritionWaterPanel';
+import useFortalezaToday from '@/hooks/useFortalezaToday';
 import FoodCatalog from '@/components/nutrition/FoodCatalog';
 import MealsCatalog from '@/components/nutrition/MealsCatalog';
 import DayDiary from '@/components/nutrition/DayDiary';
@@ -19,7 +20,6 @@ import RegimenDay from '@/components/nutrition/RegimenDay';
 import RegimenCatalog from '@/components/nutrition/RegimenCatalog';
 import MacroBars from '@/components/nutrition/MacroBars';
 import { formatKcal, GOAL_LABELS } from '@/lib/nutrition';
-import { fortalezaDateKey } from '@/lib/dates';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -51,18 +51,7 @@ export default function Nutricao() {
   const [maisPanel, setMaisPanel] = useState('alimentos');
   const [diaryDate, setDiaryDate] = useState(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-  const today = fortalezaDateKey();
-  const [waterMl, setWaterMl] = useState(() => {
-    const dateKey = fortalezaDateKey();
-    const savedMl = localStorage.getItem(`water_ml_${dateKey}`);
-    if (savedMl) return Number(savedMl);
-    const savedGlasses = localStorage.getItem(`water_${dateKey}`);
-    return savedGlasses ? Number(savedGlasses) * 250 : 0;
-  });
-  const handleWaterUpdate = (val) => {
-    setWaterMl(val);
-    localStorage.setItem(`water_ml_${today}`, String(val));
-  };
+  const today = useFortalezaToday();
 
   const {
     data: profile,
@@ -74,9 +63,9 @@ export default function Nutricao() {
     retry: 1,
   });
 
-  const dayKey = diaryDate || undefined;
+  const dayKey = diaryDate || today;
   const { data: day, isLoading: loadingDay } = useQuery({
-    queryKey: ['nutrition', 'day', dayKey || 'today'],
+    queryKey: ['nutrition', 'day', dayKey],
     queryFn: () => praxisApi.nutrition.day(dayKey),
     retry: 1,
   });
@@ -178,13 +167,15 @@ export default function Nutricao() {
           >
             {tab === 'diario' ? (
               <>
-                <WaterTracker amountMl={waterMl} onUpdate={handleWaterUpdate} />
-                <RegimenDay date={diaryDate || today} />
                 {loadingDay && !day ? (
                   <PraxisListSkeleton rows={3} />
                 ) : (
-                  <DayDiary date={diaryDate || undefined} onDateChange={setDiaryDate} />
+                  <DayDiary date={dayKey} onDateChange={(date) => setDiaryDate(date === today ? null : date)} />
                 )}
+                <div className="grid gap-4 lg:grid-cols-2 lg:items-start" aria-label="Hidratação e rotina">
+                  <NutritionWaterPanel key={dayKey} date={dayKey} />
+                  <RegimenDay date={dayKey} />
+                </div>
               </>
             ) : null}
 

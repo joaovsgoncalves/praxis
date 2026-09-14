@@ -139,9 +139,8 @@ export default function NutritionTextEntry({
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Escreve o que comeu (ou cola um transcript). A gente casa com o catálogo e
-              você confirma antes de gravar. Voz in-app fica pra depois — A.N.A. no
-              Telegram pode usar a mesma API.
+              Descreva os alimentos e as quantidades. Confira os resultados do catálogo
+              antes de salvar no diário.
             </p>
             <div className="space-y-1.5">
               <Label>Refeição</Label>

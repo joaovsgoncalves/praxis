@@ -92,9 +92,21 @@ export const nutritionApiModule = (request) => ({
           body: JSON.stringify(data),
         }),
     },
+    summary: (params = {}) => {
+      const query = new URLSearchParams();
+      if (params.from) query.set('from', params.from);
+      if (params.to) query.set('to', params.to);
+      const qs = query.toString();
+      return request(`/api/nutrition/summary${qs ? `?${qs}` : ''}`);
+    },
+    copyDay: (data = {}) =>
+      request('/api/nutrition/day/copy', { method: 'POST', body: JSON.stringify(data) }),
+    seed: () => request('/api/nutrition/seed', { method: 'POST', body: '{}' }),
     weight: {
       list: (params = {}) => {
         const q = new URLSearchParams();
+        if (params.from) q.set('from', params.from);
+        if (params.to) q.set('to', params.to);
         if (params.limit) q.set('limit', String(params.limit));
         const qs = q.toString();
         return request(`/api/nutrition/weight${qs ? `?${qs}` : ''}`);
