@@ -7,7 +7,7 @@ Pedido: corrigir erros e melhorar UI/UX, em tarefas sequenciais.
 
 **Integração deste lote à main autorizada pelo usuário em 2026-09-14. O escopo da integração é código, testes e plano; não inclui deploy manual da API.**
 
-Os 25 testes direcionados de contratos, quantidades, API e rotina (7 + 13 + 5) e o lint completo foram executados novamente e passaram antes da integração. git diff --check também passou. O build local continua recusado pela allowlist de hermes_workspace_run_test; os testes de navegador ainda não foram executados. O workflow CI existente é acionado no push para main e verifica lint, typecheck, build e testes de backend. A integração na main não equivale à aprovação da interface nem ao deploy da API; esses gates seguem pendentes abaixo.
+Os 25 testes direcionados de contratos, quantidades, API e rotina (7 + 13 + 5) e o lint completo foram executados novamente e passaram antes da integração. git diff --check também passou. O workflow CI do commit 64147bf passou na main (execução 34907644531), incluindo lint, typecheck, build e testes de backend. Em 2026-09-15, os 6 cenários de navegador passaram em celular e desktop, totalizando 12/12 execuções locais com APIs interceptadas. A integração na main não equivale ao deploy da API; esse gate segue pendente abaixo.
 
 Os testes de dados usam SQLite :memory: e um servidor HTTP efêmero de teste. Não foi executado smoke de escrita contra a API de produção. Backups dos arquivos alterados foram organizados em /root/.hermes/workspaces/backups/praxis-nutrition-20260914.
 
@@ -21,7 +21,7 @@ Os testes de dados usam SQLite :memory: e um servidor HTTP efêmero de teste. N�
 
 Evidência: api/nutrition.client.test.mjs. A remoção direta do objeto antigo, sem migrar esses métodos primeiro, teria quebrado histórico e copiar ontem.
 
-### T2 — Gramas e porções confiáveis [IMPLEMENTADA / API APROVADA / UI A VALIDAR]
+### T2 — Gramas e porções confiáveis [IMPLEMENTADA / VALIDADA]
 - [x] Campo reutilizável para gramas ou porções no cadastro e edição do diário.
 - [x] Conversão entre unidades e prévia de calorias/P/C/G.
 - [x] Bloquear quantidade vazia, zero, negativa e inválida; não substituir silenciosamente por 1 porção.
@@ -31,18 +31,18 @@ Evidência: api/nutrition.client.test.mjs. A remoção direta do objeto antigo, 
 - [x] Manter registros antigos sem peso de referência editáveis em porções, sem inventar conversões.
 - [x] Corrigir o fallback silencioso de zero para uma porção no formulário de código de barras.
 - [x] Testar 137 g, frações, edições repetidas, snapshots legados, HTTP 400 e migração idempotente de tabela antiga (13 testes).
-- [ ] Executar os testes de interação do formulário no navegador.
+- [x] Executar os testes de interação do formulário no navegador em celular e desktop.
 
 Arquivos centrais: api/nutritionQuantities.js, api/nutrition.js, src/lib/nutritionQuantity.js, src/components/nutrition/NutritionQuantityField.jsx.
 Migração de schema: nova coluna opcional food_logs.quantity_basis_json, adicionada de modo idempotente. Logs antigos só ganham base numérica própria ao serem editados. Publicar o novo helper junto com nutrition.js.
 
-### T3 — Datas e refeição selecionada [IMPLEMENTADA / NAVEGADOR A VALIDAR]
+### T3 — Datas e refeição selecionada [IMPLEMENTADA / VALIDADA]
 - [x] Usar explicitamente a data de Fortaleza e a mesma query do dia na página e no diário.
 - [x] Atualizar o dia ao retornar ao app e após a meia-noite, mantendo datas passadas escolhidas pelo usuário.
 - [x] Montar texto e código de barras ao abrir, para herdarem a refeição selecionada sem estado antigo.
 - [x] Água e rotina usam a data exibida no diário.
 - [x] Isolar água local por data, preservar o formato legado de copos e informar que o armazenamento ainda é local.
-- [ ] Validar troca de dia, reabertura dos formulários e virada da meia-noite no navegador.
+- [x] Validar troca de dia, reabertura dos formulários e virada da meia-noite no navegador.
 
 Observação: a navegação continua pelas setas existentes; não foi adicionado um novo botão de voltar para hoje.
 
@@ -76,9 +76,9 @@ Estado atual: o erro de data foi corrigido no código, mas a água continua no n
 - [x] Testes direcionados: 25 aprovados, execução sem erro.
 - [x] npm run lint: aprovado após as mudanças.
 - [x] git diff --check: aprovado.
-- [x] Preparar 6 cenários E2E em 2 viewports (12 execuções planejadas), apenas em localhost com APIs interceptadas.
-- [ ] Build: NÃO executado. hermes_workspace_run_test recusou npm run build por allowlist.
-- [ ] E2E: NÃO executado. A mesma ferramenta recusou npm run test:e2e -- --config=playwright.nutrition.config.js --max-failures=1.
+- [x] Preparar 6 cenários E2E em 2 viewports, apenas em localhost com APIs interceptadas.
+- [x] CI do commit 64147bf: execução 34907644531 aprovada, incluindo build e typecheck.
+- [x] E2E direcionado: 12/12 execuções aprovadas com Chrome do sistema.
 - [ ] Revisar o fluxo de publicação e inclusão do novo helper/schema.
 - [ ] Publicar somente após build e validação de interface; realizar verificação não destrutiva.
 
@@ -94,19 +94,18 @@ npm run lint
 git diff --check
 ```
 
-Preparados, mas bloqueados nesta ferramenta:
+Executado pelo fluxo autorizado:
 
 ```sh
-npm run build
-npm run test:e2e -- --config=playwright.nutrition.config.js --max-failures=1
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome npm run test:e2e -- --config=playwright.nutrition.config.js --max-failures=1
 ```
 
-A configuração playwright.nutrition.config.js usa somente http://127.0.0.1:18736, sem reaproveitar servidor existente. O teste intercepta todas as APIs e bloqueia outras origens; não registra alimentos reais. Nenhum resultado desses testes foi contabilizado como aprovado.
+A configuração playwright.nutrition.config.js usa somente http://127.0.0.1:18736, sem reaproveitar servidor existente. O teste intercepta as rotas reais `/api/` em qualquer host configurado pelo client, sem capturar módulos de frontend em `/src/api/`, e bloqueia as demais origens; não registra alimentos reais. Resultado: 12/12 execuções aprovadas.
 
 ## Próxima sequência
 
-1. Resolver a execução de build/E2E pelo fluxo autorizado e conferir T2/T3 no navegador.
-2. Concluir T4, validar, então iniciar T5 e T6, cada uma com seus testes.
+1. Concluir T4 e validar visualmente.
+2. Implementar e validar T5 e T6, cada uma com seus testes.
 3. Publicar apenas ao final dos gates aplicáveis.
 
 Fora deste ciclo: LLM/fallback da A.N.A., foto de refeição, scanner por câmera, novas dependências e refatoração ampla do domínio. A prioridade é corrigir a base e reduzir atrito, não expandir funcionalidades.

@@ -14,6 +14,11 @@ function makeLog(body, id = 'log-test') {
 }
 
 async function setup(page, { populated = false } = {}) {
+  page.on('pageerror', (error) => console.error(`[browser pageerror] ${error.stack || error.message}`));
+  page.on('console', (message) => {
+    if (message.type() === 'error') console.error(`[browser console] ${message.text()} @ ${message.location().url || 'unknown'}`);
+  });
+  page.on('requestfailed', (request) => console.error(`[browser requestfailed] ${request.url()} :: ${request.failure()?.errorText}`));
   // Browser day is already Sept 15 in UTC, but it is still Sept 14 in Fortaleza.
   await page.clock.install({ time: new Date('2026-09-15T01:30:00Z') });
   await page.addInitScript(() => {
@@ -23,7 +28,7 @@ async function setup(page, { populated = false } = {}) {
   const state = { logs: populated ? [makeLog({ grams: 100 })] : [], writes: [], dayDates: [], regimenDates: [] };
   // No real API, remote images or telemetry may leave this browser test.
   await page.route('**/*', (route) => route.request().url().startsWith('http://127.0.0.1:18736/') ? route.continue() : route.abort());
-  await page.route('**/api/**', async (route) => {
+  await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
