@@ -39,6 +39,7 @@ import NutritionBarcodeEntry from '@/components/nutrition/NutritionBarcodeEntry'
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import NutritionQuantityField from '@/components/nutrition/NutritionQuantityField';
+import NutritionConfirmDialog from '@/components/nutrition/NutritionConfirmDialog';
 import { nutritionQuantityPayload, parseNutritionQuantity, recordedFoodReference } from '@/lib/nutritionQuantity';
 
 import { fortalezaDateKey, fortalezaNowTimeHHMM } from '@/lib/dates';
@@ -101,6 +102,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
   const [editQuantityUnit, setEditQuantityUnit] = useState('servings');
   const [textOpen, setTextOpen] = useState(false);
   const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const { data: day, isLoading, isError } = useQuery({
     queryKey: ['nutrition', 'day', date],
@@ -108,28 +110,28 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     retry: 1,
   });
 
-  const { data: recentFoods = [] } = useQuery({
+  const { data: recentFoods = [], isLoading: recentLoading, isError: recentError, refetch: refetchRecent } = useQuery({
     queryKey: ['nutrition', 'foods', 'recent'],
     queryFn: () => praxisApi.nutrition.foods.recent({ limit: 12 }),
     enabled: addOpen,
     retry: 1,
   });
 
-  const { data: favFoods = [] } = useQuery({
+  const { data: favFoods = [], isLoading: favLoading, isError: favError, refetch: refetchFav } = useQuery({
     queryKey: ['nutrition', 'foods', { favorites: true }],
     queryFn: () => praxisApi.nutrition.foods.list({ favorites: true, limit: 30 }),
     enabled: addOpen,
     retry: 1,
   });
 
-  const { data: savedMeals = [] } = useQuery({
+  const { data: savedMeals = [], isLoading: mealsLoading, isError: mealsError, refetch: refetchMeals } = useQuery({
     queryKey: ['nutrition', 'meals', { forAdd: true }],
     queryFn: () => praxisApi.nutrition.meals.list({ limit: 30 }),
     enabled: addOpen,
     retry: 1,
   });
 
-  const { data: searchFoods = [] } = useQuery({
+  const { data: searchFoods = [], isLoading: searchLoading, isError: searchError, refetch: refetchSearch } = useQuery({
     queryKey: ['nutrition', 'foods', { q: foodQ, forAdd: true }],
     queryFn: () =>
       praxisApi.nutrition.foods.list({
@@ -166,7 +168,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       setSelectedFood(null);
       toast.success(
         res?.created
-          ? `Refeição adicionada (${res.created} item(ns))`
+          ? `Refeição adicionada com ${res.created} ${res.created === 1 ? 'item' : 'itens'}`
           : 'Refeição adicionada',
       );
     },
@@ -187,6 +189,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
     mutationFn: (id) => praxisApi.nutrition.logs.delete(id),
     onSuccess: () => {
       invalidateDay();
+      setConfirmAction(null);
       toast.success('Removido');
     },
     onError: () => toast.error('Não deu pra remover'),
@@ -200,9 +203,10 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       }),
     onSuccess: (res) => {
       invalidateDay();
+      setConfirmAction(null);
       toast.success(
         res?.copied
-          ? `Copiei ${res.copied} item(ns) de ontem`
+          ? `Copiei ${res.copied} ${res.copied === 1 ? 'item' : 'itens'} de ontem`
           : 'Ontem estava vazio — nada pra copiar',
       );
     },
@@ -290,14 +294,36 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
 
   const pickerEmptyMsg =
     pickerTab === 'recent'
-      ? 'Nada recente ainda. Busca ou cadastra um alimento e loga uma vez.'
+      ? 'Você ainda não adicionou nenhum alimento ao diário.'
       : pickerTab === 'fav'
-        ? 'Sem favoritos. Marca ⭐ na aba Alimentos.'
+        ? 'Nenhum favorito ainda. Marque a estrela em Alimentos.'
         : pickerTab === 'meals'
-          ? 'Nenhuma refeição salva. Cria na aba Refeições.'
+          ? 'Nenhuma refeição salva. Crie uma em Mais → Refeições.'
           : foodQ.trim()
             ? 'Nenhum alimento com esse nome.'
-            : 'Digita pra buscar no catálogo.';
+            : 'Digite o nome de um alimento para buscar.';
+
+  const pickerLoading = pickerTab === 'recent'
+    ? recentLoading
+    : pickerTab === 'fav'
+      ? favLoading
+      : pickerTab === 'meals'
+        ? mealsLoading
+        : searchLoading;
+  const pickerError = pickerTab === 'recent'
+    ? recentError
+    : pickerTab === 'fav'
+      ? favError
+      : pickerTab === 'meals'
+        ? mealsError
+        : searchError;
+  const retryPicker = pickerTab === 'recent'
+    ? refetchRecent
+    : pickerTab === 'fav'
+      ? refetchFav
+      : pickerTab === 'meals'
+        ? refetchMeals
+        : refetchSearch;
 
   return (
     <div className="space-y-4">
@@ -333,7 +359,8 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
       ) : isError ? (
         <PraxisEmptyState
           title="Não carregou o diário"
-          description="Confere a API ou o login e tenta de novo."
+          description="Verifique a conexão e tente novamente."
+          compact
         />
       ) : (
         <>
@@ -394,15 +421,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                   variant="outline"
                   className="rounded-full min-h-11"
                   disabled={copyYesterdayMut.isPending}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        'Copiar tudo que registrou no dia anterior para este dia?',
-                      )
-                    ) {
-                      copyYesterdayMut.mutate();
-                    }
-                  }}
+                  onClick={() => setConfirmAction({ type: 'copy' })}
                 >
                   <Copy className="w-4 h-4 mr-1.5" />
                   {copyYesterdayMut.isPending ? 'Copiando…' : 'Copiar ontem'}
@@ -448,16 +467,14 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-8 rounded-full text-xs"
+                    className="min-h-11 rounded-full text-xs"
                     onClick={() => openAdd(slot)}
                   >
                     <Plus className="w-3.5 h-3.5 mr-1" />
-                    Item
+                    Adicionar
                   </Button>
                 </div>
-                {items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-1">Nada neste horário.</p>
-                ) : (
+                {items.length > 0 ? (
                   <ul className="space-y-2">
                     {items.map((log) => (
                       <li key={log.id}>
@@ -465,7 +482,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                           <CardContent className="flex items-center gap-3 px-3 py-2.5">
                             <button
                               type="button"
-                              className="min-w-0 flex-1 text-left"
+                              className="min-h-11 min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               onClick={() => {
                                 setEditLog(log);
                                 const grams = parseNutritionQuantity(log.grams);
@@ -499,13 +516,9 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                              className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
                               aria-label="Remover"
-                              onClick={() => {
-                                if (window.confirm(`Remover “${log.name_snapshot}”?`)) {
-                                  deleteMut.mutate(log.id);
-                                }
-                              }}
+                              onClick={() => setConfirmAction({ type: 'delete', log })}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -514,7 +527,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                       </li>
                     ))}
                   </ul>
-                )}
+                ) : null}
               </section>
             );
           })}
@@ -522,7 +535,8 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
           {isEmptyDay ? (
             <PraxisEmptyState
               title="Diário vazio neste dia"
-              description="Toque num recente/favorito pra logar em 1 segundo, ou copie o dia de ontem."
+              description="Adicione uma comida ou copie os registros de ontem."
+              compact
               action={
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button className="rounded-full" onClick={() => openAdd()}>
@@ -533,7 +547,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                     variant="outline"
                     className="rounded-full"
                     disabled={copyYesterdayMut.isPending}
-                    onClick={() => copyYesterdayMut.mutate()}
+                    onClick={() => setConfirmAction({ type: 'copy' })}
                   >
                     <Copy className="w-4 h-4 mr-1.5" />
                     Copiar ontem
@@ -605,7 +619,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                       setSelectedFood(null);
                     }}
                     className={cn(
-                      'flex-1 flex items-center justify-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium transition-colors',
+                      'flex min-h-11 flex-1 items-center justify-center gap-1 rounded-full px-2 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       pickerTab === t.id
                         ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground',
@@ -632,8 +646,17 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
             ) : null}
 
             <ul className="max-h-52 overflow-y-auto space-y-1 border border-border/60 rounded-lg p-1">
-              {pickerList.length === 0 ? (
-                <li className="text-xs text-muted-foreground p-3 leading-relaxed">
+              {pickerLoading ? (
+                <li className="p-3 text-xs text-muted-foreground" role="status">Carregando opções…</li>
+              ) : pickerError ? (
+                <li className="flex items-center justify-between gap-2 p-2 text-xs text-muted-foreground">
+                  <span>Não foi possível carregar esta lista.</span>
+                  <Button type="button" variant="ghost" size="sm" className="min-h-11 rounded-full" onClick={() => retryPicker()}>
+                    Tentar novamente
+                  </Button>
+                </li>
+              ) : pickerList.length === 0 ? (
+                <li className="p-3 text-xs leading-relaxed text-muted-foreground">
                   {pickerEmptyMsg}
                 </li>
               ) : isMealsTab ? (
@@ -648,19 +671,19 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                           ) : null}
                         </span>
                         <span className="block text-xs tabular-nums text-muted-foreground">
-                          {m.item_count} item(ns) · {formatKcal(m.totals?.kcal)}
+                          {m.item_count} {m.item_count === 1 ? 'item' : 'itens'} · {formatKcal(m.totals?.kcal)}
                         </span>
                       </div>
                       <Button
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-8 rounded-full shrink-0 text-xs mr-1"
+                        className="mr-1 min-h-11 shrink-0 rounded-full text-xs"
                         disabled={fromMealMut.isPending}
                         onClick={() => quickAddMeal(m)}
                         title="Adicionar refeição inteira"
                       >
-                        +tudo
+                        Adicionar tudo
                       </Button>
                     </div>
                   </li>
@@ -683,7 +706,7 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                           setServings(String(grams || 1));
                         }}
                         className={cn(
-                          'min-w-0 flex-1 text-left rounded-md px-3 py-2 text-sm transition-colors',
+                          'min-h-11 min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                           selectedFood?.id === f.id
                             ? 'text-foreground'
                             : 'hover:bg-secondary/50 text-muted-foreground',
@@ -703,12 +726,12 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        className="h-8 rounded-full shrink-0 text-xs mr-1"
+                        className="mr-1 min-h-11 shrink-0 rounded-full text-xs"
                         disabled={createMut.isPending}
                         onClick={() => quickAdd(f)}
                         title="Adicionar 1 porção"
                       >
-                        +1
+                        Adicionar
                       </Button>
                     </div>
                   </li>
@@ -738,9 +761,8 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
                 </Button>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground text-center">
-                Toque no alimento pra ajustar porções, ou em <strong>+1</strong> pra
-                logar na hora.
+              <p className="text-center text-xs text-muted-foreground">
+                Toque no alimento para ajustar a quantidade ou use Adicionar para registrar uma porção.
               </p>
             )}
           </div>
@@ -776,6 +798,23 @@ export default function DayDiary({ date: controlledDate, onDateChange }) {
           ) : null}
         </DialogContent>
       </Dialog>
+      <NutritionConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={confirmAction?.type === 'copy' ? 'Copiar o dia de ontem?' : 'Remover do diário?'}
+        description={confirmAction?.type === 'copy'
+          ? 'Os registros de ontem serão copiados para o dia aberto.'
+          : confirmAction?.log
+            ? `“${confirmAction.log.name_snapshot}” será removido deste dia. O alimento continuará no catálogo.`
+            : ''}
+        confirmLabel={confirmAction?.type === 'copy' ? 'Copiar registros' : 'Remover'}
+        destructive={confirmAction?.type === 'delete'}
+        busy={copyYesterdayMut.isPending || deleteMut.isPending}
+        onConfirm={() => {
+          if (confirmAction?.type === 'copy') copyYesterdayMut.mutate();
+          if (confirmAction?.type === 'delete' && confirmAction.log) deleteMut.mutate(confirmAction.log.id);
+        }}
+      />
     </div>
   );
 }

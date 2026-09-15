@@ -84,7 +84,8 @@ export default function NutritionTextEntry({
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['nutrition', 'day'] });
       queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods', 'recent'] });
-      toast.success(`${res.created || 0} item(ns) no diário`);
+      const count = res.created || 0;
+      toast.success(`${count} ${count === 1 ? 'item adicionado' : 'itens adicionados'} ao diário`);
       setOpen(false);
       reset();
       onLogged?.(res);

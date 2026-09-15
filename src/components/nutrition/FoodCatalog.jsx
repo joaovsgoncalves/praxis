@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { PraxisEmptyState } from '@/components/layout/PraxisPage';
+import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
 import FoodForm from '@/components/nutrition/FoodForm';
+import NutritionConfirmDialog from '@/components/nutrition/NutritionConfirmDialog';
 import { formatGrams, formatKcal } from '@/lib/nutrition';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ export default function FoodCatalog() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState(null);
 
   const listParams = useMemo(
     () => ({
@@ -28,7 +30,7 @@ export default function FoodCatalog() {
     [q, favoritesOnly],
   );
 
-  const { data: foods = [], isLoading, isError } = useQuery({
+  const { data: foods = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['nutrition', 'foods', listParams],
     queryFn: () => praxisApi.nutrition.foods.list(listParams),
     retry: 1,
@@ -69,6 +71,7 @@ export default function FoodCatalog() {
     mutationFn: (id) => praxisApi.nutrition.foods.delete(id),
     onSuccess: () => {
       invalidate();
+      setArchiveTarget(null);
       toast.success('Alimento arquivado');
     },
     onError: () => toast.error('Não deu pra arquivar'),
@@ -111,16 +114,19 @@ export default function FoodCatalog() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando alimentos…</p>
+        <PraxisListSkeleton rows={3} />
       ) : isError ? (
         <PraxisEmptyState
-          title="Não carregou o catálogo"
-          description="Confere a conexão ou se a API de nutrição está no ar."
+          title="Não foi possível carregar os alimentos"
+          description="Verifique a conexão e tente novamente."
+          compact
+          action={<Button className="min-h-11 rounded-full" onClick={() => refetch()}>Tentar novamente</Button>}
         />
       ) : foods.length === 0 ? (
         <PraxisEmptyState
-          title={q || favoritesOnly ? 'Nenhum alimento neste filtro' : 'Catálogo vazio'}
-          description="Cadastra ovo, arroz, frango… valores por porção. Seed grande vem na fase 7."
+          title={q || favoritesOnly ? 'Nenhum alimento encontrado' : 'Nenhum alimento cadastrado'}
+          description={q || favoritesOnly ? 'Ajuste a busca ou desative o filtro de favoritos.' : 'Cadastre os alimentos que você usa no dia a dia.'}
+          compact
           action={
             <Button
               className="rounded-full"
@@ -142,7 +148,7 @@ export default function FoodCatalog() {
                 <CardContent className="flex items-center gap-3 px-4 py-3">
                   <button
                     type="button"
-                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-amber-400"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={food.is_favorite ? 'Tirar dos favoritos' : 'Favoritar'}
                     onClick={() => toggleFav.mutate(food)}
                   >
@@ -171,7 +177,7 @@ export default function FoodCatalog() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9"
+                      className="h-11 w-11"
                       aria-label="Editar"
                       onClick={() => {
                         setShowForm(false);
@@ -184,13 +190,9 @@ export default function FoodCatalog() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                      className="h-11 w-11 text-muted-foreground hover:text-destructive"
                       aria-label="Arquivar"
-                      onClick={() => {
-                        if (window.confirm(`Arquivar “${food.name}”?`)) {
-                          archiveMut.mutate(food.id);
-                        }
-                      }}
+                      onClick={() => setArchiveTarget(food)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -230,6 +232,16 @@ export default function FoodCatalog() {
           />
         </DialogContent>
       </Dialog>
+      <NutritionConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title="Arquivar alimento?"
+        description={archiveTarget ? `“${archiveTarget.name}” não aparecerá mais nas listas, mas os registros antigos serão preservados.` : ''}
+        confirmLabel="Arquivar"
+        destructive
+        busy={archiveMut.isPending}
+        onConfirm={() => archiveTarget && archiveMut.mutate(archiveTarget.id)}
+      />
     </div>
   );
 }

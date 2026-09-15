@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
+import NutritionConfirmDialog from '@/components/nutrition/NutritionConfirmDialog';
 import {
   REGIMEN_FREQUENCY_LABELS,
   REGIMEN_KIND_LABELS,
@@ -33,8 +34,9 @@ export default function RegimenCatalog() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY_FORM);
   const [open, setOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['nutrition', 'regimen', 'items'],
     queryFn: () => praxisApi.nutrition.regimen.items({ status: 'active' }),
     retry: 1,
@@ -59,6 +61,7 @@ export default function RegimenCatalog() {
     mutationFn: (id) => praxisApi.nutrition.regimen.delete(id),
     onSuccess: () => {
       invalidate();
+      setArchiveTarget(null);
       toast.success('Item arquivado');
     },
     onError: () => toast.error('Não deu pra arquivar'),
@@ -67,13 +70,11 @@ export default function RegimenCatalog() {
   return (
     <div className="space-y-4">
       <Card className="border-border/80 bg-card/40 shadow-none">
-        <CardContent className="px-4 py-4 space-y-3">
+        <CardContent className="space-y-3 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">Rotina</p>
-              <p className="text-xs text-muted-foreground">
-                Remédio separado de suplemento. Whey continua no diário de comida.
-              </p>
+              <p className="text-xs text-muted-foreground">Organize suplementos e remédios por horário.</p>
             </div>
             <Button
               type="button"
@@ -151,11 +152,20 @@ export default function RegimenCatalog() {
       </Card>
 
       {isLoading ? (
-        <PraxisListSkeleton rows={3} />
+        <PraxisListSkeleton rows={2} />
+      ) : isError ? (
+        <PraxisEmptyState
+          title="Não foi possível carregar a rotina"
+          description="Verifique a conexão e tente novamente."
+          compact
+          action={<Button className="min-h-11 rounded-full" onClick={() => refetch()}>Tentar novamente</Button>}
+        />
       ) : items.length === 0 ? (
         <PraxisEmptyState
           title="Rotina vazia"
-          description="Adiciona o que tu toma de verdade. Sem stack de influencer."
+          description="Adicione somente o que faz parte da sua rotina."
+          compact
+          action={<Button className="min-h-11 rounded-full" onClick={() => setOpen(true)}>Adicionar item</Button>}
         />
       ) : (
         <ul className="space-y-2">
@@ -187,13 +197,9 @@ export default function RegimenCatalog() {
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
                 aria-label={`Arquivar ${item.name}`}
-                onClick={() => {
-                  if (window.confirm(`Arquivar ${item.name}?`)) {
-                    deleteMut.mutate(item.id);
-                  }
-                }}
+                onClick={() => setArchiveTarget(item)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -201,6 +207,16 @@ export default function RegimenCatalog() {
           ))}
         </ul>
       )}
+      <NutritionConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(nextOpen) => !nextOpen && setArchiveTarget(null)}
+        title="Arquivar item da rotina?"
+        description={archiveTarget ? `“${archiveTarget.name}” deixará de aparecer na rotina diária.` : ''}
+        confirmLabel="Arquivar"
+        destructive
+        busy={deleteMut.isPending}
+        onConfirm={() => archiveTarget && deleteMut.mutate(archiveTarget.id)}
+      />
     </div>
   );
 }

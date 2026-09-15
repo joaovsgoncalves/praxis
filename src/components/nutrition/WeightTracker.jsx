@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { PraxisEmptyState } from '@/components/layout/PraxisPage';
+import NutritionConfirmDialog from '@/components/nutrition/NutritionConfirmDialog';
 import { toast } from 'sonner';
 
 function todayLocalISO() {
@@ -84,6 +85,7 @@ export default function WeightTracker() {
   const queryClient = useQueryClient();
   const [weight, setWeight] = useState('');
   const [date, setDate] = useState(todayLocalISO);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const { data: trend, isLoading } = useQuery({
     queryKey: ['nutrition', 'weight', 'trend'],
@@ -116,6 +118,7 @@ export default function WeightTracker() {
     mutationFn: (id) => praxisApi.nutrition.weight.delete(id),
     onSuccess: () => {
       invalidate();
+      setDeleteTarget(null);
       toast.success('Peso removido');
     },
     onError: () => toast.error('Não deu pra remover'),
@@ -227,7 +230,8 @@ export default function WeightTracker() {
       {logs.length === 0 && !isLoading ? (
         <PraxisEmptyState
           title="Nenhum peso ainda"
-          description="Registra quando quiser — sem virar app de antropometria."
+          description="Registre seu peso quando quiser acompanhar a tendência."
+          compact
         />
       ) : (
         <ul className="space-y-2">
@@ -247,13 +251,9 @@ export default function WeightTracker() {
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
                 aria-label={`Apagar peso de ${log.date}`}
-                onClick={() => {
-                  if (window.confirm(`Apagar peso de ${log.date}?`)) {
-                    delMut.mutate(log.id);
-                  }
-                }}
+                onClick={() => setDeleteTarget(log)}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -261,6 +261,16 @@ export default function WeightTracker() {
           ))}
         </ul>
       )}
+      <NutritionConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Apagar registro de peso?"
+        description={deleteTarget ? `O registro de ${deleteTarget.date} será removido.` : ''}
+        confirmLabel="Apagar"
+        destructive
+        busy={delMut.isPending}
+        onConfirm={() => deleteTarget && delMut.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

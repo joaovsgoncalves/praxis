@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { PraxisEmptyState } from '@/components/layout/PraxisPage';
+import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
+import NutritionConfirmDialog from '@/components/nutrition/NutritionConfirmDialog';
 import { formatGrams, formatKcal } from '@/lib/nutrition';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-function MealForm({ initial, foods, onSubmit, onCancel, submitting }) {
+function MealForm({ initial, foods, foodsLoading, foodsError, onRetryFoods, onSubmit, onCancel, submitting }) {
   const [name, setName] = useState(initial?.name || '');
   const [notes, setNotes] = useState(initial?.notes || '');
   const [isFavorite, setIsFavorite] = useState(!!(initial?.is_favorite === 1 || initial?.is_favorite));
@@ -103,7 +104,7 @@ function MealForm({ initial, foods, onSubmit, onCancel, submitting }) {
           id="meal-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Ex.: Almoço cut"
+          placeholder="Ex.: Almoço de sempre"
           autoFocus
           required
         />
@@ -114,7 +115,7 @@ function MealForm({ initial, foods, onSubmit, onCancel, submitting }) {
           id="meal-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Pós-treino, low carb…"
+          placeholder="Ex.: Pós-treino"
         />
       </div>
 
@@ -185,14 +186,25 @@ function MealForm({ initial, foods, onSubmit, onCancel, submitting }) {
           />
         </div>
         <ul className="max-h-36 overflow-y-auto space-y-1 border border-border/60 rounded-lg p-1">
-          {filteredFoods.length === 0 ? (
-            <li className="text-xs text-muted-foreground p-2">Nenhum alimento.</li>
+          {foodsLoading ? (
+            <li className="p-2 text-xs text-muted-foreground" role="status">Carregando alimentos…</li>
+          ) : foodsError ? (
+            <li className="flex items-center justify-between gap-2 p-2 text-xs text-muted-foreground">
+              <span>Não foi possível carregar os alimentos.</span>
+              <Button type="button" variant="ghost" size="sm" className="min-h-11 rounded-full" onClick={onRetryFoods}>
+                Tentar novamente
+              </Button>
+            </li>
+          ) : filteredFoods.length === 0 ? (
+            <li className="p-2 text-xs text-muted-foreground">
+              {q.trim() ? 'Nenhum alimento encontrado.' : 'Cadastre um alimento antes de montar a refeição.'}
+            </li>
           ) : (
             filteredFoods.map((f) => (
               <li key={f.id}>
                 <button
                   type="button"
-                  className="w-full text-left rounded-md px-3 py-2 text-sm hover:bg-secondary/50"
+                  className="min-h-11 w-full rounded-md px-3 py-2 text-left text-sm hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => addFood(f)}
                 >
                   <span className="font-medium">{f.name}</span>
@@ -234,14 +246,15 @@ export default function MealsCatalog() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState(null);
 
-  const { data: meals = [], isLoading, isError } = useQuery({
+  const { data: meals = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['nutrition', 'meals'],
     queryFn: () => praxisApi.nutrition.meals.list({ limit: 50 }),
     retry: 1,
   });
 
-  const { data: foods = [] } = useQuery({
+  const { data: foods = [], isLoading: foodsLoading, isError: foodsError, refetch: refetchFoods } = useQuery({
     queryKey: ['nutrition', 'foods', { forMeals: true }],
     queryFn: () => praxisApi.nutrition.foods.list({ limit: 100 }),
     retry: 1,
@@ -283,6 +296,7 @@ export default function MealsCatalog() {
     mutationFn: (id) => praxisApi.nutrition.meals.delete(id),
     onSuccess: () => {
       invalidate();
+      setArchiveTarget(null);
       toast.success('Refeição arquivada');
     },
     onError: () => toast.error('Não deu pra arquivar'),
@@ -305,16 +319,19 @@ export default function MealsCatalog() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando refeições…</p>
+        <PraxisListSkeleton rows={3} />
       ) : isError ? (
         <PraxisEmptyState
-          title="Não carregou refeições"
-          description="Confere a API ou o login."
+          title="Não foi possível carregar as refeições"
+          description="Verifique a conexão e tente novamente."
+          compact
+          action={<Button className="min-h-11 rounded-full" onClick={() => refetch()}>Tentar novamente</Button>}
         />
       ) : meals.length === 0 ? (
         <PraxisEmptyState
           title="Nenhuma refeição salva"
-          description="Monte um almoço cut ou jantar padrão e reutilize com 1 toque no diário."
+          description="Monte uma refeição que você repete e adicione tudo ao diário de uma vez."
+          compact
           action={
             <Button className="rounded-full" onClick={() => setShowForm(true)}>
               <Plus className="w-4 h-4 mr-1.5" />
@@ -330,9 +347,9 @@ export default function MealsCatalog() {
                 <CardContent className="flex items-center gap-3 px-4 py-3">
                   <button
                     type="button"
-                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-amber-400"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => toggleFav.mutate(meal)}
-                    aria-label="Favoritar"
+                    aria-label={meal.is_favorite ? 'Tirar dos favoritos' : 'Favoritar'}
                   >
                     <Star
                       className={cn(
@@ -344,7 +361,7 @@ export default function MealsCatalog() {
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <p className="text-sm font-medium truncate">{meal.name}</p>
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      {meal.item_count} item(ns) · {formatKcal(meal.totals?.kcal)} · P{' '}
+                      {meal.item_count} {meal.item_count === 1 ? 'item' : 'itens'} · {formatKcal(meal.totals?.kcal)} · P{' '}
                       {formatGrams(meal.totals?.protein_g)} · C{' '}
                       {formatGrams(meal.totals?.carbs_g)} · G{' '}
                       {formatGrams(meal.totals?.fat_g)}
@@ -363,7 +380,8 @@ export default function MealsCatalog() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9"
+                      className="h-11 w-11"
+                      aria-label={`Editar ${meal.name}`}
                       onClick={() => {
                         setShowForm(false);
                         setEditing(meal);
@@ -375,12 +393,9 @@ export default function MealsCatalog() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        if (window.confirm(`Arquivar “${meal.name}”?`)) {
-                          archiveMut.mutate(meal.id);
-                        }
-                      }}
+                      className="h-11 w-11 text-muted-foreground hover:text-destructive"
+                      aria-label={`Arquivar ${meal.name}`}
+                      onClick={() => setArchiveTarget(meal)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -409,6 +424,9 @@ export default function MealsCatalog() {
             key={editing?.id || 'new'}
             initial={editing || {}}
             foods={foods}
+            foodsLoading={foodsLoading}
+            foodsError={foodsError}
+            onRetryFoods={() => refetchFoods()}
             submitting={createMut.isPending || updateMut.isPending}
             onCancel={() => {
               setShowForm(false);
@@ -421,6 +439,16 @@ export default function MealsCatalog() {
           />
         </DialogContent>
       </Dialog>
+      <NutritionConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title="Arquivar refeição?"
+        description={archiveTarget ? `“${archiveTarget.name}” sairá das refeições salvas. Seus registros anteriores continuarão no diário.` : ''}
+        confirmLabel="Arquivar"
+        destructive
+        busy={archiveMut.isPending}
+        onConfirm={() => archiveTarget && archiveMut.mutate(archiveTarget.id)}
+      />
     </div>
   );
 }

@@ -46,16 +46,18 @@ Migração de schema: nova coluna opcional food_logs.quantity_basis_json, adicio
 
 Observação: a navegação continua pelas setas existentes; não foi adicionado um novo botão de voltar para hoje.
 
-### T4 — Hierarquia, clareza e acessibilidade [PARCIAL]
+### T4 — Hierarquia, clareza e acessibilidade [CONCLUÍDA / VALIDADA]
 - [x] Diário, resumo e ação principal antes dos blocos de água/rotina.
 - [x] Água e rotina em duas colunas no desktop, mantendo empilhamento no celular.
 - [x] Separar saldo calórico e proteico; remover o caso incorreto "Passou 0 kcal".
 - [x] Remover textos de desenvolvimento nas entradas por texto e código.
 - [x] Campo de quantidade com rótulo associado, unidade, estado inválido e área de toque adequada.
-- [ ] Melhorar estados de carregamento/erro das listas de recentes, favoritos, refeições e busca.
-- [ ] Refinar a densidade da rotina de suplementos/remédios e das seções vazias.
-- [ ] Uniformizar confirmações de excluir/copiar e revisar demais textos técnicos.
-- [ ] Fazer inspeção visual e teclado em 390 px e desktop; corrigir problemas encontrados.
+- [x] Melhorar estados de carregamento/erro das listas de recentes, favoritos, refeições e busca.
+- [x] Refinar a densidade da rotina de suplementos/remédios e das seções vazias.
+- [x] Uniformizar confirmações de excluir/copiar e revisar demais textos técnicos.
+- [x] Fazer inspeção visual e teclado em 390 px e desktop; corrigir problemas encontrados.
+
+Evidência: skeletons e tentativas novamente nas listas; vazios compactos; confirmações Radix para copiar, remover e arquivar; botões de toque com mínimo de 44 px; navegação por teclado e ausência de overflow verificadas. O E2E direcionado passou em 18/18 execuções, incluindo os 9 cenários em celular e desktop. Screenshots de 390 px e 1280 px foram inspecionados após a compactação das refeições vazias.
 
 ### T5 — Água no backend [PENDENTE]
 - [ ] Registro por dia, protegido pela autenticação existente.
@@ -78,7 +80,7 @@ Estado atual: o erro de data foi corrigido no código, mas a água continua no n
 - [x] git diff --check: aprovado.
 - [x] Preparar 6 cenários E2E em 2 viewports, apenas em localhost com APIs interceptadas.
 - [x] CI do commit 64147bf: execução 34907644531 aprovada, incluindo build e typecheck.
-- [x] E2E direcionado: 12/12 execuções aprovadas com Chrome do sistema.
+- [x] E2E direcionado: 18/18 execuções aprovadas com Chrome do sistema após a etapa de UI/UX.
 - [ ] Revisar o fluxo de publicação e inclusão do novo helper/schema.
 - [ ] Publicar somente após build e validação de interface; realizar verificação não destrutiva.
 
@@ -100,7 +102,7 @@ Executado pelo fluxo autorizado:
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome npm run test:e2e -- --config=playwright.nutrition.config.js --max-failures=1
 ```
 
-A configuração playwright.nutrition.config.js usa somente http://127.0.0.1:18736, sem reaproveitar servidor existente. O teste intercepta as rotas reais `/api/` em qualquer host configurado pelo client, sem capturar módulos de frontend em `/src/api/`, e bloqueia as demais origens; não registra alimentos reais. Resultado: 12/12 execuções aprovadas.
+A configuração playwright.nutrition.config.js usa somente http://127.0.0.1:18736, sem reaproveitar servidor existente. O teste intercepta as rotas reais `/api/` em qualquer host configurado pelo client, sem capturar módulos de frontend em `/src/api/`, e bloqueia as demais origens; não registra alimentos reais. Resultado atual: 18/18 execuções aprovadas.
 
 ## Próxima sequência
 

@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pill } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
-import { PraxisListSkeleton } from '@/components/layout/PraxisPage';
+import { Button } from '@/components/ui/button';
+import { PraxisEmptyState, PraxisListSkeleton } from '@/components/layout/PraxisPage';
 import {
   REGIMEN_FREQUENCY_LABELS,
   REGIMEN_KIND_LABELS,
@@ -16,7 +17,7 @@ import { toast } from 'sonner';
 export default function RegimenDay({ date }) {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['nutrition', 'regimen', date],
     queryFn: () => praxisApi.nutrition.regimen.day(date),
     enabled: !!date,
@@ -43,9 +44,12 @@ export default function RegimenDay({ date }) {
   if (isLoading && !data) return <PraxisListSkeleton rows={2} />;
   if (isError) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Não carregou a rotina de suplementos.
-      </p>
+      <PraxisEmptyState
+        title="Não foi possível carregar a rotina"
+        description="Verifique a conexão e tente novamente."
+        compact
+        action={<Button className="min-h-11 rounded-full" onClick={() => refetch()}>Tentar novamente</Button>}
+      />
     );
   }
 
@@ -54,15 +58,13 @@ export default function RegimenDay({ date }) {
 
   return (
     <Card className="border-border/80 bg-card/40 shadow-none">
-      <CardContent className="px-4 py-4 space-y-3">
+      <CardContent className="space-y-3 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Pill className="w-4 h-4 text-sky-400/90 shrink-0" aria-hidden />
             <div>
               <p className="text-sm font-semibold">Suplementos e remédio</p>
-              <p className="text-xs text-muted-foreground">
-                Não entra nas calorias · whey fica no diário
-              </p>
+              <p className="text-xs text-muted-foreground">Whey e alimentos continuam no diário</p>
             </div>
           </div>
           {due > 0 ? (
@@ -73,9 +75,7 @@ export default function RegimenDay({ date }) {
         </div>
 
         {groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nada cadastrado ainda. Adiciona em Mais → Rotina.
-          </p>
+          <p className="text-sm text-muted-foreground">Nada para marcar hoje.</p>
         ) : (
           <div className="space-y-3">
             {groups.map((group) => (

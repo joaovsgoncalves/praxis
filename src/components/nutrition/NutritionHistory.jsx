@@ -126,7 +126,7 @@ export default function NutritionHistory({ onOpenDay }) {
       ) : isError ? (
         <PraxisEmptyState
           title="Não carregou o histórico"
-          description="Confere a API ou tenta de novo."
+          description="Verifique a conexão e tente novamente."
         />
       ) : !data || data.days_logged === 0 ? (
         <PraxisEmptyState
@@ -149,7 +149,7 @@ export default function NutritionHistory({ onOpenDay }) {
                   ) : null}
                 </p>
                 <p className="text-xs text-muted-foreground pt-1">
-                  {data.days_logged} dia(s) com comida · {data.log_count} item(ns)
+                  {data.days_logged} {data.days_logged === 1 ? 'dia' : 'dias'} com comida · {data.log_count} {data.log_count === 1 ? 'item' : 'itens'}
                   {data.days_hit_protein != null
                     ? ` · proteína ≥90% meta em ${data.days_hit_protein} dia(s)`
                     : ''}
@@ -203,7 +203,7 @@ export default function NutritionHistory({ onOpenDay }) {
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium tabular-nums">{d.date}</span>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        {d.log_count} item(ns)
+                        {d.log_count} {d.log_count === 1 ? 'item' : 'itens'}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground tabular-nums mt-0.5">

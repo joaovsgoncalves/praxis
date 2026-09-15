@@ -115,7 +115,7 @@ export default function NutritionBarcodeEntry({
       reset();
       onLogged?.();
     },
-    onError: () => toast.error('Não deu pra logar'),
+    onError: () => toast.error('Não deu pra registrar'),
   });
 
   const food = result?.food;

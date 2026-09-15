@@ -166,10 +166,15 @@ export function PraxisLoadingSplash({ message = 'Carregando o Praxis…' }) {
 /** Empty padronizado — lista vazia ou filtro sem resultado.
  *  Centro do bloco (ícone + texto + CTAs) no eixo da coluna/container.
  *  Use className="mx-auto max-w-lg" em empty de página/coluna larga. */
-export function PraxisEmptyState({ icon: Icon, title, description, action, className }) {
+export function PraxisEmptyState({ icon: Icon, title, description, action, className, compact = false }) {
   return (
     <Card className={cn('border-dashed border-border/60 bg-card/40', className)}>
-      <CardContent className="flex flex-col items-center py-12 px-6 text-center sm:py-14">
+      <CardContent
+        className={cn(
+          'flex flex-col items-center px-6 text-center',
+          compact ? 'py-6 sm:py-7' : 'py-12 sm:py-14',
+        )}
+      >
         {Icon ? (
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
             <Icon className="h-5 w-5 text-primary/90" aria-hidden />

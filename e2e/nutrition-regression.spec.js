@@ -13,12 +13,8 @@ function makeLog(body, id = 'log-test') {
   };
 }
 
-async function setup(page, { populated = false } = {}) {
+async function setup(page, { populated = false, recentDelayMs = 0, failRecent = false } = {}) {
   page.on('pageerror', (error) => console.error(`[browser pageerror] ${error.stack || error.message}`));
-  page.on('console', (message) => {
-    if (message.type() === 'error') console.error(`[browser console] ${message.text()} @ ${message.location().url || 'unknown'}`);
-  });
-  page.on('requestfailed', (request) => console.error(`[browser requestfailed] ${request.url()} :: ${request.failure()?.errorText}`));
   // Browser day is already Sept 15 in UTC, but it is still Sept 14 in Fortaleza.
   await page.clock.install({ time: new Date('2026-09-15T01:30:00Z') });
   await page.addInitScript(() => {
@@ -51,7 +47,14 @@ async function setup(page, { populated = false } = {}) {
       state.regimenDates.push(url.searchParams.get('date'));
       return reply({ items: [], due_count: 0, taken_count: 0 });
     }
-    if (path === '/api/nutrition/foods' || path === '/api/nutrition/foods/recent') return reply([FOOD]);
+    if (path === '/api/nutrition/foods/recent') {
+      if (recentDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, recentDelayMs));
+      if (failRecent) return reply({ error: 'test_failure' }, 503);
+      return reply([FOOD]);
+    }
+    if (path === '/api/nutrition/foods') {
+      return reply(url.searchParams.get('favorites') === '1' ? [] : [FOOD]);
+    }
     if (path === '/api/nutrition/meals') return reply([]);
     if (path.startsWith('/api/nutrition/barcode/')) return reply({ source: 'cache', food: FOOD, barcode: '7891000100103' });
     if (path === '/api/nutrition/logs' && method === 'POST') {
@@ -81,7 +84,7 @@ async function setup(page, { populated = false } = {}) {
 }
 
 async function openMeal(page, label) {
-  await page.getByRole('heading', { name: label, exact: true }).locator('..').getByRole('button', { name: 'Item', exact: true }).click();
+  await page.getByRole('heading', { name: label, exact: true }).locator('..').getByRole('button', { name: 'Adicionar', exact: true }).click();
 }
 
 async function noOverflow(page) {
@@ -173,4 +176,39 @@ test('diário aberto acompanha a meia-noite de Fortaleza', async ({ page }) => {
   await page.clock.fastForward(5_500_000);
   await expect.poll(() => state.dayDates.includes('2026-09-15')).toBe(true);
   await expect(page.getByText(/Água de 15\/09\/2026/)).toBeVisible();
+});
+
+test('vazios, confirmação, teclado e áreas de toque permanecem acessíveis', async ({ page }) => {
+  await setup(page);
+  await page.getByRole('button', { name: 'Copiar ontem', exact: true }).first().click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation.getByRole('heading', { name: 'Copiar o dia de ontem?' })).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Cancelar' }).click();
+
+  await openMeal(page, 'Almoço');
+  const dialog = page.getByRole('dialog');
+  for (const name of ['Recentes', 'Favoritos', 'Refeições', 'Buscar']) {
+    await expect(dialog.getByRole('button', { name, exact: true })).toHaveCSS('min-height', '44px');
+  }
+  await dialog.getByRole('button', { name: 'Favoritos', exact: true }).click();
+  await expect(dialog.getByText('Nenhum favorito ainda. Marque a estrela em Alimentos.')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.matches(':focus-visible'))).toBe(true);
+  await noOverflow(page);
+});
+
+test('lista de recentes comunica carregamento', async ({ page }) => {
+  await setup(page, { recentDelayMs: 700 });
+  await openMeal(page, 'Almoço');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Carregando opções…')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Arroz de teste/ })).toBeVisible();
+});
+
+test('lista de recentes mostra erro com nova tentativa', async ({ page }) => {
+  await setup(page, { failRecent: true });
+  await openMeal(page, 'Almoço');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('Não foi possível carregar esta lista.')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Tentar novamente', exact: true })).toBeVisible();
 });
