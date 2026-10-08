@@ -30,6 +30,8 @@ import {
   deleteWeightLog,
   buildWeightTrend,
   lookupBarcode,
+  getWaterLog,
+  upsertWaterLog,
 } from '../nutrition.js';
 import {
   listRegimenItems,
@@ -87,6 +89,28 @@ export function createNutritionRouter({ db, getLocalDateString }) {
       return res.status(400).json({ error: 'data inválida (use YYYY-MM-DD)' });
     }
     res.json(buildDayPayload(db, raw));
+  });
+
+  router.get('/water', (req, res) => {
+    try {
+      const date = req.query.date != null && String(req.query.date).trim() !== ''
+        ? String(req.query.date).trim().slice(0, 10)
+        : getLocalDateString();
+      res.json(getWaterLog(db, date));
+    } catch (err) {
+      res.status(err?.status || 400).json({ error: err?.message || 'não deu pra carregar a água' });
+    }
+  });
+
+  router.put('/water', (req, res) => {
+    try {
+      res.json(upsertWaterLog(db, req.body || {}, { today: getLocalDateString() }));
+    } catch (err) {
+      res.status(err?.status || 400).json({
+        error: err?.message || 'não deu pra salvar a água',
+        ...(err?.current ? { current: err.current } : {}),
+      });
+    }
   });
 
   // summary / history (fase 9)

@@ -13,6 +13,16 @@ export const nutritionApiModule = (request) => ({
       const q = date ? `?date=${encodeURIComponent(date)}` : '';
       return request(`/api/nutrition/day${q}`);
     },
+    water: {
+      get: (date) => {
+        const q = date ? `?date=${encodeURIComponent(date)}` : '';
+        return request(`/api/nutrition/water${q}`);
+      },
+      set: (data) => request('/api/nutrition/water', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    },
     foods: {
       list: (params = {}) => {
         const query = new URLSearchParams();

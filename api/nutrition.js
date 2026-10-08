@@ -147,6 +147,13 @@ export function initNutritionSchema(db) {
       UNIQUE(date)
     );
 
+    CREATE TABLE IF NOT EXISTS nutrition_water_logs (
+      date TEXT PRIMARY KEY,
+      amount_ml INTEGER NOT NULL DEFAULT 0 CHECK(amount_ml >= 0 AND amount_ml <= 20000),
+      revision INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_food_logs_date ON food_logs(date);
     CREATE INDEX IF NOT EXISTS idx_food_items_name ON food_items(name);
     CREATE INDEX IF NOT EXISTS idx_food_items_favorite ON food_items(is_favorite);
@@ -294,6 +301,70 @@ export function suggestNutritionTargets(input = {}) {
     height_cm: height,
     birth_year: birthYear,
   };
+}
+
+export function getWaterLog(db, date) {
+  if (!isValidDateString(date)) {
+    const error = new Error('data inválida (use YYYY-MM-DD)');
+    error.status = 400;
+    throw error;
+  }
+  const row = db.prepare(`
+    SELECT date, amount_ml, revision, updated_at
+    FROM nutrition_water_logs
+    WHERE date = ?
+  `).get(date);
+  return row
+    ? { ...row, exists: true }
+    : { date, amount_ml: 0, revision: 0, updated_at: null, exists: false };
+}
+
+export function upsertWaterLog(db, body = {}, { today } = {}) {
+  const date = body.date == null || String(body.date).trim() === ''
+    ? today
+    : String(body.date).trim().slice(0, 10);
+  if (!isValidDateString(date)) {
+    const error = new Error('data inválida (use YYYY-MM-DD)');
+    error.status = 400;
+    throw error;
+  }
+  const amount = Number(body.amount_ml);
+  const expectedRevision = Number(body.expected_revision);
+  if (!Number.isInteger(amount) || amount < 0 || amount > 20000) {
+    const error = new Error('quantidade de água inválida');
+    error.status = 400;
+    throw error;
+  }
+  if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
+    const error = new Error('versão do registro inválida');
+    error.status = 400;
+    throw error;
+  }
+
+  return db.transaction(() => {
+    const current = getWaterLog(db, date);
+    // Totais absolutos tornam repetição de uma requisição segura.
+    if (current.exists && current.amount_ml === amount) return current;
+    if (current.revision !== expectedRevision) {
+      const error = new Error('a água deste dia foi atualizada em outro dispositivo');
+      error.status = 409;
+      error.current = current;
+      throw error;
+    }
+    if (!current.exists) {
+      db.prepare(`
+        INSERT INTO nutrition_water_logs (date, amount_ml, revision)
+        VALUES (?, ?, 1)
+      `).run(date, amount);
+    } else {
+      db.prepare(`
+        UPDATE nutrition_water_logs
+        SET amount_ml = ?, revision = revision + 1, updated_at = datetime('now')
+        WHERE date = ? AND revision = ?
+      `).run(amount, date, expectedRevision);
+    }
+    return getWaterLog(db, date);
+  })();
 }
 
 export function updateNutritionProfile(db, body = {}) {
