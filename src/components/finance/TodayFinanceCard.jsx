@@ -5,9 +5,11 @@ import { Wallet, ArrowRight } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatBrl, formatDay } from '@/lib/finance';
+import { formatDay } from '@/lib/finance';
+import { useHideMoney } from '@/hooks/useHideMoney';
 
 export default function TodayFinanceCard() {
+  const { money, text } = useHideMoney();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['finance', 'overview'],
     queryFn: () => praxisApi.finance.overview(),
@@ -20,7 +22,7 @@ export default function TodayFinanceCard() {
     ? '…'
     : isError
       ? '—'
-      : formatBrl(data?.caixa);
+      : money(data?.caixa);
 
   return (
     <Card className="praxis-dashboard-card praxis-context-card">
@@ -32,7 +34,7 @@ export default function TodayFinanceCard() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-muted-foreground">Finanças</p>
-              <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em]">Caixa {label}</h3>
+              <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em] tabular-nums">Caixa {label}</h3>
             </div>
           </div>
         </div>
@@ -40,8 +42,8 @@ export default function TodayFinanceCard() {
           {isError
             ? 'Não deu para carregar o caixa agora.'
             : nextDue
-              ? `Vence: ${nextDue.title} ${formatDay(nextDue.due_date)} · ${formatBrl(nextDue.amount)}`
-              : data?.next_step?.label || 'Abrir o mapa do mês.'}
+              ? `Vence: ${nextDue.title} ${formatDay(nextDue.due_date)} · ${money(nextDue.amount)}`
+              : text(data?.next_step?.label) || 'Abrir o mapa do mês.'}
         </p>
         <div className="flex items-center border-t border-white/[0.05] pt-3">
           <Button asChild size="sm" variant="ghost" className="h-9 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground">

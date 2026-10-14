@@ -77,6 +77,33 @@ export function TaskPriorityRuler({ task, className }) {
   );
 }
 
+/** Cor sólida de cada área para a régua (mesma matiz do chip). */
+export const AREA_BAR_CLASS = {
+  farmacia: 'bg-green-400/80',
+  gofluxo: 'bg-amber-400/80',
+  treino: 'bg-red-400/80',
+  estudo: 'bg-purple-400/80',
+  jotav_fit: 'bg-pink-400/80',
+  ideias: 'bg-cyan-400/80',
+  pessoal: 'bg-yellow-400/80',
+  rotina: 'bg-orange-400/80',
+  wellness: 'bg-emerald-400/80',
+};
+
+/** Régua lateral curta na cor da área (hábitos) — par da régua de prioridade das tarefas. */
+export function AreaRuler({ category, done = false, className }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'absolute left-0 top-3 h-7 w-[3px] rounded-r-full',
+        done ? 'bg-domain-wellness/60' : AREA_BAR_CLASS[category] || 'bg-domain-gold/70',
+        className
+      )}
+    />
+  );
+}
+
 export function TaskAreaChip({ category, className, compact = false }) {
   const cat = CATEGORIES[category];
   if (!cat) return null;

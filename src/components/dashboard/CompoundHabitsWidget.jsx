@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { SectionHeader } from '@/components/layout/PraxisPage';
+import { AreaRuler } from '@/components/habits-tasks/TaskCardParts';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -29,6 +31,26 @@ function ConfettiOverlay() {
       className="praxis-completion-glow pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-xl"
       aria-hidden
     />
+  );
+}
+
+/** Contador feitos/total em chip mono — mesma peça do contador de seção. */
+function CompoundCount({ completed, total, skipped, done }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      <span
+        className={cn(
+          'inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white/[0.06] px-2 font-mono text-xs font-medium tabular-nums shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]',
+          done ? 'text-domain-wellness' : 'text-secondary-foreground',
+        )}
+      >
+        <span className="sr-only">Feitos: </span>
+        {completed}/{total}
+      </span>
+      {skipped > 0 ? (
+        <span className="text-[11px] font-medium text-amber-200/80">{skipped} não rolou</span>
+      ) : null}
+    </span>
   );
 }
 
@@ -74,14 +96,10 @@ function CompoundHabitItem({
 
   return (
     <div
-      className={cn(
-        'relative rounded-xl border transition-[background-color,border-color,box-shadow]',
-        'p-3.5',
-        isClosed
-          ? 'border-domain-wellness/25 bg-domain-wellness/[0.07]'
-          : 'border-border/70 bg-card/60 hover:border-amber-500/35',
-      )}
+      data-done={isClosed ? 'true' : 'false'}
+      className="praxis-board-card relative rounded-xl p-3.5"
     >
+      <AreaRuler category={compound.category} done={isClosed} />
       {showConfetti && <ConfettiOverlay />}
 
       <div className="flex items-center gap-1.5">
@@ -104,16 +122,13 @@ function CompoundHabitItem({
             >
               {compound.title}
             </span>
-            <span
+            <CompoundCount completed={completedCount} total={totalCount} skipped={skippedCount} done={isClosed} />
+            <ChevronDown
               className={cn(
-                'shrink-0 tabular-nums text-muted-foreground',
-                listItem ? 'rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium' : 'text-xs',
+                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none',
+                isOpen && 'rotate-180',
               )}
-            >
-              {completedCount}/{totalCount}
-              {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
-            </span>
-            <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
+            />
           </button>
         ) : (
           <div className={cn('flex min-w-0 flex-1 items-center gap-2.5', listItem && 'min-h-11')}>
@@ -126,15 +141,7 @@ function CompoundHabitItem({
             >
               {compound.title}
             </span>
-            <span
-              className={cn(
-                'shrink-0 tabular-nums text-muted-foreground',
-                listItem ? 'rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-medium' : 'text-xs',
-              )}
-            >
-              {completedCount}/{totalCount}
-              {skippedCount > 0 ? ` · ${skippedCount} não rolou` : ''}
-            </span>
+            <CompoundCount completed={completedCount} total={totalCount} skipped={skippedCount} done={isClosed} />
           </div>
         )}
         <Button
@@ -158,7 +165,7 @@ function CompoundHabitItem({
             value={progressPercent}
             className={cn(
               listItem ? 'mb-2.5 h-2' : 'mb-2 h-1.5',
-              isClosed ? '[&>div]:bg-green-500' : '[&>div]:bg-gold',
+              isClosed ? '[&>div]:bg-domain-wellness' : '[&>div]:bg-gold',
             )}
           />
           <div className={cn('flex items-center justify-between gap-2', listItem ? 'mb-3.5' : 'mb-3')}>
@@ -218,7 +225,7 @@ function CompoundHabitItem({
                         'shrink-0',
                         listItem ? 'h-5 w-5' : 'h-4 w-4',
                         done
-                          ? 'data-[state=checked]:border-green-500 data-[state=checked]:bg-green-500'
+                          ? 'data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness data-[state=checked]:text-black'
                           : 'border-muted-foreground/40',
                       )}
                     />
@@ -239,11 +246,12 @@ function CompoundHabitItem({
                       {timeLabel && (
                         <span
                           className={cn(
-                            'inline-flex items-center gap-0.5 rounded-full border border-domain-gold/25 bg-domain-gold/10 font-semibold tabular-nums text-domain-gold',
-                            listItem ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-0.5 text-[10px]',
+                            'inline-flex items-center gap-1 tabular-nums text-muted-foreground',
+                            listItem ? 'text-xs' : 'text-[11px]',
                           )}
                         >
-                          <Clock className={listItem ? 'h-3 w-3' : 'h-2.5 w-2.5'} aria-hidden />
+                          <Clock className="h-3 w-3 opacity-80" aria-hidden />
+                          <span className="sr-only">Horário: </span>
                           {timeLabel}
                         </span>
                       )}
@@ -603,19 +611,18 @@ export default function CompoundHabitsWidget({
     <>
       {variant !== 'card' ? content : (
         <Card className="praxis-dashboard-card">
-          <CardHeader className="p-5 pb-3 sm:p-5 sm:pb-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-domain-gold/15 bg-domain-gold/[0.07]">
-                <Sparkles className="h-4 w-4 text-domain-gold" aria-hidden />
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground">Hábitos compostos</p>
-                <CardTitle className="mt-0.5 text-base tracking-[-0.025em]">Rotinas</CardTitle>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Faça, nomeie o que não rolou e siga pelo próximo passo.
-                </p>
-              </div>
-            </div>
+          <CardHeader className="space-y-1.5 p-5 pb-3 sm:p-5 sm:pb-3">
+            <SectionHeader
+              size="sm"
+              as="h3"
+              title="Rotinas"
+              icon={Sparkles}
+              iconClassName="text-domain-gold"
+              count={compounds.length ? compounds.length : undefined}
+            />
+            <p className="text-xs text-muted-foreground">
+              Faça, nomeie o que não rolou e siga pelo próximo passo.
+            </p>
           </CardHeader>
           <CardContent className="px-5 pb-5 sm:px-5 sm:pb-5">{content}</CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Wallet } from "lucide-react";
 import { toast } from "sonner";
@@ -31,9 +31,14 @@ import {
   SUB_STATUS_LABELS,
   debtTone,
   financeSummaryPhrase,
-  formatBrl,
   formatDay,
 } from "@/lib/finance";
+import { buildWalletCards } from "@/lib/financeWallet";
+import { useHideMoney } from "@/hooks/useHideMoney";
+import SourceChip from "@/components/finance/SourceChip";
+import WalletCards from "@/components/finance/WalletCards";
+import AccountsGrid from "@/components/finance/AccountsGrid";
+import { HideMoneyButton, WalletActions, WalletHero } from "@/components/finance/WalletHero";
 import { cn } from "@/lib/utils";
 
 function invalidateFinance(queryClient) {
@@ -62,26 +67,6 @@ function TabChips({ tab, onChange }) {
   );
 }
 
-const SOURCE_CHIP_LABELS = {
-  joao: "joão",
-  pierre: "pierre",
-  oficial: "oficial",
-  seed: "seed",
-  agent: "agente",
-  projecao: "projeção",
-  projeção: "projeção",
-};
-
-function SourceChip({ label, source }) {
-  const text = label || SOURCE_CHIP_LABELS[source] || source;
-  if (!text) return null;
-  return (
-    <Badge variant="outline" className="border-white/10 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-      {text}
-    </Badge>
-  );
-}
-
 function ProgressBar({ value, max, className }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
@@ -99,6 +84,9 @@ export default function Financas() {
   const [caixaOpen, setCaixaOpen] = useState(false);
   const [caixaAmount, setCaixaAmount] = useState("");
   const [txCategory, setTxCategory] = useState("");
+  const tabsRef = useRef(null);
+  const hide = useHideMoney();
+  const { money, text } = hide;
 
   const { data: overview, isLoading, isError } = useQuery({
     queryKey: ["finance", "overview"],
@@ -249,9 +237,24 @@ export default function Financas() {
     return list;
   }, [syncedAccounts]);
 
+  const walletCards = useMemo(() => buildWalletCards(overview), [overview]);
+
   function openPay(debt) {
     setPayDebt(debt);
     setPayAmount(String(debt.balance ?? ""));
+  }
+
+  function openCaixaDialog() {
+    setCaixaAmount(String(overview?.caixa ?? ""));
+    setCaixaOpen(true);
+  }
+
+  function showDues() {
+    setTab("dividas");
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    });
   }
 
   function submitPay() {
@@ -291,30 +294,25 @@ export default function Financas() {
         kicker="Dinheiro"
         kickerIcon={Wallet}
         title="Finanças"
-        description={financeSummaryPhrase(overview.caixa, overview.invested)}
+        description={text(financeSummaryPhrase(overview.caixa, overview.invested))}
         action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full"
-              disabled={syncMutation.isPending}
-              onClick={() => syncMutation.mutate()}
-            >
-              {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full"
-              onClick={() => {
-                setCaixaAmount(String(overview.caixa ?? ""));
-                setCaixaOpen(true);
-              }}
-            >
-              Atualizar saldo
-            </Button>
-          </div>
+          tab === "agora" ? null : (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                disabled={syncMutation.isPending}
+                onClick={() => syncMutation.mutate()}
+              >
+                {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
+              </Button>
+              <Button type="button" variant="outline" className="rounded-full" onClick={openCaixaDialog}>
+                Atualizar saldo
+              </Button>
+              <HideMoneyButton hide={hide} />
+            </div>
+          )
         }
       />
 
@@ -322,7 +320,7 @@ export default function Financas() {
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary/80">Próximo passo</p>
-            <p className="text-lg font-semibold leading-snug tracking-[-0.03em]">{overview.next_step?.label}</p>
+            <p className="text-lg font-semibold leading-snug tracking-[-0.03em]">{text(overview.next_step?.label)}</p>
           </div>
           {overview.next_step?.kind === "due" && overview.next_step.debt_id ? (
             <Button
@@ -339,7 +337,34 @@ export default function Financas() {
         </CardContent>
       </Card>
 
-      <TabChips tab={tab} onChange={setTab} />
+      {tab === "agora" ? (
+        <section aria-label="Carteira" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-6">
+          <WalletHero overview={overview} hide={hide} />
+          <div className="flex min-w-0 flex-col justify-between gap-4">
+            {walletCards.length ? (
+              <WalletCards cards={walletCards} money={money} />
+            ) : (
+              <PraxisEmptyState
+                compact
+                icon={Wallet}
+                title="Nenhum cartão para mostrar"
+                description="Marque uma conta como do dia ou sincronize os bancos."
+              />
+            )}
+            <WalletActions
+              hide={hide}
+              syncing={syncMutation.isPending}
+              onUpdateBalance={openCaixaDialog}
+              onSync={() => syncMutation.mutate()}
+              onDues={showDues}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <div ref={tabsRef} className="scroll-mt-4">
+        <TabChips tab={tab} onChange={setTab} />
+      </div>
 
       {tab === "agora" ? (
         <div className="space-y-8">
@@ -348,32 +373,26 @@ export default function Financas() {
               <CardContent className="flex h-full flex-col justify-between space-y-4 p-5">
                 <div className="space-y-3">
                   <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                    Resultado do mês
+                    Entradas e saídas
                   </p>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Caixa disponível (Inter)</p>
-                    <p className="text-3xl font-bold tracking-tight text-foreground tabular-nums sm:text-4xl">
-                      {formatBrl(overview.caixa)}
+                  {overview.invested > 0 ? (
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      Em auto-invest {money(overview.invested)}
                     </p>
-                    {overview.invested > 0 ? (
-                      <p className="text-xs tabular-nums text-muted-foreground">
-                        em auto-invest {formatBrl(overview.invested)}
-                      </p>
-                    ) : null}
-                  </div>
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Entradas (30d)</p>
                     <p className="text-lg font-semibold tabular-nums text-foreground">
-                      {insights ? formatBrl(insights.inflow) : "—"}
+                      {insights ? money(insights.inflow) : "—"}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Saídas (30d)</p>
                     <p className="text-lg font-semibold tabular-nums text-foreground">
-                      {insights ? formatBrl(insights.outflow) : "—"}
+                      {insights ? money(insights.outflow) : "—"}
                     </p>
                   </div>
                 </div>
@@ -388,7 +407,7 @@ export default function Financas() {
                   </p>
                   {insights && insights.outflow > 0 ? (
                     <span className="text-xs font-medium tabular-nums text-muted-foreground">
-                      Total: {formatBrl(insights.outflow)}
+                      Total: {money(insights.outflow)}
                     </span>
                   ) : null}
                 </div>
@@ -403,7 +422,7 @@ export default function Financas() {
                       <div key={cat.name} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <span className="truncate text-foreground">{cat.name}</span>
-                          <span className="tabular-nums text-muted-foreground">{formatBrl(cat.amount)}</span>
+                          <span className="tabular-nums text-muted-foreground">{money(cat.amount)}</span>
                         </div>
                         <ProgressBar value={cat.amount} max={topCategoriesMax} />
                       </div>
@@ -415,53 +434,23 @@ export default function Financas() {
           </div>
           <section className="space-y-4">
             <SectionHeading title="Reservas deste mês" kicker="Antes de qualquer cartão" />
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Card className="border-white/10 bg-white/[0.03]">
                 <CardContent className="space-y-1 p-4">
                   <p className="text-xs text-muted-foreground">Carro</p>
-                  <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.reserved_car)}</p>
+                  <p className="text-xl font-semibold tabular-nums">{money(overview.reserved_car)}</p>
                 </CardContent>
               </Card>
               <Card className="border-white/10 bg-white/[0.03]">
                 <CardContent className="space-y-1 p-4">
                   <p className="text-xs text-muted-foreground">Viver</p>
-                  <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.reserved_live)}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-white/10 bg-white/[0.03]">
-                <CardContent className="space-y-1 p-4">
-                  <p className="text-xs text-muted-foreground">Sobrou</p>
-                  <p className={cn("text-xl font-semibold tabular-nums", overview.livre < 0 && "text-amber-200")}>
-                    {formatBrl(overview.livre)}
-                  </p>
+                  <p className="text-xl font-semibold tabular-nums">{money(overview.reserved_live)}</p>
                 </CardContent>
               </Card>
             </div>
           </section>
 
-          <section className="space-y-3">
-            <SectionHeading title="Contas" kicker="Saldo operacional" />
-            <div className="space-y-2">
-              {overview.accounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{acc.name}</p>
-                      <SourceChip source={acc.available_source} />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {acc.is_operational ? "Conta do dia" : acc.institution}
-                      {acc.available_as_of ? ` · ${formatDay(acc.available_as_of)}` : ""}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-base font-semibold tabular-nums">{formatBrl(acc.available)}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+          <AccountsGrid accounts={overview.accounts} money={money} />
 
           {overview.last_sync && Boolean(overview.last_sync.ok) ? (
             <section className="space-y-3">
@@ -493,7 +482,7 @@ export default function Financas() {
                       </p>
                     </div>
                     <p className="shrink-0 text-base font-semibold tabular-nums">
-                      {formatBrl(entry.amount)}
+                      {money(entry.amount)}
                     </p>
                   </div>
                 ))}
@@ -508,11 +497,11 @@ export default function Financas() {
                 <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Ainda resta</p>
-                    <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_remaining)}</p>
+                    <p className="text-xl font-semibold tabular-nums">{money(overview.installments_remaining)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Pesa por mês</p>
-                    <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_month)}</p>
+                    <p className="text-xl font-semibold tabular-nums">{money(overview.installments_month)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Última</p>
@@ -531,7 +520,7 @@ export default function Financas() {
         <div className="space-y-4">
           <SectionHeading
             title="Fila"
-            kicker={`${formatBrl(overview.debts_total)} em aberto`}
+            kicker={`${money(overview.debts_total)} em aberto`}
           />
           {openDebts.map((debt) => (
             <Card key={debt.id} className="border-white/10 bg-white/[0.03]">
@@ -557,7 +546,7 @@ export default function Financas() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-lg font-semibold tabular-nums">{formatBrl(debt.balance)}</p>
+                  <p className="text-lg font-semibold tabular-nums">{money(debt.balance)}</p>
                   <Button type="button" size="sm" className="h-10 rounded-full" onClick={() => openPay(debt)}>
                     Paguei
                   </Button>
@@ -580,19 +569,19 @@ export default function Financas() {
             kicker={`${overview.installments_n || 0} em andamento · Pierre 12/08`}
           />
           <p className="text-sm text-muted-foreground">
-            Isso já está dentro da fatura do cartão. Não soma em cima dos R$ 10,5 mil.
+            {text("Isso já está dentro da fatura do cartão. Não soma em cima dos R$ 10,5 mil.")}
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card className="border-white/10 bg-white/[0.03]">
               <CardContent className="space-y-1 p-4">
                 <p className="text-xs text-muted-foreground">Ainda resta</p>
-                <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_remaining)}</p>
+                <p className="text-xl font-semibold tabular-nums">{money(overview.installments_remaining)}</p>
               </CardContent>
             </Card>
             <Card className="border-white/10 bg-white/[0.03]">
               <CardContent className="space-y-1 p-4">
                 <p className="text-xs text-muted-foreground">Pesa / mês</p>
-                <p className="text-xl font-semibold tabular-nums">{formatBrl(overview.installments_month)}</p>
+                <p className="text-xl font-semibold tabular-nums">{money(overview.installments_month)}</p>
               </CardContent>
             </Card>
             <Card className="border-white/10 bg-white/[0.03]">
@@ -624,11 +613,11 @@ export default function Financas() {
                       <SourceChip source={inst.source} />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {inst.paid_n}/{inst.total_n}x · {formatBrl(inst.monthly)}/mês
+                      {inst.paid_n}/{inst.total_n}x · {money(inst.monthly)}/mês
                       {acc ? ` · ${acc.name}` : ""}
                     </p>
                     </div>
-                    <p className="shrink-0 tabular-nums font-semibold">{formatBrl(inst.remaining)}</p>
+                    <p className="shrink-0 tabular-nums font-semibold">{money(inst.remaining)}</p>
                   </div>
                 );
               })}
@@ -644,7 +633,7 @@ export default function Financas() {
             { title: "Pessoal", items: personalSubs, total: overview.personal_month },
           ].map((block) => (
             <section key={block.title} className="space-y-3">
-              <SectionHeading title={block.title} kicker={formatBrl(block.total)} />
+              <SectionHeading title={block.title} kicker={money(block.total)} />
               {block.items.map((sub) => (
                 <div
                   key={sub.id}
@@ -657,7 +646,7 @@ export default function Financas() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="tabular-nums font-semibold">{formatBrl(sub.amount)}</p>
+                    <p className="tabular-nums font-semibold">{money(sub.amount)}</p>
                     <Button
                       type="button"
                       size="sm"
@@ -722,7 +711,7 @@ export default function Financas() {
                     </p>
                   </div>
                   <p className={cn("tabular-nums font-semibold", tx.amount < 0 && "text-amber-100")}>
-                    {formatBrl(tx.amount)}
+                    {money(tx.amount)}
                   </p>
                 </div>
               ))}
@@ -733,7 +722,7 @@ export default function Financas() {
 
       {tab === "graficos" ? (
         <div className="space-y-6">
-          <SectionHeading title="30 dias" kicker={insights ? formatBrl(insights.outflow) : "…"} />
+          <SectionHeading title="30 dias" kicker={insights ? money(insights.outflow) : "…"} />
           {!insights || (!insights.categories.length && (!insights.days || !insights.days.length)) ? (
             <PraxisEmptyState
               title="Ainda sem gasto pra desenhar"
@@ -772,7 +761,7 @@ export default function Financas() {
                               color: "hsl(0 0% 95%)",
                               fontSize: "12px",
                             }}
-                            formatter={(value) => [formatBrl(value), "Saída"]}
+                            formatter={(value) => [money(value), "Saída"]}
                             labelFormatter={(label) => formatDay(label)}
                           />
                           <Bar
@@ -796,13 +785,13 @@ export default function Financas() {
                     <div key={cat.name} className="space-y-1.5">
                       <div className="flex items-center justify-between text-sm">
                         <span>{cat.name}</span>
-                        <span className="tabular-nums text-muted-foreground">{formatBrl(cat.amount)}</span>
+                        <span className="tabular-nums text-muted-foreground">{money(cat.amount)}</span>
                       </div>
                       <ProgressBar value={cat.amount} max={maxCat} />
                     </div>
                   ))}
                   <p className="text-xs text-muted-foreground">
-                    Cartão {formatBrl(insights.card_outflow)} · conta {formatBrl(insights.cash_outflow)}. Transferência interna não entra.
+                    Cartão {money(insights.card_outflow)} · conta {money(insights.cash_outflow)}. Transferência interna não entra.
                   </p>
                 </div>
               ) : null}
@@ -824,7 +813,7 @@ export default function Financas() {
                     <div>
                       <p className="font-semibold">{goal.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatBrl(goal.current_amount)} de {formatBrl(goal.target_amount)}
+                        {money(goal.current_amount)} de {money(goal.target_amount)}
                         {goal.due_date ? ` · ${formatDay(goal.due_date)}` : ""}
                       </p>
                     </div>

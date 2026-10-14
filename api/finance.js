@@ -259,6 +259,58 @@ export function initFinanceSchema(db) {
       ON finance_transactions(pierre_tx_id)
       WHERE pierre_tx_id IS NOT NULL AND pierre_tx_id != '';
   `);
+
+  // carteira (fase 3): cor do cartão, final do cartão e ocultar valores — só aditivo
+  const accountCols = db.prepare('PRAGMA table_info(finance_accounts)').all().map((c) => c.name);
+  if (!accountCols.includes('brand_color')) {
+    db.exec('ALTER TABLE finance_accounts ADD COLUMN brand_color TEXT');
+  }
+  if (!accountCols.includes('card_last4')) {
+    db.exec('ALTER TABLE finance_accounts ADD COLUMN card_last4 TEXT');
+  }
+  const settingsCols = db.prepare('PRAGMA table_info(finance_settings)').all().map((c) => c.name);
+  if (!settingsCols.includes('hide_values')) {
+    db.exec('ALTER TABLE finance_settings ADD COLUMN hide_values INTEGER DEFAULT 0');
+  }
+}
+
+/** Ids da paleta do cartão — espelha src/lib/financeBrand.js. */
+export const BRAND_COLOR_IDS = [
+  'inter',
+  'c6',
+  'nubank',
+  'mp',
+  'santander',
+  'picpay',
+  'carteira',
+  'petroleo',
+  'vinho',
+  'neutro',
+];
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+const LAST4_RE = /^\d{4}$/;
+
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+/** null/'' limpa (volta à cor do banco); hex #rrggbb ou id da paleta; o resto é 400. */
+export function normalizeBrandColor(value) {
+  if (value === null || value === '') return null;
+  const str = String(value).trim();
+  if (HEX_COLOR_RE.test(str)) return str.toLowerCase();
+  if (BRAND_COLOR_IDS.includes(str)) return str;
+  throw badRequest('brand_color inválido: use #rrggbb ou um id da paleta');
+}
+
+/** null/'' limpa; senão exatamente 4 dígitos. */
+export function normalizeCardLast4(value) {
+  if (value === null || value === '') return null;
+  const str = String(value).trim();
+  if (LAST4_RE.test(str)) return str;
+  throw badRequest('card_last4 inválido: use 4 dígitos');
 }
 
 function insertAccount(db, row) {
@@ -524,14 +576,18 @@ export function seedFinanceIfEmpty(db, { force = false } = {}) {
   return { seeded: true };
 }
 
+function settingsRow(row) {
+  return { ...row, hide_values: Number(row.hide_values) === 1 };
+}
+
 export function getSettings(db) {
   const row = db.prepare('SELECT * FROM finance_settings WHERE id = ?').get('default');
-  if (row) return row;
+  if (row) return settingsRow(row);
   db.prepare(`
     INSERT INTO finance_settings (id, reserved_car, reserved_live, snapshot_label, updated_at)
     VALUES ('default', 0, 0, '', ?)
   `).run(nowIso());
-  return db.prepare('SELECT * FROM finance_settings WHERE id = ?').get('default');
+  return settingsRow(db.prepare('SELECT * FROM finance_settings WHERE id = ?').get('default'));
 }
 
 export function updateSettings(db, body = {}) {
@@ -539,11 +595,18 @@ export function updateSettings(db, body = {}) {
   const reservedCar = body.reserved_car !== undefined ? money(body.reserved_car) : current.reserved_car;
   const reservedLive = body.reserved_live !== undefined ? money(body.reserved_live) : current.reserved_live;
   const label = body.snapshot_label !== undefined ? String(body.snapshot_label) : current.snapshot_label;
+  let hideValues = current.hide_values;
+  if (body.hide_values !== undefined) {
+    if (typeof body.hide_values !== 'boolean' && ![0, 1].includes(body.hide_values)) {
+      throw badRequest('hide_values precisa ser booleano');
+    }
+    hideValues = Boolean(body.hide_values);
+  }
   db.prepare(`
     UPDATE finance_settings
-    SET reserved_car = ?, reserved_live = ?, snapshot_label = ?, updated_at = ?
+    SET reserved_car = ?, reserved_live = ?, snapshot_label = ?, hide_values = ?, updated_at = ?
     WHERE id = 'default'
-  `).run(reservedCar, reservedLive, label, nowIso());
+  `).run(reservedCar, reservedLive, label, hideValues ? 1 : 0, nowIso());
   return getSettings(db);
 }
 
@@ -572,6 +635,8 @@ export function listAccounts(db, { status = 'active' } = {}) {
     const projected = latestBalance(db, acc.id, 'projected_bill');
     return {
       ...acc,
+      brand_color: acc.brand_color || null,
+      card_last4: acc.card_last4 || null,
       is_operational: Number(acc.is_operational) === 1,
       available: available ? money(available.amount) : 0,
       available_as_of: available?.as_of || null,
@@ -628,6 +693,9 @@ export function createAccount(db, body) {
 export function updateAccount(db, id, body = {}) {
   const existing = db.prepare('SELECT * FROM finance_accounts WHERE id = ?').get(id);
   if (!existing) return null;
+  // valida antes de gravar qualquer coisa
+  const brandColor = body.brand_color !== undefined ? normalizeBrandColor(body.brand_color) : existing.brand_color;
+  const cardLast4 = body.card_last4 !== undefined ? normalizeCardLast4(body.card_last4) : existing.card_last4;
   db.prepare(`
     UPDATE finance_accounts SET
       name = COALESCE(?, name),
@@ -636,6 +704,8 @@ export function updateAccount(db, id, body = {}) {
       mask = COALESCE(?, mask),
       is_operational = ?,
       status = ?,
+      brand_color = ?,
+      card_last4 = ?,
       updated_at = ?
     WHERE id = ?
   `).run(
@@ -645,6 +715,8 @@ export function updateAccount(db, id, body = {}) {
     body.mask !== undefined ? String(body.mask).slice(-4) : null,
     body.is_operational !== undefined ? (body.is_operational ? 1 : 0) : existing.is_operational,
     body.status !== undefined ? (body.status === 'archived' ? 'archived' : 'active') : existing.status,
+    brandColor ?? null,
+    cardLast4 ?? null,
     nowIso(),
     id,
   );

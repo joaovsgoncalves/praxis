@@ -53,6 +53,12 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - **Carregando:** `Skeleton` com varredura (`praxis-skeleton`), parada em `prefers-reduced-motion`.
 - **Mobile:** navegação em ilha flutuante; conteúdo reserva `6.5rem + safe-area` embaixo até `lg`.
 
+## Visual premium — Fase 3 (2026-10-14)
+
+- **Carteira (Finanças › Agora):** `WalletHero` (caixa livre + caixa, reservado, faturas) e `WalletCards` (leque no desktop, carrossel com snap no celular). Cor do cartão em `src/lib/financeBrand.js`: paleta de 10 com texto sólido AA testado em `api/finance.wallet.test.mjs`; roxo só no Nubank.
+- **Ocultar valores:** `useHideMoney()` + `formatMoney`/`maskMoneyText` (`R$ •••••`), salvo em `finance_settings.hide_values`. Todo valor de Finanças e do card do Hoje passa por aí.
+- **Hábitos:** linha = `praxis-board-card` + `AreaRuler` (tique lateral de 3px na cor da área) + `TaskAreaChip`, horário, sequência em chip mono; feito = verde igual à tarefa.
+
 ## E2E mobile (390px)
 
 ```bash

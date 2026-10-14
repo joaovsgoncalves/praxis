@@ -75,9 +75,13 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.patch('/accounts/:id', (req, res) => {
-    const row = updateAccount(db, req.params.id, req.body || {});
-    if (!row) return res.status(404).json({ error: 'Not found' });
-    res.json(row);
+    try {
+      const row = updateAccount(db, req.params.id, req.body || {});
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      res.json(row);
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.get('/balances', (req, res) => {

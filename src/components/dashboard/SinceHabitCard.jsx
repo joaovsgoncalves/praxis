@@ -14,6 +14,7 @@ import {
   sinceMilestone,
 } from "@/lib/habits";
 import { cn } from "@/lib/utils";
+import { AreaRuler, TaskAreaChip } from "@/components/habits-tasks/TaskCardParts";
 
 const CLOCK_PARTS = [
   ["days", "D"],
@@ -46,6 +47,7 @@ export default function SinceHabitCard({
   const milestone = habit?.since_line
     ? { phase: habit.since_phase, line: habit.since_line }
     : sinceMilestone(elapsed.days);
+  const sinceDays = habit?.days_since ?? elapsed.days;
 
   if (!habit) return null;
 
@@ -53,14 +55,15 @@ export default function SinceHabitCard({
     <>
       <div
         className={cn(
-          "flex items-center gap-1.5 rounded-xl border border-domain-gold/20 bg-card/60 p-3.5 transition-colors hover:border-domain-gold/35 hover:bg-card/80",
-          compact && "p-2.5 sm:p-3",
+          "praxis-board-card relative flex items-center gap-1.5 rounded-xl py-1.5 pl-1.5 pr-1.5",
+          compact && "py-1",
           className,
         )}
       >
+        <AreaRuler category={habit.category} />
         <button
           type="button"
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-1.5 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           onClick={() => setIsOpen(true)}
           aria-haspopup="dialog"
           aria-label={`Abrir relógio de ${habit.title}`}
@@ -69,11 +72,15 @@ export default function SinceHabitCard({
             <Clock3 className="h-4 w-4" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold sm:text-[15px]">
+            <span className="block truncate text-[15px] font-medium leading-snug text-stone-100">
               {habit.title || "Sem pornografia"}
             </span>
-            <span className="mt-0.5 block text-[11px] font-medium text-domain-gold">
-              Limpo
+            <span className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs leading-none">
+              <TaskAreaChip category={habit.category} />
+              <span className="font-medium text-domain-gold">Limpo</span>
+              <span className="inline-flex shrink-0 items-center rounded-full bg-white/[0.05] px-2 py-[3px] font-mono text-[11px] font-medium tabular-nums text-domain-gold shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]">
+                {sinceDays} {sinceDays === 1 ? "dia" : "dias"}
+              </span>
             </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

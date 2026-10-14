@@ -42,6 +42,21 @@ export function formatBrl(value) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+export const MONEY_MASK = 'R$ •••••';
+
+/** Formatador único dos valores de Finanças: respeita o "ocultar valores". */
+export function formatMoney(value, hidden = false) {
+  return hidden ? MONEY_MASK : formatBrl(value);
+}
+
+const MONEY_IN_TEXT = /-?R\$\s?-?[\d.]+(?:,\d{1,2})?(?:\s?(?:mil|mi)\b)?/g;
+
+/** Frases prontas da API (próximo passo, resumo) também escondem o R$. */
+export function maskMoneyText(text, hidden = false) {
+  if (!hidden || typeof text !== 'string') return text;
+  return text.replace(MONEY_IN_TEXT, MONEY_MASK);
+}
+
 export function formatDay(ymd) {
   if (!ymd || typeof ymd !== 'string') return '—';
   const [y, m, d] = ymd.split('-');
