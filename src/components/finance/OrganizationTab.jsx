@@ -115,14 +115,14 @@ function CategoryRow({ row, maxSpent, money, editing, onEdit, onDone }) {
     : null;
 
   return (
-    <li className="space-y-2 py-3">
-      <div className="flex items-center gap-3">
+    <li className="min-w-0 space-y-2 py-3">
+      <div className="flex min-w-0 items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.04] shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.07)]">
           <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="truncate text-sm font-medium">{row.category}</p>
+          <div className="flex min-w-0 items-baseline justify-between gap-3">
+            <p className="min-w-0 truncate text-sm font-medium">{row.category}</p>
             <p className="shrink-0 text-sm font-semibold tabular-nums">
               {money(row.spent)}
               {hasLimit ? <span className="font-normal text-muted-foreground"> de {money(row.limit)}</span> : null}
@@ -195,7 +195,7 @@ function MonthSection({ currentMonth, money }) {
         title="Gasto por categoria"
         icon={ChartPie}
         trailing={
-          <div className="-mx-2 flex items-center gap-0.5 sm:mx-0">
+          <div className="flex items-center justify-between gap-0.5 sm:justify-start">
             <Button
               type="button"
               size="icon"
@@ -503,7 +503,7 @@ function FixedSection({ money }) {
           </p>
           <ul className="divide-y divide-white/[0.05]">
             {fixed.map((item) => (
-              <li key={item.id} className={cn("flex items-center gap-2 py-1", !item.active && "opacity-60")}>
+              <li key={item.id} className={cn("flex min-w-0 items-center gap-2 py-1", !item.active && "opacity-60")}>
                 <button
                   type="button"
                   onClick={() => setDialog({ open: true, fixed: item })}
@@ -563,15 +563,16 @@ function GoalsSection({ money }) {
       ) : !goals.length ? (
         <PraxisEmptyState compact icon={Target} title="Sem meta ainda" description="Quando o Midas criar uma meta, o progresso aparece aqui." />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        // grid-cols-1 = minmax(0, 1fr): a coluna nunca cresce além do container por causa do conteúdo
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {goals.map((goal) => {
             const done = goal.status === "done";
             return (
-              <li key={goal.id} className="praxis-panel space-y-3 rounded-2xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+              <li key={goal.id} className="praxis-panel min-w-0 space-y-3 rounded-2xl p-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{goal.title}</p>
-                    <p className="text-xs tabular-nums text-muted-foreground">
+                    <p className="text-xs tabular-nums text-muted-foreground [overflow-wrap:anywhere]">
                       {money(goal.current_amount)} de {money(goal.target_amount)}
                       {goal.due_date ? ` · até ${formatDay(goal.due_date)}` : ""}
                     </p>

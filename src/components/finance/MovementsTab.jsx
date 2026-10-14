@@ -175,7 +175,7 @@ export default function MovementsTab({ overview, money }) {
       />
 
       <div className="space-y-3">
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_11rem_11rem]">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_11rem_11rem]">
           <label className="relative block">
             <span className="sr-only">Buscar</span>
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
