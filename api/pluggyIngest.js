@@ -4,9 +4,19 @@
  */
 
 import { randomUUID } from 'crypto';
-import { getOverview, money, todayFortaleza, updateSettings } from './finance.js';
+import {
+  MANUAL_SOURCES,
+  cleanMerchant,
+  getOverview,
+  mapBankCategory,
+  money,
+  todayFortaleza,
+  updateSettings,
+} from './finance.js';
 
 export const PLUGGY_INSTITUTIONS = ['inter', 'c6', 'mp', 'nubank', 'santander'];
+export const PLUGGY_ACCOUNT_TYPES = ['BANK', 'CREDIT'];
+const MAX_TRANSACTIONS = 2000;
 const ISO_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LAST4_RE = /^\d{4}$/;
@@ -134,7 +144,40 @@ export function parsePluggyPayload(body) {
       card: parseCard(raw.card, `${path}.card`),
     };
   });
-  return { fetched_at: fetchedAt, institutions };
+  return { fetched_at: fetchedAt, institutions, transactions: parseTransactions(body.transactions) };
+}
+
+/**
+ * transactions (opcional): [{ external_id, institution, account_type: BANK|CREDIT, date: YYYY-MM-DD,
+ *   amount (negativo = saída), description, category }]
+ */
+function parseTransactions(list) {
+  if (list === null || list === undefined) return [];
+  if (!Array.isArray(list)) throw invalid('transactions', 'lista');
+  if (list.length > MAX_TRANSACTIONS) throw invalid('transactions', `no máximo ${MAX_TRANSACTIONS}`);
+  const seen = new Set();
+  return list.map((raw, i) => {
+    const path = `transactions[${i}]`;
+    if (!isPlainObject(raw)) throw invalid(path, 'objeto');
+    const externalId = shortText(raw.external_id, `${path}.external_id`, { max: 120, nullable: false }).trim();
+    if (seen.has(externalId)) throw invalid(`${path}.external_id`, 'repetido');
+    seen.add(externalId);
+    if (!PLUGGY_INSTITUTIONS.includes(raw.institution)) {
+      throw invalid(`${path}.institution`, `use ${PLUGGY_INSTITUTIONS.join(', ')}`);
+    }
+    if (!PLUGGY_ACCOUNT_TYPES.includes(raw.account_type)) throw invalid(`${path}.account_type`, 'use BANK ou CREDIT');
+    const amount = finite(raw.amount, `${path}.amount`);
+    if (amount === 0) throw invalid(`${path}.amount`, 'diferente de zero');
+    return {
+      external_id: externalId,
+      institution: raw.institution,
+      account_type: raw.account_type,
+      date: ymd(raw.date, `${path}.date`),
+      amount,
+      description: shortText(raw.description, `${path}.description`, { max: 300 }) || '',
+      category: shortText(raw.category, `${path}.category`, { max: 80 }),
+    };
+  });
 }
 
 /** Conta do dia a dia da instituição: não-crédito, ativa, operacional primeiro. */
@@ -302,12 +345,100 @@ function applyInstitution(db, item, now) {
   return { applied };
 }
 
+/** Conta do lançamento: crédito da instituição (se houver) para CREDIT; senão a conta do dia dela. */
+function transactionAccount(db, tx) {
+  const op = operationalAccount(db, tx.institution);
+  if (tx.account_type !== 'CREDIT') return op;
+  return db.prepare(`
+    SELECT * FROM finance_accounts
+    WHERE kind = 'credit' AND status = 'active' AND institution = ?
+    ORDER BY sort_order ASC, id ASC
+    LIMIT 1
+  `).get(tx.institution) || op;
+}
+
+/**
+ * Gasto que o João lançou e o banco agora confirmou: mesmo valor, até 3 dias de diferença,
+ * mesma conta (ou lançado sem conta). O manual sai das somas; a categoria e o nome dele ficam na linha do banco.
+ */
+function matchManual(db, bankTx) {
+  if (bankTx.amount >= 0) return null;
+  const placeholders = MANUAL_SOURCES.map(() => '?').join(', ');
+  return db.prepare(`
+    SELECT * FROM finance_transactions
+    WHERE source IN (${placeholders}) AND direction = 'outflow' AND matched_tx_id IS NULL
+      AND (external_id IS NULL OR external_id = '')
+      AND ABS(ABS(amount) - ?) < 0.005
+      AND posted_on >= date(?, '-3 day') AND posted_on <= date(?, '+3 day')
+      AND (account_id IS NULL OR account_id = ?)
+    ORDER BY ABS(julianday(posted_on) - julianday(?)) ASC, created_at ASC
+    LIMIT 1
+  `).get(...MANUAL_SOURCES, Math.abs(bankTx.amount), bankTx.posted_on, bankTx.posted_on, bankTx.account_id, bankTx.posted_on) || null;
+}
+
+function applyTransactions(db, list) {
+  const summary = { received: list.length, inserted: 0, duplicates: 0, matched: 0, skipped: [] };
+  const exists = db.prepare('SELECT id FROM finance_transactions WHERE external_id = ?');
+  const insert = db.prepare(`
+    INSERT INTO finance_transactions
+      (id, external_id, account_id, posted_on, amount, direction, raw_description,
+       merchant, category, source, note, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pluggy', ?, ?)
+  `);
+  for (const tx of list) {
+    if (exists.get(tx.external_id)) {
+      summary.duplicates += 1;
+      continue;
+    }
+    const account = transactionAccount(db, tx);
+    if (!account) {
+      summary.skipped.push({ external_id: tx.external_id, reason: 'sem conta na Praxis' });
+      continue;
+    }
+    const row = {
+      id: randomUUID(),
+      account_id: account.id,
+      posted_on: tx.date,
+      amount: money(tx.amount),
+      category: mapBankCategory(tx.category, tx.description, tx.amount, tx.account_type),
+      merchant: cleanMerchant(tx.description),
+      note: '',
+    };
+    const manual = matchManual(db, row);
+    if (manual) {
+      if (manual.category && manual.category !== 'Outros') row.category = manual.category;
+      if (manual.merchant) row.merchant = manual.merchant;
+      row.note = manual.note || '';
+    }
+    insert.run(
+      row.id,
+      tx.external_id,
+      row.account_id,
+      row.posted_on,
+      row.amount,
+      row.amount < 0 ? 'outflow' : 'inflow',
+      tx.description,
+      row.merchant,
+      row.category,
+      row.note,
+      new Date().toISOString(),
+    );
+    summary.inserted += 1;
+    if (manual) {
+      db.prepare('UPDATE finance_transactions SET matched_tx_id = ? WHERE id = ?').run(row.id, manual.id);
+      summary.matched += 1;
+    }
+  }
+  return summary;
+}
+
 /** POST /api/finance/ingest/pluggy — idempotente; status != UPDATED só entra no log. */
 export function ingestPluggy(db, body, { today } = {}) {
   const payload = parsePluggyPayload(body);
   const now = new Date().toISOString();
   const applied = [];
   const skipped = [];
+  let transactions = null;
 
   db.transaction(() => {
     for (const item of payload.institutions) {
@@ -323,14 +454,16 @@ export function ingestPluggy(db, body, { today } = {}) {
       // dado vivo do banco: deixa de ser "foto"
       updateSettings(db, { snapshot_label: '' });
     }
+    transactions = applyTransactions(db, payload.transactions);
     db.prepare(`
       INSERT INTO finance_sync_log (id, started_at, finished_at, ok, accounts_n, tx_n, error, actor)
-      VALUES (?, ?, ?, 1, ?, 0, ?, 'midas')
+      VALUES (?, ?, ?, 1, ?, ?, ?, 'midas')
     `).run(
       randomUUID(),
       now,
       now,
       applied.length,
+      transactions.inserted,
       skipped.map((s) => `${s.institution}: ${s.status === 'UPDATED' ? s.reason : s.status}`).join('; '),
     );
   })();
@@ -340,10 +473,13 @@ export function ingestPluggy(db, body, { today } = {}) {
     ok: true,
     applied,
     skipped,
+    transactions,
     overview_snapshot: {
       caixa: overview.caixa,
       livre: overview.livre,
       safe_to_spend: overview.safe_to_spend,
+      committed_until_salary: overview.committed_until_salary,
+      next_salary_date: overview.next_salary_date,
       bills_due_7d: overview.bills_due_7d,
     },
   };

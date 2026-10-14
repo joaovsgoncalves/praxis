@@ -29,12 +29,19 @@ export const FINANCE_CATEGORIES = [
   'Trabalho',
   'Família',
   'Reserva',
+  'Compras',
   'Transferência',
+  'Pagamento de fatura',
   'Receita',
   'Outros',
 ];
+/** Dinheiro que só muda de lugar: fica fora de gráfico, orçamento e /month. */
+export const OFF_BUDGET_CATEGORIES = ['Pagamento de fatura', 'Transferência'];
+/** Quem lança à mão (app ou Midas falando com o João). */
+export const MANUAL_SOURCES = ['joao', 'agent'];
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const INVEST_PATTERN = /invest|auto-?invest|cdb|aplic[aäã]?[çc]|aplic[aä]c|investimento/i;
 
@@ -292,6 +299,50 @@ export function initFinanceSchema(db) {
   if (!settingsCols.includes('hide_values')) {
     db.exec('ALTER TABLE finance_settings ADD COLUMN hide_values INTEGER DEFAULT 0');
   }
+
+  // fase 4: despesas fixas, orçamento, dia do salário e transações do banco — só aditivo
+  if (!settingsCols.includes('salary_day')) {
+    db.exec('ALTER TABLE finance_settings ADD COLUMN salary_day INTEGER DEFAULT 12');
+  }
+  const txCols = db.prepare('PRAGMA table_info(finance_transactions)').all().map((c) => c.name);
+  if (!txCols.includes('external_id')) {
+    db.exec('ALTER TABLE finance_transactions ADD COLUMN external_id TEXT');
+  }
+  // lançamento manual que o banco depois confirmou: aponta para a linha do banco e sai das somas
+  if (!txCols.includes('matched_tx_id')) {
+    db.exec('ALTER TABLE finance_transactions ADD COLUMN matched_tx_id TEXT');
+  }
+  if (!txCols.includes('note')) {
+    db.exec("ALTER TABLE finance_transactions ADD COLUMN note TEXT DEFAULT ''");
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS finance_fixed_expenses (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      due_day INTEGER,
+      category TEXT DEFAULT 'Outros',
+      lane TEXT DEFAULT 'personal',
+      active INTEGER DEFAULT 1,
+      last_paid_month TEXT,
+      note TEXT DEFAULT '',
+      created_at TEXT,
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS finance_budgets (
+      category TEXT PRIMARY KEY,
+      monthly_limit REAL NOT NULL,
+      updated_at TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_tx_external
+      ON finance_transactions(external_id)
+      WHERE external_id IS NOT NULL AND external_id != '';
+
+    CREATE INDEX IF NOT EXISTS idx_finance_tx_posted
+      ON finance_transactions(posted_on);
+  `);
 }
 
 /** Ids da paleta do cartão — espelha src/lib/financeBrand.js. */
@@ -419,6 +470,8 @@ export function seedFinanceIfEmpty(db, { force = false } = {}) {
         DELETE FROM finance_settings;
         DELETE FROM finance_sync_log;
         DELETE FROM finance_card_status;
+        DELETE FROM finance_fixed_expenses;
+        DELETE FROM finance_budgets;
       `);
     }
 
@@ -597,8 +650,24 @@ export function seedFinanceIfEmpty(db, { force = false } = {}) {
   return { seeded: true };
 }
 
+export const DEFAULT_SALARY_DAY = 12;
+
 function settingsRow(row) {
-  return { ...row, hide_values: Number(row.hide_values) === 1 };
+  const salaryDay = Number(row.salary_day);
+  return {
+    ...row,
+    hide_values: Number(row.hide_values) === 1,
+    salary_day: Number.isInteger(salaryDay) && salaryDay >= 1 && salaryDay <= 31 ? salaryDay : DEFAULT_SALARY_DAY,
+  };
+}
+
+/** Dia do mês 1..31 (inteiro). Usado no salário e nas despesas fixas. */
+function parseMonthDay(value, field) {
+  if (typeof value === 'string' && value.trim() !== '') value = Number(value);
+  if (!Number.isInteger(value) || value < 1 || value > 31) {
+    throw badRequest(`${field} precisa ser um dia de 1 a 31`);
+  }
+  return value;
 }
 
 export function getSettings(db) {
@@ -623,11 +692,12 @@ export function updateSettings(db, body = {}) {
     }
     hideValues = Boolean(body.hide_values);
   }
+  const salaryDay = body.salary_day !== undefined ? parseMonthDay(body.salary_day, 'salary_day') : current.salary_day;
   db.prepare(`
     UPDATE finance_settings
-    SET reserved_car = ?, reserved_live = ?, snapshot_label = ?, hide_values = ?, updated_at = ?
+    SET reserved_car = ?, reserved_live = ?, snapshot_label = ?, hide_values = ?, salary_day = ?, updated_at = ?
     WHERE id = 'default'
-  `).run(reservedCar, reservedLive, label, hideValues ? 1 : 0, nowIso());
+  `).run(reservedCar, reservedLive, label, hideValues ? 1 : 0, salaryDay, nowIso());
   return getSettings(db);
 }
 
@@ -881,35 +951,47 @@ export function updateDebt(db, id, body = {}) {
   return listDebts(db, { status: 'all' }).find((d) => d.id === id);
 }
 
+/**
+ * Lançamento (gasto do João, Midas, pagamento ou sync). Saída fica negativa e entrada positiva,
+ * seja qual for o sinal recebido; sem direction, o sinal decide.
+ */
 export function createTransaction(db, body) {
   const postedOn = isValidDateString(body.posted_on) ? body.posted_on : todayFortaleza();
-  const amount = money(body.amount);
-  if (!Number.isFinite(Number(body.amount))) {
-    const err = new Error('amount required');
-    err.status = 400;
-    throw err;
+  const raw = typeof body.amount === 'string' ? body.amount.trim().replace(',', '.') : body.amount;
+  if (raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw))) {
+    throw badRequest('amount precisa ser número');
   }
+  const signed = money(raw);
   const id = body.id || randomUUID();
-  const direction = pick(body.direction, TX_DIRECTIONS, amount < 0 ? 'outflow' : 'inflow');
+  const direction = pick(body.direction, TX_DIRECTIONS, signed < 0 ? 'outflow' : 'inflow');
+  let amount = signed;
+  if (direction === 'outflow') amount = -Math.abs(signed);
+  else if (direction === 'inflow') amount = Math.abs(signed);
   const category = FINANCE_CATEGORIES.includes(body.category) ? body.category : 'Outros';
+  if (body.account_id) {
+    const account = db.prepare('SELECT id FROM finance_accounts WHERE id = ?').get(String(body.account_id));
+    if (!account) throw badRequest('account_id não existe');
+  }
   db.prepare(`
     INSERT INTO finance_transactions
-      (id, pierre_tx_id, account_id, posted_on, amount, direction, raw_description,
-       merchant, category, subscription_id, debt_id, source, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, pierre_tx_id, external_id, account_id, posted_on, amount, direction, raw_description,
+       merchant, category, subscription_id, debt_id, source, note, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     body.pierre_tx_id || null,
+    body.external_id || null,
     body.account_id || null,
     postedOn,
     amount,
     direction,
-    String(body.raw_description || ''),
-    String(body.merchant || ''),
+    String(body.raw_description || '').slice(0, 300),
+    String(body.merchant || '').trim().slice(0, 120),
     category,
     body.subscription_id || null,
     body.debt_id || null,
     pick(body.source, SOURCES, 'joao'),
+    String(body.note || '').slice(0, 500),
     nowIso(),
   );
   return db.prepare('SELECT * FROM finance_transactions WHERE id = ?').get(id);
@@ -924,26 +1006,29 @@ export function updateTransaction(db, id, body = {}) {
       category = ?,
       subscription_id = COALESCE(?, subscription_id),
       debt_id = COALESCE(?, debt_id),
-      raw_description = COALESCE(?, raw_description)
+      raw_description = COALESCE(?, raw_description),
+      note = COALESCE(?, note)
     WHERE id = ?
   `).run(
-    body.merchant !== undefined ? String(body.merchant) : null,
+    body.merchant !== undefined ? String(body.merchant).trim().slice(0, 120) : null,
     body.category !== undefined && FINANCE_CATEGORIES.includes(body.category)
       ? body.category
       : existing.category,
     body.subscription_id !== undefined ? body.subscription_id : null,
     body.debt_id !== undefined ? body.debt_id : null,
     body.raw_description !== undefined ? String(body.raw_description) : null,
+    body.note !== undefined ? String(body.note).slice(0, 500) : null,
     id,
   );
   return db.prepare('SELECT * FROM finance_transactions WHERE id = ?').get(id);
 }
 
+/** Extrato: lançamento manual já confirmado pelo banco não aparece de novo. */
 export function listTransactions(db, { from, to, account_id, category, q, limit } = {}) {
   const today = todayFortaleza();
   const start = isValidDateString(from) ? from : addDays(today, -30);
   const end = isValidDateString(to) ? to : today;
-  let sql = 'SELECT * FROM finance_transactions WHERE posted_on >= ? AND posted_on <= ?';
+  let sql = 'SELECT * FROM finance_transactions WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL';
   const params = [start, end];
   if (account_id) {
     sql += ' AND account_id = ?';
@@ -959,7 +1044,7 @@ export function listTransactions(db, { from, to, account_id, category, q, limit 
     params.push(like, like);
   }
   sql += ' ORDER BY posted_on DESC, created_at DESC LIMIT ?';
-  params.push(Math.min(Number(limit) || 200, 500));
+  params.push(Math.min(Number(limit) || 200, 1000));
   return db.prepare(sql).all(...params);
 }
 
@@ -1008,7 +1093,8 @@ export function payDebt(db, id, body = {}) {
       amount: -Math.abs(amount),
       direction: 'outflow',
       merchant: debt.title,
-      category: 'Dívidas',
+      // fatura de cartão só muda o dinheiro de lugar: as compras já contam no cartão
+      category: debt.kind === 'card' ? 'Pagamento de fatura' : 'Dívidas',
       debt_id: id,
       source: 'joao',
       raw_description: `Pagamento ${debt.title}`,
@@ -1306,8 +1392,8 @@ export function getInsights(db, { from, to } = {}) {
   const end = isValidDateString(to) ? to : today;
   const rows = db.prepare(`
     SELECT * FROM finance_transactions
-    WHERE posted_on >= ? AND posted_on <= ?
-  `).all(start, end);
+    WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL
+  `).all(start, end).filter((tx) => !OFF_BUDGET_CATEGORIES.includes(tx.category));
 
   let outflow = 0;
   let inflow = 0;
@@ -1357,59 +1443,501 @@ export function getInsights(db, { from, to } = {}) {
   };
 }
 
-function buildNextStep({ caixa, debts, today }) {
-  const open = debts.filter((d) => d.status !== 'clean');
-  const dueSoon = open
-    .filter((d) => d.due_date)
-    .map((d) => ({ ...d, days: daysUntil(d.due_date, today) }))
-    .filter((d) => d.days !== null && d.days <= 14 && d.days >= -2)
-    .sort((a, b) => a.days - b.days);
+// ── Despesas fixas ────────────────────────────────────────────────────────────
 
-  if (dueSoon[0] && caixa < dueSoon[0].balance) {
-    const gap = money(dueSoon[0].balance - caixa);
-    const dueLabel = dueSoon[0].due_date.slice(8);
+function monthOf(ymd) {
+  return String(ymd).slice(0, 7);
+}
+
+function parseMonth(value, field = 'month') {
+  if (typeof value !== 'string' || !MONTH_RE.test(value)) throw badRequest(`${field}: use YYYY-MM`);
+  return value;
+}
+
+function parseAmount(value, field = 'amount') {
+  if (typeof value === 'string' && value.trim() !== '') value = Number(value.replace(',', '.'));
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw badRequest(`${field} precisa ser número >= 0`);
+  }
+  return money(value);
+}
+
+function fixedRow(row, today) {
+  const month = monthOf(today);
+  return {
+    ...row,
+    amount: money(row.amount),
+    due_day: row.due_day == null ? null : Number(row.due_day),
+    active: Number(row.active) === 1,
+    last_paid_month: row.last_paid_month || null,
+    paid_this_month: row.last_paid_month === month,
+  };
+}
+
+export function listFixedExpenses(db, { today } = {}) {
+  const day = isValidDateString(today) ? today : todayFortaleza();
+  return db.prepare(`
+    SELECT * FROM finance_fixed_expenses
+    ORDER BY active DESC, due_day IS NULL, due_day ASC, name ASC
+  `).all().map((row) => fixedRow(row, day));
+}
+
+function getFixed(db, id, today) {
+  const row = db.prepare('SELECT * FROM finance_fixed_expenses WHERE id = ?').get(id);
+  return row ? fixedRow(row, isValidDateString(today) ? today : todayFortaleza()) : null;
+}
+
+/** Valida tudo antes de gravar; no PATCH só os campos enviados. */
+function fixedFields(body, existing = null) {
+  const out = {};
+  if (!existing || body.name !== undefined) {
+    const name = String(body.name ?? '').trim();
+    if (!name) throw badRequest('name obrigatório');
+    out.name = name.slice(0, 120);
+  }
+  if (!existing || body.amount !== undefined) out.amount = parseAmount(body.amount);
+  if (body.due_day !== undefined) {
+    out.due_day = body.due_day === null || body.due_day === '' ? null : parseMonthDay(body.due_day, 'due_day');
+  }
+  if (body.category !== undefined) {
+    if (!FINANCE_CATEGORIES.includes(body.category)) throw badRequest('category inválida');
+    out.category = body.category;
+  }
+  if (body.lane !== undefined) {
+    if (!SUB_LANES.includes(body.lane)) throw badRequest('lane: use personal ou work');
+    out.lane = body.lane;
+  }
+  if (body.active !== undefined) {
+    if (typeof body.active !== 'boolean' && ![0, 1].includes(body.active)) throw badRequest('active precisa ser booleano');
+    out.active = body.active ? 1 : 0;
+  }
+  if (body.note !== undefined) out.note = String(body.note ?? '').slice(0, 500);
+  return out;
+}
+
+export function createFixedExpense(db, body = {}, { today } = {}) {
+  const fields = fixedFields(body);
+  const id = randomUUID();
+  const now = nowIso();
+  db.prepare(`
+    INSERT INTO finance_fixed_expenses
+      (id, name, amount, due_day, category, lane, active, last_paid_month, note, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+  `).run(
+    id,
+    fields.name,
+    fields.amount,
+    fields.due_day ?? null,
+    fields.category || 'Outros',
+    fields.lane || 'personal',
+    fields.active ?? 1,
+    fields.note || '',
+    now,
+    now,
+  );
+  return getFixed(db, id, today);
+}
+
+export function updateFixedExpense(db, id, body = {}, { today } = {}) {
+  const existing = db.prepare('SELECT * FROM finance_fixed_expenses WHERE id = ?').get(id);
+  if (!existing) return null;
+  const fields = fixedFields(body, existing);
+  const next = { ...existing, ...fields };
+  db.prepare(`
+    UPDATE finance_fixed_expenses
+    SET name = ?, amount = ?, due_day = ?, category = ?, lane = ?, active = ?, note = ?, updated_at = ?
+    WHERE id = ?
+  `).run(next.name, next.amount, next.due_day, next.category, next.lane, next.active, next.note || '', nowIso(), id);
+  return getFixed(db, id, today);
+}
+
+export function deleteFixedExpense(db, id) {
+  const existing = db.prepare('SELECT * FROM finance_fixed_expenses WHERE id = ?').get(id);
+  if (!existing) return null;
+  db.prepare('DELETE FROM finance_fixed_expenses WHERE id = ?').run(id);
+  return existing;
+}
+
+/** Marca pago no mês (padrão: mês de hoje em Fortaleza). `month: null` desfaz. */
+export function markFixedPaid(db, id, { month, today } = {}) {
+  const existing = db.prepare('SELECT * FROM finance_fixed_expenses WHERE id = ?').get(id);
+  if (!existing) return null;
+  const day = isValidDateString(today) ? today : todayFortaleza();
+  const value = month === null ? null : month === undefined ? monthOf(day) : parseMonth(month);
+  db.prepare('UPDATE finance_fixed_expenses SET last_paid_month = ?, updated_at = ? WHERE id = ?')
+    .run(value, nowIso(), id);
+  return getFixed(db, id, day);
+}
+
+// ── Janela até o salário ──────────────────────────────────────────────────────
+
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function ymdOf(year, month, day) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Dia D no mês (ano, mês 1..12); dia 31 em mês de 30 vira o último dia. */
+function dayInMonth(year, month, day) {
+  return ymdOf(year, month, Math.min(day, daysInMonth(year, month)));
+}
+
+function shiftMonth(year, month, delta) {
+  const idx = year * 12 + (month - 1) + delta;
+  return [Math.floor(idx / 12), (idx % 12) + 1];
+}
+
+/** Próximo dia do salário: se hoje já é (ou passou) o dia, é o do mês seguinte. */
+export function nextSalaryDate(today, salaryDay = DEFAULT_SALARY_DAY) {
+  const [y, m] = today.split('-').map(Number);
+  const thisMonth = dayInMonth(y, m, salaryDay);
+  if (today < thisMonth) return thisMonth;
+  const [ny, nm] = shiftMonth(y, m, 1);
+  return dayInMonth(ny, nm, salaryDay);
+}
+
+/** Datas em que o dia D do mês cai dentro de [from, to]. */
+function occurrencesInWindow(day, from, to) {
+  const [fy, fm] = from.split('-').map(Number);
+  const out = [];
+  for (let i = 0; i < 3; i += 1) {
+    const [y, m] = shiftMonth(fy, fm, i);
+    const date = dayInMonth(y, m, day);
+    if (date > to) break;
+    if (date >= from) out.push(date);
+  }
+  return out;
+}
+
+/** paid: restante < R$ 5; min_paid_rolled: pagou o mínimo, o resto rola; min_open: nem o mínimo. */
+export function cardSituation(card) {
+  if (!card || card.bill_total == null) return null;
+  const total = Number(card.bill_total) || 0;
+  const paid = Number(card.bill_paid) || 0;
+  const remaining = card.bill_remaining != null ? Number(card.bill_remaining) : Math.max(0, total - paid);
+  if (remaining < 5) return 'paid';
+  if (paid + 0.009 >= (Number(card.bill_minimum) || 0)) return 'min_paid_rolled';
+  return 'min_open';
+}
+
+function cardLabel(card) {
+  return card.account_name || card.institution || 'cartão';
+}
+
+/**
+ * Tudo que sai do caixa de hoje até a véspera do salário:
+ * fixas ativas não pagas no mês do vencimento, assinaturas active/keep e mínimo em aberto dos cartões.
+ * Dívida com status waiting (pai) não entra.
+ */
+export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus }) {
+  const until = addDays(salaryDate, -1);
+  const items = [];
+  const unknown = [];
+
+  for (const fx of listFixedExpenses(db, { today })) {
+    if (!fx.active || !(fx.amount > 0)) continue;
+    if (fx.due_day == null) {
+      unknown.push({ kind: 'fixed', id: fx.id, name: fx.name, amount: fx.amount });
+      continue;
+    }
+    for (const date of occurrencesInWindow(fx.due_day, today, until)) {
+      if (fx.last_paid_month === monthOf(date)) continue;
+      items.push({ kind: 'fixed', id: fx.id, name: fx.name, amount: fx.amount, due_date: date });
+    }
+  }
+
+  for (const sub of listSubscriptions(db)) {
+    if (!['active', 'keep'].includes(sub.status) || !(sub.amount > 0)) continue;
+    if (sub.cadence === 'yearly') {
+      if (sub.next_charge && sub.next_charge >= today && sub.next_charge <= until) {
+        items.push({ kind: 'subscription', id: sub.id, name: sub.name, amount: sub.amount, due_date: sub.next_charge });
+      }
+      continue;
+    }
+    const day = Number(sub.charge_day);
+    if (!Number.isInteger(day) || day < 1 || day > 31) {
+      unknown.push({ kind: 'subscription', id: sub.id, name: sub.name, amount: sub.amount });
+      continue;
+    }
+    for (const date of occurrencesInWindow(day, today, until)) {
+      items.push({ kind: 'subscription', id: sub.id, name: sub.name, amount: sub.amount, due_date: date });
+    }
+  }
+
+  // mínimo em aberto conta até o salário; vencido há até 7 dias ainda pesa
+  const overdueFrom = addDays(today, -7);
+  for (const card of cardsStatus) {
+    if (card.account_status !== 'active' || card.card_situation !== 'min_open' || !card.bill_due) continue;
+    if (card.bill_due < overdueFrom || card.bill_due > until) continue;
+    const amount = money(Math.max(0, Number(card.bill_minimum || 0) - Number(card.bill_paid || 0)));
+    if (!(amount > 0)) continue;
+    items.push({
+      kind: 'card_minimum',
+      id: card.account_id,
+      name: cardLabel(card),
+      amount,
+      due_date: card.bill_due,
+    });
+  }
+
+  items.sort((a, b) => a.due_date.localeCompare(b.due_date) || b.amount - a.amount);
+  return { items, unknown, until };
+}
+
+function shortDate(ymd) {
+  return `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}`;
+}
+
+/**
+ * Próximo passo, nesta ordem:
+ * (a) cartão com mínimo em aberto vencendo em até 3 dias (ou vencido);
+ * (b) primeiro compromisso até o salário que o livre não cobre;
+ * (c) nada aperta: quanto dá pra gastar até o salário.
+ * Fatura com mínimo pago nunca vira passo: rolar o resto foi decisão.
+ */
+function buildNextStep({ livre, commitments, cardsStatus, today, salaryDate, safeToSpend }) {
+  const urgentCard = cardsStatus
+    .filter((c) => c.account_status === 'active' && c.card_situation === 'min_open' && c.bill_due)
+    .map((c) => ({ ...c, days: daysUntil(c.bill_due, today) }))
+    .filter((c) => c.days !== null && c.days <= 3 && c.days >= -7)
+    .sort((a, b) => a.days - b.days)[0];
+  if (urgentCard) {
+    const gap = money(Math.max(0, Number(urgentCard.bill_minimum || 0) - Number(urgentCard.bill_paid || 0)));
+    const when = urgentCard.days < 0 ? `(venceu ${shortDate(urgentCard.bill_due)})` : `até ${shortDate(urgentCard.bill_due)}`;
     return {
-      kind: 'due',
-      debt_id: dueSoon[0].id,
-      title: dueSoon[0].title,
-      amount: dueSoon[0].balance,
+      kind: 'card_min',
+      ref: { kind: 'card_minimum', id: urgentCard.account_id },
+      debt_id: null,
+      title: cardLabel(urgentCard),
+      amount: gap,
       gap,
-      label: `Falta ${formatBrl(gap)} pro ${dueSoon[0].title.toLowerCase()} no dia ${dueLabel}. Não pague Mercado Pago agora.`,
+      due_date: urgentCard.bill_due,
+      label: `Falta ${formatBrl(gap)} pro mínimo do ${cardLabel(urgentCard)} ${when}`,
     };
   }
 
-  const monster = open
-    .filter((d) => ['open', 'blocked'].includes(d.status))
-    .sort((a, b) => a.queue - b.queue)[0];
-  if (monster) {
+  let left = Math.max(0, livre);
+  for (const item of commitments) {
+    if (left >= item.amount) {
+      left = money(left - item.amount);
+      continue;
+    }
+    const gap = money(item.amount - left);
     return {
-      kind: 'avalanche',
-      debt_id: monster.id,
-      title: monster.title,
-      amount: monster.balance,
-      gap: null,
-      label: `Próximo tiro: ${monster.title} (${formatBrl(monster.balance)}).`,
+      kind: 'cover',
+      ref: { kind: item.kind, id: item.id },
+      debt_id: null,
+      title: item.name,
+      amount: item.amount,
+      gap,
+      due_date: item.due_date,
+      label: `Separa ${formatBrl(gap)} pra ${item.name} (${shortDate(item.due_date)})`,
     };
   }
 
   return {
     kind: 'clear',
+    ref: null,
     debt_id: null,
     title: null,
-    amount: 0,
+    amount: safeToSpend,
     gap: null,
-    label: 'Nada urgente na fila.',
+    due_date: salaryDate,
+    label: `Sem compromisso descoberto até o salário (${shortDate(salaryDate)}). Pode gastar ${formatBrl(safeToSpend)}.`,
   };
 }
 
-/** Estado dos cartões que o banco mandou, com o nome da conta. */
+/**
+ * Gasto lançado à mão (app/Midas) ainda não visto pelo banco: posted_on depois do último saldo
+ * da conta, ou no mesmo dia e lançado depois dele. Sem conta, compara com o saldo mais novo do caixa.
+ * Conta que não é do dia e cartão de crédito não mexem no caixa.
+ */
+function manualPendingOut(db, accounts, today) {
+  const operational = accounts.filter((a) => a.is_operational && a.status === 'active' && a.kind !== 'credit');
+  const latest = new Map();
+  for (const acc of operational) {
+    const bal = latestBalance(db, acc.id, 'available');
+    if (bal) latest.set(acc.id, bal);
+  }
+  const newest = [...latest.values()].sort((a, b) =>
+    `${a.as_of}${a.created_at}`.localeCompare(`${b.as_of}${b.created_at}`),
+  ).at(-1) || null;
+  const placeholders = MANUAL_SOURCES.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT * FROM finance_transactions
+    WHERE source IN (${placeholders}) AND direction = 'outflow' AND matched_tx_id IS NULL
+      AND posted_on >= ? AND posted_on <= ?
+  `).all(...MANUAL_SOURCES, addDays(today, -40), today);
+
+  let total = 0;
+  for (const tx of rows) {
+    let bal;
+    if (!tx.account_id) bal = newest;
+    else if (operational.some((a) => a.id === tx.account_id)) bal = latest.get(tx.account_id) || null;
+    else continue;
+    const pending = !bal
+      || tx.posted_on > bal.as_of
+      || (tx.posted_on === bal.as_of && String(tx.created_at) > String(bal.created_at));
+    if (pending) total += Math.abs(Number(tx.amount) || 0);
+  }
+  return money(total);
+}
+
+// ── Orçamento e mês ───────────────────────────────────────────────────────────
+
+export function listBudgets(db) {
+  return db.prepare('SELECT * FROM finance_budgets ORDER BY category ASC').all()
+    .map((b) => ({ ...b, monthly_limit: money(b.monthly_limit) }));
+}
+
+/** PUT aceita {category, monthly_limit}, uma lista ou {budgets: [...]}; limite null apaga. */
+export function saveBudgets(db, body) {
+  const list = Array.isArray(body) ? body : body && body.budgets !== undefined ? body.budgets : [body];
+  if (!Array.isArray(list) || !list.length) throw badRequest('budgets: lista de {category, monthly_limit}');
+  const parsed = list.map((item, i) => {
+    if (!item || typeof item !== 'object') throw badRequest(`budgets[${i}]: objeto`);
+    if (!FINANCE_CATEGORIES.includes(item.category) || OFF_BUDGET_CATEGORIES.includes(item.category) || item.category === 'Receita') {
+      throw badRequest(`budgets[${i}].category inválida`);
+    }
+    if (item.monthly_limit === null) return { category: item.category, limit: null };
+    return { category: item.category, limit: parseAmount(item.monthly_limit, `budgets[${i}].monthly_limit`) };
+  });
+  const now = nowIso();
+  db.transaction(() => {
+    for (const { category, limit } of parsed) {
+      if (limit === null) {
+        db.prepare('DELETE FROM finance_budgets WHERE category = ?').run(category);
+      } else {
+        db.prepare(`
+          INSERT INTO finance_budgets (category, monthly_limit, updated_at) VALUES (?, ?, ?)
+          ON CONFLICT(category) DO UPDATE SET monthly_limit = excluded.monthly_limit, updated_at = excluded.updated_at
+        `).run(category, limit, now);
+      }
+    }
+  })();
+  return listBudgets(db);
+}
+
+/** Gasto do mês por categoria (só saídas; fatura e transferência à parte), com limite e % do orçamento. */
+export function getMonthSummary(db, { month, today } = {}) {
+  const day = isValidDateString(today) ? today : todayFortaleza();
+  const ym = month === undefined || month === null || month === '' ? monthOf(day) : parseMonth(month);
+  const [y, m] = ym.split('-').map(Number);
+  const from = `${ym}-01`;
+  const to = ymdOf(y, m, daysInMonth(y, m));
+  const rows = db.prepare(`
+    SELECT category, direction, amount FROM finance_transactions
+    WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL AND direction != 'internal'
+  `).all(from, to);
+
+  const spent = new Map();
+  const count = new Map();
+  let totalOut = 0;
+  let totalIn = 0;
+  let offBudget = 0;
+  for (const tx of rows) {
+    const amt = Math.abs(Number(tx.amount) || 0);
+    const out = tx.direction === 'outflow' || Number(tx.amount) < 0;
+    if (OFF_BUDGET_CATEGORIES.includes(tx.category)) {
+      if (out) offBudget += amt;
+      continue;
+    }
+    if (!out) {
+      totalIn += amt;
+      continue;
+    }
+    const cat = tx.category || 'Outros';
+    totalOut += amt;
+    spent.set(cat, (spent.get(cat) || 0) + amt);
+    count.set(cat, (count.get(cat) || 0) + 1);
+  }
+
+  const budgets = new Map(listBudgets(db).map((b) => [b.category, b.monthly_limit]));
+  const names = new Set([...spent.keys(), ...budgets.keys()]);
+  const categories = [...names].map((category) => {
+    const value = money(spent.get(category) || 0);
+    const limit = budgets.has(category) ? budgets.get(category) : null;
+    return {
+      category,
+      spent: value,
+      limit,
+      pct: limit ? Math.round((value / limit) * 100) : limit === 0 ? (value > 0 ? 100 : 0) : null,
+      tx_count: count.get(category) || 0,
+    };
+  }).sort((a, b) => b.spent - a.spent || (b.limit || 0) - (a.limit || 0) || a.category.localeCompare(b.category));
+
+  return {
+    month: ym,
+    from,
+    to,
+    total_out: money(totalOut),
+    total_in: money(totalIn),
+    off_budget_out: money(offBudget),
+    budget_total: money([...budgets.values()].reduce((s, v) => s + v, 0)),
+    categories,
+  };
+}
+
+// ── Categoria e descrição do banco ────────────────────────────────────────────
+
+const CATEGORY_RULES = [
+  ['Pagamento de fatura', /credit card payment|card bill|pagamento (de )?fatura|pagto\.? fatura|pgto\.? fatura|pag fatura|fatura (do )?cart/i],
+  ['Transferência', /same person|mesma titularidade|entre contas|own account|transfer[eê]ncia (entre|para) (contas|mim)|investment|aplica[cç][aã]o|resgate|poupan[cç]a|cofrinho|caixinha/i],
+  ['Receita', /salary|sal[aá]rio|income|proventos|renda|dividend/i],
+  ['Impostos', /\btax(es)?\b|impost|darf|\bdas\b|iptu|ipva|simples nacional/i],
+  ['Assinaturas', /subscription|streaming|digital service|assinatura|netflix|spotify|youtube|icloud|apple\.com|google one|prime video|disney|hbo|deezer|chatgpt|openai/i],
+  ['Alimentação', /food|eating|restaurant|delivery|groceries|supermarket|bakery|ifood|rappi|aliment|restaurante|lanchonete|padaria|mercado(?! ?(pago|livre))|supermercado|atacad|a[cç]ougue|hortifruti|caf[eé]\b/i],
+  ['Transporte', /transport|taxi|ride|uber|99app|99 ?pop|gas station|fuel|parking|toll|combust|posto|estacionamento|ped[aá]gio|[oô]nibus|metr[oô]|passagem/i],
+  ['Moradia', /housing|rent\b|electricity|water|utilities|telecom|internet|aluguel|condom[ií]nio|energia|enel|[aá]gua|cagece|g[aá]s de cozinha/i],
+  ['Saúde', /health|pharmac|drugstore|hospital|clinic|dentist|doctor|sa[uú]de|farm[aá]cia|drogaria|drogasil|pague menos|cl[ií]nica|laborat[oó]rio|m[eé]dic/i],
+  ['Educação', /educat|school|university|college|course|book|faculdade|escola|curso|livraria|udemy|alura/i],
+  ['Compras', /shopping|clothing|electronics|department store|marketplace|compras|loja|vestu[aá]rio|mercado ?livre|amazon|shopee|magalu|magazine|aliexpress|shein/i],
+  ['Lazer', /leisure|entertainment|travel|hotel|airline|cinema|theater|game|sport|lazer|viagem|show|ingresso|bar\b/i],
+];
+
+/** Categoria do Pluggy/Midas (ou descrição) → categoria da Praxis. */
+export function mapBankCategory(category, description, amount, accountType) {
+  if (FINANCE_CATEGORIES.includes(category)) return category;
+  const desc = String(description || '');
+  if (accountType === 'CREDIT' && Number(amount) > 0 && /pagamento|payment/i.test(`${category || ''} ${desc}`)) {
+    return 'Pagamento de fatura';
+  }
+  for (const text of [category, desc]) {
+    if (!text) continue;
+    for (const [name, re] of CATEGORY_RULES) {
+      if (re.test(text)) return name;
+    }
+  }
+  if (Number(amount) > 0 && accountType !== 'CREDIT') return 'Receita';
+  return 'Outros';
+}
+
+const MERCHANT_PREFIX = /^(compra (no |com )?(d[eé]bito|cr[eé]dito|cart[aã]o)|compra|pix (enviado|recebido|transf)|pix|pagamento( de)?|pag\*|pg \*|transfer[eê]ncia (enviada|recebida)|ted|doc|d[eé]bito autom[aá]tico)\b\s*[-:]?\s*/i;
+
+function titleCase(text) {
+  return text.toLowerCase().replace(/(^|[\s/-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
+/** "COMPRA CARTAO IFOOD *RESTAURANTE 12/10" → "Ifood Restaurante". */
+export function cleanMerchant(description) {
+  const original = String(description || '').replace(/\s+/g, ' ').trim();
+  let s = original.replace(MERCHANT_PREFIX, '');
+  s = s.replace(/\*/g, ' ').replace(/\s+\d{2}\/\d{2}(\/\d{2,4})?$/, '').replace(/\s+/g, ' ').trim();
+  if (!s) s = original;
+  if (s && s === s.toUpperCase()) s = titleCase(s);
+  return s.slice(0, 80);
+}
+
+/** Estado dos cartões que o banco mandou, com o nome da conta e a situação da fatura. */
 export function listCardStatus(db) {
   return db.prepare(`
     SELECT cs.*, a.name AS account_name, a.status AS account_status
     FROM finance_card_status cs
     LEFT JOIN finance_accounts a ON a.id = cs.account_id
     ORDER BY cs.bill_due IS NULL, cs.bill_due ASC, cs.institution ASC
-  `).all();
+  `).all().map((card) => ({ ...card, card_situation: cardSituation(card) }));
 }
 
 /** Última atualização de cada banco ativo (cartão ou saldo do Pluggy); devolve a mais antiga. */
@@ -1452,11 +1980,14 @@ export function getOverview(db, { today } = {}) {
     'SELECT * FROM finance_sync_log ORDER BY started_at DESC LIMIT 1',
   ).get();
 
-  const caixa = money(
+  const caixaBanco = money(
     accounts
       .filter((a) => a.is_operational && a.status === 'active')
       .reduce((sum, a) => sum + Number(a.available || 0), 0),
   );
+  // gasto lançado hoje desconta na hora; some quando o banco mandar o saldo novo
+  const manualPending = manualPendingOut(db, accounts, day);
+  const caixa = money(caixaBanco - manualPending);
   const invested = money(
     accounts
       .filter((a) => a.status === 'active')
@@ -1479,9 +2010,12 @@ export function getOverview(db, { today } = {}) {
       .filter((d) => d.due_date && d.due_date >= billsFrom && d.due_date <= billsTo)
       .reduce((s, d) => s + d.balance, 0),
   );
-  const safeToSpend = money(Math.max(0, livre - billsDue7d));
 
   const cardsStatus = listCardStatus(db);
+  const salaryDate = nextSalaryDate(day, settings.salary_day);
+  const commitments = commitmentsUntilSalary(db, { today: day, salaryDate, cardsStatus });
+  const committedUntilSalary = money(commitments.items.reduce((s, c) => s + c.amount, 0));
+  const safeToSpend = money(Math.max(0, livre - committedUntilSalary));
   const creditAvailableTotal = money(
     cardsStatus
       .filter((c) => c.account_status === 'active')
@@ -1505,20 +2039,36 @@ export function getOverview(db, { today } = {}) {
     .filter((d) => d.due_date)
     .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0] || null;
 
-  const nextStep = buildNextStep({ caixa, debts: openDebts, today: day });
+  const nextStep = buildNextStep({
+    livre,
+    commitments: commitments.items,
+    cardsStatus,
+    today: day,
+    salaryDate,
+    safeToSpend,
+  });
 
   return {
     today: day,
     snapshot_label: settings.snapshot_label || '',
     caixa,
+    caixa_banco: caixaBanco,
+    manual_pending_out: manualPending,
     invested,
     patrimonio_liquido_curto: money(caixa + invested),
     reserved_car: reservedCar,
     reserved_live: reservedLive,
     reserved,
     livre,
+    salary_day: settings.salary_day,
+    next_salary_date: salaryDate,
+    committed_until_salary: committedUntilSalary,
+    commitments_until_salary: commitments.items,
+    commitments_unknown_day: commitments.unknown,
     safe_to_spend: safeToSpend,
+    // compatibilidade: faturas de cartão de hoje-3 a hoje+7 (o front usa os compromissos até o salário)
     bills_due_7d: billsDue7d,
+    month: getMonthSummary(db, { today: day }),
     debts_total: debtsTotal,
     cards_total: cardsTotal,
     cards_status: cardsStatus,

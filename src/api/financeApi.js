@@ -58,6 +58,21 @@ export const financeApiModule = (request) => ({
         request(`/api/finance/transactions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     },
     insights: (params = {}) => request(`/api/finance/insights${qs(params)}`),
+    month: (params = {}) => request(`/api/finance/month${qs(params)}`),
+    budgets: {
+      list: () => request('/api/finance/budgets'),
+      save: (data) => request('/api/finance/budgets', { method: 'PUT', body: JSON.stringify(data) }),
+    },
+    fixed: {
+      list: () => request('/api/finance/fixed'),
+      create: (data) => request('/api/finance/fixed', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id, data) =>
+        request(`/api/finance/fixed/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      remove: (id) => request(`/api/finance/fixed/${id}`, { method: 'DELETE' }),
+      markPaid: (id, data = {}) =>
+        request(`/api/finance/fixed/${id}/paid`, { method: 'POST', body: JSON.stringify(data) }),
+      unmarkPaid: (id) => request(`/api/finance/fixed/${id}/paid`, { method: 'DELETE' }),
+    },
     goals: {
       list: () => request('/api/finance/goals'),
       create: (data) => request('/api/finance/goals', { method: 'POST', body: JSON.stringify(data) }),

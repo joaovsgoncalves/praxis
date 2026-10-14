@@ -1,16 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Wallet } from "lucide-react";
+import { Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 import { praxisApi } from "@/api/praxisClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +22,7 @@ import {
   SUB_STATUS_LABELS,
   debtTone,
   financeSummaryPhrase,
+  formatBrl,
   formatDay,
 } from "@/lib/finance";
 import { buildWalletCards } from "@/lib/financeWallet";
@@ -39,6 +31,9 @@ import SourceChip from "@/components/finance/SourceChip";
 import WalletCards from "@/components/finance/WalletCards";
 import AccountsGrid from "@/components/finance/AccountsGrid";
 import { HideMoneyButton, MidasChip, WalletActions, WalletHero } from "@/components/finance/WalletHero";
+import SpendSheet from "@/components/finance/SpendSheet";
+import MovementsTab from "@/components/finance/MovementsTab";
+import OrganizationTab from "@/components/finance/OrganizationTab";
 import { cn } from "@/lib/utils";
 
 function invalidateFinance(queryClient) {
@@ -83,7 +78,7 @@ export default function Financas() {
   const [payAmount, setPayAmount] = useState("");
   const [caixaOpen, setCaixaOpen] = useState(false);
   const [caixaAmount, setCaixaAmount] = useState("");
-  const [txCategory, setTxCategory] = useState("");
+  const [spendOpen, setSpendOpen] = useState(false);
   const tabsRef = useRef(null);
   const hide = useHideMoney();
   const { money, text } = hide;
@@ -103,21 +98,18 @@ export default function Financas() {
     queryFn: () => praxisApi.finance.installments.list({ status: "open" }),
   });
 
-  const { data: transactions = [] } = useQuery({
-    queryKey: ["finance", "transactions"],
-    queryFn: () => praxisApi.finance.transactions.list(),
-    enabled: tab === "extrato" || tab === "graficos",
-  });
-
   const { data: insights } = useQuery({
     queryKey: ["finance", "insights"],
     queryFn: () => praxisApi.finance.insights(),
   });
 
-  const { data: goals = [] } = useQuery({
-    queryKey: ["finance", "goals"],
-    queryFn: () => praxisApi.finance.goals.list(),
-    enabled: tab === "metas" || tab === "agora",
+  const fixedPaidMutation = useMutation({
+    mutationFn: (id) => praxisApi.finance.fixed.markPaid(id),
+    onSuccess: (row) => {
+      toast.success(`${row?.name || "Despesa"} marcada como paga`);
+      invalidateFinance(queryClient);
+    },
+    onError: (err) => toast.error(err.message || "Não deu para marcar"),
   });
 
   const payMutation = useMutation({
@@ -170,10 +162,6 @@ export default function Financas() {
   const liveSubs = subscriptions.filter((s) => s.status !== "cancelled" && s.status !== "cancel" && s.status !== "installment");
   const workSubs = liveSubs.filter((s) => s.lane === "work");
   const personalSubs = liveSubs.filter((s) => s.lane === "personal");
-  const visibleTx = txCategory
-    ? transactions.filter((t) => t.category === txCategory)
-    : transactions;
-  const maxCat = insights?.categories?.[0]?.amount || 1;
 
   const topCategories = useMemo(
     () => (insights?.categories || []).slice(0, 5),
@@ -283,6 +271,10 @@ export default function Financas() {
         action={
           tab === "agora" ? null : (
             <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" className="h-10 rounded-full px-4 font-semibold" onClick={() => setSpendOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+                Lançar gasto
+              </Button>
               <MidasChip sync={overview.last_midas_sync} />
               <Button type="button" variant="outline" className="rounded-full" onClick={openCaixaDialog}>
                 Atualizar saldo
@@ -299,16 +291,15 @@ export default function Financas() {
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-primary/80">Próximo passo</p>
             <p className="text-lg font-semibold leading-snug tracking-[-0.03em]">{text(overview.next_step?.label)}</p>
           </div>
-          {overview.next_step?.kind === "due" && overview.next_step.debt_id ? (
+          {overview.next_step?.kind === "cover" && overview.next_step.ref?.kind === "fixed" ? (
             <Button
               type="button"
-              className="h-10 shrink-0 rounded-full"
-              onClick={() => {
-                const debt = overview.debts.find((d) => d.id === overview.next_step.debt_id);
-                if (debt) openPay(debt);
-              }}
+              variant="outline"
+              className="h-10 shrink-0 rounded-full border-white/15 bg-white/[0.03]"
+              disabled={fixedPaidMutation.isPending}
+              onClick={() => fixedPaidMutation.mutate(overview.next_step.ref.id)}
             >
-              Registrar pagamento do {overview.next_step.title}
+              Já paguei {overview.next_step.title}
             </Button>
           ) : null}
         </CardContent>
@@ -333,6 +324,7 @@ export default function Financas() {
               midasSync={overview.last_midas_sync}
               onUpdateBalance={openCaixaDialog}
               onDues={showDues}
+              onSpend={() => setSpendOpen(true)}
             />
           </div>
         </section>
@@ -542,10 +534,12 @@ export default function Financas() {
         <div className="space-y-4">
           <SectionHeading
             title="Já comprado, ainda cai"
-            kicker={`${overview.installments_n || 0} em andamento · Pierre 12/08`}
+            kicker={`${overview.installments_n || 0} em andamento`}
           />
           <p className="text-sm text-muted-foreground">
-            {text("Isso já está dentro da fatura do cartão. Não soma em cima dos R$ 10,5 mil.")}
+            {Number(overview.cards_total) > 0
+              ? text(`Isso já está dentro da fatura do cartão. Não soma em cima dos ${formatBrl(overview.cards_total)} em faturas abertas.`)
+              : "Isso já está dentro da fatura do cartão. Não soma de novo."}
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card className="border-white/10 bg-white/[0.03]">
@@ -641,167 +635,16 @@ export default function Financas() {
         </div>
       ) : null}
 
-      {tab === "extrato" ? (
-        <div className="space-y-4">
-          <SectionHeading title="Últimos 30 dias" kicker="Saída negativa" />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={txCategory ? "ghost" : "secondary"}
-              className="h-9 rounded-full"
-              onClick={() => setTxCategory("")}
-            >
-              Tudo
-            </Button>
-            {["Dívidas", "Assinaturas", "Alimentação", "Trabalho"].map((cat) => (
-              <Button
-                key={cat}
-                type="button"
-                size="sm"
-                variant={txCategory === cat ? "secondary" : "ghost"}
-                className="h-9 rounded-full"
-                onClick={() => setTxCategory(cat)}
-              >
-                {cat}
-              </Button>
-            ))}
-          </div>
-          {!visibleTx.length ? (
-            <PraxisEmptyState
-              title="Sem lançamento ainda"
-              description="Quando você marcar um pagamento ou o sync entrar, aparece aqui."
-            />
-          ) : (
-            <div className="space-y-2">
-              {visibleTx.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{tx.merchant || tx.raw_description || "Lançamento"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDay(tx.posted_on)} · {tx.category}
-                      {tx.direction === "internal" ? " · transferência" : ""}
-                    </p>
-                  </div>
-                  <p className={cn("tabular-nums font-semibold", tx.amount < 0 && "text-amber-100")}>
-                    {money(tx.amount)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
+      {tab === "movimentacoes" ? <MovementsTab overview={overview} money={money} /> : null}
 
-      {tab === "graficos" ? (
-        <div className="space-y-6">
-          <SectionHeading title="30 dias" kicker={insights ? money(insights.outflow) : "…"} />
-          {!insights || (!insights.categories.length && (!insights.days || !insights.days.length)) ? (
-            <PraxisEmptyState
-              title="Ainda sem gasto pra desenhar"
-              description="Registre um pagamento ou um lançamento que o gráfico aparece."
-            />
-          ) : (
-            <div className="space-y-6">
-              {insights.days && insights.days.length > 0 ? (
-                <Card className="border-white/10 bg-white/[0.03]">
-                  <CardContent className="space-y-3 p-5">
-                    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Fluxo diário (30 dias)
-                    </p>
-                    <div className="h-[160px] w-full pt-1">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={insights.days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 4% 18%)" vertical={false} />
-                          <XAxis
-                            dataKey="date"
-                            tickFormatter={(v) => {
-                              if (!v || typeof v !== "string") return "";
-                              const parts = v.split("-");
-                              return parts.length === 3 ? `${parts[2]}/${parts[1]}` : v;
-                            }}
-                            tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
-                            interval="preserveStartEnd"
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis hide />
-                          <Tooltip
-                            contentStyle={{
-                              background: "hsl(240 5% 10%)",
-                              border: "1px solid hsl(240 4% 18%)",
-                              borderRadius: "8px",
-                              color: "hsl(0 0% 95%)",
-                              fontSize: "12px",
-                            }}
-                            formatter={(value) => [money(value), "Saída"]}
-                            labelFormatter={(label) => formatDay(label)}
-                          />
-                          <Bar
-                            dataKey="amount"
-                            fill="hsl(38 85% 52%)"
-                            radius={[3, 3, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
+      {tab === "organizacao" ? <OrganizationTab overview={overview} money={money} /> : null}
 
-              {insights.categories && insights.categories.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                    Por categoria
-                  </p>
-                  {insights.categories.map((cat) => (
-                    <div key={cat.name} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{cat.name}</span>
-                        <span className="tabular-nums text-muted-foreground">{money(cat.amount)}</span>
-                      </div>
-                      <ProgressBar value={cat.amount} max={maxCat} />
-                    </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground">
-                    Cartão {money(insights.card_outflow)} · conta {money(insights.cash_outflow)}. Transferência interna não entra.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      {tab === "metas" ? (
-        <div className="space-y-4">
-          <SectionHeading title="Alvos" kicker="Um monstro por vez" />
-          {!goals.length ? (
-            <PraxisEmptyState title="Sem meta financeira" description="A seed cria carro, MP e óculos." />
-          ) : (
-            goals.map((goal) => (
-              <Card key={goal.id} className="border-white/10 bg-white/[0.03]">
-                <CardContent className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{goal.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {money(goal.current_amount)} de {money(goal.target_amount)}
-                        {goal.due_date ? ` · ${formatDay(goal.due_date)}` : ""}
-                      </p>
-                    </div>
-                    <SourceChip label={goal.status === "done" ? "feito" : `${goal.progress}%`} />
-                  </div>
-                  <ProgressBar value={goal.current_amount} max={goal.target_amount} />
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      ) : null}
+      <SpendSheet
+        open={spendOpen}
+        onOpenChange={setSpendOpen}
+        accounts={overview.accounts}
+        today={overview.today}
+      />
 
       <Dialog open={Boolean(payDebt)} onOpenChange={(open) => !open && setPayDebt(null)}>
         <DialogContent className="sm:max-w-md">

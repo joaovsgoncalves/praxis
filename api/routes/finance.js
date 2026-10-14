@@ -9,18 +9,26 @@ import {
   deleteInstallment,
   deleteSubscription,
   createTransaction,
+  createFixedExpense,
+  deleteFixedExpense,
   getInsights,
+  getMonthSummary,
   getOverview,
   getSettings,
   lastSync,
   listAccounts,
   listBalances,
+  listBudgets,
   listDebts,
+  listFixedExpenses,
   listGoals,
   listInstallments,
   listSubscriptions,
   listTransactions,
+  markFixedPaid,
   payDebt,
+  saveBudgets,
+  updateFixedExpense,
   seedFinanceIfEmpty,
   updateAccount,
   updateDebt,
@@ -41,14 +49,79 @@ function sendError(res, err) {
 /** Finanças — mounted at /api/finance */
 export function createFinanceRouter({ db, getLocalDateString }) {
   const router = Router();
+  const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
 
   router.get('/overview', (req, res) => {
     try {
-      const today = typeof getLocalDateString === 'function' ? getLocalDateString() : undefined;
-      res.json(getOverview(db, { today }));
+      res.json(getOverview(db, { today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
+  });
+
+  router.get('/month', (req, res) => {
+    try {
+      res.json(getMonthSummary(db, { month: req.query.month, today: localToday() }));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.get('/budgets', (_req, res) => {
+    res.json(listBudgets(db));
+  });
+
+  router.put('/budgets', (req, res) => {
+    try {
+      res.json(saveBudgets(db, req.body));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // despesas fixas mensais (faculdade, carro, contador…) — entram no "pode gastar até o salário"
+  router.get('/fixed', (_req, res) => {
+    res.json(listFixedExpenses(db, { today: localToday() }));
+  });
+
+  router.post('/fixed', (req, res) => {
+    try {
+      res.status(201).json(createFixedExpense(db, req.body || {}, { today: localToday() }));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.patch('/fixed/:id', (req, res) => {
+    try {
+      const row = updateFixedExpense(db, req.params.id, req.body || {}, { today: localToday() });
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      res.json(row);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.delete('/fixed/:id', (req, res) => {
+    const row = deleteFixedExpense(db, req.params.id);
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, id: row.id });
+  });
+
+  router.post('/fixed/:id/paid', (req, res) => {
+    try {
+      const row = markFixedPaid(db, req.params.id, { month: req.body?.month, today: localToday() });
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      res.json(row);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.delete('/fixed/:id/paid', (req, res) => {
+    const row = markFixedPaid(db, req.params.id, { month: null, today: localToday() });
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json(row);
   });
 
   router.get('/settings', (_req, res) => {
@@ -186,7 +259,8 @@ export function createFinanceRouter({ db, getLocalDateString }) {
 
   router.post('/transactions', (req, res) => {
     try {
-      res.status(201).json(createTransaction(db, req.body || {}));
+      const body = req.body || {};
+      res.status(201).json(createTransaction(db, { ...body, posted_on: body.posted_on ?? localToday() }));
     } catch (err) {
       sendError(res, err);
     }
@@ -228,8 +302,7 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   // Midas manda o JSON normalizado do Pluggy de hora em hora
   router.post('/ingest/pluggy', (req, res) => {
     try {
-      const today = typeof getLocalDateString === 'function' ? getLocalDateString() : undefined;
-      res.json(ingestPluggy(db, req.body, { today }));
+      res.json(ingestPluggy(db, req.body, { today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }

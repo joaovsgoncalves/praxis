@@ -59,6 +59,14 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - **Ocultar valores:** `useHideMoney()` + `formatMoney`/`maskMoneyText` (`R$ •••••`), salvo em `finance_settings.hide_values`. Todo valor de Finanças e do card do Hoje passa por aí.
 - **Hábitos:** linha = `praxis-board-card` + `AreaRuler` (tique lateral de 3px na cor da área) + `TaskAreaChip`, horário, sequência em chip mono; feito = verde igual à tarefa.
 
+## Visual premium — Fase 4 (2026-10-14)
+
+- **Pode gastar até o salário:** o hero da carteira mostra `safe_to_spend` = livre − compromissos até a véspera do `salary_day` (fixas não pagas no mês, assinaturas active/keep, mínimo de cartão em aberto). A linha "Compromissos até o salário" abre a lista em popover.
+- **Selo do cartão:** `Paga` (verde), `Mínimo pago · rolou` (neutro, nunca vermelho: rolar é decisão), `Mínimo em aberto` (âmbar). Selo sólido com texto escuro, AA em qualquer cor de banco.
+- **Lançar gasto:** pílula primária nas ações da carteira, no cabeçalho das outras abas e no card do Hoje; `SpendSheet` (sheet de baixo, foco no valor, chips de categoria) com desconto otimista no overview.
+- **Movimentações:** extrato por dia (`Hoje`, `Ontem`, `seg, 12/10`) com ícone de categoria em `src/lib/financeCategories.js`; manual leva o selo "lançado por ti". Toque troca a categoria.
+- **Organização:** barras por categoria num tom só (ouro); com limite, a barra é o consumo: ouro < 80%, laranja 80–100%, vermelho só acima, sempre com o texto do status. Fatura e transferência entre contas ficam fora.
+
 ## E2E mobile (390px)
 
 ```bash

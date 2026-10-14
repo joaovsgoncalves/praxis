@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Wallet, ArrowRight } from 'lucide-react';
+import { Wallet, ArrowRight, Plus } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatDay } from '@/lib/finance';
+import { formatShortDay } from '@/lib/finance';
 import { useHideMoney } from '@/hooks/useHideMoney';
+import SpendSheet from '@/components/finance/SpendSheet';
 
 export default function TodayFinanceCard() {
   const { money, text } = useHideMoney();
+  const [spendOpen, setSpendOpen] = useState(false);
   const { data, isLoading, isError } = useQuery({
     queryKey: ['finance', 'overview'],
     queryFn: () => praxisApi.finance.overview(),
@@ -17,9 +19,9 @@ export default function TodayFinanceCard() {
     staleTime: 30_000,
   });
 
-  const nextDue = data?.next_due;
-  // livre menos as faturas dos próximos 7 dias; API antiga sem o campo cai no caixa
+  // livre menos os compromissos até o salário; API antiga sem o campo cai no caixa
   const hasSafe = data?.safe_to_spend != null;
+  const until = data?.next_salary_date ? ` até ${formatShortDay(data.next_salary_date)}` : '';
   const label = isLoading
     ? '…'
     : isError
@@ -37,7 +39,7 @@ export default function TodayFinanceCard() {
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-muted-foreground">Finanças</p>
               <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em] tabular-nums">
-                {hasSafe || isLoading ? 'Pode gastar' : 'Caixa'} {label}
+                {hasSafe || isLoading ? `Pode gastar${until}` : 'Caixa'} {label}
               </h3>
             </div>
           </div>
@@ -45,12 +47,20 @@ export default function TodayFinanceCard() {
         <p className="text-sm leading-relaxed text-muted-foreground">
           {isError
             ? 'Não deu para carregar o caixa agora.'
-            : nextDue
-              ? `Vence: ${nextDue.title} ${formatDay(nextDue.due_date)} · ${money(nextDue.amount)}`
-              : text(data?.next_step?.label) || 'Abrir o mapa do mês.'}
+            : text(data?.next_step?.label) || 'Abrir o mapa do mês.'}
         </p>
-        <div className="flex items-center border-t border-white/[0.05] pt-3">
-          <Button asChild size="sm" variant="ghost" className="h-9 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground">
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.05] pt-3">
+          <Button
+            type="button"
+            size="sm"
+            className="h-10 rounded-full px-4 text-xs font-semibold transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transition-none"
+            disabled={!data}
+            onClick={() => setSpendOpen(true)}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+            Lançar gasto
+          </Button>
+          <Button asChild size="sm" variant="ghost" className="h-10 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground">
             <Link to="/financas">
               Abrir Finanças
               <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden />
@@ -58,6 +68,9 @@ export default function TodayFinanceCard() {
           </Button>
         </div>
       </CardContent>
+      {data ? (
+        <SpendSheet open={spendOpen} onOpenChange={setSpendOpen} accounts={data.accounts} today={data.today} />
+      ) : null}
     </Card>
   );
 }

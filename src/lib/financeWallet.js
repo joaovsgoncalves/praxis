@@ -41,9 +41,14 @@ export function accountBill(account) {
 function bankCardFields(status, fallbackDue) {
   if (!status) return null;
   const hasBill = status.bill_total != null;
-  const paidOff = hasBill && Number(status.bill_total) > 0 && Number(status.bill_remaining) <= 0.01;
+  // situação vem da API (paid / min_paid_rolled / min_open); API antiga cai no "paga" pelo restante
+  const situation = hasBill ? status.card_situation || null : null;
+  const paidOff = situation
+    ? situation === 'paid'
+    : hasBill && Number(status.bill_total) > 0 && Number(status.bill_remaining) <= 0.01;
   const due = status.bill_due ? { due_date: status.bill_due } : fallbackDue;
   return {
+    situation: situation || (paidOff ? 'paid' : null),
     amountLabel: hasBill ? 'A pagar' : 'Usado',
     amount: hasBill ? status.bill_remaining : status.used,
     asOf: status.bank_updated_at ? status.bank_updated_at.slice(0, 10) : null,

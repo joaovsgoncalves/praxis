@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import SourceChip from "@/components/finance/SourceChip";
 import { accountBrand, brandOptionsFor, brandSurfaceStyle } from "@/lib/financeBrand";
-import { formatDay } from "@/lib/finance";
+import { CARD_SITUATION_LABELS, formatDay } from "@/lib/finance";
 import {
   STACK_CARD_WIDTH,
   STACK_MAX_STEP,
@@ -146,6 +146,33 @@ function BrandPicker({ card, onUpdate, busy }) {
   );
 }
 
+const CARD_SITUATION_SPOKEN = {
+  paid: "Fatura paga",
+  min_paid_rolled: "Mínimo pago, o resto rolou para o próximo mês",
+  min_open: "Mínimo em aberto",
+};
+
+// Selo sólido com texto escuro: lê AA em qualquer cor de cartão. Rolar é decisão, então neutro; só o mínimo em aberto alerta.
+const SEAL_CLASS = {
+  paid: "bg-emerald-100 text-emerald-900",
+  min_paid_rolled: "bg-amber-50 text-stone-800",
+  min_open: "bg-amber-300 text-amber-950",
+};
+
+function SituationSeal({ situation }) {
+  if (!situation || !CARD_SITUATION_LABELS[situation]) return null;
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none",
+        SEAL_CLASS[situation],
+      )}
+    >
+      {CARD_SITUATION_LABELS[situation]}
+    </span>
+  );
+}
+
 function BankCard({ card, money, active, onSelect, onUpdate, busy, className, peekWidth }) {
   const { brand } = card;
   const muted = { color: brand.muted };
@@ -153,13 +180,13 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
   const nameStyle = peekWidth ? { maxWidth: Math.max(0, peekWidth - PEEK_TEXT_INSET) } : undefined;
   const billLine = card.bill ? `Fatura ${money(card.bill.total)} · pago ${money(card.bill.paid ?? 0)}` : null;
   const limitLine = card.limitAvailable != null ? `Limite livre ${money(card.limitAvailable)}` : null;
-  const paidOff = Boolean(card.bill?.paidOff);
+  const situation = card.situation || (card.bill?.paidOff ? "paid" : null);
   const spoken = [
     `${card.name}, ${card.typeLabel}. ${card.amountLabel} ${money(card.amount)}`,
     billLine,
     limitLine,
     card.dueLabel,
-    paidOff ? "Fatura paga" : null,
+    situation ? CARD_SITUATION_SPOKEN[situation] : null,
   ]
     .filter(Boolean)
     .join(". ");
@@ -197,9 +224,12 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
         </div>
       </div>
       <div className="pointer-events-none relative">
-        <p className="text-[11px] font-medium" style={muted}>
-          {card.amountLabel}
-        </p>
+        <div className="flex min-h-[18px] items-center gap-1.5">
+          <p className="text-[11px] font-medium" style={muted}>
+            {card.amountLabel}
+          </p>
+          <SituationSeal situation={situation} />
+        </div>
         <p className="truncate font-display text-[1.65rem] font-semibold leading-tight tracking-[-0.02em] tabular-nums">
           {money(card.amount)}
         </p>
@@ -220,14 +250,7 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
         ) : (
           <span />
         )}
-        <span className="flex items-center gap-1.5">
-          {card.dueLabel ? <span className="font-medium tabular-nums">{card.dueLabel}</span> : null}
-          {paidOff ? (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-emerald-900">
-              Paga
-            </span>
-          ) : null}
-        </span>
+        {card.dueLabel ? <span className="font-medium tabular-nums">{card.dueLabel}</span> : null}
       </div>
     </div>
   );

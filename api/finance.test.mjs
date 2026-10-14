@@ -133,14 +133,16 @@ function mockPierreFetch(t, mockData = {}) {
   return { calls };
 }
 
-test('overview with seed: Inter 1103.62 and next step is carro', async (t) => {
+test('overview with seed: Inter 1103.62 and next step separates the first uncovered commitment', async (t) => {
   const { server } = await mountFinance(t);
   const body = await requestJson(server.base, '/api/finance/overview');
   assert.equal(body.caixa, 1103.62);
   assert.equal(body.snapshot_label, 'foto 12/08');
-  assert.equal(body.next_step.kind, 'due');
-  assert.equal(body.next_step.debt_id, 'debt-carro');
-  assert.ok(body.next_step.label.toLowerCase().includes('carro'));
+  // livre negativo (reservas > caixa): a primeira assinatura até o salário (12/09) já não fecha
+  assert.equal(body.next_salary_date, '2026-09-12');
+  assert.equal(body.next_step.kind, 'cover');
+  assert.equal(body.next_step.label, 'Separa R$ 37,00 pra Uazapi (25/08)');
+  assert.doesNotMatch(body.next_step.label, /Mercado Pago/);
   assert.equal(body.cards_total, 3782 + 3227 + 2162 + 1371);
   assert.ok(body.work_month >= 220 && body.work_month <= 240);
   assert.ok(body.personal_month >= 180 && body.personal_month <= 200);

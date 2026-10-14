@@ -316,14 +316,19 @@ test('overview: pode gastar, faturas dos próximos 7 dias, limite livre e data d
     ]),
   });
 
-  // Inter: 3163,96 - 1338,49 = 1825,47 vencendo 12/10 (hoje-2) entra; C6 (03/11) fica fora
+  // faturas 7d (compatibilidade): Inter 3163,96 - 1338,49 = 1825,47 vencendo 12/10 (hoje-2) entra; C6 (03/11) fica fora
+  // pode gastar até o salário (12/11): o Inter já pagou o mínimo (não pesa); C6 tem mínimo de 60 em aberto
+  // em 03/11; assinaturas da seed no intervalo somam 415,80
   assert.equal(res.overview_snapshot.caixa, 2500.35);
   assert.equal(res.overview_snapshot.livre, 2500.35);
   assert.equal(res.overview_snapshot.bills_due_7d, 1825.47);
-  assert.equal(res.overview_snapshot.safe_to_spend, 674.88);
+  assert.equal(res.overview_snapshot.committed_until_salary, 475.8);
+  assert.equal(res.overview_snapshot.safe_to_spend, 2024.55);
 
   const overview = getOverview(db, { today: TODAY });
-  assert.equal(overview.safe_to_spend, 674.88);
+  assert.equal(overview.safe_to_spend, 2024.55);
+  assert.equal(overview.cards_status.find((c) => c.account_id === 'acc-inter').card_situation, 'min_paid_rolled');
+  assert.equal(overview.cards_status.find((c) => c.account_id === 'acc-c6').card_situation, 'min_open');
   assert.equal(overview.bills_due_7d, 1825.47);
   assert.equal(overview.credit_available_total, 1940.06);
   assert.equal(overview.bank_data_as_of, '2026-10-14T12:00:00.000Z', 'o mais antigo entre as instituições');
@@ -335,9 +340,9 @@ test('overview: pode gastar, faturas dos próximos 7 dias, limite livre e data d
   assert.equal(overview.cards_total, Math.round(cardDebts.reduce((s, d) => s + d.balance, 0) * 100) / 100);
   assert.equal(overview.debts.find((d) => d.id === 'debt-c6').balance, 400);
 
-  // livre menor que as faturas: pode gastar não fica negativo
+  // livre menor que os compromissos: pode gastar não fica negativo
   const tight = getOverview(db, { today: '2026-10-10' });
-  updateSettings(db, { reserved_car: 2000 });
+  updateSettings(db, { reserved_car: 2500 });
   assert.equal(getOverview(db, { today: TODAY }).safe_to_spend, 0);
   assert.equal(tight.bills_due_7d, 1825.47, '12/10 está dentro de hoje+7 em 10/10');
   assert.equal(getOverview(db, { today: '2026-10-16' }).bills_due_7d, 0, '12/10 já passou de hoje-3 em 16/10');
