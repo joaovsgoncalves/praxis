@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Palette } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { praxisApi } from "@/api/praxisClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -8,10 +8,19 @@ import { Input } from "@/components/ui/input";
 import SourceChip from "@/components/finance/SourceChip";
 import { accountBrand, brandOptionsFor, brandSurfaceStyle } from "@/lib/financeBrand";
 import { formatDay } from "@/lib/finance";
+import {
+  STACK_CARD_WIDTH,
+  STACK_MAX_STEP,
+  STACK_MAX_VISIBLE,
+  stackStep,
+  stackStepIndex,
+  stackVisibleCount,
+  stackWindow,
+} from "@/lib/walletStack";
 import { cn } from "@/lib/utils";
 
-const CARD_WIDTH = 288;
-const MAX_STEP = 64;
+// Fatia do cartão de trás: padding esquerdo (16) + respiro antes do cartão da frente (8)
+const PEEK_TEXT_INSET = 24;
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -137,9 +146,11 @@ function BrandPicker({ card, onUpdate, busy }) {
   );
 }
 
-function BankCard({ card, money, active, onSelect, onUpdate, busy, className }) {
+function BankCard({ card, money, active, onSelect, onUpdate, busy, className, peekWidth }) {
   const { brand } = card;
   const muted = { color: brand.muted };
+  // Atrás na pilha só a fatia aparece: o nome trunca dentro dela (reticências visíveis).
+  const nameStyle = peekWidth ? { maxWidth: Math.max(0, peekWidth - PEEK_TEXT_INSET) } : undefined;
   return (
     <div
       data-active={active ? "true" : "false"}
@@ -158,7 +169,7 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className }) 
         className="absolute inset-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
       />
       <div className="pointer-events-none relative flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0" style={nameStyle}>
           {card.bankLabel ? (
             <p className="truncate text-[11px] font-medium leading-tight" style={muted}>
               {card.bankLabel}
@@ -197,8 +208,11 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className }) 
   );
 }
 
-/** Desktop: leque com leve sobreposição; o ativo vai para a frente (ponta direita). */
-function CardStack({ cards, activeKey, onSelect, renderCard, className }) {
+/**
+ * Desktop: até 4 cartões em leque — o ativo na frente (direita) e os próximos atrás,
+ * cada fatia com ≥ 56px. Os demais ficam a um "›" de distância.
+ */
+function CardStack({ cards, activeIndex, onSelect, renderCard, className }) {
   const ref = useRef(null);
   const [width, setWidth] = useState(0);
 
@@ -212,29 +226,52 @@ function CardStack({ cards, activeKey, onSelect, renderCard, className }) {
     return () => observer.disconnect();
   }, []);
 
-  const n = cards.length;
-  const order = [...cards.filter((c) => c.key !== activeKey), ...cards.filter((c) => c.key === activeKey)];
-  const step = n > 1 ? Math.max(0, Math.min(MAX_STEP, (width - CARD_WIDTH) / (n - 1))) : 0;
+  const count = stackVisibleCount(width, cards.length);
+  const step = stackStep(width, count);
+  const visible = stackWindow(cards.length, activeIndex, count);
 
   return (
     <div
       ref={ref}
       className={cn("relative h-[196px] w-full", className)}
-      style={{ maxWidth: CARD_WIDTH + MAX_STEP * Math.max(0, n - 1) }}
+      style={{ maxWidth: STACK_CARD_WIDTH + STACK_MAX_STEP * (STACK_MAX_VISIBLE - 1) }}
     >
-      {cards.map((card) => {
-        const slot = order.indexOf(card);
-        const isActive = card.key === activeKey;
+      {visible.map((cardIndex, slot) => {
+        const card = cards[cardIndex];
+        const isActive = cardIndex === activeIndex;
         return (
           <div
             key={card.key}
             className="praxis-bank-slot absolute left-0 top-2"
             style={{ transform: `translate3d(${slot * step}px, 0, 0)`, zIndex: slot + 1 }}
           >
-            {renderCard(card, { active: isActive, onSelect: () => onSelect(card.key) })}
+            {renderCard(card, {
+              active: isActive,
+              peekWidth: isActive ? undefined : step,
+              onSelect: () => onSelect(card.key),
+            })}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function StackNav({ total, activeIndex, onStep, className }) {
+  const buttonClass =
+    "flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-transform duration-150 ease-out hover:bg-white/[0.06] hover:text-foreground active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
+  return (
+    <div className={cn("items-center gap-0.5", className)}>
+      <button type="button" className={buttonClass} onClick={() => onStep(-1)} aria-label="Cartão anterior">
+        <ChevronLeft className="h-4 w-4" aria-hidden />
+      </button>
+      <span className="min-w-[3.25rem] text-center font-mono text-xs tabular-nums text-muted-foreground">
+        <span className="sr-only">Cartão </span>
+        {activeIndex + 1}/{total}
+      </span>
+      <button type="button" className={buttonClass} onClick={() => onStep(1)} aria-label="Próximo cartão">
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </button>
     </div>
   );
 }
@@ -295,19 +332,24 @@ function CardCarousel({ cards, activeKey, onSelect, renderCard, className }) {
 export default function WalletCards({ cards, money }) {
   const [activeKey, setActiveKey] = useState(cards[0]?.key);
   const updateAccount = useUpdateAccount();
-  const active = cards.find((c) => c.key === activeKey) || cards[0];
+  const foundIndex = cards.findIndex((c) => c.key === activeKey);
+  const activeIndex = foundIndex >= 0 ? foundIndex : 0;
+  const active = cards[activeIndex];
 
   const select = useCallback((key) => setActiveKey(key), []);
 
   if (!active) return null;
 
-  const renderCard = (card, { active: isActive, onSelect, className }) => (
+  const stepActive = (delta) => setActiveKey(cards[stackStepIndex(cards.length, activeIndex, delta)].key);
+
+  const renderCard = (card, { active: isActive, onSelect, className, peekWidth }) => (
     <BankCard
       card={card}
       money={money}
       active={isActive}
       onSelect={onSelect}
       className={className}
+      peekWidth={peekWidth}
       busy={updateAccount.isPending}
       onUpdate={(data) => updateAccount.mutate({ id: card.accountId, data })}
     />
@@ -318,7 +360,7 @@ export default function WalletCards({ cards, money }) {
       <CardStack
         className="hidden sm:block"
         cards={cards}
-        activeKey={active.key}
+        activeIndex={activeIndex}
         onSelect={select}
         renderCard={renderCard}
       />
@@ -338,8 +380,16 @@ export default function WalletCards({ cards, money }) {
         <SourceChip source={active.source} />
         {cards.length > 1 ? (
           <span className="ml-auto tabular-nums sm:hidden" aria-hidden>
-            {cards.indexOf(active) + 1}/{cards.length}
+            {activeIndex + 1}/{cards.length}
           </span>
+        ) : null}
+        {cards.length > STACK_MAX_VISIBLE ? (
+          <StackNav
+            className="ml-auto hidden sm:flex"
+            total={cards.length}
+            activeIndex={activeIndex}
+            onStep={stepActive}
+          />
         ) : null}
       </div>
     </div>

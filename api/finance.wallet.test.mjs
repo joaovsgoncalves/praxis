@@ -5,6 +5,13 @@ import { createFinanceRouter } from './routes/finance.js';
 import { BRAND_COLOR_IDS, initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
 import { createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
 import { BRAND_PALETTE, accountBrand, brandOptionsFor, contrastRatio } from '../src/lib/financeBrand.js';
+import {
+  STACK_MIN_STEP,
+  stackStep,
+  stackStepIndex,
+  stackVisibleCount,
+  stackWindow,
+} from '../src/lib/walletStack.js';
 
 async function mountFinance(t) {
   const db = createTestDb({ withFinance: true });
@@ -204,6 +211,47 @@ test('paleta do cartão: ids batem com a API e texto tem contraste AA nas duas p
       assert.ok(contrastRatio(stop, brand.muted) >= 4.5, `hex ${hex} muted em ${stop}`);
     }
   }
+});
+
+test('pilha desktop: no máximo 4 visíveis, ativo na frente, próximos atrás em ciclo', () => {
+  assert.deepEqual(stackWindow(11, 0), [3, 2, 1, 0]);
+  assert.deepEqual(stackWindow(11, 5), [8, 7, 6, 5]);
+  assert.deepEqual(stackWindow(11, 9), [1, 0, 10, 9]);
+  assert.deepEqual(stackWindow(11, 10), [2, 1, 0, 10]);
+  assert.deepEqual(stackWindow(3, 1), [0, 2, 1]);
+  assert.deepEqual(stackWindow(1, 0), [0]);
+  assert.deepEqual(stackWindow(0, 0), []);
+  assert.deepEqual(stackWindow(11, 0, 2), [1, 0]);
+  for (let active = 0; active < 11; active += 1) {
+    const win = stackWindow(11, active);
+    assert.equal(win.length, 4);
+    assert.equal(win.at(-1), active, 'ativo sempre na frente');
+    assert.equal(new Set(win).size, 4, 'sem repetir cartão');
+  }
+
+  assert.equal(stackStepIndex(11, 0, -1), 10);
+  assert.equal(stackStepIndex(11, 10, 1), 0);
+  assert.equal(stackStepIndex(11, 4, 1), 5);
+  assert.equal(stackStepIndex(0, 0, 1), 0);
+});
+
+test('pilha desktop: fatia nunca menor que 56px', () => {
+  // coluna da carteira em 1440px (~600px) e telas estreitas
+  for (const width of [288, 320, 350, 400, 460, 520, 600, 900]) {
+    for (const total of [1, 2, 3, 4, 11]) {
+      const count = stackVisibleCount(width, total);
+      assert.ok(count >= 1 && count <= Math.min(4, total), `${width}px/${total}: ${count}`);
+      if (count > 1) {
+        assert.ok(stackStep(width, count) >= STACK_MIN_STEP, `${width}px/${total}: fatia ${stackStep(width, count)}`);
+      }
+    }
+  }
+  assert.equal(stackVisibleCount(600, 11), 4);
+  assert.equal(stackVisibleCount(400, 11), 3);
+  assert.equal(stackVisibleCount(300, 11), 1);
+  assert.equal(stackVisibleCount(600, 0), 0);
+  assert.equal(stackStep(600, 4), 96, 'fatia limitada a 96px');
+  assert.equal(stackStep(600, 1), 0);
 });
 
 test('cor padrão por instituição e roxo só no Nubank', () => {

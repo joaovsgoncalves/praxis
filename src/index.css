@@ -229,6 +229,11 @@
   }
   .praxis-bank-slot {
     transition: transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
+    /* cartão que entra na janela da pilha (‹ ›) aparece suave, sem pular */
+    animation: praxis-bank-in 180ms ease-out;
+  }
+  @keyframes praxis-bank-in {
+    from { opacity: 0; }
   }
   @media (hover: hover) and (pointer: fine) {
     .praxis-bank-slot .praxis-bank-card[data-active='false']:hover {
@@ -239,6 +244,7 @@
     .praxis-bank-card,
     .praxis-bank-slot {
       transition: none;
+      animation: none;
     }
     .praxis-bank-slot .praxis-bank-card[data-active='false']:hover {
       transform: none;
