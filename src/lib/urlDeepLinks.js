@@ -45,3 +45,16 @@ export function setTaskLensInSearchParams(searchParams, lens) {
   else next.set('lens', lens);
   return next;
 }
+
+/** ?task=<id> abre o painel de detalhe daquela tarefa. */
+export function taskIdFromSearchParams(searchParams) {
+  const id = String(searchParams.get('task') || '').trim();
+  return id || null;
+}
+
+export function setTaskIdInSearchParams(searchParams, taskId) {
+  const next = new URLSearchParams(searchParams);
+  if (taskId === null || taskId === undefined || taskId === '') next.delete('task');
+  else next.set('task', String(taskId));
+  return next;
+}

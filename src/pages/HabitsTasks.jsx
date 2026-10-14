@@ -75,24 +75,26 @@ import {
   setTaskScopeInSearchParams,
   taskLensFromSearchParams,
   setTaskLensInSearchParams,
+  taskIdFromSearchParams,
+  setTaskIdInSearchParams,
 } from '@/lib/urlDeepLinks';
-import { boardColumnForTask, weekRange, applyBoardMove } from '@/lib/taskLenses';
+import {
+  boardColumnForTask,
+  weekRange,
+  applyBoardMove,
+  moveTaskToColumn,
+  reorderColumnIds,
+  sortedBoardColumn,
+} from '@/lib/taskLenses';
+import { tasksForDay, shiftWeek, toggleSelectedDay, formatDayLabel } from '@/lib/taskWeekStrip';
+import { useIsMobile } from '@/hooks/use-mobile';
 import TaskBoard from '@/components/habits-tasks/TaskBoard';
 import TaskWeek from '@/components/habits-tasks/TaskWeek';
+import TaskWeekStrip from '@/components/habits-tasks/TaskWeekStrip';
+import TaskLensSwitch from '@/components/habits-tasks/TaskLensSwitch';
+import TaskDetailPanel from '@/components/habits-tasks/TaskDetailPanel';
+import { TaskCardMeta, TaskPriorityRuler, PRIORITY_CONFIG, taskPriorityKey } from '@/components/habits-tasks/TaskCardParts';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-
-
-const priorityStyles = {
-  high: 'bg-destructive/15 text-destructive border-destructive/20',
-  medium: 'bg-chart-4/15 text-chart-4 border-chart-4/20',
-  low: 'bg-muted text-muted-foreground border-border',
-};
-
-const priorityLabels = {
-  high: 'Alta',
-  medium: 'Média',
-  low: 'Baixa',
-};
 
 export default function HabitsTasks() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -100,7 +102,6 @@ export default function HabitsTasks() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [createTaskInitial, setCreateTaskInitial] = useState(null);
-  const [editingTask, setEditingTask] = useState(null);
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
   const [savingHabitId, setSavingHabitId] = useState(null);
@@ -117,6 +118,11 @@ export default function HabitsTasks() {
   const queryClient = useQueryClient();
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
+  const isMobile = useIsMobile();
+  // Faixa da semana: semana mostrada e dia escolhido (Lista filtra; Linha do tempo foca no celular).
+  const [weekBase, setWeekBase] = useState(today);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const openTaskId = taskIdFromSearchParams(searchParams);
 
   useEffect(() => {
     setView(habitTasksTabFromSearchParams(searchParams));
@@ -138,6 +144,32 @@ export default function HabitsTasks() {
     setTaskScope(scope);
     setSearchParams(setTaskScopeInSearchParams(searchParams, scope), { replace: true });
     setSelectedTaskIds(new Set());
+    setSelectedDay(null);
+  };
+
+  const handleSelectDay = (day) => {
+    setSelectedDay((current) => toggleSelectedDay(current, day));
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleWeekChange = (delta) => {
+    setWeekBase((base) => shiftWeek(base, delta));
+    setSelectedDay(null);
+  };
+
+  const handleWeekToday = () => {
+    setWeekBase(today);
+    setSelectedDay(null);
+  };
+
+  // Painel de detalhe: ?task=<id> é a fonte da verdade (compartilhável).
+  const openTask = (task) => {
+    if (!task?.id) return;
+    setSearchParams((prev) => setTaskIdInSearchParams(prev, task.id), { replace: true });
+  };
+
+  const closeTask = () => {
+    setSearchParams((prev) => setTaskIdInSearchParams(prev, null), { replace: true });
   };
 
   const handleViewChange = (next) => {
@@ -187,68 +219,7 @@ export default function HabitsTasks() {
     );
   };
 
-  const updateTask = useMutation({
-    mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
-    onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks'] });
-      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
-      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
-
-      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
-      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
-      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
-
-      if (data?.status === 'completed') hapticLight();
-
-      const updateList = (old) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((t) =>
-          t.id === id
-            ? {
-                ...t,
-                ...data,
-                completed_date:
-                  data?.status === 'completed'
-                    ? today
-                    : data?.status && data.status !== 'completed'
-                    ? null
-                    : t.completed_date,
-                completed_at:
-                  data?.status === 'completed'
-                    ? new Date().toISOString()
-                    : data?.status && data.status !== 'completed'
-                    ? null
-                    : t.completed_at,
-              }
-            : t
-        );
-      };
-
-      queryClient.setQueriesData({ queryKey: ['tasks'] }, updateList);
-      queryClient.setQueriesData({ queryKey: ['allTasks'] }, updateList);
-      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, updateList);
-
-      return { prevTasks, prevAllTasks, prevDashboard };
-    },
-    onError: (_err, _vars, context) => {
-      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error('Erro ao atualizar tarefa');
-    },
-    onSuccess: (data) => {
-      dispatchPraxisLevelUpFromResponse(data);
-      notifyPraxisRecurrenceSpawned(data);
-      setEditingTask(null);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
-    },
-  });
+  // Edição de tarefa: TaskDetailPanel grava sozinho (otimista, com rollback).
 
   const createHabit = useMutation({
     mutationFn: (data) => praxisApi.habits.create(data),
@@ -424,6 +395,28 @@ export default function HabitsTasks() {
         toast.error('Erro ao criar tarefa');
         throw err;
       });
+
+  // "Mover para…" do painel: mesma regra do quadro (fim da coluna de destino).
+  const handleMoveTaskToColumn = (task, columnId) => {
+    const orderedIds = reorderColumnIds(sortedBoardColumn(tasks, columnId, today), task.id, Infinity);
+    const patch = moveTaskToColumn(task, columnId, today);
+    moveBoardTask.mutate({ task, patch, orderedIds });
+  };
+
+  const listOpenTask = openTaskId ? tasks.find((t) => String(t.id) === openTaskId) : null;
+  const { data: fetchedOpenTask, isError: openTaskMissing } = useQuery({
+    queryKey: ['task', openTaskId],
+    queryFn: () => praxisApi.tasks.get(openTaskId),
+    enabled: Boolean(openTaskId) && !listOpenTask,
+    retry: false,
+  });
+  const panelTask = listOpenTask || (fetchedOpenTask && String(fetchedOpenTask.id) === openTaskId ? fetchedOpenTask : null);
+
+  useEffect(() => {
+    if (!openTaskId || !openTaskMissing) return;
+    toast.error('Não achei essa tarefa.');
+    setSearchParams((prev) => setTaskIdInSearchParams(prev, null), { replace: true });
+  }, [openTaskId, openTaskMissing, setSearchParams]);
 
   const reorderHabits = useMutation({
     mutationFn: (orderedIds) => praxisApi.habits.reorder(orderedIds),
@@ -897,21 +890,27 @@ export default function HabitsTasks() {
     return boardColumnForTask(t, today) !== null;
   }).length;
 
-  const weekRangeCurrent = weekRange(today);
-  const weekTasksCount = tasks.filter((t) => {
-    if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
+  const categoryTasks = categoryFilter === 'all' ? tasks : tasks.filter((t) => t.category === categoryFilter);
+
+  const weekRangeShown = weekRange(weekBase);
+  const weekTasksCount = categoryTasks.filter((t) => {
     if (t.category === 'ideias' || t.status === 'cancelled') return false;
     if (!t.date) return false;
     const d = String(t.date).slice(0, 10);
-    return d >= weekRangeCurrent.start && d <= weekRangeCurrent.end;
+    return d >= weekRangeShown.start && d <= weekRangeShown.end;
   }).length;
 
   const scopedTasks = filterTasksByScope(tasks, taskScope, today);
   const overdueInScope = countOpenOverdue(scopedTasks, today);
   const overdueOpenTotal = countOpenOverdue(tasks, today);
 
-  const filteredTasks = filterTasksForListPresentation(scopedTasks, categoryFilter, today)
-    .sort((a, b) => sortTasksForList(a, b, today));
+  // Dia escolhido na faixa vira o escopo da Lista; sem dia, vale o chip de escopo.
+  const listDay = lens === 'list' ? selectedDay : null;
+  const filteredTasks = (
+    listDay
+      ? tasksForDay(categoryTasks, listDay)
+      : filterTasksForListPresentation(scopedTasks, categoryFilter, today)
+  ).sort((a, b) => sortTasksForList(a, b, today));
 
   const archivableTasks = filteredTasks.filter((t) => isTaskOpen(t));
 
@@ -1089,44 +1088,7 @@ export default function HabitsTasks() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center rounded-full bg-white/[0.03] p-0.5 border border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleLensChange('list')}
-                  className={cn(
-                    'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
-                    lens === 'list'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  Lista
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLensChange('board')}
-                  className={cn(
-                    'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
-                    lens === 'board'
-                      ? 'bg-domain-gold/20 text-domain-gold border border-domain-gold/30 shadow-sm font-semibold'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  Quadro
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLensChange('week')}
-                  className={cn(
-                    'rounded-full px-3.5 py-1 text-xs font-medium transition-colors',
-                    lens === 'week'
-                      ? 'bg-domain-gold/20 text-domain-gold border border-domain-gold/30 shadow-sm font-semibold'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  Semana
-                </button>
-              </div>
+              <TaskLensSwitch value={lens} onChange={handleLensChange} />
 
               <Button
                 onClick={() => handleOpenCreateTask(null)}
@@ -1148,7 +1110,7 @@ export default function HabitsTasks() {
             onMoveTask={(move) => moveBoardTask.mutate(move)}
             onCreateInColumn={handleCreateInColumn}
             onToggleComplete={(task) => toggleTask.mutate(task)}
-            onEditTask={(task) => setEditingTask(task)}
+            onEditTask={openTask}
             onDeleteTask={(task) => confirmDeleteTask(task)}
             onNotToday={(task) => notTodayTask.mutate(task.id)}
             onOpenCreateTask={(columnId) => {
@@ -1173,51 +1135,19 @@ export default function HabitsTasks() {
                     ({lens === 'board' ? boardTasksCount : lens === 'week' ? weekTasksCount : filteredTasks.length})
                   </span>
                 </h2>
-                {lens === 'list' && overdueInScope > 0 && taskScope !== 'overdue' && (
+                {lens === 'list' && !listDay && overdueInScope > 0 && taskScope !== 'overdue' && (
                   <p className="mt-1 text-xs text-destructive">
                     {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste recorte
                   </p>
                 )}
+                {listDay ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mostrando {formatDayLabel(listDay)}. Toque no dia de novo para voltar.
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <div className="flex items-center rounded-full bg-white/[0.03] p-0.5 border border-white/10 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleLensChange('list')}
-                    className={cn(
-                      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                      lens === 'list'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    Lista
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLensChange('board')}
-                    className={cn(
-                      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                      lens === 'board'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    Quadro
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLensChange('week')}
-                    className={cn(
-                      'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                      lens === 'week'
-                        ? 'bg-domain-gold/20 text-domain-gold border border-domain-gold/30 shadow-sm font-semibold'
-                        : 'text-muted-foreground hover:text-foreground'
-                      )}
-                      >
-                      Semana
-                  </button>
-                </div>
+                <TaskLensSwitch value={lens} onChange={handleLensChange} />
 
                 {lens === 'list' && (
                   <>
@@ -1266,16 +1196,27 @@ export default function HabitsTasks() {
               isPending={createTask.isPending}
             />
 
+            <TaskWeekStrip
+              weekBase={weekBase}
+              today={today}
+              tasks={categoryTasks}
+              selectedDay={selectedDay}
+              onSelectDay={handleSelectDay}
+              onWeekChange={handleWeekChange}
+              onToday={handleWeekToday}
+            />
+
             {lens === 'list' && (
               <div className="praxis-scroll-x flex gap-2 pb-1">
                 {TASK_SCOPE_CHIPS.map((chip) => (
                   <button
                     key={chip.id}
                     type="button"
+                    aria-pressed={!listDay && taskScope === chip.id}
                     onClick={() => handleTaskScopeChange(chip.id)}
                     className={cn(
                       'rounded-full px-3 py-1.5 text-xs font-medium transition-colors shrink-0',
-                      taskScope === chip.id
+                      !listDay && taskScope === chip.id
                         ? 'bg-primary/90 text-primary-foreground'
                         : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground',
                     )}
@@ -1294,15 +1235,24 @@ export default function HabitsTasks() {
 
             {lens === 'week' ? (
               <TaskWeek
-                tasks={categoryFilter === 'all' ? tasks : tasks.filter((t) => t.category === categoryFilter)}
-                allTasks={tasks}
+                tasks={categoryTasks}
                 today={today}
-                onUpdateTask={(id, data) => updateTask.mutate({ id, data })}
-                onToggleComplete={(task) => toggleTask.mutate(task)}
-                onEditTask={(task) => setEditingTask(task)}
-                onDeleteTask={(task) => confirmDeleteTask(task)}
-                onNotToday={(task) => notTodayTask.mutate(task.id)}
+                weekBase={weekBase}
+                focusDay={isMobile ? selectedDay : null}
+                highlightDay={selectedDay}
+                onEditTask={openTask}
                 onCreateTaskAt={(initialData) => handleOpenCreateTask(initialData)}
+              />
+            ) : filteredTasks.length === 0 && listDay ? (
+              <PraxisEmptyState
+                icon={ListTodo}
+                title={'Nada em ' + formatDayLabel(listDay)}
+                description="Toque no dia de novo para voltar ao filtro, ou crie algo para esse dia."
+                action={
+                  <Button onClick={() => handleOpenCreateTask({ date: listDay })} className="rounded-full praxis-touch-target">
+                    <Plus className="mr-1.5 h-4 w-4" /> Tarefa nesse dia
+                  </Button>
+                }
               />
             ) : filteredTasks.length === 0 ? (
               <PraxisEmptyState
@@ -1341,119 +1291,114 @@ export default function HabitsTasks() {
               <DragDropContext onDragEnd={handleTaskDragEnd}>
                 <Droppable droppableId="task-list">
                   {(dropProvided) => (
-                    <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-3">
-                      {filteredTasks.map((task, index) => (
+                    <div ref={dropProvided.innerRef} {...dropProvided.droppableProps} className="space-y-2">
+                      {filteredTasks.map((task, index) => {
+                        const title = cleanPriorityPrefix(task.title);
+                        const done = isTaskDone(task);
+                        const selected = taskSelectionMode && selectedTaskIds.has(task.id);
+                        return (
                         <Draggable key={task.id} draggableId={String(task.id)} index={index} isDragDisabled={taskSelectionMode || reorderTasks.isPending}>
                           {(dragProvided, dragSnapshot) => (
                             <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} style={dragProvided.draggableProps.style} className={cn(dragSnapshot.isDragging && 'relative z-50')}>
-                              <Card className={cn(
-                                'overflow-hidden shadow-none transition-colors',
-                                isTaskDone(task)
-                                  ? 'card-domain domain-wellness border-domain-wellness/30 bg-domain-wellness/10'
-                                  : 'border-border/80 bg-card/50',
-                                dragSnapshot.isDragging && 'border-primary/40 bg-card shadow-lg',
-                              )}>
-                                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
-                                  {!taskSelectionMode && (
-                                    <button type="button" {...dragProvided.dragHandleProps} className="praxis-touch-target shrink-0 cursor-grab rounded-xl p-2 text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing" aria-label="Arrastar tarefa" title="Arraste para mudar a ordem de execução">
-                                      <GripVertical className="h-5 w-5" />
-                                    </button>
+                              {/* Mesma linguagem do card do Quadro: régua de prioridade, área, data/hora, checklist */}
+                              <div
+                                data-done={done ? 'true' : 'false'}
+                                data-dragging={dragSnapshot.isDragging && !dragSnapshot.isDropAnimating ? 'true' : 'false'}
+                                className={cn(
+                                  'praxis-board-card relative flex min-w-0 items-start gap-0.5 rounded-xl py-1.5 pl-1 pr-1.5 sm:gap-1',
+                                  selected && 'bg-primary/[0.08]'
+                                )}
+                              >
+                                <TaskPriorityRuler task={task} className="left-[3.25rem]" />
+                                {!taskSelectionMode && (
+                                  <button type="button" {...dragProvided.dragHandleProps} className="praxis-touch-target flex shrink-0 cursor-grab items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing" aria-label="Arrastar tarefa" title="Arraste para mudar a ordem de execução">
+                                    <GripVertical className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {taskSelectionMode && (
+                                  <span className="flex h-11 w-11 shrink-0 items-center justify-center">
+                                    {isTaskOpen(task) ? (
+                                      <Checkbox
+                                        checked={selectedTaskIds.has(task.id)}
+                                        onCheckedChange={() => toggleTaskSelected(task.id)}
+                                        aria-label={'Selecionar ' + title + ' para arquivar'}
+                                      />
+                                    ) : null}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleTask.mutate(task)}
+                                  className="praxis-touch-target flex shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                                  aria-label={(done ? 'Reabrir ' : 'Concluir ') + title}
+                                >
+                                  {done ? (
+                                    <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
+                                  ) : (
+                                    <Circle className="h-5 w-5" />
                                   )}
-                      {taskSelectionMode && isTaskOpen(task) && (
-                        <Checkbox
-                          checked={selectedTaskIds.has(task.id)}
-                          onCheckedChange={() => toggleTaskSelected(task.id)}
-                          className="shrink-0"
-                          aria-label="Selecionar para arquivar"
-                        />
-                      )}
-                      <button
-                        onClick={() => toggleTask.mutate(task)}
-                        className="praxis-touch-target shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label={`Alternar ${cleanPriorityPrefix(task.title)}`}
-                      >
-                        {isTaskDone(task) ? (
-                          <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
-                        ) : (
-                          <Circle className="h-5 w-5" />
-                        )}
-                      </button>
+                                </button>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p
-                            className={cn(
-                              'font-semibold leading-snug text-base',
-                              isTaskDone(task) && 'text-domain-wellness line-through opacity-80',
-                            )}
-                          >
-                            {cleanPriorityPrefix(task.title)}
-                          </p>
-                          {task.time && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">
-                              <Clock className="mr-0.5 h-3 w-3" />
-                              {String(task.time).slice(0, 5)}
-                            </Badge>
-                          )}
-                          <Badge className={cn('text-[10px] sm:text-xs shrink-0', priorityStyles[task.priority])}>
-                            {priorityLabels[task.priority] || task.priority}
-                          </Badge>
-                          <CategoryBadge category={task.category} />
-                          <TaskRecurrenceBadge task={task} allTasks={tasks} className="shrink-0" />
-                          {isTaskOverdue(task, today) && (
-                            <Badge variant="destructive" className="text-[10px] shrink-0">
-                              Atrasada
-                            </Badge>
-                          )}
-                          {task.status === 'in_progress' && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0 border-primary/30 bg-primary/10 text-primary">
-                              Andamento
-                            </Badge>
-                          )}
-                          {isInboxTask(task) && (
-                            <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0 border-white/15 text-muted-foreground">
-                              Caixa
-                            </Badge>
-                          )}
-                        </div>
-                        {task.date && (
-                          <div className="mt-1.5 flex flex-wrap gap-2">
-                            <Badge variant="outline" className="text-xs">{task.date}</Badge>
-                            {task.day_outcome === 'not_today'
-                              && task.day_outcome_date === addDaysToDateKey(today, -1) && (
-                              <Badge variant="outline" className="text-[10px] text-amber-200/90 border-amber-500/25">
-                                Empurrada de ontem
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                        {!task.date && task.recurrence && task.recurrence !== 'none' && (
-                          <p className="mt-1 text-xs text-amber-400/90">Defina uma data para a recorrência funcionar.</p>
-                        )}
-                      </div>
+                                <div className="min-w-0 flex-1 cursor-pointer py-2 pr-1" onClick={() => openTask(task)}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openTask(task);
+                                    }}
+                                    className={cn(
+                                      'block w-full rounded-sm text-left text-[15px] font-medium leading-snug outline-none focus-visible:ring-2 focus-visible:ring-ring [text-wrap:pretty]',
+                                      done ? 'text-muted-foreground line-through decoration-muted-foreground/50' : 'text-stone-100'
+                                    )}
+                                  >
+                                    <span className="break-words">{title}</span>
+                                    <span className="sr-only">
+                                      {', prioridade ' + PRIORITY_CONFIG[taskPriorityKey(task)].label.toLowerCase() + '. Abrir detalhes'}
+                                    </span>
+                                  </button>
+                                  <TaskCardMeta task={task} today={today} className="mt-2">
+                                    {isTaskOverdue(task, today) ? (
+                                      <span className="font-medium text-rose-300" aria-hidden>Atrasada</span>
+                                    ) : null}
+                                    {task.status === 'in_progress' ? (
+                                      <span className="font-medium text-primary">Andamento</span>
+                                    ) : null}
+                                    {isInboxTask(task) ? <span>Caixa</span> : null}
+                                    {task.day_outcome === 'not_today'
+                                      && task.day_outcome_date === addDaysToDateKey(today, -1) ? (
+                                      <span className="text-amber-200/90">Empurrada de ontem</span>
+                                    ) : null}
+                                    <TaskRecurrenceBadge task={task} allTasks={tasks} className="shrink-0" />
+                                  </TaskCardMeta>
+                                  {!task.date && task.recurrence && task.recurrence !== 'none' && (
+                                    <p className="mt-1.5 text-xs text-amber-400/90">Defina uma data para a recorrência funcionar.</p>
+                                  )}
+                                </div>
 
-                      <TaskRowMenu
-                        label={cleanPriorityPrefix(task.title)}
-                        busy={reorderTasks.isPending || notTodayTask.isPending}
-                        disableUp={index === 0}
-                        disableDown={index === filteredTasks.length - 1}
-                        onMoveUp={() => moveTask(task.id, -1)}
-                        onMoveDown={() => moveTask(task.id, 1)}
-                        onEdit={() => setEditingTask(task)}
-                        onDelete={() => confirmDeleteTask(task)}
-                        showNotToday={
-                          isTaskOpen(task)
-                          && task.category !== 'ideias'
-                          && (!task.date || task.date <= today)
-                        }
-                        onNotToday={() => notTodayTask.mutate(task.id)}
-                      />
-                                </CardContent>
-                              </Card>
+                                <div className="flex h-11 shrink-0 items-center">
+                                  <TaskRowMenu
+                                    label={title}
+                                    busy={reorderTasks.isPending || notTodayTask.isPending}
+                                    disableUp={index === 0}
+                                    disableDown={index === filteredTasks.length - 1}
+                                    onMoveUp={() => moveTask(task.id, -1)}
+                                    onMoveDown={() => moveTask(task.id, 1)}
+                                    onEdit={() => openTask(task)}
+                                    onDelete={() => confirmDeleteTask(task)}
+                                    showNotToday={
+                                      isTaskOpen(task)
+                                      && task.category !== 'ideias'
+                                      && (!task.date || task.date <= today)
+                                    }
+                                    onNotToday={() => notTodayTask.mutate(task.id)}
+                                  />
+                                </div>
+                              </div>
                             </div>
                           )}
                         </Draggable>
-                      ))}
+                        );
+                      })}
                       {dropProvided.placeholder}
                     </div>
                   )}
@@ -1818,18 +1763,17 @@ export default function HabitsTasks() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(editingTask)} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar tarefa</DialogTitle></DialogHeader>
-          {editingTask && (
-            <TaskForm
-              initial={editingTask}
-              onSubmit={(data) => updateTask.mutate({ id: editingTask.id, data })}
-              onCancel={() => setEditingTask(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <TaskDetailPanel
+        task={panelTask}
+        open={Boolean(openTaskId && panelTask)}
+        onOpenChange={(open) => {
+          if (!open) closeTask();
+        }}
+        today={today}
+        onDelete={(task) => confirmDeleteTask(task)}
+        onNotToday={(task) => notTodayTask.mutate(task.id)}
+        onMoveToColumn={handleMoveTaskToColumn}
+      />
 
       <Dialog open={showHabitForm} onOpenChange={setShowHabitForm}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -1882,7 +1826,10 @@ export default function HabitsTasks() {
             <AlertDialogAction
               className={buttonVariants({ variant: 'destructive' })}
               onClick={() => {
-                if (taskPendingDelete) deleteTask.mutate(taskPendingDelete.id);
+                if (taskPendingDelete) {
+                  if (String(taskPendingDelete.id) === openTaskId) closeTask();
+                  deleteTask.mutate(taskPendingDelete.id);
+                }
                 setTaskPendingDelete(null);
               }}
             >

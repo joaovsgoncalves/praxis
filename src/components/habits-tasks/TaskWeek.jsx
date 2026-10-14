@@ -1,49 +1,31 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, CalendarDays, Clock } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { weekRange, taskBlock, layoutTimedBlocks } from '@/lib/taskLenses';
+import { taskBlock, layoutTimedBlocks } from '@/lib/taskLenses';
+import { visibleWeekDays } from '@/lib/taskWeekStrip';
 import { fortalezaNowTimeHHMM } from '@/lib/dates';
 import { cleanPriorityPrefix, isTaskDone } from '@/lib/tasks';
+import {
+  PRIORITY_CONFIG,
+  TaskAreaChip,
+  TaskChecklistProgress,
+  TaskPriorityRuler,
+  taskPriorityKey,
+} from './TaskCardParts';
 
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
 const HOUR_HEIGHT = 56; // Altura em px por hora
 const TOTAL_HOURS = HOURS.length; // 15 horas (07:00 às 22:00)
 const TOTAL_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT; // 840px
+const GUTTER = '3.5rem';
+const META_MIN_HEIGHT = 76;
 
 const DOW_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-const MONTH_NAMES_SHORT = [
-  'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-  'jul', 'ago', 'set', 'out', 'nov', 'dez',
-];
 
-function formatDayHeader(dateStr, index) {
-  const parts = String(dateStr || '').split('-');
-  const m = parts[1] || '01';
-  const d = parts[2] || '01';
-  const dow = DOW_LABELS[index] || '';
-  return {
-    dow,
-    dayNum: String(Number(d)),
-    dateFormatted: `${d}/${m}`,
-  };
-}
-
-function formatWeekHeaderRange(start, end) {
-  const startParts = String(start || '').split('-');
-  const endParts = String(end || '').split('-');
-  const startM = startParts[1] || '01';
-  const startD = startParts[2] || '01';
-  const endM = endParts[1] || '01';
-  const endD = endParts[2] || '01';
-
-  const endMonthLabel = MONTH_NAMES_SHORT[Number(endM) - 1] || '';
-  if (startM === endM) {
-    return `${startD} a ${endD} de ${endMonthLabel}`;
-  }
-  const startMonthLabel = MONTH_NAMES_SHORT[Number(startM) - 1] || '';
-  return `${startD} de ${startMonthLabel} a ${endD} de ${endMonthLabel}`;
+function dowFor(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const jsDay = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+  return DOW_LABELS[(jsDay + 6) % 7];
 }
 
 function getBlockPosition(block, durationMinutes) {
@@ -67,29 +49,51 @@ function getBlockPosition(block, durationMinutes) {
   return { top: clampedTop, height: clampedHeight };
 }
 
+function nowOffset(nowTime) {
+  const [nowH, nowM] = String(nowTime).split(':').map(Number);
+  const minutesFrom7 = (nowH - 7) * 60 + nowM;
+  if (minutesFrom7 < 0 || minutesFrom7 > TOTAL_HOURS * 60) return null;
+  return (minutesFrom7 / 60) * HOUR_HEIGHT;
+}
+
 function UntimedTaskChip({ task, onEditTask }) {
   const isDone = isTaskDone(task);
+  const title = cleanPriorityPrefix(task.title);
+  const priority = PRIORITY_CONFIG[taskPriorityKey(task)];
   return (
     <button
       type="button"
       onClick={() => onEditTask?.(task)}
+      data-done={isDone ? 'true' : 'false'}
       className={cn(
-        'max-w-full truncate rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-left text-[11px] font-medium text-stone-200 hover:border-white/20',
-        isDone && 'text-muted-foreground line-through',
+        'praxis-board-card flex w-full min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs font-medium outline-none',
+        'focus-visible:ring-2 focus-visible:ring-ring',
+        isDone ? 'text-muted-foreground' : 'text-stone-100'
       )}
-      title={cleanPriorityPrefix(task.title)}
+      title={title}
     >
-      {cleanPriorityPrefix(task.title)}
+      <span
+        aria-hidden
+        className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isDone ? 'bg-domain-wellness/70' : priority.barClass)}
+      />
+      <span className={cn('min-w-0 flex-1 truncate', isDone && 'line-through decoration-muted-foreground/50')}>
+        {title}
+      </span>
+      <span className="sr-only">{', prioridade ' + priority.label.toLowerCase()}</span>
     </button>
   );
 }
 
 function TimedTaskBlock({ task, block, col = 0, cols = 1, onEditTask }) {
   const isDone = isTaskDone(task);
+  const title = cleanPriorityPrefix(task.title);
   const { top, height } = getBlockPosition(block, task.duration_minutes);
   const gap = 3;
   const widthPct = 100 / Math.max(1, cols);
   const leftPct = col * widthPct;
+  const blockHeight = Math.max(48, height) - 4;
+  const showMeta = blockHeight >= META_MIN_HEIGHT;
+  const priority = PRIORITY_CONFIG[taskPriorityKey(task)];
 
   return (
     <button
@@ -98,44 +102,63 @@ function TimedTaskBlock({ task, block, col = 0, cols = 1, onEditTask }) {
         event.stopPropagation();
         onEditTask?.(task);
       }}
+      data-done={isDone ? 'true' : 'false'}
       style={{
-        top: `${top}px`,
-        height: `${Math.max(48, height) - 4}px`,
+        top: `${top + 2}px`,
+        height: `${blockHeight}px`,
         left: `calc(${leftPct}% + ${gap}px)`,
         width: `calc(${widthPct}% - ${gap * 2}px)`,
       }}
       className={cn(
-        'absolute z-10 flex flex-col items-start justify-start overflow-hidden rounded-md border px-2 py-1.5 text-left',
-        'border-white/[0.10] bg-[#161a23] hover:border-domain-gold/40 hover:z-20',
-        isDone && 'opacity-55',
+        // Camadas: bloco 10 < bloco em foco 11 < linha agora 12 < trilho de horas 20 < cabeçalho 30.
+        'praxis-board-card absolute z-10 flex flex-col items-start justify-start gap-1 overflow-hidden rounded-lg px-2 pb-1.5 pt-2 text-left outline-none hover:z-[11]',
+        'focus-visible:z-[11] focus-visible:ring-2 focus-visible:ring-ring'
       )}
     >
-      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-        {block.start}-{block.end}
+      <TaskPriorityRuler task={task} className="left-2 w-5" />
+      <span className="text-[11px] font-medium leading-none tabular-nums text-muted-foreground">
+        {block.start}–{block.end}
       </span>
       <span
         className={cn(
-          'mt-0.5 line-clamp-2 break-normal text-[12px] font-medium leading-snug text-stone-100',
-          isDone && 'line-through text-muted-foreground',
+          'line-clamp-2 break-words text-xs font-medium leading-snug',
+          isDone ? 'text-muted-foreground line-through decoration-muted-foreground/50' : 'text-stone-100'
         )}
       >
-        {cleanPriorityPrefix(task.title)}
+        {title}
+        <span className="sr-only">{', prioridade ' + priority.label.toLowerCase()}</span>
       </span>
+      {showMeta ? (
+        <span className="mt-auto flex min-w-0 max-w-full items-center gap-2 text-[11px] leading-none text-muted-foreground">
+          <TaskAreaChip category={task.category} compact={cols > 1} className="min-w-0" />
+          <TaskChecklistProgress task={task} className="[&>span:last-child]:hidden" />
+        </span>
+      ) : null}
     </button>
   );
 }
 
+/**
+ * Linha do tempo por hora (07h–22h). `weekBase` escolhe a semana; `focusDay` mostra só um dia
+ * (celular); `highlightDay` marca o dia escolhido na faixa.
+ */
 export default function TaskWeek({
   tasks = [],
   today,
+  weekBase,
+  focusDay = null,
+  highlightDay = null,
   onEditTask,
   onCreateTaskAt,
 }) {
-  const todayColRef = useRef(null);
-  const timeGridScrollRef = useRef(null);
+  const scrollRef = useRef(null);
+  const todayHeaderRef = useRef(null);
   const [nowTime, setNowTime] = useState(() => fortalezaNowTimeHHMM());
 
-  const { start, end, days } = weekRange(today);
+  const days = visibleWeekDays(weekBase || today, focusDay);
+  const single = days.length === 1;
+  const showsToday = days.includes(today);
+  const nowTop = showsToday ? nowOffset(nowTime) : null;
 
   // Mantém horário do fuso Fortaleza atualizado a cada minuto
   useEffect(() => {
@@ -145,239 +168,195 @@ export default function TaskWeek({
     return () => clearInterval(interval);
   }, []);
 
-  const scrollToToday = () => {
-    if (todayColRef.current) {
-      todayColRef.current.scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest',
-      });
-    }
-    if (timeGridScrollRef.current) {
-      const [nowH, nowM] = nowTime.split(':').map(Number);
-      const minutesFrom7 = (nowH - 7) * 60 + nowM;
-      if (minutesFrom7 >= 0 && minutesFrom7 <= TOTAL_HOURS * 60) {
-        const targetTop = (minutesFrom7 / 60) * HOUR_HEIGHT - 120;
-        timeGridScrollRef.current.scrollTo({
-          top: Math.max(0, targetTop),
-          behavior: 'smooth',
-        });
-      }
-    }
-  };
-
-  // Scroll inicial para posicionar o dia de hoje
+  // Rolagem inicial: hora atual no topo (uma vez).
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (todayColRef.current) {
-        todayColRef.current.scrollIntoView({
-          behavior: 'auto',
-          inline: 'center',
-          block: 'nearest',
-        });
-      }
-      if (timeGridScrollRef.current) {
-        const [nowH, nowM] = fortalezaNowTimeHHMM().split(':').map(Number);
-        const minutesFrom7 = (nowH - 7) * 60 + nowM;
-        if (minutesFrom7 >= 0 && minutesFrom7 <= TOTAL_HOURS * 60) {
-          const targetTop = (minutesFrom7 / 60) * HOUR_HEIGHT - 120;
-          timeGridScrollRef.current.scrollTo({
-            top: Math.max(0, targetTop),
-            behavior: 'auto',
-          });
-        }
-      }
-    }, 50);
-    return () => clearTimeout(timer);
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const offset = nowOffset(fortalezaNowTimeHHMM());
+    if (offset !== null) scroller.scrollTop = Math.max(0, offset - 120);
   }, []);
 
-  // Filtra tarefas da semana atual (sem inbox sem data, sem ideias, sem canceladas)
+  // A cada troca de semana/dia: hoje à vista na horizontal (sem mexer na rolagem da página).
+  const weekKey = days[0];
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const header = todayHeaderRef.current;
+    if (!header || single) {
+      scroller.scrollLeft = 0;
+      return;
+    }
+    const gutterWidth = scroller.firstElementChild?.firstElementChild?.offsetWidth || 56;
+    scroller.scrollLeft = Math.max(0, header.offsetLeft - gutterWidth - 8);
+  }, [weekKey, single]);
+
+  const daySet = new Set(days);
   const weekTasks = tasks.filter((t) => {
     if (!t?.date) return false;
     if (t.category === 'ideias' || t.status === 'cancelled') return false;
-    const d = String(t.date).slice(0, 10);
-    return d >= start && d <= end;
+    return daySet.has(String(t.date).slice(0, 10));
   });
 
+  const untimedByDay = new Map(days.map((day) => [day, []]));
+  const timedByDay = new Map(days.map((day) => [day, []]));
+  weekTasks.forEach((task) => {
+    const day = String(task.date).slice(0, 10);
+    const block = taskBlock(task);
+    if (block) timedByDay.get(day).push({ id: task.id, task, ...block });
+    else untimedByDay.get(day).push(task);
+  });
+  const hasUntimed = days.some((day) => untimedByDay.get(day).length > 0);
+
+  const gridStyle = {
+    gridTemplateColumns: single
+      ? `${GUTTER} minmax(0, 1fr)`
+      : `${GUTTER} repeat(${days.length}, minmax(8rem, 1fr))`,
+  };
+
   return (
-    <div className="flex flex-col rounded-2xl border border-white/[0.06] bg-card/30 p-3 sm:p-4">
-      {/* Barra de cabeçalho da semana */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary shrink-0" />
-          <span className="text-sm font-semibold text-foreground">
-            {formatWeekHeaderRange(start, end)}
-          </span>
-          <Badge variant="outline" className="text-[10px] text-muted-foreground border-white/10 shrink-0">
-            {weekTasks.length} {weekTasks.length === 1 ? 'tarefa' : 'tarefas'}
-          </Badge>
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={scrollToToday}
-          className="h-8 rounded-full px-3 text-xs font-medium gap-1.5 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-colors"
-        >
-          <Calendar className="h-3.5 w-3.5 text-primary" />
-          Hoje
-        </Button>
-      </div>
-
-      {/* Grade com scroll horizontal no mobile e scroll vertical de horários */}
+    <div className="praxis-panel min-w-0 overflow-hidden rounded-2xl">
       <div
-        ref={timeGridScrollRef}
-        className="praxis-scroll-x max-h-[700px] overflow-y-auto overflow-x-auto snap-x snap-mandatory rounded-xl border border-white/[0.06] bg-background/50"
+        ref={scrollRef}
+        className="praxis-scroll-x relative max-h-[70vh] overflow-auto overscroll-x-contain"
+        aria-label="Linha do tempo"
+        role="region"
+        tabIndex={-1}
       >
-        <div className="flex min-w-[700px] lg:min-w-0">
-          {/* Coluna da esquerda: Marcadores de hora */}
-          <div className="sticky left-0 z-20 w-12 sm:w-14 shrink-0 bg-background/95 backdrop-blur select-none border-r border-white/[0.06] pr-2">
-            <div className="h-[34px] flex items-center justify-end">
-              <Clock className="h-3.5 w-3.5 text-muted-foreground/40" />
-            </div>
-            <div className="h-[84px] flex items-center justify-end text-[10px] text-muted-foreground/50 font-medium">
-              <span>Hora</span>
-            </div>
-            <div style={{ height: `${TOTAL_HEIGHT}px` }} className="relative">
-              {HOURS.map((hour) => (
-                <div
-                  key={hour}
-                  style={{ height: `${HOUR_HEIGHT}px` }}
-                  className="flex items-start justify-end text-[11px] font-mono tabular-nums text-muted-foreground/60"
-                >
-                  <span className="-translate-y-2">{String(hour).padStart(2, '0')}:00</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="grid" style={gridStyle}>
+          {/* Cabeçalho dos dias */}
+          <div className="sticky left-0 top-0 z-40 border-b border-white/[0.06] bg-card" />
+          {days.map((day) => {
+            const isToday = day === today;
+            const isHighlighted = highlightDay === day && !single;
+            return (
+              <div
+                key={day}
+                ref={isToday ? todayHeaderRef : null}
+                className={cn(
+                  'sticky top-0 z-30 flex items-baseline gap-1.5 border-b border-l border-white/[0.06] bg-card px-2.5 py-2.5',
+                  isHighlighted && 'bg-secondary'
+                )}
+              >
+                <span className={cn('text-xs font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>
+                  {dowFor(day)}
+                </span>
+                <span className={cn('text-sm font-semibold tabular-nums', isToday ? 'text-primary' : 'text-foreground')}>
+                  {Number(day.slice(8, 10))}
+                </span>
+                {isToday ? <span className="sr-only">hoje</span> : null}
+              </div>
+            );
+          })}
 
-          {/* 7 Colunas dos dias da semana (Segunda a Domingo) */}
-          <div className="grid grid-cols-7 flex-1 divide-x divide-white/[0.06]">
-            {days.map((day, dayIndex) => {
-              const isToday = day === today;
-              const header = formatDayHeader(day, dayIndex);
-
-              const dayUntimedTasks = weekTasks.filter(
-                (t) => t.date === day && taskBlock(t) === null
-              );
-              const dayTimedLaid = layoutTimedBlocks(
-                weekTasks
-                  .filter((t) => t.date === day && taskBlock(t))
-                  .map((task) => ({ task, ...taskBlock(task) })),
-              );
-
-              return (
+          {/* Faixa "Sem horário" — chips acima da grade */}
+          {hasUntimed ? (
+            <>
+              <div className="sticky left-0 z-20 flex items-start justify-end border-b border-white/[0.06] bg-card px-1.5 py-2 text-right text-[11px] font-medium leading-tight text-muted-foreground">
+                Sem horário
+              </div>
+              {days.map((day) => (
                 <div
                   key={day}
-                  ref={isToday ? todayColRef : null}
                   className={cn(
-                    'flex flex-col p-2 min-w-[130px] sm:min-w-[150px] lg:min-w-0 snap-start',
-                    isToday && 'bg-white/[0.02]'
+                    'flex min-w-0 flex-col gap-1.5 border-b border-l border-white/[0.06] p-1.5',
+                    highlightDay === day && !single && 'bg-white/[0.02]'
                   )}
                 >
-                  {/* Cabeçalho do dia */}
-                  <div className="flex items-center justify-between pb-2 h-[34px]">
-                    <div className="flex items-baseline gap-1.5">
-                      <span
-                        className={cn(
-                          'text-xs font-semibold uppercase tracking-wider',
-                          isToday ? 'text-primary' : 'text-muted-foreground'
-                        )}
-                      >
-                        {header.dow}
-                      </span>
-                      <span
-                        className={cn(
-                          'text-sm font-bold',
-                          isToday ? 'text-primary' : 'text-foreground'
-                        )}
-                      >
-                        {header.dayNum}
-                      </span>
-                    </div>
-                    {isToday && (
-                      <Badge
-                        variant="outline"
-                        className="border-primary/40 bg-primary/10 px-1.5 py-0 text-[10px] text-primary"
-                      >
-                        Hoje
-                      </Badge>
-                    )}
-                  </div>
-
-                  {dayUntimedTasks.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-1">
-                      {dayUntimedTasks.map((task) => (
-                        <UntimedTaskChip key={task.id} task={task} onEditTask={onEditTask} />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Grade de horários do dia */}
-                  <div
-                    style={{ height: `${TOTAL_HEIGHT}px` }}
-                    className="relative rounded-xl border border-white/[0.06] bg-card/20 overflow-hidden"
-                  >
-                    {/* Linhas / Células de hora clicáveis */}
-                    {HOURS.map((hour) => {
-                      const timeStr = `${String(hour).padStart(2, '0')}:00`;
-                      return (
-                        <div
-                          key={hour}
-                          onClick={() => onCreateTaskAt?.({ date: day, time: timeStr })}
-                          style={{ height: `${HOUR_HEIGHT}px` }}
-                          className="group relative border-t border-white/[0.04] first:border-t-0 transition-colors hover:bg-white/[0.03] cursor-pointer flex items-center justify-center"
-                          title={`Criar tarefa às ${timeStr} (${header.dow} ${header.dayNum})`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              onCreateTaskAt?.({ date: day, time: timeStr });
-                            }
-                          }}
-                        >
-                          <Plus className="h-3.5 w-3.5 opacity-0 group-hover:opacity-40 text-muted-foreground transition-opacity" />
-                        </div>
-                      );
-                    })}
-
-                    {/* Blocos de tarefas com horário */}
-                    {dayTimedLaid.map((laid) => (
-                      <TimedTaskBlock
-                        key={laid.task.id}
-                        task={laid.task}
-                        block={laid}
-                        col={laid.col}
-                        cols={laid.cols}
-                        onEditTask={onEditTask}
-                      />
-                    ))}
-
-                    {/* Linha de agora (apenas no dia de hoje) */}
-                    {isToday && (() => {
-                      const [nowH, nowM] = nowTime.split(':').map(Number);
-                      const minutesFrom7 = (nowH - 7) * 60 + nowM;
-                      if (minutesFrom7 < 0 || minutesFrom7 > TOTAL_HOURS * 60) return null;
-                      const nowTop = (minutesFrom7 / 60) * HOUR_HEIGHT;
-
-                      return (
-                        <div
-                          id="praxis-week-now-line"
-                          className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
-                          style={{ top: `${nowTop}px` }}
-                        >
-                          <div className="relative -ml-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-rose-500/30" />
-                          <div className="h-[2px] w-full bg-rose-500/90 shadow-[0_0_6px_rgba(244,63,94,0.7)]" />
-                        </div>
-                      );
-                    })()}
-                  </div>
+                  {untimedByDay.get(day).map((task) => (
+                    <UntimedTaskChip key={task.id} task={task} onEditTask={onEditTask} />
+                  ))}
                 </div>
-              );
-            })}
+              ))}
+            </>
+          ) : null}
+
+          {/* Trilho de horas */}
+          <div style={{ height: `${TOTAL_HEIGHT}px` }} className="sticky left-0 z-20 select-none bg-card">
+            {HOURS.map((hour) => (
+              <div
+                key={hour}
+                style={{ height: `${HOUR_HEIGHT}px` }}
+                className="flex items-start justify-end pr-2 text-[11px] tabular-nums text-muted-foreground"
+              >
+                <span className="translate-y-1">{String(hour).padStart(2, '0')}:00</span>
+              </div>
+            ))}
+            {nowTop !== null ? (
+              <span
+                className="absolute right-1 -translate-y-1/2 rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums text-primary-foreground"
+                style={{ top: `${nowTop}px` }}
+              >
+                <span className="sr-only">Agora: </span>
+                {nowTime}
+              </span>
+            ) : null}
           </div>
+
+          {/* Colunas dos dias */}
+          {days.map((day) => {
+            const isToday = day === today;
+            const dow = dowFor(day);
+            const dayNum = Number(day.slice(8, 10));
+            const laid = layoutTimedBlocks(timedByDay.get(day));
+            return (
+              <div
+                key={day}
+                style={{ height: `${TOTAL_HEIGHT}px` }}
+                className={cn(
+                  'relative min-w-0 border-l border-white/[0.06]',
+                  highlightDay === day && !single && 'bg-white/[0.02]'
+                )}
+              >
+                {HOURS.map((hour) => {
+                  const timeStr = `${String(hour).padStart(2, '0')}:00`;
+                  return (
+                    <div
+                      key={hour}
+                      onClick={() => onCreateTaskAt?.({ date: day, time: timeStr })}
+                      style={{ height: `${HOUR_HEIGHT}px` }}
+                      className="group relative flex cursor-pointer items-center justify-center border-t border-white/[0.04] outline-none transition-colors duration-150 first:border-t-0 hover:bg-white/[0.025] focus-visible:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      title={`Criar tarefa às ${timeStr} (${dow} ${dayNum})`}
+                      aria-label={`Criar tarefa às ${timeStr}, ${dow} ${dayNum}`}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onCreateTaskAt?.({ date: day, time: timeStr });
+                        }
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-visible:opacity-60" />
+                    </div>
+                  );
+                })}
+
+                {laid.map((item) => (
+                  <TimedTaskBlock
+                    key={item.task.id}
+                    task={item.task}
+                    block={item}
+                    col={item.col}
+                    cols={item.cols}
+                    onEditTask={onEditTask}
+                  />
+                ))}
+
+                {/* Linha de agora (apenas no dia de hoje) */}
+                {isToday && nowTop !== null ? (
+                  <div
+                    id="praxis-week-now-line"
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 z-[12] flex items-center"
+                    style={{ top: `${nowTop}px` }}
+                  >
+                    <span className="-ml-[3px] h-1.5 w-1.5 shrink-0 -translate-y-px rounded-full bg-primary" />
+                    <span className="h-0.5 w-full -translate-y-px bg-primary" />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
