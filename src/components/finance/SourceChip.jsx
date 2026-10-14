@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 const SOURCE_CHIP_LABELS = {
   joao: "joão",
   pierre: "pierre",
+  pluggy: "banco",
   oficial: "oficial",
   seed: "seed",
   agent: "agente",

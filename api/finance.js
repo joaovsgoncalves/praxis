@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 
 export const ACCOUNT_KINDS = ['checking', 'prepaid', 'credit', 'cash', 'other'];
 export const AMOUNT_KINDS = ['available', 'invested', 'used_limit', 'official_bill', 'projected_bill'];
-export const SOURCES = ['pierre', 'joao', 'agent', 'seed'];
+export const SOURCES = ['pierre', 'pluggy', 'joao', 'agent', 'seed'];
 export const DEBT_KINDS = ['card', 'loan', 'installment', 'family', 'other'];
 export const DEBT_STATUSES = ['open', 'min_paid', 'clean', 'waiting', 'blocked'];
 export const APR_LABELS = ['high', 'medium', 'low', 'none'];
@@ -255,6 +255,26 @@ export function initFinanceSchema(db) {
       actor TEXT DEFAULT 'system'
     );
 
+    -- estado do cartão vindo do banco (Pluggy via Midas): uma linha por conta
+    CREATE TABLE IF NOT EXISTS finance_card_status (
+      account_id TEXT PRIMARY KEY,
+      institution TEXT NOT NULL,
+      last4 TEXT,
+      brand TEXT,
+      used REAL,
+      limit_total REAL,
+      limit_available REAL,
+      bill_total REAL,
+      bill_minimum REAL,
+      bill_paid REAL,
+      bill_remaining REAL,
+      bill_due TEXT,
+      bill_closing TEXT,
+      bank_updated_at TEXT,
+      updated_at TEXT,
+      source TEXT DEFAULT 'pluggy'
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_tx_pierre
       ON finance_transactions(pierre_tx_id)
       WHERE pierre_tx_id IS NOT NULL AND pierre_tx_id != '';
@@ -398,6 +418,7 @@ export function seedFinanceIfEmpty(db, { force = false } = {}) {
         DELETE FROM finance_accounts;
         DELETE FROM finance_settings;
         DELETE FROM finance_sync_log;
+        DELETE FROM finance_card_status;
       `);
     }
 
@@ -1381,6 +1402,46 @@ function buildNextStep({ caixa, debts, today }) {
   };
 }
 
+/** Estado dos cartões que o banco mandou, com o nome da conta. */
+export function listCardStatus(db) {
+  return db.prepare(`
+    SELECT cs.*, a.name AS account_name, a.status AS account_status
+    FROM finance_card_status cs
+    LEFT JOIN finance_accounts a ON a.id = cs.account_id
+    ORDER BY cs.bill_due IS NULL, cs.bill_due ASC, cs.institution ASC
+  `).all();
+}
+
+/** Última atualização de cada banco ativo (cartão ou saldo do Pluggy); devolve a mais antiga. */
+function bankDataAsOf(db, cardsStatus) {
+  const latest = new Map();
+  const note = (institution, ts) => {
+    if (!institution || !ts) return;
+    if (!latest.has(institution) || ts > latest.get(institution)) latest.set(institution, ts);
+  };
+  for (const card of cardsStatus) {
+    if (card.account_status === 'active') note(card.institution, card.bank_updated_at);
+  }
+  const balances = db.prepare(`
+    SELECT a.institution, MAX(b.created_at) AS ts
+    FROM finance_balances b
+    JOIN finance_accounts a ON a.id = b.account_id
+    WHERE b.source = 'pluggy' AND a.status = 'active'
+    GROUP BY a.institution
+  `).all();
+  for (const row of balances) note(row.institution, row.ts);
+  return [...latest.values()].sort()[0] || null;
+}
+
+export function lastMidasSync(db) {
+  return db.prepare(`
+    SELECT * FROM finance_sync_log
+    WHERE actor = 'midas' AND ok = 1
+    ORDER BY started_at DESC
+    LIMIT 1
+  `).get() || null;
+}
+
 export function getOverview(db, { today } = {}) {
   const day = isValidDateString(today) ? today : todayFortaleza();
   const settings = getSettings(db);
@@ -1409,7 +1470,23 @@ export function getOverview(db, { today } = {}) {
   const openDebts = debts.filter((d) => d.status !== 'clean');
   const cardOpen = openDebts.filter((d) => d.kind === 'card');
   const debtsTotal = money(openDebts.reduce((s, d) => s + d.balance, 0));
+  // dívida de cartão alimentada pelo Pluggy guarda o restante da fatura (total - pago) em balance
   const cardsTotal = money(cardOpen.reduce((s, d) => s + d.balance, 0));
+  const billsFrom = addDays(day, -3);
+  const billsTo = addDays(day, 7);
+  const billsDue7d = money(
+    cardOpen
+      .filter((d) => d.due_date && d.due_date >= billsFrom && d.due_date <= billsTo)
+      .reduce((s, d) => s + d.balance, 0),
+  );
+  const safeToSpend = money(Math.max(0, livre - billsDue7d));
+
+  const cardsStatus = listCardStatus(db);
+  const creditAvailableTotal = money(
+    cardsStatus
+      .filter((c) => c.account_status === 'active')
+      .reduce((s, c) => s + Number(c.limit_available || 0), 0),
+  );
 
   const liveSubs = subscriptions.filter((s) => ['active', 'keep'].includes(s.status));
   const workMonth = money(liveSubs.filter((s) => s.lane === 'work').reduce((s, x) => s + x.amount, 0));
@@ -1440,8 +1517,13 @@ export function getOverview(db, { today } = {}) {
     reserved_live: reservedLive,
     reserved,
     livre,
+    safe_to_spend: safeToSpend,
+    bills_due_7d: billsDue7d,
     debts_total: debtsTotal,
     cards_total: cardsTotal,
+    cards_status: cardsStatus,
+    credit_available_total: creditAvailableTotal,
+    bank_data_as_of: bankDataAsOf(db, cardsStatus),
     subscriptions_month: money(workMonth + personalMonth),
     work_month: workMonth,
     personal_month: personalMonth,
@@ -1456,6 +1538,7 @@ export function getOverview(db, { today } = {}) {
     accounts,
     debts,
     last_sync: lastSync || null,
+    last_midas_sync: lastMidasSync(db),
     settings,
   };
 }

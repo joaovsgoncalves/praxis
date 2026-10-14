@@ -38,7 +38,7 @@ import { useHideMoney } from "@/hooks/useHideMoney";
 import SourceChip from "@/components/finance/SourceChip";
 import WalletCards from "@/components/finance/WalletCards";
 import AccountsGrid from "@/components/finance/AccountsGrid";
-import { HideMoneyButton, WalletActions, WalletHero } from "@/components/finance/WalletHero";
+import { HideMoneyButton, MidasChip, WalletActions, WalletHero } from "@/components/finance/WalletHero";
 import { cn } from "@/lib/utils";
 
 function invalidateFinance(queryClient) {
@@ -118,21 +118,6 @@ export default function Financas() {
     queryKey: ["finance", "goals"],
     queryFn: () => praxisApi.finance.goals.list(),
     enabled: tab === "metas" || tab === "agora",
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: () => praxisApi.finance.sync(),
-    onSuccess: () => {
-      toast.success("Finanças sincronizadas");
-      invalidateFinance(queryClient);
-    },
-    onError: (err) => {
-      if (err?.status === 503 || err?.message === "pierre_not_configured") {
-        toast.info("Bancos ainda não ligados");
-      } else {
-        toast.error(err.message || "Não deu para sincronizar");
-      }
-    },
   });
 
   const payMutation = useMutation({
@@ -298,15 +283,7 @@ export default function Financas() {
         action={
           tab === "agora" ? null : (
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full"
-                disabled={syncMutation.isPending}
-                onClick={() => syncMutation.mutate()}
-              >
-                {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
-              </Button>
+              <MidasChip sync={overview.last_midas_sync} />
               <Button type="button" variant="outline" className="rounded-full" onClick={openCaixaDialog}>
                 Atualizar saldo
               </Button>
@@ -353,9 +330,8 @@ export default function Financas() {
             )}
             <WalletActions
               hide={hide}
-              syncing={syncMutation.isPending}
+              midasSync={overview.last_midas_sync}
               onUpdateBalance={openCaixaDialog}
-              onSync={() => syncMutation.mutate()}
               onDues={showDues}
             />
           </div>

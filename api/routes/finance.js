@@ -30,6 +30,7 @@ import {
   updateSubscription,
   updateTransaction,
 } from '../finance.js';
+import { ingestPluggy } from '../pluggyIngest.js';
 import { syncPierre } from '../pierreSync.js';
 
 function sendError(res, err) {
@@ -222,6 +223,16 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   router.post('/seed', (req, res) => {
     const result = seedFinanceIfEmpty(db, { force: Boolean(req.body?.force) });
     res.json(result);
+  });
+
+  // Midas manda o JSON normalizado do Pluggy de hora em hora
+  router.post('/ingest/pluggy', (req, res) => {
+    try {
+      const today = typeof getLocalDateString === 'function' ? getLocalDateString() : undefined;
+      res.json(ingestPluggy(db, req.body, { today }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.get('/sync/last', (_req, res) => {

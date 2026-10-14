@@ -1,0 +1,350 @@
+/**
+ * Ingest do Pluggy via Midas: o Midas lê os bancos e manda um JSON já normalizado.
+ * A Praxis não fala com o Pluggy. Valida tudo antes e grava numa transação só.
+ */
+
+import { randomUUID } from 'crypto';
+import { getOverview, money, todayFortaleza, updateSettings } from './finance.js';
+
+export const PLUGGY_INSTITUTIONS = ['inter', 'c6', 'mp', 'nubank', 'santander'];
+const ISO_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LAST4_RE = /^\d{4}$/;
+
+function invalid(path, message) {
+  const err = new Error(`${path}: ${message}`);
+  err.status = 400;
+  return err;
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function finite(value, path, { nullable = false } = {}) {
+  if (value === null || value === undefined) {
+    if (nullable) return null;
+    throw invalid(path, 'número obrigatório');
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw invalid(path, 'precisa ser número finito');
+  return value;
+}
+
+function ymd(value, path, { nullable = false } = {}) {
+  if (value === null || value === undefined) {
+    if (nullable) return null;
+    throw invalid(path, 'data obrigatória');
+  }
+  if (typeof value !== 'string' || !YMD_RE.test(value)) throw invalid(path, 'use YYYY-MM-DD');
+  const [y, m, d] = value.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    throw invalid(path, 'data inexistente');
+  }
+  return value;
+}
+
+function isoTime(value, path) {
+  if (typeof value !== 'string' || !ISO_TIME_RE.test(value) || !Number.isFinite(Date.parse(value))) {
+    throw invalid(path, 'use data e hora ISO 8601');
+  }
+  return new Date(value).toISOString();
+}
+
+function shortText(value, path, { max = 60, nullable = true } = {}) {
+  if (value === null || value === undefined) {
+    if (nullable) return null;
+    throw invalid(path, 'texto obrigatório');
+  }
+  if (typeof value !== 'string' || value.length > max) throw invalid(path, `texto de até ${max} caracteres`);
+  if (!nullable && !value.trim()) throw invalid(path, 'texto obrigatório');
+  return value;
+}
+
+function parseBank(bank, path) {
+  if (bank === null || bank === undefined) return null;
+  if (!isPlainObject(bank)) throw invalid(path, 'objeto ou null');
+  const reservedRaw = bank.reserved ?? [];
+  if (!Array.isArray(reservedRaw)) throw invalid(`${path}.reserved`, 'lista');
+  const reserved = reservedRaw.map((item, i) => {
+    if (!isPlainObject(item)) throw invalid(`${path}.reserved[${i}]`, 'objeto');
+    return {
+      name: shortText(item.name, `${path}.reserved[${i}].name`, { max: 120 }) || '',
+      amount: finite(item.amount, `${path}.reserved[${i}].amount`),
+    };
+  });
+  return { balance: finite(bank.balance, `${path}.balance`), reserved };
+}
+
+function parseBill(bill, path) {
+  if (bill === null || bill === undefined) return null;
+  if (!isPlainObject(bill)) throw invalid(path, 'objeto ou null');
+  const paymentsN = bill.payments_n ?? null;
+  if (paymentsN !== null && !(Number.isInteger(paymentsN) && paymentsN >= 0)) {
+    throw invalid(`${path}.payments_n`, 'inteiro >= 0');
+  }
+  return {
+    due_date: ymd(bill.due_date, `${path}.due_date`),
+    closing_date: ymd(bill.closing_date, `${path}.closing_date`, { nullable: true }),
+    total: finite(bill.total, `${path}.total`),
+    minimum: finite(bill.minimum, `${path}.minimum`, { nullable: true }) ?? 0,
+    paid: finite(bill.paid, `${path}.paid`, { nullable: true }) ?? 0,
+    payments_n: paymentsN,
+  };
+}
+
+function parseCard(card, path) {
+  if (card === null || card === undefined) return null;
+  if (!isPlainObject(card)) throw invalid(path, 'objeto ou null');
+  const last4 = card.last4 ?? null;
+  if (last4 !== null && (typeof last4 !== 'string' || !LAST4_RE.test(last4))) {
+    throw invalid(`${path}.last4`, '4 dígitos');
+  }
+  return {
+    last4,
+    brand: shortText(card.brand, `${path}.brand`, { max: 40 }),
+    used: finite(card.used, `${path}.used`, { nullable: true }),
+    limit: finite(card.limit, `${path}.limit`, { nullable: true }),
+    available: finite(card.available, `${path}.available`, { nullable: true }),
+    bill: parseBill(card.bill, `${path}.bill`),
+  };
+}
+
+/** Valida o corpo inteiro; qualquer erro vira 400 antes de gravar qualquer coisa. */
+export function parsePluggyPayload(body) {
+  if (!isPlainObject(body)) throw invalid('body', 'objeto JSON');
+  if (body.source !== 'pluggy') throw invalid('source', 'precisa ser "pluggy"');
+  const fetchedAt = body.fetched_at == null ? null : isoTime(body.fetched_at, 'fetched_at');
+  if (!Array.isArray(body.institutions)) throw invalid('institutions', 'lista');
+  if (body.institutions.length > 20) throw invalid('institutions', 'no máximo 20');
+  const seen = new Set();
+  const institutions = body.institutions.map((raw, i) => {
+    const path = `institutions[${i}]`;
+    if (!isPlainObject(raw)) throw invalid(path, 'objeto');
+    if (!PLUGGY_INSTITUTIONS.includes(raw.institution)) {
+      throw invalid(`${path}.institution`, `use ${PLUGGY_INSTITUTIONS.join(', ')}`);
+    }
+    if (seen.has(raw.institution)) throw invalid(`${path}.institution`, 'repetida');
+    seen.add(raw.institution);
+    return {
+      institution: raw.institution,
+      updated_at: isoTime(raw.updated_at, `${path}.updated_at`),
+      status: shortText(raw.status, `${path}.status`, { max: 40, nullable: false }),
+      bank: parseBank(raw.bank, `${path}.bank`),
+      card: parseCard(raw.card, `${path}.card`),
+    };
+  });
+  return { fetched_at: fetchedAt, institutions };
+}
+
+/** Conta do dia a dia da instituição: não-crédito, ativa, operacional primeiro. */
+function operationalAccount(db, institution) {
+  return db.prepare(`
+    SELECT * FROM finance_accounts
+    WHERE institution = ? AND kind != 'credit' AND status = 'active'
+    ORDER BY is_operational DESC, sort_order ASC, id ASC
+    LIMIT 1
+  `).get(institution) || null;
+}
+
+/** Conta de crédito com o mesmo final; senão a conta da instituição (ex.: pré-pago do Mercado Pago). */
+function cardAccount(db, institution, last4, fallback) {
+  if (last4) {
+    const credit = db.prepare(`
+      SELECT * FROM finance_accounts
+      WHERE kind = 'credit' AND status = 'active' AND (mask = ? OR card_last4 = ?)
+      ORDER BY (institution = ?) DESC, sort_order ASC, id ASC
+      LIMIT 1
+    `).get(last4, last4, institution);
+    if (credit) return credit;
+  }
+  return fallback;
+}
+
+/** Hora do banco mais recente já gravada para a instituição (para não regredir com JSON atrasado). */
+function storedBankTime(db, institution) {
+  const card = db.prepare(
+    'SELECT MAX(bank_updated_at) AS ts FROM finance_card_status WHERE institution = ?',
+  ).get(institution);
+  const balance = db.prepare(`
+    SELECT MAX(b.created_at) AS ts
+    FROM finance_balances b
+    JOIN finance_accounts a ON a.id = b.account_id
+    WHERE b.source = 'pluggy' AND a.institution = ?
+  `).get(institution);
+  return [card?.ts, balance?.ts].filter(Boolean).sort().at(-1) || null;
+}
+
+function upsertBalance(db, accountId, bank, bankUpdatedAt) {
+  const asOf = todayFortaleza(new Date(bankUpdatedAt));
+  const amount = money(bank.balance + bank.reserved.reduce((s, r) => s + r.amount, 0));
+  const reservedNames = bank.reserved.filter((r) => r.amount).map((r) => r.name).filter(Boolean);
+  const note = reservedNames.length ? `inclui reservas: ${reservedNames.join(', ')}` : '';
+  const existing = db.prepare(`
+    SELECT id FROM finance_balances
+    WHERE account_id = ? AND as_of = ? AND amount_kind = 'available' AND source = 'pluggy'
+  `).get(accountId, asOf);
+  // created_at = hora real do banco: no desempate de latestBalance, o manual mais novo que ela vence
+  if (existing) {
+    db.prepare('UPDATE finance_balances SET amount = ?, note = ?, created_at = ? WHERE id = ?')
+      .run(amount, note, bankUpdatedAt, existing.id);
+  } else {
+    db.prepare(`
+      INSERT INTO finance_balances (id, account_id, as_of, amount, amount_kind, source, locked, note, created_at)
+      VALUES (?, ?, ?, ?, 'available', 'pluggy', 0, ?, ?)
+    `).run(randomUUID(), accountId, asOf, amount, note, bankUpdatedAt);
+  }
+  return amount;
+}
+
+function upsertCardStatus(db, accountId, institution, card, bankUpdatedAt, now) {
+  const bill = card.bill;
+  const remaining = bill ? money(Math.max(0, bill.total - bill.paid)) : null;
+  db.prepare(`
+    INSERT INTO finance_card_status
+      (account_id, institution, last4, brand, used, limit_total, limit_available,
+       bill_total, bill_minimum, bill_paid, bill_remaining, bill_due, bill_closing,
+       bank_updated_at, updated_at, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pluggy')
+    ON CONFLICT(account_id) DO UPDATE SET
+      institution = excluded.institution,
+      last4 = excluded.last4,
+      brand = excluded.brand,
+      used = excluded.used,
+      limit_total = excluded.limit_total,
+      limit_available = excluded.limit_available,
+      bill_total = excluded.bill_total,
+      bill_minimum = excluded.bill_minimum,
+      bill_paid = excluded.bill_paid,
+      bill_remaining = excluded.bill_remaining,
+      bill_due = excluded.bill_due,
+      bill_closing = excluded.bill_closing,
+      bank_updated_at = excluded.bank_updated_at,
+      updated_at = excluded.updated_at,
+      source = excluded.source
+  `).run(
+    accountId,
+    institution,
+    card.last4,
+    card.brand,
+    card.used == null ? null : money(card.used),
+    card.limit == null ? null : money(card.limit),
+    card.available == null ? null : money(card.available),
+    bill ? money(bill.total) : null,
+    bill ? money(bill.minimum) : null,
+    bill ? money(bill.paid) : null,
+    remaining,
+    bill?.due_date || null,
+    bill?.closing_date || null,
+    bankUpdatedAt,
+    now,
+  );
+  return remaining;
+}
+
+/** Só os campos da fatura; ignora locked porque o Pluggy é a fonte oficial dela. */
+function updateCardDebt(db, accountIds, bill, now) {
+  let debt = null;
+  for (const id of accountIds) {
+    debt = db.prepare(`
+      SELECT * FROM finance_debts
+      WHERE kind = 'card' AND account_id = ?
+      ORDER BY queue ASC, created_at ASC
+      LIMIT 1
+    `).get(id);
+    if (debt) break;
+  }
+  if (!debt) return null;
+  const remaining = money(Math.max(0, bill.total - bill.paid));
+  db.prepare(`
+    UPDATE finance_debts
+    SET balance = ?, min_payment = ?, due_date = ?, status = ?, source = 'pluggy', updated_at = ?
+    WHERE id = ?
+  `).run(
+    remaining,
+    money(Math.max(0, bill.minimum - bill.paid)),
+    bill.due_date,
+    remaining <= 0.01 ? 'clean' : 'open',
+    now,
+    debt.id,
+  );
+  return debt.id;
+}
+
+function applyInstitution(db, item, now) {
+  const op = operationalAccount(db, item.institution);
+  const cardAcc = item.card ? cardAccount(db, item.institution, item.card.last4, op) : null;
+  if (!op && !cardAcc) return { skipped: { institution: item.institution, status: item.status, reason: 'sem conta na Praxis' } };
+
+  const stored = storedBankTime(db, item.institution);
+  if (stored && item.updated_at < stored) {
+    return { skipped: { institution: item.institution, status: item.status, reason: 'dados mais antigos que os gravados' } };
+  }
+
+  const applied = {
+    institution: item.institution,
+    account_id: op?.id || null,
+    card_account_id: cardAcc?.id || null,
+    balance: null,
+    bill_remaining: null,
+    debt_id: null,
+  };
+  if (item.bank && op) {
+    applied.balance = upsertBalance(db, op.id, item.bank, item.updated_at);
+  }
+  if (item.card && cardAcc) {
+    applied.bill_remaining = upsertCardStatus(db, cardAcc.id, item.institution, item.card, item.updated_at, now);
+    if (item.card.bill) {
+      const ids = [...new Set([cardAcc.id, op?.id].filter(Boolean))];
+      applied.debt_id = updateCardDebt(db, ids, item.card.bill, now);
+    }
+  }
+  return { applied };
+}
+
+/** POST /api/finance/ingest/pluggy — idempotente; status != UPDATED só entra no log. */
+export function ingestPluggy(db, body, { today } = {}) {
+  const payload = parsePluggyPayload(body);
+  const now = new Date().toISOString();
+  const applied = [];
+  const skipped = [];
+
+  db.transaction(() => {
+    for (const item of payload.institutions) {
+      if (item.status !== 'UPDATED') {
+        skipped.push({ institution: item.institution, status: item.status, reason: 'status do banco' });
+        continue;
+      }
+      const result = applyInstitution(db, item, now);
+      if (result.applied) applied.push(result.applied);
+      else skipped.push(result.skipped);
+    }
+    if (applied.some((a) => a.balance !== null)) {
+      // dado vivo do banco: deixa de ser "foto"
+      updateSettings(db, { snapshot_label: '' });
+    }
+    db.prepare(`
+      INSERT INTO finance_sync_log (id, started_at, finished_at, ok, accounts_n, tx_n, error, actor)
+      VALUES (?, ?, ?, 1, ?, 0, ?, 'midas')
+    `).run(
+      randomUUID(),
+      now,
+      now,
+      applied.length,
+      skipped.map((s) => `${s.institution}: ${s.status === 'UPDATED' ? s.reason : s.status}`).join('; '),
+    );
+  })();
+
+  const overview = getOverview(db, { today });
+  return {
+    ok: true,
+    applied,
+    skipped,
+    overview_snapshot: {
+      caixa: overview.caixa,
+      livre: overview.livre,
+      safe_to_spend: overview.safe_to_spend,
+      bills_due_7d: overview.bills_due_7d,
+    },
+  };
+}

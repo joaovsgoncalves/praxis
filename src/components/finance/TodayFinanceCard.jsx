@@ -18,11 +18,13 @@ export default function TodayFinanceCard() {
   });
 
   const nextDue = data?.next_due;
+  // livre menos as faturas dos próximos 7 dias; API antiga sem o campo cai no caixa
+  const hasSafe = data?.safe_to_spend != null;
   const label = isLoading
     ? '…'
     : isError
       ? '—'
-      : money(data?.caixa);
+      : money(hasSafe ? data.safe_to_spend : data?.caixa);
 
   return (
     <Card className="praxis-dashboard-card praxis-context-card">
@@ -34,7 +36,9 @@ export default function TodayFinanceCard() {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-muted-foreground">Finanças</p>
-              <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em] tabular-nums">Caixa {label}</h3>
+              <h3 className="praxis-title mt-0.5 text-base font-semibold tracking-[-0.025em] tabular-nums">
+                {hasSafe || isLoading ? 'Pode gastar' : 'Caixa'} {label}
+              </h3>
             </div>
           </div>
         </div>

@@ -151,6 +151,18 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
   const muted = { color: brand.muted };
   // Atrás na pilha só a fatia aparece: o nome trunca dentro dela (reticências visíveis).
   const nameStyle = peekWidth ? { maxWidth: Math.max(0, peekWidth - PEEK_TEXT_INSET) } : undefined;
+  const billLine = card.bill ? `Fatura ${money(card.bill.total)} · pago ${money(card.bill.paid ?? 0)}` : null;
+  const limitLine = card.limitAvailable != null ? `Limite livre ${money(card.limitAvailable)}` : null;
+  const paidOff = Boolean(card.bill?.paidOff);
+  const spoken = [
+    `${card.name}, ${card.typeLabel}. ${card.amountLabel} ${money(card.amount)}`,
+    billLine,
+    limitLine,
+    card.dueLabel,
+    paidOff ? "Fatura paga" : null,
+  ]
+    .filter(Boolean)
+    .join(". ");
   return (
     <div
       data-active={active ? "true" : "false"}
@@ -165,7 +177,7 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
         type="button"
         onClick={onSelect}
         aria-pressed={active}
-        aria-label={`${card.name}, ${card.typeLabel}. ${card.amountLabel} ${money(card.amount)}${card.dueLabel ? `. ${card.dueLabel}` : ""}`}
+        aria-label={spoken}
         className="absolute inset-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
       />
       <div className="pointer-events-none relative flex items-start justify-between gap-2">
@@ -191,6 +203,12 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
         <p className="truncate font-display text-[1.65rem] font-semibold leading-tight tracking-[-0.02em] tabular-nums">
           {money(card.amount)}
         </p>
+        {billLine || limitLine ? (
+          <div className="mt-0.5 space-y-px text-[11px] font-medium leading-tight tabular-nums" style={muted}>
+            {billLine ? <p className="truncate">{billLine}</p> : null}
+            {limitLine ? <p className="truncate">{limitLine}</p> : null}
+          </div>
+        ) : null}
       </div>
       <div className="pointer-events-none relative flex min-h-4 items-center justify-between gap-2 text-xs">
         {card.last4 ? (
@@ -202,7 +220,14 @@ function BankCard({ card, money, active, onSelect, onUpdate, busy, className, pe
         ) : (
           <span />
         )}
-        {card.dueLabel ? <span className="font-medium tabular-nums">{card.dueLabel}</span> : null}
+        <span className="flex items-center gap-1.5">
+          {card.dueLabel ? <span className="font-medium tabular-nums">{card.dueLabel}</span> : null}
+          {paidOff ? (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold leading-none text-emerald-900">
+              Paga
+            </span>
+          ) : null}
+        </span>
       </div>
     </div>
   );
