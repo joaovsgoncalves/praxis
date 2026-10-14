@@ -43,6 +43,62 @@ export function tasksForBoardColumn(tasks, column, today) {
   return tasks.filter((t) => boardColumnForTask(t, today) === column);
 }
 
+/** Ordem da coluna: sort_order crescente (nulos no fim), depois created_date mais novo primeiro. */
+export function compareBoardOrder(a, b) {
+  const aHas = a?.sort_order !== null && a?.sort_order !== undefined && a?.sort_order !== '';
+  const bHas = b?.sort_order !== null && b?.sort_order !== undefined && b?.sort_order !== '';
+  if (aHas !== bHas) return aHas ? -1 : 1;
+  if (aHas && bHas) {
+    const diff = Number(a.sort_order) - Number(b.sort_order);
+    if (diff !== 0) return diff;
+  }
+  return String(b?.created_date || '').localeCompare(String(a?.created_date || ''));
+}
+
+/** Tarefas da coluna já na ordem de exibição. */
+export function sortedBoardColumn(tasks, column, today) {
+  return tasksForBoardColumn(tasks, column, today).sort(compareBoardOrder);
+}
+
+/**
+ * Nova ordem de IDs da coluna de destino depois de soltar `movedId` em `toIndex`.
+ * `columnTasks` é a coluna como está na tela (pode ou não conter a tarefa movida).
+ */
+export function reorderColumnIds(columnTasks, movedId, toIndex) {
+  const ids = (Array.isArray(columnTasks) ? columnTasks : [])
+    .map((t) => String(t.id))
+    .filter((id) => id !== String(movedId));
+  const index = Math.max(0, Math.min(Number.isFinite(toIndex) ? toIndex : ids.length, ids.length));
+  ids.splice(index, 0, String(movedId));
+  return ids;
+}
+
+/**
+ * Aplica localmente (otimista) um movimento do quadro: patch de coluna na tarefa movida
+ * e sort_order = índice para os IDs da coluna de destino (mesma regra do PATCH /reorder).
+ */
+export function applyBoardMove(tasks, move, today) {
+  if (!Array.isArray(tasks) || !move?.taskId) return tasks;
+  const patch = move.patch || {};
+  const order = new Map((move.orderedIds || []).map((id, index) => [String(id), index]));
+  return tasks.map((t) => {
+    const id = String(t.id);
+    let next = t;
+    if (id === String(move.taskId) && Object.keys(patch).length > 0) {
+      next = { ...next, ...patch };
+      if (patch.status === 'completed') {
+        next.completed_date = today;
+        next.completed_at = next.completed_at || new Date().toISOString();
+      } else if (patch.status) {
+        next.completed_date = null;
+        next.completed_at = null;
+      }
+    }
+    if (order.has(id)) next = { ...next, sort_order: order.get(id) };
+    return next;
+  });
+}
+
 /**
  * Calcula patch para mover tarefa para uma coluna do quadro.
  * - inbox: { date: null, time: null }

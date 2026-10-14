@@ -76,7 +76,7 @@ import {
   taskLensFromSearchParams,
   setTaskLensInSearchParams,
 } from '@/lib/urlDeepLinks';
-import { boardColumnForTask, weekRange } from '@/lib/taskLenses';
+import { boardColumnForTask, weekRange, applyBoardMove } from '@/lib/taskLenses';
 import TaskBoard from '@/components/habits-tasks/TaskBoard';
 import TaskWeek from '@/components/habits-tasks/TaskWeek';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -359,6 +359,71 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
   });
+
+  // Quadro: muda de coluna (se mudou) e grava a nova ordem da coluna. Otimista, com rollback.
+  const moveBoardTask = useMutation({
+    mutationFn: async ({ task, patch, orderedIds }) => {
+      // PUT usa COALESCE: null não limpa. '' limpa (mesma convenção do TaskForm) — ex.: mover pra Caixa.
+      const body = Object.fromEntries(
+        Object.entries(patch).map(([key, value]) => [key, (key === 'date' || key === 'time') && value === null ? '' : value])
+      );
+      const updated = Object.keys(body).length > 0 ? await praxisApi.tasks.update(task.id, body) : null;
+      await praxisApi.tasks.reorder(orderedIds);
+      return updated;
+    },
+    onMutate: async ({ task, patch, orderedIds }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
+      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
+
+      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
+      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
+      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
+
+      if (patch?.status === 'completed') hapticLight();
+
+      const move = { taskId: task.id, patch, orderedIds };
+      const updateList = (old) => (Array.isArray(old) ? applyBoardMove(old, move, today) : old);
+      queryClient.setQueriesData({ queryKey: ['tasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['allTasks'] }, updateList);
+      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, updateList);
+
+      return { prevTasks, prevAllTasks, prevDashboard };
+    },
+    onError: (_err, _vars, context) => {
+      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
+      toast.error('Não deu pra mover a tarefa. Tente de novo.');
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      dispatchPraxisLevelUpFromResponse(data);
+      notifyPraxisRecurrenceSpawned(data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['gamification'] });
+    },
+  });
+
+  const BOARD_CREATE_FIELDS = {
+    inbox: { date: null, status: 'pending' },
+    todo: { date: today, status: 'pending' },
+    doing: { date: today, status: 'in_progress' },
+    done: { date: today, status: 'completed' },
+  };
+
+  const handleCreateInColumn = (columnId, title) =>
+    createTask
+      .mutateAsync({ title, source: 'manual', ...(BOARD_CREATE_FIELDS[columnId] || BOARD_CREATE_FIELDS.inbox) })
+      .catch((err) => {
+        toast.error('Erro ao criar tarefa');
+        throw err;
+      });
 
   const reorderHabits = useMutation({
     mutationFn: (orderedIds) => praxisApi.habits.reorder(orderedIds),
@@ -1079,9 +1144,9 @@ export default function HabitsTasks() {
 
           <TaskBoard
             tasks={tasks}
-            allTasks={tasks}
             today={today}
-            onUpdateTask={(id, data) => updateTask.mutate({ id, data })}
+            onMoveTask={(move) => moveBoardTask.mutate(move)}
+            onCreateInColumn={handleCreateInColumn}
             onToggleComplete={(task) => toggleTask.mutate(task)}
             onEditTask={(task) => setEditingTask(task)}
             onDeleteTask={(task) => confirmDeleteTask(task)}

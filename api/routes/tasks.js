@@ -22,6 +22,36 @@ export function createTasksRouter(ctx) {
 
   const router = Router();
 
+  // Uma consulta agregada para a lista inteira (json_each evita estourar o limite de parâmetros).
+  const checklistCountsStmt = db.prepare(`
+    SELECT task_id, COUNT(*) AS total, COALESCE(SUM(CASE WHEN done = 1 THEN 1 ELSE 0 END), 0) AS done
+    FROM task_checklist_items
+    WHERE task_id IN (SELECT value FROM json_each(?))
+    GROUP BY task_id
+  `);
+
+  function withChecklistCounts(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+    const counts = new Map(
+      checklistCountsStmt.all(JSON.stringify(rows.map((row) => row.id))).map((row) => [row.task_id, row]),
+    );
+    return rows.map((row) => {
+      const c = counts.get(row.id);
+      return { ...row, checklist_total: c ? Number(c.total) : 0, checklist_done: c ? Number(c.done) : 0 };
+    });
+  }
+
+  function findTask(id) {
+    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  }
+
+  function listChecklist(taskId) {
+    return db
+      .prepare('SELECT * FROM task_checklist_items WHERE task_id = ? ORDER BY sort_order IS NULL, sort_order ASC, created_date ASC')
+      .all(taskId)
+      .map((item) => ({ ...item, done: Boolean(item.done) }));
+  }
+
   router.get('/', (req, res) => {
     const { date, status, category, idea_status, limit = 100, offset = 0, include_overdue, today: todayParam } = req.query;
     const limitN = Math.min(1000, Math.max(1, Number(limit) || 100));
@@ -43,7 +73,7 @@ export function createTasksRouter(ctx) {
     const recent = db.prepare(query).all(...params);
 
     if (!mergeOverdue) {
-      return res.json(recent.map(enrichCategory));
+      return res.json(withChecklistCounts(recent).map(enrichCategory));
     }
 
     // The frontend uses this mode for the operational payload. Include all open
@@ -95,7 +125,7 @@ export function createTasksRouter(ctx) {
       return String(b.created_date || '').localeCompare(String(a.created_date || ''));
     });
 
-    res.json(merged.map(enrichCategory));
+    res.json(withChecklistCounts(merged).map(enrichCategory));
   });
 
   router.patch('/reorder', (req, res) => {
@@ -107,7 +137,79 @@ export function createTasksRouter(ctx) {
   router.get('/:id', (req, res) => {
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    res.json(enrichCategory(task));
+    res.json(enrichCategory(withChecklistCounts([task])[0]));
+  });
+
+  // Checklist da tarefa — /reorder antes de /:itemId.
+  router.get('/:id/checklist', (req, res) => {
+    if (!findTask(req.params.id)) return res.status(404).json({ error: 'Task not found' });
+    res.json(listChecklist(req.params.id));
+  });
+
+  router.post('/:id/checklist', (req, res) => {
+    if (!findTask(req.params.id)) return res.status(404).json({ error: 'Task not found' });
+    const title = String(req.body?.title ?? '').trim();
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    const id = randomUUID();
+    const next = db
+      .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM task_checklist_items WHERE task_id = ?')
+      .get(req.params.id);
+    db.prepare(`
+      INSERT INTO task_checklist_items (id, task_id, title, done, sort_order)
+      VALUES (?, ?, ?, 0, ?)
+    `).run(id, req.params.id, title, Number(next?.next_order || 0));
+
+    const item = db.prepare('SELECT * FROM task_checklist_items WHERE id = ?').get(id);
+    res.status(201).json({ ...item, done: Boolean(item.done) });
+  });
+
+  router.patch('/:id/checklist/reorder', (req, res) => {
+    if (!findTask(req.params.id)) return res.status(404).json({ error: 'Task not found' });
+    const ids = req.body?.ordered_ids;
+    if (!Array.isArray(ids)) return res.status(400).json({ error: 'ordered_ids must be an array' });
+
+    const uniqueIds = [...new Set(ids.filter(Boolean).map(String))];
+    const update = db.prepare(`
+      UPDATE task_checklist_items SET sort_order = ?, updated_date = datetime('now')
+      WHERE id = ? AND task_id = ?
+    `);
+    const run = db.transaction((list) => {
+      list.forEach((itemId, index) => update.run(index, itemId, req.params.id));
+    });
+    run(uniqueIds);
+    res.json({ success: true, items: listChecklist(req.params.id) });
+  });
+
+  router.patch('/:id/checklist/:itemId', (req, res) => {
+    const existing = db
+      .prepare('SELECT * FROM task_checklist_items WHERE id = ? AND task_id = ?')
+      .get(req.params.itemId, req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Checklist item not found' });
+
+    const { title, done } = req.body || {};
+    let nextTitle = existing.title;
+    if (title !== undefined) {
+      nextTitle = String(title).trim();
+      if (!nextTitle) return res.status(400).json({ error: 'Title cannot be empty' });
+    }
+    const nextDone = done !== undefined ? (done ? 1 : 0) : existing.done;
+
+    db.prepare(`
+      UPDATE task_checklist_items SET title = ?, done = ?, updated_date = datetime('now')
+      WHERE id = ?
+    `).run(nextTitle, nextDone, existing.id);
+
+    const item = db.prepare('SELECT * FROM task_checklist_items WHERE id = ?').get(existing.id);
+    res.json({ ...item, done: Boolean(item.done) });
+  });
+
+  router.delete('/:id/checklist/:itemId', (req, res) => {
+    const result = db
+      .prepare('DELETE FROM task_checklist_items WHERE id = ? AND task_id = ?')
+      .run(req.params.itemId, req.params.id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Checklist item not found' });
+    res.json({ success: true });
   });
 
   function spawnNextRecurringTask(db, task, { completedDate, today }) {
@@ -305,7 +407,10 @@ export function createTasksRouter(ctx) {
     if (!existing) return res.status(404).json({ error: 'Task not found' });
 
     const calendarSync = syncTaskToCalendar({ ...existing, status: 'cancelled' });
-    db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+    db.transaction((taskId) => {
+      db.prepare('DELETE FROM task_checklist_items WHERE task_id = ?').run(taskId);
+      db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+    })(req.params.id);
     res.json({ success: true, calendar_sync: calendarSync });
   });
 

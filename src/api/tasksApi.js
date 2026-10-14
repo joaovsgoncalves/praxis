@@ -13,6 +13,20 @@ export const tasksApiModule = (request) => ({
     notToday: (id, body = {}) =>
       request(`/api/tasks/${id}/not-today`, { method: 'POST', body: JSON.stringify(body) }),
     delete: (id) => request(`/api/tasks/${id}`, { method: 'DELETE' }),
+    checklist: {
+      list: (taskId) => request(`/api/tasks/${taskId}/checklist`),
+      create: (taskId, title) =>
+        request(`/api/tasks/${taskId}/checklist`, { method: 'POST', body: JSON.stringify({ title }) }),
+      /** Body: { title?, done? } */
+      update: (taskId, itemId, data) =>
+        request(`/api/tasks/${taskId}/checklist/${itemId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (taskId, itemId) => request(`/api/tasks/${taskId}/checklist/${itemId}`, { method: 'DELETE' }),
+      reorder: (taskId, orderedIds) =>
+        request(`/api/tasks/${taskId}/checklist/reorder`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ordered_ids: orderedIds }),
+        }),
+    },
   },
 
   ideas: {

@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { CalendarIcon, Lightbulb, Repeat } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import TaskChecklist from './TaskChecklist';
 
 const WEEKDAYS = [
   { value: 1, short: 'Seg' },
@@ -200,6 +201,7 @@ export default function TaskForm({ onSubmit, onCancel, goals = [], initial = {} 
           </SelectContent>
         </Select>
       )}
+      {!isCreating && initial.category !== 'ideias' ? <TaskChecklist taskId={initial.id} /> : null}
       <div className="flex gap-2 justify-end">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>}
         <Button type="submit" disabled={recurrenceNeedsDate} className="bg-primary hover:bg-primary/90">{isCreating ? 'Criar Tarefa' : 'Salvar'}</Button>

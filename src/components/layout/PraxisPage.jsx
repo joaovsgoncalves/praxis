@@ -77,23 +77,49 @@ export function StatTile({ label, value, tone = 'neutral', valueClassName, align
  * Cabeçalho de seção. Opcionais: `icon` ao lado do título, `count` (pílula mono)
  * e `action` (botão/menu compacto, fica à direita do título até no celular).
  * `trailing` continua como antes: bloco que empilha abaixo no mobile.
+ * `size="sm"` é o cabeçalho compacto (colunas do quadro); `iconClassName` troca o acento do ícone
+ * e `as` o nível do título.
  */
-export function SectionHeader({ kicker, title, trailing, className, icon: Icon, count, action }) {
+export function SectionHeader({
+  kicker,
+  title,
+  trailing,
+  className,
+  icon: Icon,
+  iconClassName,
+  count,
+  action,
+  size = 'md',
+  as: TitleTag = 'h2',
+}) {
   const hasCount = count !== undefined && count !== null && count !== '';
   const hasTitleRow = Boolean(title || Icon || hasCount || action);
+  const small = size === 'sm';
   return (
     <div className={cn('space-y-2', className)}>
       {kicker ? <p className="praxis-kicker-row text-muted-foreground">{kicker}</p> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {hasTitleRow ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <div className={cn('flex min-w-0 flex-1 items-center', small ? 'gap-2' : 'gap-2.5')}>
             {Icon ? (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.04] shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.07)]">
-                <Icon className="h-4 w-4 text-primary" aria-hidden />
+              <span
+                className={cn(
+                  'flex shrink-0 items-center justify-center bg-white/[0.04] shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.07)]',
+                  small ? 'h-7 w-7 rounded-lg' : 'h-8 w-8 rounded-[10px]',
+                )}
+              >
+                <Icon className={cn(small ? 'h-3.5 w-3.5' : 'h-4 w-4', iconClassName || 'text-primary')} aria-hidden />
               </span>
             ) : null}
             {title ? (
-              <h2 className="praxis-title min-w-0 text-xl font-semibold leading-tight [text-wrap:balance] sm:text-2xl">{title}</h2>
+              <TitleTag
+                className={cn(
+                  'praxis-title min-w-0 font-semibold leading-tight [text-wrap:balance]',
+                  small ? 'truncate text-sm tracking-[-0.01em]' : 'text-xl sm:text-2xl',
+                )}
+              >
+                {title}
+              </TitleTag>
             ) : null}
             {hasCount ? (
               <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] px-2 font-mono text-xs font-medium tabular-nums text-secondary-foreground shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]">

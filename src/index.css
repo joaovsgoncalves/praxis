@@ -164,6 +164,52 @@
     box-shadow: var(--glow-gold), var(--praxis-elev, 0 0 #0000);
   }
 
+  /* Quadro — card: nível 1 em repouso, 2 no hover (com lift), 3 arrastando (leve rotação) */
+  .praxis-board-card {
+    --praxis-elev: var(--elev-1);
+    background-color: hsl(var(--card));
+    background-image: var(--surface-sheen);
+    box-shadow: var(--praxis-elev), inset 0 0 0 1px hsl(0 0% 100% / 0.055);
+    transition:
+      transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+      box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 150ms ease-out;
+  }
+  .praxis-board-card[data-done='true'] {
+    background-color: hsl(var(--domain-wellness) / 0.07);
+    box-shadow: var(--praxis-elev), inset 0 0 0 1px hsl(var(--domain-wellness) / 0.2);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .praxis-board-card:hover {
+      --praxis-elev: var(--elev-2);
+      transform: translateY(-1px);
+    }
+    /* Ações rápidas: aparecem no hover e em qualquer foco dentro do card (teclado incluso) */
+    .praxis-board-actions {
+      opacity: 0;
+      transition: opacity 120ms ease-out;
+    }
+    .praxis-board-card:hover .praxis-board-actions,
+    .praxis-board-card:focus-within .praxis-board-actions,
+    .praxis-board-handle:focus-visible .praxis-board-actions,
+    .praxis-board-actions:has([data-state='open']) {
+      opacity: 1;
+    }
+  }
+  .praxis-board-card[data-dragging='true'] {
+    --praxis-elev: var(--elev-3);
+    transform: rotate(1.5deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .praxis-board-card {
+      transition: box-shadow 150ms ease-out, background-color 150ms ease-out;
+    }
+    .praxis-board-card:hover,
+    .praxis-board-card[data-dragging='true'] {
+      transform: none;
+    }
+  }
+
   /* Skeleton — base neutra + varredura discreta (só transform) */
   .praxis-skeleton {
     position: relative;

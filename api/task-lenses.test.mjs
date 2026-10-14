@@ -9,6 +9,9 @@ import {
   moveTaskToColumn,
   weekRange,
   taskBlock,
+  sortedBoardColumn,
+  reorderColumnIds,
+  applyBoardMove,
 } from '../src/lib/taskLenses.js';
 import {
   TASK_SCOPE_CHIPS,
@@ -215,5 +218,44 @@ describe('taskLenses - PRD Fase 0', () => {
 
     const nextScope = setTaskScopeInSearchParams(paramsDefault, 'inbox');
     assert.equal(nextScope.get('scope'), 'inbox');
+  });
+});
+
+describe('taskLenses - ordem livre do quadro (Fase 1)', () => {
+  it('sorts a column by sort_order with nulls last, then newest created_date', () => {
+    const today = '2026-08-24';
+    const tasks = [
+      { id: 'n-old', status: 'pending', date: today, sort_order: null, created_date: '2026-08-01 10:00:00' },
+      { id: 's2', status: 'pending', date: today, sort_order: 2 },
+      { id: 'n-new', status: 'pending', date: today, sort_order: null, created_date: '2026-08-20 10:00:00' },
+      { id: 's0', status: 'pending', date: today, sort_order: 0 },
+      { id: 'other', status: 'in_progress', date: today, sort_order: 1 },
+    ];
+    assert.deepEqual(sortedBoardColumn(tasks, 'todo', today).map((t) => t.id), ['s0', 's2', 'n-new', 'n-old']);
+  });
+
+  it('reorderColumnIds moves within a column and inserts from another column', () => {
+    const column = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    assert.deepEqual(reorderColumnIds(column, 'a', 2), ['b', 'c', 'a']);
+    assert.deepEqual(reorderColumnIds(column, 'c', 0), ['c', 'a', 'b']);
+    assert.deepEqual(reorderColumnIds(column, 'x', 1), ['a', 'x', 'b', 'c']);
+    assert.deepEqual(reorderColumnIds(column, 'x', 99), ['a', 'b', 'c', 'x']);
+    assert.deepEqual(reorderColumnIds([], 'x', 0), ['x']);
+  });
+
+  it('applyBoardMove patches the moved task and rewrites column sort_order', () => {
+    const today = '2026-08-24';
+    const tasks = [
+      { id: 'a', status: 'pending', date: today, sort_order: 5 },
+      { id: 'b', status: 'pending', date: today, sort_order: 9 },
+      { id: 'c', status: 'in_progress', date: today, sort_order: 1 },
+    ];
+    const moved = applyBoardMove(tasks, { taskId: 'c', patch: { status: 'completed' }, orderedIds: ['c'] }, today);
+    assert.equal(boardColumnForTask(moved[2], today), 'done');
+    assert.equal(moved[2].sort_order, 0);
+
+    const reordered = applyBoardMove(tasks, { taskId: 'b', patch: {}, orderedIds: ['b', 'a'] }, today);
+    assert.deepEqual(sortedBoardColumn(reordered, 'todo', today).map((t) => t.id), ['b', 'a']);
+    assert.equal(tasks[0].sort_order, 5, 'não muta a lista original');
   });
 });

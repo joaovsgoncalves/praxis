@@ -519,6 +519,18 @@ if (!tasksCols2.includes('day_outcome_date')) {
 if (!tasksCols2.includes('day_outcome_reason')) {
   db.exec('ALTER TABLE tasks ADD COLUMN day_outcome_reason TEXT');
 }
+db.exec(`
+  CREATE TABLE IF NOT EXISTS task_checklist_items (
+    id TEXT PRIMARY KEY,
+    task_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    done INTEGER DEFAULT 0,
+    sort_order INTEGER,
+    created_date TEXT DEFAULT (datetime('now')),
+    updated_date TEXT DEFAULT (datetime('now'))
+  )
+`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_task_checklist_task ON task_checklist_items(task_id, sort_order)');
 db.prepare(`
   UPDATE tasks SET idea_status = 'capturada'
   WHERE category = 'ideias' AND (idea_status IS NULL OR idea_status = '')
