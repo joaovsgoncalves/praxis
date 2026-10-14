@@ -52,6 +52,25 @@
     --domain-wellness: 160 45% 42%;
     --domain-sky: 200 50% 48%;
     --domain-pink: 330 45% 52%;
+
+    /* Elevação — sombra com deslocamento + highlight interno no topo */
+    --elev-1:
+      inset 0 1px 0 hsl(0 0% 100% / 0.04),
+      0 1px 2px hsl(0 0% 0% / 0.24),
+      0 8px 22px -12px hsl(0 0% 0% / 0.55);
+    --elev-2:
+      inset 0 1px 0 hsl(0 0% 100% / 0.05),
+      0 2px 4px hsl(0 0% 0% / 0.24),
+      0 16px 36px -16px hsl(0 0% 0% / 0.62);
+    --elev-3:
+      inset 0 1px 0 hsl(0 0% 100% / 0.06),
+      0 4px 10px hsl(0 0% 0% / 0.28),
+      0 24px 52px -18px hsl(0 0% 0% / 0.72);
+    --glow-gold:
+      inset 0 0 0 1px hsl(var(--primary) / 0.18),
+      0 10px 28px -14px hsl(var(--primary) / 0.32);
+    /* Topo da superfície um pouco mais claro; a cor de fundo continua livre pros utilitários bg-* */
+    --surface-sheen: linear-gradient(180deg, hsl(0 0% 100% / 0.03), hsl(0 0% 100% / 0) 55%);
   }
 
   .dark {
@@ -122,10 +141,96 @@
     box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03);
   }
 
+  /* Elevação em 3 níveis — glow-gold soma por cima do nível via --praxis-elev */
+  .praxis-elev-1,
+  .praxis-elev-2,
+  .praxis-elev-3 {
+    background-image: var(--surface-sheen);
+    box-shadow: var(--praxis-elev);
+  }
+  .praxis-elev-1 { --praxis-elev: var(--elev-1); }
+  .praxis-elev-2 { --praxis-elev: var(--elev-2); }
+  .praxis-elev-3 { --praxis-elev: var(--elev-3); }
+
   .praxis-panel {
-    background: hsl(var(--card) / 0.94);
+    --praxis-elev: var(--elev-1);
+    background-color: hsl(var(--card) / 0.94);
+    background-image: var(--surface-sheen);
     border: 1px solid hsl(0 0% 100% / 0.06);
-    box-shadow: none;
+    box-shadow: var(--praxis-elev);
+  }
+
+  .praxis-glow-gold {
+    box-shadow: var(--glow-gold), var(--praxis-elev, 0 0 #0000);
+  }
+
+  /* Skeleton — base neutra + varredura discreta (só transform) */
+  .praxis-skeleton {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background-color: hsl(0 0% 100% / 0.05);
+  }
+  .praxis-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.06) 50%, transparent);
+    transform: translateX(-100%);
+    animation: praxis-shimmer 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  @keyframes praxis-shimmer {
+    to { transform: translateX(100%); }
+  }
+
+  /* Empty — medalhão com anel dourado suave */
+  .praxis-empty-medal {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.06), hsl(0 0% 100% / 0.015));
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary) / 0.16),
+      inset 0 1px 0 hsl(0 0% 100% / 0.06),
+      0 8px 22px -12px hsl(var(--primary) / 0.22);
+  }
+  .praxis-empty-medal::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+    border: 1px solid hsl(0 0% 100% / 0.05);
+    pointer-events: none;
+  }
+  .praxis-empty-medal[data-tone='gold'] {
+    background: linear-gradient(180deg, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.07));
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary) / 0.32),
+      inset 0 1px 0 hsl(0 0% 100% / 0.08),
+      0 10px 28px -12px hsl(var(--primary) / 0.42);
+  }
+  .praxis-empty-medal[data-tone='gold']::before {
+    border-color: hsl(var(--primary) / 0.14);
+  }
+
+  /* Navegação mobile em ilha */
+  .praxis-nav-island {
+    background-color: hsl(240 6% 9% / 0.82);
+    background-image: var(--surface-sheen);
+    box-shadow: var(--elev-3), 0 0 0 1px hsl(0 0% 100% / 0.07);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .praxis-skeleton::after {
+      animation: none;
+      display: none;
+    }
   }
 
   .praxis-kicker {
@@ -400,13 +505,9 @@ a:focus-visible .praxis-brand-mark {
   max-width: 80rem;
 }
 
+/* Dashboard: só mais translúcido; sombra e brilho vêm do .praxis-panel (elev-1) */
 .praxis-dashboard .praxis-panel {
-  background:
-    linear-gradient(180deg, hsl(var(--card) / 0.82), hsl(var(--card) / 0.68));
-  border-color: hsl(0 0% 100% / 0.06);
-  box-shadow:
-    inset 0 1px 0 hsl(0 0% 100% / 0.025),
-    0 14px 45px hsl(0 0% 0% / 0.10);
+  background-color: hsl(var(--card) / 0.76);
 }
 
 .praxis-dashboard .praxis-dashboard-card {
@@ -421,15 +522,13 @@ a:focus-visible .praxis-brand-mark {
 }
 
 .praxis-dashboard-context .praxis-context-card {
-  background:
-    linear-gradient(180deg, hsl(var(--card) / 0.76), hsl(var(--card) / 0.63));
+  background-color: hsl(var(--card) / 0.7);
 }
 
 .praxis-dashboard-summary,
 .praxis-now-card {
-  box-shadow:
-    inset 0 1px 0 hsl(0 0% 100% / 0.03),
-    0 18px 55px hsl(0 0% 0% / 0.13);
+  --praxis-elev: var(--elev-2);
+  box-shadow: var(--elev-2);
 }
 
 .praxis-progress-fill {

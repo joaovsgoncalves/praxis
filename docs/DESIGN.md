@@ -45,6 +45,14 @@ Manter tokens em `index.css` (`--domain-*`). Ideias = ciano suave; metas = prima
 - **Lote 9 (2026-07-09):** empty Agora ≤2 CTAs; HeroDay strip `bg-card/40` (sem glass no Hoje); Avoidance com **dot** de severidade (sem `border-l-4`); glass residual só login/splash/404.
 - Calendar: ver `docs/PRAXIS-CALENDAR-SYNC.md`.
 
+## Visual premium — Fase 0 (2026-10-14)
+
+- **Elevação:** `--elev-1/2/3` (+ `shadow-elev-*` no Tailwind, classes `praxis-elev-*`). `.praxis-panel` (todo `Card`) usa nível 1; destaque do Hoje usa 2; ilha mobile usa 3. `praxis-glow-gold` soma por cima do nível — no máximo 1 por tela.
+- **Seção:** `SectionHeader` (`icon`, `count`, `action`); `SectionHeading` é o mesmo componente.
+- **Vazio:** `PraxisEmptyState` com medalhão; `tone="gold"` só para vazio que convida a começar.
+- **Carregando:** `Skeleton` com varredura (`praxis-skeleton`), parada em `prefers-reduced-motion`.
+- **Mobile:** navegação em ilha flutuante; conteúdo reserva `6.5rem + safe-area` embaixo até `lg`.
+
 ## E2E mobile (390px)
 
 ```bash

@@ -62,7 +62,7 @@ export default function AppLayout() {
                     ? 'mx-auto max-w-xl px-3 py-3 sm:px-4 sm:py-5'
                     : jotaFitMode
                       ? 'min-h-screen p-0'
-                      : 'mx-auto max-w-[1480px] p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-5 md:pb-10 lg:p-6 lg:pb-10'
+                      : 'mx-auto max-w-[1480px] p-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:p-5 md:pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:p-6 lg:pb-10'
               }
             >
               {!isLogin && !workoutSessionMode ? <OfflineBanner /> : null}

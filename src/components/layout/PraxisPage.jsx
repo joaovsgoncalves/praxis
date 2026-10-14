@@ -73,19 +73,44 @@ export function StatTile({ label, value, tone = 'neutral', valueClassName, align
   );
 }
 
-export function SectionHeading({ kicker, title, trailing, className }) {
+/**
+ * Cabeçalho de seção. Opcionais: `icon` ao lado do título, `count` (pílula mono)
+ * e `action` (botão/menu compacto, fica à direita do título até no celular).
+ * `trailing` continua como antes: bloco que empilha abaixo no mobile.
+ */
+export function SectionHeader({ kicker, title, trailing, className, icon: Icon, count, action }) {
+  const hasCount = count !== undefined && count !== null && count !== '';
+  const hasTitleRow = Boolean(title || Icon || hasCount || action);
   return (
     <div className={cn('space-y-2', className)}>
       {kicker ? <p className="praxis-kicker-row text-muted-foreground">{kicker}</p> : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {title ? (
-          <h2 className="praxis-title min-w-0 text-xl font-semibold leading-tight sm:text-2xl">{title}</h2>
+        {hasTitleRow ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            {Icon ? (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.04] shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.07)]">
+                <Icon className="h-4 w-4 text-primary" aria-hidden />
+              </span>
+            ) : null}
+            {title ? (
+              <h2 className="praxis-title min-w-0 text-xl font-semibold leading-tight [text-wrap:balance] sm:text-2xl">{title}</h2>
+            ) : null}
+            {hasCount ? (
+              <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] px-2 font-mono text-xs font-medium tabular-nums text-secondary-foreground shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]">
+                {count}
+              </span>
+            ) : null}
+            {action ? <div className="ml-auto flex shrink-0 items-center gap-1">{action}</div> : null}
+          </div>
         ) : null}
         {trailing ? <div className="w-full shrink-0 sm:w-auto">{trailing}</div> : null}
       </div>
     </div>
   );
 }
+
+/** Nome histórico — mesmo componente, usos antigos (kicker/title/trailing) seguem iguais. */
+export const SectionHeading = SectionHeader;
 
 /**
  * Faixa de conteúdo composta — heading 100% largura no topo; grid de conteúdo abaixo.
@@ -165,10 +190,18 @@ export function PraxisLoadingSplash({ message = 'Carregando o Praxis…' }) {
 
 /** Empty padronizado — lista vazia ou filtro sem resultado.
  *  Centro do bloco (ícone + texto + CTAs) no eixo da coluna/container.
- *  Use className="mx-auto max-w-lg" em empty de página/coluna larga. */
-export function PraxisEmptyState({ icon: Icon, title, description, action, className, compact = false }) {
+ *  Use className="mx-auto max-w-lg" em empty de página/coluna larga.
+ *  tone="gold" para vazio que convida a começar (medalhão e borda em ouro). */
+export function PraxisEmptyState({ icon: Icon, title, description, action, className, compact = false, tone = 'neutral' }) {
+  const gold = tone === 'gold';
   return (
-    <Card className={cn('border-dashed border-border/60 bg-card/40', className)}>
+    <Card
+      className={cn(
+        'border-dashed bg-card/40 shadow-none',
+        gold ? 'border-primary/25' : 'border-border/60',
+        className,
+      )}
+    >
       <CardContent
         className={cn(
           'flex flex-col items-center px-6 text-center',
@@ -176,14 +209,26 @@ export function PraxisEmptyState({ icon: Icon, title, description, action, class
         )}
       >
         {Icon ? (
-          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
-            <Icon className="h-5 w-5 text-primary/90" aria-hidden />
+          <div
+            className={cn('praxis-empty-medal', compact ? 'mb-4 h-12 w-12' : 'mb-5')}
+            data-tone={gold ? 'gold' : 'neutral'}
+          >
+            <Icon className={cn(compact ? 'h-5 w-5' : 'h-6 w-6', gold ? 'text-primary' : 'text-primary/85')} aria-hidden />
           </div>
         ) : null}
-        <div className="w-full max-w-sm space-y-2">
-          <p className="text-base font-semibold leading-snug">{title}</p>
+        <div className="w-full max-w-sm space-y-1.5">
+          <p
+            className={cn(
+              'font-display font-semibold leading-snug tracking-[-0.01em] text-foreground [text-wrap:balance]',
+              compact ? 'text-base' : 'text-lg',
+            )}
+          >
+            {title}
+          </p>
           {description ? (
-            <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+            <p className="mx-auto max-w-[42ch] text-sm leading-relaxed text-muted-foreground [text-wrap:pretty]">
+              {description}
+            </p>
           ) : null}
         </div>
         {action ? (
