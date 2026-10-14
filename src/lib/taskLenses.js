@@ -193,17 +193,25 @@ function timeToMinutes(hhmm) {
   return h * 60 + m;
 }
 
+/** Geometria da linha do tempo — a mesma usada pra desenhar e pra calcular colisão. */
+export const TIMELINE_HOUR_HEIGHT = 56; // px por hora
+export const TIMELINE_MIN_BLOCK_HEIGHT = 48; // px — bloco curto ainda legível
+/** Minutos que a altura mínima ocupa na tela (48 px ≈ 52 min). */
+export const TIMELINE_MIN_BLOCK_MINUTES = Math.ceil((TIMELINE_MIN_BLOCK_HEIGHT / TIMELINE_HOUR_HEIGHT) * 60);
+
 /**
  * Coloca blocos sobrepostos lado a lado.
+ * A colisão usa o fim VISUAL (início + max(duração, altura mínima em minutos)):
+ * um bloco de 10 min desenhado com altura mínima não pode cobrir o seguinte.
  * Devolve os mesmos itens + { col, cols } (0-indexed).
  */
-export function layoutTimedBlocks(items) {
+export function layoutTimedBlocks(items, { minMinutes = TIMELINE_MIN_BLOCK_MINUTES } = {}) {
   const list = Array.isArray(items) ? items : [];
   if (list.length === 0) return [];
 
   const parsed = list.map((item, index) => {
     const s = timeToMinutes(item.start);
-    const e = Math.max(timeToMinutes(item.end), s + 1);
+    const e = Math.max(timeToMinutes(item.end), s + Math.max(1, minMinutes));
     return { id: item.id, s, e, index };
   });
   parsed.sort((a, b) => a.s - b.s || a.e - b.e || String(a.id).localeCompare(String(b.id)));

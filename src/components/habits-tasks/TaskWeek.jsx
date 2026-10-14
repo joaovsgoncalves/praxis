@@ -1,7 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { taskBlock, layoutTimedBlocks } from '@/lib/taskLenses';
+import {
+  taskBlock,
+  layoutTimedBlocks,
+  TIMELINE_HOUR_HEIGHT,
+  TIMELINE_MIN_BLOCK_HEIGHT,
+} from '@/lib/taskLenses';
 import { visibleWeekDays } from '@/lib/taskWeekStrip';
 import { fortalezaNowTimeHHMM } from '@/lib/dates';
 import { cleanPriorityPrefix, isTaskDone } from '@/lib/tasks';
@@ -14,7 +19,8 @@ import {
 } from './TaskCardParts';
 
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
-const HOUR_HEIGHT = 56; // Altura em px por hora
+const HOUR_HEIGHT = TIMELINE_HOUR_HEIGHT; // Altura em px por hora
+const MIN_BLOCK_HEIGHT = TIMELINE_MIN_BLOCK_HEIGHT; // mesma altura mínima que layoutTimedBlocks usa na colisão
 const TOTAL_HOURS = HOURS.length; // 15 horas (07:00 às 22:00)
 const TOTAL_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT; // 840px
 const GUTTER = '3.5rem';
@@ -39,11 +45,8 @@ function getBlockPosition(block, durationMinutes) {
   }
 
   const top = (startMinFrom7 / 60) * HOUR_HEIGHT;
-  const height = Math.max(28, (duration / 60) * HOUR_HEIGHT);
-
-  const minH = 48;
-  const nextHeight = Math.max(minH, height);
-  const clampedTop = Math.max(0, Math.min(TOTAL_HEIGHT - minH, top));
+  const nextHeight = Math.max(MIN_BLOCK_HEIGHT, (duration / 60) * HOUR_HEIGHT);
+  const clampedTop = Math.max(0, Math.min(TOTAL_HEIGHT - MIN_BLOCK_HEIGHT, top));
   const clampedHeight = Math.min(TOTAL_HEIGHT - clampedTop, nextHeight);
 
   return { top: clampedTop, height: clampedHeight };
@@ -91,7 +94,7 @@ function TimedTaskBlock({ task, block, col = 0, cols = 1, onEditTask }) {
   const gap = 3;
   const widthPct = 100 / Math.max(1, cols);
   const leftPct = col * widthPct;
-  const blockHeight = Math.max(48, height) - 4;
+  const blockHeight = Math.max(MIN_BLOCK_HEIGHT, height) - 4;
   const showMeta = blockHeight >= META_MIN_HEIGHT;
   const priority = PRIORITY_CONFIG[taskPriorityKey(task)];
 
