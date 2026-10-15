@@ -4,11 +4,10 @@ import { praxisApi } from "@/api/praxisClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DayStrip from "@/components/dashboard/DayStrip";
 import NowBlock from "@/components/dashboard/NowBlock";
-import TodayTasks from "@/components/dashboard/TodayTasks";
+import DayTrack from "@/components/dashboard/DayTrack";
 import TodayHabits from "@/components/dashboard/TodayHabits";
-import WellnessWidget from "@/components/dashboard/WellnessWidget";
-import TodayFinanceCard from "@/components/finance/TodayFinanceCard";
-import TodayCalendar from "@/components/dashboard/TodayCalendar";
+import DayBento from "@/components/dashboard/DayBento";
+import WeekDots, { WEEK_DOTS_QUERY_KEY } from "@/components/dashboard/WeekDots";
 import XpProgressStrip from "@/components/dashboard/XpProgressStrip";
 import WeeklyReviewPrompt from "@/components/dashboard/WeeklyReviewPrompt";
 import AvoidanceWidget from "@/components/dashboard/AvoidanceWidget";
@@ -25,8 +24,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronDown, Gauge, ListChecks } from "lucide-react";
+import { ChevronDown, LayoutGrid } from "lucide-react";
+import { SectionHeader } from "@/components/layout/PraxisPage";
 import TaskForm from "@/components/habits-tasks/TaskForm";
+import HabitForm from "@/components/habits-tasks/HabitForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from "@/lib/dates";
 import { planNowTasks } from "@/lib/nowTask";
@@ -34,31 +35,12 @@ import { computeDayLeft } from "@/lib/dayLeft";
 import { hapticLight } from "@/lib/haptics";
 import { useTimeOfDay } from "@/hooks/useTimeOfDay";
 import { isHabitDueOnDate } from "@/lib/habits";
-import { buildDragOrder } from "@/lib/taskReorder";
 import { dispatchPraxisLevelUpFromResponse } from "@/lib/praxisLevelUp";
 import { notifyPraxisRecurrenceSpawned } from "@/lib/praxisRecurrenceToast";
 import { isTaskCompletedForToday, isTaskDone, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
 import { addDaysToDateKey, sortTasksForList } from "@/lib/taskListFilters";
 import SuggestedGoalCard from "@/components/dashboard/SuggestedGoalCard";
 import { toast } from "sonner";
-
-// Lote 7: widgets sem glow de domínio (app mais quieto)
-const Slot = ({ children }) => <div>{children}</div>;
-
-function DashboardGroupHeading({ icon: Icon, eyebrow, title, description, tone = "text-domain-gold" }) {
-  return (
-    <div className="mb-3 flex items-start gap-3 px-1 sm:mb-4">
-      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.03]">
-        <Icon className={`h-4 w-4 ${tone}`} aria-hidden />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium text-muted-foreground">{eyebrow}</p>
-        <h2 className="praxis-title mt-0.5 text-lg font-semibold tracking-[-0.035em] sm:text-xl">{title}</h2>
-        {description ? <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80 sm:text-sm">{description}</p> : null}
-      </div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -118,6 +100,12 @@ export default function Dashboard() {
   const [showNewTaskForm, setShowNewTaskForm] = React.useState(false);
   const [taskPendingDelete, setTaskPendingDelete] = React.useState(null);
   const [habitPendingDelete, setHabitPendingDelete] = React.useState(null);
+  const [editingHabit, setEditingHabit] = React.useState(null);
+
+  // A semana em 7 pontos conta tarefas e hábitos: muda junto com eles.
+  const invalidateWeek = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [WEEK_DOTS_QUERY_KEY] });
+  }, [queryClient]);
 
   const invalidateTaskQueries = React.useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["dashboardTasks"] });
@@ -125,7 +113,8 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: ["allTasks"] });
     queryClient.invalidateQueries({ queryKey: ["pendingTasks"] });
     queryClient.invalidateQueries({ queryKey: ["gamification"] });
-  }, [queryClient]);
+    invalidateWeek();
+  }, [queryClient, invalidateWeek]);
 
   const toggleTaskMutation = useMutation({
     mutationFn: (task) => {
@@ -257,19 +246,6 @@ export default function Dashboard() {
     },
   });
 
-  const reorderTasksMutation = useMutation({
-    mutationFn: (orderedIds) => praxisApi.tasks.reorder(orderedIds),
-    onSuccess: invalidateTaskQueries,
-  });
-
-  const handleReorderPending = React.useCallback(
-    (visibleTasks, fromIndex, toIndex) => {
-      const orderedIds = buildDragOrder(allTasks, visibleTasks, fromIndex, toIndex);
-      if (orderedIds) reorderTasksMutation.mutate(orderedIds);
-    },
-    [allTasks, reorderTasksMutation]
-  );
-
   const toggleHabitMutation = useMutation({
     mutationFn: async ({ habitId, isDone, value }) => {
       const logs = habitLogs.filter((l) => l.habit_id === habitId && l.date === today);
@@ -367,6 +343,7 @@ export default function Dashboard() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
       queryClient.invalidateQueries({ queryKey: ["gamification"] });
+      invalidateWeek();
     },
   });
 
@@ -465,6 +442,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["allHabits"] });
       queryClient.invalidateQueries({ queryKey: ["gamification"] });
+      invalidateWeek();
     },
   });
 
@@ -550,6 +528,7 @@ export default function Dashboard() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
+      invalidateWeek();
     },
   });
 
@@ -597,7 +576,20 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["allHabits"] });
       queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
+      invalidateWeek();
     },
+  });
+
+  const updateHabitMutation = useMutation({
+    mutationFn: ({ id, data }) => praxisApi.habits.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["allHabits"] });
+      queryClient.invalidateQueries({ queryKey: ["goalHabits"] });
+      invalidateWeek();
+      setEditingHabit(null);
+    },
+    onError: () => toast.error("Não deu pra salvar o hábito."),
   });
 
   const notTodayTaskMutation = useMutation({
@@ -645,6 +637,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["allTasks"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardTasks"] });
+      invalidateWeek();
     },
   });
 
@@ -709,18 +702,24 @@ export default function Dashboard() {
     (isLoadingSettings && !settings && allTasks.length === 0);
 
   if (isInitialLoading && allTasks.length === 0 && habits.length === 0) {
+    // Mesma silhueta do Hoje: faixa, agora, trilha, hábitos; no xl, a coluna "Dia em um olhar".
     return (
-      <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5 animate-pulse">
-        <div className="h-44 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
-        <div className="h-28 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
-        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(350px,0.9fr)] xl:gap-6">
-          <div className="space-y-5">
-            <div className="h-64 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
-            <div className="h-64 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+      <div className="praxis-page praxis-dashboard space-y-0" aria-busy="true">
+        <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
+          <div className="min-w-0 space-y-4 sm:space-y-5">
+            <div className="praxis-skeleton h-16 rounded-2xl" />
+            <div className="praxis-skeleton h-56 rounded-2xl" />
+            <div className="praxis-skeleton h-72 rounded-2xl" />
+            <div className="praxis-skeleton h-56 rounded-2xl" />
           </div>
-          <div className="space-y-5">
-            <div className="h-48 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
-            <div className="h-48 rounded-2xl bg-white/[0.03] border border-white/[0.055]" />
+          <div className="hidden min-w-0 space-y-3 xl:block">
+            <div className="praxis-skeleton h-8 w-40 rounded-lg" />
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="praxis-skeleton h-[140px] rounded-2xl" />
+              ))}
+            </div>
+            <div className="praxis-skeleton h-[68px] rounded-2xl" />
           </div>
         </div>
       </div>
@@ -728,94 +727,91 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="praxis-page praxis-dashboard flex flex-col gap-4 sm:gap-5">
+    <div className="praxis-page praxis-dashboard flex flex-col gap-4 space-y-0 sm:gap-5">
       {/* OfflineBanner vive no AppLayout — vale para todas as abas, não só o Hoje. */}
       <PwaInstallBanner />
 
-      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "0ms" }}>
-        <DayStrip
-          greeting={greeting}
-          clock={clock}
-          userName={settings?.full_name}
-          left={dayLeft.left}
-          total={dayLeft.total}
-        />
-      </div>
-
-      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "40ms" }}>
-        <NowBlock
-          task={nowPlan.now}
-          next={nowPlan.next}
-          today={today}
-          onComplete={(t) => toggleTaskMutation.mutate(t)}
-          onSnooze15={handleSnooze15}
-          onSnoozeTomorrow={handleSnoozeTomorrow}
-          onAddTask={() => setShowNewTaskForm(true)}
-        />
-      </div>
-
-      <div
-        className="praxis-dashboard-reveal grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(350px,0.9fr)] xl:gap-6"
-        style={{ "--praxis-reveal-delay": "80ms" }}
-      >
-        <section className="min-w-0">
-          <DashboardGroupHeading
-            icon={ListChecks}
-            eyebrow="Execução"
-            title="O que precisa sair do papel"
-            description="Tarefas e hábitos que movem o dia."
-            tone="text-domain-gold"
-          />
-          <div className="space-y-4 lg:space-y-5">
-            <Slot domain="ember">
-              <TodayTasks
-                tasks={tasks}
-                today={today}
-                behind={nowPlan.behind}
-                allTasksForRecurrence={allTasks}
-                onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
-                onEditTask={setEditingTask}
-                onDeleteTask={setTaskPendingDelete}
-                onNotToday={(t) => notTodayTaskMutation.mutate(t.id)}
-                notTodayBusy={notTodayTaskMutation.isPending}
-                onReorderPending={handleReorderPending}
-                reorderBusy={reorderTasksMutation.isPending}
-              />
-            </Slot>
-            <Slot domain="wellness">
-              <TodayHabits
-                title="Hábitos essenciais"
-                today={today}
-                habits={standaloneHabitsDueToday}
-                compounds={compoundHabits}
-                sinceHabits={sinceHabits}
-                summaryHabits={essentialHabits}
-                habitLogs={habitLogs}
-                onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
-                onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
-                onSkipHabit={(habitId, skipReason, skipNote) =>
-                  skipHabitMutation.mutate({ habitId, skipReason, skipNote })
-                }
-                onDeleteHabit={setHabitPendingDelete}
-              />
-            </Slot>
+      <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
+        <div className="min-w-0 space-y-4 sm:space-y-5">
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "0ms" }}>
+            <DayStrip
+              greeting={greeting}
+              clock={clock}
+              userName={settings?.full_name}
+              left={dayLeft.left}
+              total={dayLeft.total}
+            />
           </div>
-        </section>
 
-        <section className="praxis-dashboard-context min-w-0">
-          <DashboardGroupHeading
-            icon={Gauge}
-            eyebrow="Contexto"
-            title="Como seu dia está agora"
-            description="Finanças, corpo e agenda no mesmo quadro."
-            tone="text-domain-wellness"
-          />
-          <div className="space-y-3 sm:space-y-4">
-            <TodayFinanceCard />
-            <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
-            <TodayCalendar />
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "40ms" }}>
+            <NowBlock
+              task={nowPlan.now}
+              next={nowPlan.next}
+              today={today}
+              onComplete={(t) => toggleTaskMutation.mutate(t)}
+              onSnooze15={handleSnooze15}
+              onSnoozeTomorrow={handleSnoozeTomorrow}
+              onAddTask={() => setShowNewTaskForm(true)}
+            />
           </div>
-        </section>
+
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "80ms" }}>
+            <DayTrack
+              tasks={tasks}
+              today={today}
+              clock={clock}
+              behind={nowPlan.behind}
+              onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
+              onEditTask={setEditingTask}
+              onDeleteTask={setTaskPendingDelete}
+              onNotToday={(t) => notTodayTaskMutation.mutate(t.id)}
+              notTodayBusy={notTodayTaskMutation.isPending}
+              onSnooze15={handleSnooze15}
+            />
+          </div>
+
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "120ms" }}>
+            <TodayHabits
+              today={today}
+              clock={clock}
+              habits={standaloneHabitsDueToday}
+              compounds={compoundHabits}
+              sinceHabits={sinceHabits}
+              summaryHabits={essentialHabits}
+              habitLogs={habitLogs}
+              onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
+              onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
+              onSkipHabit={(habitId, skipReason, skipNote) =>
+                skipHabitMutation.mutate({ habitId, skipReason, skipNote })
+              }
+              onEditHabit={setEditingHabit}
+              onDeleteHabit={setHabitPendingDelete}
+            />
+          </div>
+        </div>
+
+        {/* Dia em um olhar: fixa no xl; se passar da tela, rola por dentro. */}
+        <aside
+          className="praxis-dashboard-reveal praxis-hide-scrollbar min-w-0 space-y-3 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto"
+          style={{ "--praxis-reveal-delay": "160ms" }}
+          aria-labelledby="day-glance-title"
+          data-testid="day-glance"
+        >
+          {/* No celular os cards se explicam sozinhos; o título só aparece na coluna do xl. */}
+          <SectionHeader
+            className="hidden xl:block"
+            title={<span id="day-glance-title">Dia em um olhar</span>}
+            icon={LayoutGrid}
+            iconClassName="text-domain-gold"
+          />
+          <DayBento
+            today={today}
+            clock={clock}
+            todayCheck={todayCheck}
+            onSaveWellness={(d) => saveWellnessMutation.mutateAsync(d)}
+          />
+          <WeekDots today={today} />
+        </aside>
       </div>
 
       <Collapsible
@@ -824,11 +820,8 @@ export default function Dashboard() {
         style={{ "--praxis-reveal-delay": "190ms" }}
       >
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="h-auto w-full justify-between rounded-2xl px-4 py-4 hover:bg-white/[0.025] sm:px-5">
-            <span className="text-left">
-              <span className="block text-sm font-medium">Sugestões e reflexão</span>
-              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">Abra quando quiser olhar além da execução imediata.</span>
-            </span>
+          <Button variant="ghost" className="h-auto min-h-12 w-full justify-between rounded-2xl px-4 py-3 hover:bg-white/[0.025] sm:px-5">
+            <span className="text-left text-sm font-medium">Sugestões e reflexão</span>
             <ChevronDown className="h-4 w-4 shrink-0 opacity-55" />
           </Button>
         </CollapsibleTrigger>
@@ -840,7 +833,28 @@ export default function Dashboard() {
         </CollapsibleContent>
       </Collapsible>
 
-      <XpProgressStrip className="praxis-dashboard-reveal mt-1" />
+      <XpProgressStrip className="praxis-dashboard-reveal" />
+
+      <Dialog
+        open={Boolean(editingHabit)}
+        onOpenChange={(open) => {
+          if (!open) setEditingHabit(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar hábito</DialogTitle>
+          </DialogHeader>
+          {editingHabit && (
+            <HabitForm
+              key={editingHabit.id}
+              initial={editingHabit}
+              onSubmit={(data) => updateHabitMutation.mutate({ id: editingHabit.id, data })}
+              onCancel={() => setEditingHabit(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(editingTask)}

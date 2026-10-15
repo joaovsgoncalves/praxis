@@ -79,6 +79,11 @@ export function createCalendarServices({ db, getLocalDateString }) {
     return true;
   }
 
+  function taskIdFromEventDescription(description) {
+    const match = /Task ID:\s*(\S+)/.exec(String(description || ''));
+    return match ? match[1] : null;
+  }
+
   function taskCalendarDescription(task) {
     const parts = [
       'Criado pela Praxis.',
@@ -248,11 +253,15 @@ export function createCalendarServices({ db, getLocalDateString }) {
           '--json', '--no-input',
         ], 15000);
         const events = (parsed.events || []).map(ev => ({
+          id: ev.id || null,
           title: ev.summary || '(Sem título)',
           start: ev.start?.dateTime || ev.start?.date || null,
           end: ev.end?.dateTime || ev.end?.date || null,
+          all_day: Boolean(ev.start?.date && !ev.start?.dateTime),
           location: ev.location || null,
           htmlLink: ev.htmlLink || null,
+          // Evento criado pela Praxis carrega "Task ID: <id>" na descrição (espelho da tarefa).
+          task_id: taskIdFromEventDescription(ev.description),
         }));
 
         calendarCache = { data: events, date: todayDate, timestamp: now.getTime() };

@@ -58,3 +58,30 @@ export function setTaskIdInSearchParams(searchParams, taskId) {
   else next.set('task', String(taskId));
   return next;
 }
+
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** ?day=YYYY-MM-DD escolhe o dia na faixa da semana (inválido = nenhum). */
+export function taskDayFromSearchParams(searchParams) {
+  const day = String(searchParams.get('day') || '').trim();
+  if (!DAY_KEY_RE.test(day)) return null;
+  const [y, m, d] = day.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const valid = date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+  return valid ? day : null;
+}
+
+export function setTaskDayInSearchParams(searchParams, day) {
+  const next = new URLSearchParams(searchParams);
+  if (!day) next.delete('day');
+  else next.set('day', day);
+  return next;
+}
+
+/** Link para Hábitos e Tarefas › Tarefas › Semana com o dia escolhido. */
+export function weekDayHref(day) {
+  let params = setHabitTasksTabInSearchParams(new URLSearchParams(), 'tasks');
+  params = setTaskScopeInSearchParams(params, 'week');
+  params = setTaskDayInSearchParams(params, day);
+  return `/habitos-tarefas?${params.toString()}`;
+}

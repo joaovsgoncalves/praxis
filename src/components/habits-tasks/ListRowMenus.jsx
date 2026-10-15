@@ -36,13 +36,18 @@ export function TaskRowMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem disabled={busy || disableUp} onClick={onMoveUp}>
-          <ArrowUp className="mr-2 h-4 w-4" /> Subir
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={busy || disableDown} onClick={onMoveDown}>
-          <ArrowDown className="mr-2 h-4 w-4" /> Descer
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {/* Sem reordenar (ex.: no Hoje), o menu começa no Editar. */}
+        {onMoveUp || onMoveDown ? (
+          <>
+            <DropdownMenuItem disabled={busy || disableUp} onClick={onMoveUp}>
+              <ArrowUp className="mr-2 h-4 w-4" /> Subir
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={busy || disableDown} onClick={onMoveDown}>
+              <ArrowDown className="mr-2 h-4 w-4" /> Descer
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>
@@ -90,13 +95,18 @@ export function HabitRowMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem disabled={busy || disableUp} onClick={onMoveUp}>
-          <ArrowUp className="mr-2 h-4 w-4" /> Subir
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={busy || disableDown} onClick={onMoveDown}>
-          <ArrowDown className="mr-2 h-4 w-4" /> Descer
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {/* Sem reordenar (ex.: no Hoje), o menu começa no Editar. */}
+        {onMoveUp || onMoveDown ? (
+          <>
+            <DropdownMenuItem disabled={busy || disableUp} onClick={onMoveUp}>
+              <ArrowUp className="mr-2 h-4 w-4" /> Subir
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={busy || disableDown} onClick={onMoveDown}>
+              <ArrowDown className="mr-2 h-4 w-4" /> Descer
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem onClick={onEdit}>
           <Pencil className="mr-2 h-4 w-4" /> Editar
         </DropdownMenuItem>

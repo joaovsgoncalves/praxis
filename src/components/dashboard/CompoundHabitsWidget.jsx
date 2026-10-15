@@ -63,9 +63,10 @@ function CompoundHabitItem({
   onEditCompound,
   collapsible = true,
   listItem = false,
+  defaultOpen = false,
 }) {
   const [showConfetti, setShowConfetti] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const prevAllDoneRef = useRef(null);
   const steps = compound.children || [];
   const completedCount = steps.filter((step) => habitDayState(step) === 'done').length;
@@ -74,16 +75,13 @@ function CompoundHabitItem({
   const totalCount = steps.length;
   const isClosed = totalCount > 0 && addressedCount === totalCount;
   const allDone = totalCount > 0 && completedCount === totalCount;
-  const isPartial = addressedCount > 0 && !isClosed;
   const progressPercent = totalCount > 0 ? Math.round((addressedCount / totalCount) * 100) : 0;
   const nextStep = steps.find((step) => habitDayState(step) === 'open');
   const statusCopy = isClosed
     ? skippedCount > 0
       ? `Dia registrado · ${completedCount} ${completedCount === 1 ? 'feito' : 'feitos'} · ${skippedCount} não rolou`
       : 'Rotina concluída. Dia registrado.'
-    : isPartial
-      ? 'Você já começou. Siga pelo próximo passo.'
-      : 'Comece pelo mínimo: só o primeiro passo.';
+    : null;
 
   useEffect(() => {
     if (prevAllDoneRef.current === false && allDone) {
@@ -116,7 +114,7 @@ function CompoundHabitItem({
             <span className={cn(listItem ? 'text-xl' : 'text-lg')}>{compound.emoji || '⚡'}</span>
             <span
               className={cn(
-                'flex-1 truncate font-medium',
+                'min-w-0 flex-1 break-words font-medium leading-snug [text-wrap:pretty]',
                 listItem ? 'text-base font-semibold tracking-[-0.02em]' : 'text-sm',
               )}
             >
@@ -135,7 +133,7 @@ function CompoundHabitItem({
             <span className={cn(listItem ? 'text-xl' : 'text-lg')}>{compound.emoji || '⚡'}</span>
             <span
               className={cn(
-                'flex-1 truncate font-medium',
+                'min-w-0 flex-1 break-words font-medium leading-snug [text-wrap:pretty]',
                 listItem ? 'text-base font-semibold tracking-[-0.02em]' : 'text-sm',
               )}
             >
@@ -160,18 +158,17 @@ function CompoundHabitItem({
       </div>
 
       {(!collapsible || isOpen) && (
-        <div className={cn(listItem ? 'mt-4' : 'mt-3')}>
-          <Progress
-            value={progressPercent}
-            className={cn(
-              listItem ? 'mb-2.5 h-2' : 'mb-2 h-1.5',
-              isClosed ? '[&>div]:bg-domain-wellness' : '[&>div]:bg-gold',
-            )}
-          />
-          <div className={cn('flex items-center justify-between gap-2', listItem ? 'mb-3.5' : 'mb-3')}>
-            <p className={cn('text-muted-foreground', listItem ? 'text-xs leading-snug' : 'text-[11px]')}>
-              {statusCopy}
-            </p>
+        <div className="mt-3">
+          {/* Barra e "Mínimo" na mesma linha; a frase só aparece com a rotina fechada. */}
+          <div className={cn('flex items-center gap-2', listItem ? 'mb-2.5' : 'mb-2')}>
+            <Progress
+              value={progressPercent}
+              className={cn(
+                'min-w-0 flex-1',
+                listItem ? 'h-2' : 'h-1.5',
+                isClosed ? '[&>div]:bg-domain-wellness' : '[&>div]:bg-gold',
+              )}
+            />
             {!isClosed && nextStep && (
               <Button
                 type="button"
@@ -179,7 +176,7 @@ function CompoundHabitItem({
                 variant="ghost"
                 className={cn(
                   'shrink-0 text-gold hover:text-gold',
-                  listItem ? 'h-9 px-2.5 text-xs' : 'h-7 px-2 text-[11px]',
+                  listItem ? 'h-11 px-2.5 text-xs' : 'h-7 px-2 text-[11px]',
                 )}
                 onClick={() => onCompleteMinimum(nextStep)}
               >
@@ -188,8 +185,13 @@ function CompoundHabitItem({
               </Button>
             )}
           </div>
+          {statusCopy ? (
+            <p className={cn('text-muted-foreground', listItem ? 'mb-3 text-xs leading-snug' : 'mb-3 text-[11px]')}>
+              {statusCopy}
+            </p>
+          ) : null}
 
-          <ul className={cn(listItem ? 'space-y-2' : 'space-y-1.5')}>
+          <ul className={cn(listItem ? 'space-y-1' : 'space-y-1.5')}>
             {steps.map((step) => {
               const state = habitDayState(step);
               const done = state === 'done';
@@ -201,7 +203,7 @@ function CompoundHabitItem({
                   key={step.id}
                   className={cn(
                     'group flex items-center gap-2 rounded-lg',
-                    listItem ? 'min-h-11 gap-2.5 px-2 py-2' : 'px-1 py-1.5',
+                    listItem ? 'min-h-11 gap-2.5 px-2 py-0.5' : 'px-1 py-1.5',
                     skipped && 'bg-amber-500/[0.06]',
                     timeLabel && !done && !skipped && 'bg-domain-gold/[0.04]',
                   )}
@@ -343,6 +345,7 @@ export default function CompoundHabitsWidget({
   status = 'active',
   variant = 'card',
   onEditCompound: onEditCompoundProp,
+  defaultOpenFor,
 }) {
   const queryClient = useQueryClient();
   const today = todayProp || fortalezaDateKey();
@@ -570,11 +573,15 @@ export default function CompoundHabitsWidget({
       )}
       {!isLoading && !isError && compounds.length > 0 && (
         <div className={cn(variant === 'card' ? 'space-y-3' : 'space-y-2.5')}>
-          {compounds.map((compound) => (
+          {compounds.map((compound) => {
+            const startsOpen = Boolean(defaultOpenFor?.(compound));
+            return (
             <CompoundHabitItem
-              key={compound.id}
+              // Virou a janela (ex.: 11h, 20h)? Recomeça no estado da hora; dentro dela, o toque manda.
+              key={`${compound.id}:${startsOpen ? 'open' : 'closed'}`}
               compound={compound}
               collapsible={collapsible}
+              defaultOpen={startsOpen}
               listItem={variant !== 'card'}
               onToggleHabit={(stepOrId, isDone) => {
                 const step = typeof stepOrId === 'object' ? stepOrId : compound.children?.find((c) => c.id === stepOrId);
@@ -601,7 +608,8 @@ export default function CompoundHabitsWidget({
                 toggleHabitMutation.mutate({ habitId, isDone: false });
               }}
             />
-          ))}
+            );
+          })}
         </div>
       )}
     </>

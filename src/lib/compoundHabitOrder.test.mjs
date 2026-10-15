@@ -8,7 +8,9 @@
 import assert from 'node:assert/strict';
 import {
   compareCompoundHabitsForDay,
+  isRitualOpenByDefault,
   partitionCompoundHabitsForDay,
+  ritualPhase,
   sortCompoundHabitsForDay,
   titlePeriodMinutes,
 } from './compoundHabitOrder.js';
@@ -67,5 +69,20 @@ assert.deepEqual(unified.map((item) => item.title), [
   'Preparar o sono',
   'Fechamento do dia',
 ]);
+
+// Janelas do Hoje: Abertura expandida antes das 11h, Fechamento a partir das 20h.
+assert.equal(ritualPhase(abertura), 'opening');
+assert.equal(ritualPhase(fechamento), 'closing');
+assert.equal(ritualPhase({ title: 'Revisão', preferred_time: '15:00' }), 'other');
+assert.equal(isRitualOpenByDefault(abertura, '06:30'), true);
+assert.equal(isRitualOpenByDefault(abertura, '10:59'), true);
+assert.equal(isRitualOpenByDefault(abertura, '11:00'), false);
+assert.equal(isRitualOpenByDefault(abertura, 21), false);
+assert.equal(isRitualOpenByDefault(fechamento, '19:59'), false);
+assert.equal(isRitualOpenByDefault(fechamento, '20:00'), true);
+assert.equal(isRitualOpenByDefault(fechamento, 23), true);
+assert.equal(isRitualOpenByDefault(fechamento, '08:00'), false);
+assert.equal(isRitualOpenByDefault({ title: 'Revisão', preferred_time: '15:00' }, '15:00'), false);
+assert.equal(isRitualOpenByDefault(abertura, new Date(2026, 9, 15, 9, 0)), true);
 
 console.log('compoundHabitOrder.test.mjs: ok');

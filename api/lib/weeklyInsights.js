@@ -52,12 +52,8 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
   const today = String(options.today || localYmd());
   // Semana em andamento: só conta dias já transcorridos (não pune o futuro).
   const effEnd = today < weekEnd ? today : weekEnd;
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const d = addDaysYmd(weekStart, i);
-    if (d > effEnd) break;
-    days.push(d);
-  }
+  const weekDates = [];
+  for (let i = 0; i < 7; i++) weekDates.push(addDaysYmd(weekStart, i));
 
   const completedTasks = db.prepare(`
     SELECT id, title, priority, category, date, completed_date
@@ -93,19 +89,37 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
   const skipByHabit = {};
   const skipReasonByHabit = {};
 
-  for (const day of days) {
+  // Por dia (seg a dom): hábitos folha devidos, sem contar "não rolou" (decisão, não pendência).
+  // A rotina (kind = compound) é contêiner: os passos já entram, então ela fica fora do dia
+  // e vai para `days_routines`, que fecha a conta com `victories`.
+  const habitDayStats = Object.fromEntries(weekDates.map((d) => [d, { done: 0, total: 0 }]));
+  const routineSlots = { slots: 0, done: 0, skipped: 0 };
+  const habitLogStmt = db.prepare(
+    'SELECT completed, outcome, skip_reason FROM habit_logs WHERE habit_id = ? AND date = ?',
+  );
+
+  for (const day of weekDates) {
+    const isFuture = day > effEnd;
     for (const h of activeHabits) {
       if (!isHabitDueOnDate(h, day)) continue;
-      habitSlots += 1;
-      const log = db.prepare(
-        'SELECT completed, outcome, skip_reason FROM habit_logs WHERE habit_id = ? AND date = ?',
-      ).get(h.id, day);
+      const log = habitLogStmt.get(h.id, day);
       const isSkipped = log && log.outcome === 'skipped';
       const isDone = log && !isSkipped && (
         log.outcome === 'done' || log.completed === 1 || log.completed === true
       );
+      const isRoutine = h.kind === 'compound';
+      if (!isSkipped && !isRoutine) habitDayStats[day].total += 1;
+      // Futuro: só o que está agendado entra no ponto; nada conta como feito nem nos totais da semana.
+      if (isFuture) continue;
+      habitSlots += 1;
+      if (isRoutine) {
+        routineSlots.slots += 1;
+        if (isDone) routineSlots.done += 1;
+        if (isSkipped) routineSlots.skipped += 1;
+      }
       if (isDone) {
         habitDone += 1;
+        if (!isRoutine) habitDayStats[day].done += 1;
       } else if (isSkipped) {
         habitSkipped += 1;
         const key = h.title || h.id;
@@ -124,6 +138,41 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
   }
 
   const habitPct = habitSlots > 0 ? Math.round((habitDone / habitSlots) * 100) : null;
+
+  // Tarefas do dia: data no dia, fora ideias e canceladas (inclui "não rolou").
+  const taskDayRows = db.prepare(`
+    SELECT substr(date, 1, 10) AS day,
+           COUNT(*) AS total,
+           SUM(CASE WHEN status IN ('completed', 'done') THEN 1 ELSE 0 END) AS done
+    FROM tasks
+    WHERE date IS NOT NULL
+      AND substr(date, 1, 10) BETWEEN ? AND ?
+      AND COALESCE(category, '') != 'ideias'
+      AND COALESCE(status, 'pending') != 'cancelled'
+    GROUP BY substr(date, 1, 10)
+  `).all(weekStart, weekEnd);
+  const taskDayStats = Object.fromEntries(taskDayRows.map((r) => [r.day, r]));
+
+  const dayItems = weekDates.map((date) => {
+    const isFuture = date > today;
+    const taskRow = taskDayStats[date];
+    const tasksTotal = Number(taskRow?.total) || 0;
+    const tasksDone = isFuture ? 0 : Number(taskRow?.done) || 0;
+    const habitsTotal = habitDayStats[date].total;
+    const habitsDone = isFuture ? 0 : habitDayStats[date].done;
+    return {
+      date,
+      weekday: new Date(`${date}T12:00:00`).getDay(),
+      is_today: date === today,
+      is_future: isFuture,
+      done: tasksDone + habitsDone,
+      total: tasksTotal + habitsTotal,
+      tasks_done: tasksDone,
+      tasks_total: tasksTotal,
+      habits_done: habitsDone,
+      habits_total: habitsTotal,
+    };
+  });
 
   const focusAgg = db.prepare(`
     SELECT COUNT(*) as sessions, COALESCE(SUM(duration_seconds), 0) as total_seconds
@@ -326,6 +375,8 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
       next_week_focus: draft_next_week_focus,
     },
     life_history: buildLifeHistory(db, weekStart, weekEnd),
+    days: dayItems,
+    days_routines: routineSlots,
   };
 }
 

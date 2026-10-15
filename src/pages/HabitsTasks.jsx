@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
-import { Plus, CheckCircle2, Circle, Clock, Flame, Eraser, Archive, ListTodo, Minus, GripVertical } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Flame, Eraser, Archive, ListTodo, GripVertical } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState, SectionHeader } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
@@ -39,17 +39,11 @@ import { buildMovedOrder, buildDragOrder } from '@/lib/taskReorder';
 import { isTaskOpen, isTaskDone, isTaskMissed, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
-  SKIP_REASON_LABELS,
   countHabitDayOutcomes,
-  formatFrequencyLabel,
-  formatPreferredTime,
   getHabitDayOutcome,
   isHabitDueOnDate,
   isQuantitativeHabit,
   isQuickIncrementHabit,
-  formatHabitProgress,
-  formatQuickIncrementButtonLabel,
-  formatQuickIncrementAriaLabel,
   todayLogForHabit,
 } from '@/lib/habits';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
@@ -74,6 +68,8 @@ import {
   setTaskLensInSearchParams,
   taskIdFromSearchParams,
   setTaskIdInSearchParams,
+  taskDayFromSearchParams,
+  setTaskDayInSearchParams,
 } from '@/lib/urlDeepLinks';
 import {
   boardColumnForTask,
@@ -91,9 +87,8 @@ import TaskWeek from '@/components/habits-tasks/TaskWeek';
 import TaskWeekStrip from '@/components/habits-tasks/TaskWeekStrip';
 import TaskLensSwitch from '@/components/habits-tasks/TaskLensSwitch';
 import TaskDetailPanel from '@/components/habits-tasks/TaskDetailPanel';
+import HabitRowCard from '@/components/habits-tasks/HabitRowCard';
 import {
-  AreaRuler,
-  TaskAreaChip,
   TaskCardMeta,
   TaskPriorityRuler,
   PRIORITY_CONFIG,
@@ -126,15 +121,24 @@ export default function HabitsTasks() {
   const isMobile = useIsMobile();
   const isWide = useMinWidth(1280);
   // Faixa da semana: semana mostrada e dia escolhido (Lista filtra; Linha do tempo foca no celular).
-  const [weekBase, setWeekBase] = useState(today);
-  const [selectedDay, setSelectedDay] = useState(null);
+  const [weekBase, setWeekBase] = useState(() => taskDayFromSearchParams(searchParams) || today);
+  const [selectedDay, setSelectedDay] = useState(() => taskDayFromSearchParams(searchParams));
   const openTaskId = taskIdFromSearchParams(searchParams);
 
   useEffect(() => {
     setView(habitTasksTabFromSearchParams(searchParams));
     setTaskScope(taskScopeFromSearchParams(searchParams));
     setLens(taskLensFromSearchParams(searchParams));
-  }, [searchParams]);
+    // ?day= (vindo da semana do Hoje) escolhe o dia uma vez e sai da URL.
+    const linkedDay = taskDayFromSearchParams(searchParams);
+    if (searchParams.has('day')) {
+      if (linkedDay) {
+        setWeekBase(linkedDay);
+        setSelectedDay(linkedDay);
+      }
+      setSearchParams(setTaskDayInSearchParams(searchParams, null), { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleOpenCreateTask = (initialData = null) => {
     setCreateTaskInitial(initialData);
@@ -1518,195 +1522,27 @@ export default function HabitsTasks() {
                     );
                   }
                   const outcome = habitDayOutcome(habit.id);
-                  const done = outcome === 'done';
-                  const skipped = outcome === 'skipped';
-                  const dueToday = isHabitDueOnDate(habit, today);
-                  const canCheckIn = !isSince && habit.status === 'active' && dueToday;
                   const todayLog = todayLogForHabit(habitLogs, habit.id, today);
-                  const quant = isQuantitativeHabit(habit);
-                  const quick = isQuickIncrementHabit(habit);
                   const title = cleanPriorityPrefix(habit.title);
-                  const timeLabel = formatPreferredTime(habit.preferred_time);
-                  const showQuickIncrement = canCheckIn && !done && !skipped && quick;
-                  const showSkip = canCheckIn && outcome !== 'skipped' && !quick;
-                  const showSkippedActions = canCheckIn && outcome === 'skipped';
+                  const canCheckIn = habit.status === 'active' && isHabitDueOnDate(habit, today);
                   return (
-                    /* Mesma linguagem do card de tarefa: superfície, régua (da área), chips e verde quando feito */
-                    <div
+                    <HabitRowCard
                       key={habit.id}
-                      ref={el => { if (el) habitRowRefs.current.set(habit.id, el); else habitRowRefs.current.delete(habit.id); }}
-                      data-done={done ? 'true' : 'false'}
-                      data-skipped={skipped ? 'true' : 'false'}
-                      className="praxis-board-card relative grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1 rounded-xl py-1.5 pl-1.5 pr-1.5 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-center sm:gap-x-2"
-                    >
-                      <AreaRuler category={habit.category} done={done} />
-                      <div className="col-start-1 row-start-1 flex">
-                        {canCheckIn ? (
-                          <button
-                            type="button"
-                            onClick={(evt) => {
-                              if (skipped) {
-                                toggleHabit.mutate({ habitId: habit.id, isDone: true });
-                                return;
-                              }
-                              handleToggleHabit(habit, done, evt);
-                            }}
-                            disabled={toggleHabit.isPending || skipHabit.isPending}
-                            className="praxis-touch-target flex shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                            aria-label={
-                              skipped
-                                ? `Desfazer não rolou — ${title}`
-                                : quick && !done
-                                  ? formatQuickIncrementAriaLabel(habit)
-                                  : `${done ? 'Desmarcar' : 'Concluir'} ${title}`
-                            }
-                          >
-                            {done ? (
-                              <CheckCircle2 className="h-5 w-5 text-domain-wellness" />
-                            ) : skipped ? (
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-400">
-                                <Minus className="h-3 w-3" />
-                              </span>
-                            ) : (
-                              <Circle className="h-5 w-5" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="h-11 w-11 shrink-0" aria-hidden />
-                        )}
-                      </div>
-
-                      <div className="col-start-2 row-start-1 min-w-0 py-2 pr-1">
-                        <p
-                          className={cn(
-                            'break-words text-[15px] font-medium leading-snug [text-wrap:pretty]',
-                            done
-                              ? 'text-muted-foreground line-through decoration-muted-foreground/50'
-                              : skipped
-                                ? 'text-muted-foreground'
-                                : 'text-stone-100',
-                          )}
-                        >
-                          {title}
-                        </p>
-                        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs leading-none text-muted-foreground">
-                          <TaskAreaChip category={habit.category} />
-                          {timeLabel ? (
-                            <span className="inline-flex shrink-0 items-center gap-1 tabular-nums">
-                              <Clock className="h-3 w-3 opacity-80" aria-hidden />
-                              <span>
-                                <span className="sr-only">Horário: </span>
-                                {timeLabel}
-                              </span>
-                            </span>
-                          ) : null}
-                          <span className="shrink-0">{formatFrequencyLabel(habit)}</span>
-                          {habit.current_streak > 0 ? (
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/[0.05] px-2 py-[3px] font-mono text-[11px] font-medium tabular-nums text-orange-300 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]">
-                              <Flame className="h-3 w-3" aria-hidden />
-                              <span className="sr-only">Sequência: </span>
-                              {habit.current_streak}
-                              <span className="sr-only">{habit.current_streak === 1 ? ' dia' : ' dias'}</span>
-                            </span>
-                          ) : null}
-                          {quick ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQuantSheetHabit(habit);
-                              }}
-                              className="inline-flex min-h-6 items-center rounded-full bg-domain-wellness/10 px-2 py-[3px] text-[11px] font-semibold tabular-nums text-domain-wellness shadow-[inset_0_0_0_1px_hsl(var(--domain-wellness)/0.3)] transition-colors hover:bg-domain-wellness/20"
-                              title="Clique para ajustar quantidade"
-                              aria-label={`Progresso: ${formatHabitProgress(todayLog?.value, habit.target_value, habit.unit)}. Clique para ajustar.`}
-                            >
-                              {formatHabitProgress(todayLog?.value, habit.target_value, habit.unit)}
-                            </button>
-                          ) : null}
-                          {skipped ? (
-                            <span className="font-medium text-amber-200/90">
-                              Não rolou
-                              {todayLog?.skip_reason
-                                ? ` · ${SKIP_REASON_LABELS[todayLog.skip_reason] || todayLog.skip_reason}`
-                                : ''}
-                            </span>
-                          ) : null}
-                          {quant && todayLog?.value != null && done ? (
-                            <span className="tabular-nums">
-                              Hoje: {todayLog.value}
-                              {habit.unit ? ` ${habit.unit}` : ''}
-                            </span>
-                          ) : null}
-                          {!dueToday && habit.status === 'active' ? <span>Não previsto para hoje</span> : null}
-                        </div>
-                        {skipped && todayLog?.note ? (
-                          <p className="mt-2 text-[11px] leading-snug text-amber-100/75">
-                            “{todayLog.note}”
-                          </p>
-                        ) : null}
-                      </div>
-
-                      {showQuickIncrement || showSkip || showSkippedActions ? (
-                        <div className="col-start-2 row-start-2 flex flex-wrap items-center gap-1.5 pb-2 sm:col-start-3 sm:row-start-1 sm:pb-0">
-                          {showQuickIncrement ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="praxis-touch-target min-h-[44px] min-w-[72px] rounded-full border border-domain-wellness/30 bg-domain-wellness/20 px-4 font-bold text-domain-wellness transition-transform hover:bg-domain-wellness/30 active:scale-[0.96] touch-manipulation motion-reduce:transition-none"
-                              disabled={savingHabitId === habit.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleQuickIncrement(habit, e);
-                              }}
-                              aria-label={formatQuickIncrementAriaLabel(habit)}
-                            >
-                              {savingHabitId === habit.id ? (
-                                <span className="animate-pulse">…</span>
-                              ) : (
-                                formatQuickIncrementButtonLabel(habit)
-                              )}
-                            </Button>
-                          ) : null}
-                          {showSkip ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-9 shrink-0 rounded-full border-amber-500/30 bg-amber-500/10 text-xs text-amber-100 hover:bg-amber-500/20"
-                              disabled={skipHabit.isPending}
-                              onClick={() => skipHabit.mutate({ habitId: habit.id })}
-                            >
-                              Não rolou
-                            </Button>
-                          ) : null}
-                          {showSkippedActions ? (
-                            <>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-9 shrink-0 rounded-full text-xs text-muted-foreground hover:text-foreground"
-                                disabled={skipHabit.isPending}
-                                onClick={() => setSkipSheetHabit(habit)}
-                              >
-                                Nomear
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 shrink-0 rounded-full text-xs"
-                                disabled={toggleHabit.isPending}
-                                onClick={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
-                              >
-                                Desfazer
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      <div className="col-start-3 row-start-1 flex h-11 items-center sm:col-start-4">
+                      habit={habit}
+                      today={today}
+                      todayLog={todayLog}
+                      outcome={outcome}
+                      rowRef={el => { if (el) habitRowRefs.current.set(habit.id, el); else habitRowRefs.current.delete(habit.id); }}
+                      toggleBusy={toggleHabit.isPending}
+                      skipBusy={skipHabit.isPending}
+                      saving={savingHabitId === habit.id}
+                      onToggle={(evt) => handleToggleHabit(habit, outcome === 'done', evt)}
+                      onUndo={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
+                      onQuickIncrement={(evt) => handleQuickIncrement(habit, evt)}
+                      onSkip={() => skipHabit.mutate({ habitId: habit.id })}
+                      onNomear={() => setSkipSheetHabit(habit)}
+                      onAdjustQuantity={() => setQuantSheetHabit(habit)}
+                      menu={(
                         <HabitRowMenu
                           label={title}
                           busy={reorderHabits.isPending || skipHabit.isPending || savingHabitId === habit.id}
@@ -1721,11 +1557,11 @@ export default function HabitsTasks() {
                           onNaoRolou={() => skipHabit.mutate({ habitId: habit.id })}
                           onNomear={() => setSkipSheetHabit(habit)}
                           onUndoDayOutcome={() => toggleHabit.mutate({ habitId: habit.id, isDone: true })}
-                          onAdjustQuantity={quant ? () => setQuantSheetHabit(habit) : undefined}
+                          onAdjustQuantity={isQuantitativeHabit(habit) ? () => setQuantSheetHabit(habit) : undefined}
                           hasValue={todayLog?.value != null && Number(todayLog.value) > 0}
                         />
-                      </div>
-                    </div>
+                      )}
+                    />
                   );
                 })}
                 <CompoundHabitsWidget

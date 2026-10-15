@@ -28,7 +28,7 @@ export function timeToMinutes(time) {
 }
 
 /** Relógio injetável: aceita "HH:MM", Date ou nada (agora, em Fortaleza). */
-function resolveNowMinutes(now) {
+export function nowToMinutes(now) {
   if (typeof now === 'string') return timeToMinutes(now) ?? 0;
   return timeToMinutes(fortalezaNowTimeHHMM(now instanceof Date ? now : new Date())) ?? 0;
 }
@@ -62,7 +62,7 @@ function fallbackNowTask(pending, today) {
  * - Ficou pra trás: abertas de dias anteriores + de hoje fora da janela.
  */
 export function planNowTasks(tasks, today, now) {
-  const nowMin = resolveNowMinutes(now);
+  const nowMin = nowToMinutes(now);
   const windowStart = nowMin - NOW_WINDOW_MINUTES;
   const pending = (tasks || []).filter((t) => isTaskOpen(t) && !isTaskDone(t));
 

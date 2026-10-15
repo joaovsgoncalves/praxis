@@ -92,3 +92,32 @@ export function partitionCompoundHabitsForDay(compounds) {
 
   return { beforeChecks, afterChecks };
 }
+
+/** Abertura começa aberta antes das 11h; Fechamento, a partir das 20h. */
+export const OPENING_OPEN_UNTIL_HOUR = 11;
+export const CLOSING_OPEN_FROM_HOUR = 20;
+
+/** Fase do ritual no dia: 'opening' (manhã), 'closing' (noite/fechamento) ou 'other'. */
+export function ritualPhase(compound) {
+  const titleMinutes = titlePeriodMinutes(compound?.title);
+  const { minutes } = compoundHabitDayRank(compound);
+  if (titleMinutes === KEYWORD_MINUTES.morning || (titleMinutes === null && minutes < 12 * 60)) return 'opening';
+  if (titleMinutes === KEYWORD_MINUTES.evening || (titleMinutes === null && minutes >= 18 * 60)) return 'closing';
+  return 'other';
+}
+
+/**
+ * O ritual começa expandido agora? `now` = hora (0–23), "HH:MM" ou Date.
+ * Fora das janelas fica recolhido mostrando feitos/total; o toque abre e fecha.
+ */
+export function isRitualOpenByDefault(compound, now) {
+  let hour;
+  if (typeof now === 'number') hour = now;
+  else if (typeof now === 'string') hour = Number(now.split(':')[0]);
+  else hour = (now instanceof Date ? now : new Date()).getHours();
+  if (!Number.isFinite(hour)) return false;
+  const phase = ritualPhase(compound);
+  if (phase === 'opening') return hour < OPENING_OPEN_UNTIL_HOUR;
+  if (phase === 'closing') return hour >= CLOSING_OPEN_FROM_HOUR;
+  return false;
+}
