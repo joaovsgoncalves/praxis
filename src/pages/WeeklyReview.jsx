@@ -254,7 +254,7 @@ export default function WeeklyReview() {
                 <InsightBlock title="Gargalos">
                   <p className="text-muted-foreground leading-relaxed">{auto.bottlenecks?.summary}</p>
                 </InsightBlock>
-                <InsightBlock title="Ideias na semana">
+                <InsightBlock title="Ideias na semana" className="sm:col-span-2">
                   <p className="text-muted-foreground">
                     {auto.ideas?.new_captures ?? 0} nova(s) · {auto.ideas?.promissoras_count ?? 0} promissora(s) no banco
                   </p>
@@ -558,9 +558,9 @@ function WeekNumber({ label, value, detail }) {
   );
 }
 
-function InsightBlock({ title, children }) {
+function InsightBlock({ title, children, className = '' }) {
   return (
-    <div className="rounded-xl bg-white/[0.03] px-4 py-3.5 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]">
+    <div className={`${className} rounded-xl bg-white/[0.03] px-4 py-3.5 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]`}>
       <p className="mb-1.5 text-xs font-medium text-muted-foreground">{title}</p>
       {children}
     </div>
