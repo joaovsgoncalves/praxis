@@ -1,6 +1,6 @@
 # Plano Praxis: evolução pós-auditoria (out/2026)
 
-Criado em 2026-10-15. **Atualizado em 2026-10-15, 17h50 (Fortaleza): fases A, B e C no ar; próxima é a D.**
+Criado em 2026-10-15. **Atualizado em 2026-10-15, 18h10 (Fortaleza): fases A, B, C e D no ar; próxima é a E.**
 Substitui as fases 5 e 6 de `docs/PLANO-PRAXIS-VISUAL-PREMIUM.md` (fases 0 a 4 entregues e no ar).
 Fontes: auditoria do Sistema Forja (`audits/forja-rea-2026-10-14/RELATORIO.md`), revisão do Hoje pelo Fable 5.1 (`audits/forja-rea-2026-10-14/REVISAO-HOJE-FABLE-2026-10-15.md`), prints de produção de 15/10 e o feedback do João no mesmo dia.
 Escopo: só construção e validação. Uso, piloto e decisões de rotina ficam com o João.
@@ -13,8 +13,8 @@ Escopo: só construção e validação. Uso, piloto e decisões de rotina ficam 
 | **A** acabamento das abas | **No ar** | `d1e89a0`, `a0f05e7`, `ef55a93` |
 | **B** Hoje enxuto | **No ar** | `f819f65`, `309985d`, `4974a52`, `f70af44` |
 | **C** trilha e bento | **No ar** | `aa54c1b` |
-| **D** XP por evento e meta semanal de foco | **Próxima** | |
-| E acabamento final | Pendente | |
+| **D** XP por evento e meta semanal de foco | **No ar** | `5708c49` |
+| **E** acabamento final | **Próxima** | |
 
 - `main` = `origin/main` em `f70af44`, árvore limpa. Produção: https://dopraxis.vercel.app (deploy `praxis-5sfo0lnyx`) e API `praxis-api` reiniciada depois do backup de 15/10.
 - `smoke:prod` completo verde depois de A, B e do ajuste do Sêneca. 214 testes da API verdes depois da saída de treino e alimentação.
@@ -62,13 +62,15 @@ Cada fase entra no ar completa: código, testes focados, QA da A.N.A. no navegad
 - **Verificado:** 3,2 telas em 390 px, `scrollWidth` 390, bento com 140 px nos quatro cards em 390 e 1440 px, marcador 17:42 entre RCA 14:00 e faculdade 18:20, Abertura expandida às 8h e Fechamento às 21h, toque no dia abre a semana com o dia certo, agenda real (5 eventos, todos espelho de tarefa) sem duplicar. 269 testes, lint, build e `smoke:prod` verdes.
 - **Contrato do `days[]`:** conta só hábitos folha; as rotinas-contêiner ficam em `days_routines`, que fecha a conta com `victories`. Drag de reordenar saiu do Hoje (continua em Hábitos e Tarefas). `TodayTasks`, `TodayCalendar` e `TodayFinanceCard` removidos.
 
-### Fase D: XP ligado à ação e meta semanal de foco (próxima)
+### Fase D: XP ligado à ação e meta semanal de foco (no ar)
 - **Registro de XP por origem** (tabela de eventos: origem, id, valor). Desmarcar tarefa ou hábito estorna o XP; marcar de novo não duplica. Bug confirmado no código: `PUT /api/tasks/:id` soma +10 toda vez que a tarefa volta a ficar concluída (`api/routes/tasks.js`, `taskXpAwarded`).
 - O total e o nível são recalculados a partir do registro. Na migração, o XP atual vira um saldo inicial, sem perder nível.
 - **Meta semanal de foco** definida pelo João em Configurações ou no Foco, desligada por padrão. Mostra o feito na semana e uma projeção, sem tom de cobrança e sem número imposto.
 - **Pronto quando:** teste de marcar/desmarcar/marcar resulta em +10 uma vez só; XP e nível iguais antes e depois da migração; com a meta desligada, nada aparece; com a meta ligada, o feito bate com as sessões da semana.
+- **Verificado:** na cópia do banco real, marcar/desmarcar/marcar = +10 uma vez, desmarcar volta a 2.225, excluir tarefa concluída estorna; migração em produção gravou um evento `baseline` de 2.225 com nível 6 inalterado; `smoke:prod` deixou o XP em 2.225 (antes somava +20). Meta desligada não aparece em Foco nem Revisar; ligada mostrou "0 min nesta semana, meta 300 min"; desligar com `null` e valor inválido (400) testados. 290 testes, lint e build verdes.
+- **Limite conhecido:** tarefas concluídas antes da migração não têm evento (o XP delas está no baseline), então desmarcar uma delas não tira XP. `add-xp` ainda desbloqueia conquistas sem creditar o `xp_reward`, como antes.
 
-### Fase E: acabamento final
+### Fase E: acabamento final (próxima)
 - Animação de entrada do Hoje uma vez por sessão (320 ms), confete respeitando movimento reduzido (`src/lib/celebration.js`), barras com `scaleX` em vez de `width`.
 - Skeletons na mesma silhueta das telas novas e transição entre rotas.
 - Modal "Últimas atualizações" depois de cada publicação.
