@@ -1,5 +1,7 @@
 # Plano Praxis Visual Premium
 
+> **Atualização 15/10/2026:** fases 0 a 4 no ar. As fases 5 e 6 abaixo foram substituídas por `docs/PLANO-PRAXIS-EVOLUCAO-2026-10.md` (fases A a E). Vale aquele arquivo.
+
 Data: 2026-10-14. Base: auditoria do Sistema Forja (`workspaces/audits/forja-rea-2026-10-14/`), feita só com leitura.
 
 ## Promessa
