@@ -114,3 +114,29 @@ test('lista sem include_overdue não fecha nada', async (t) => {
 
   assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get('faculdade').status, 'pending');
 });
+
+test('bloco com hora do Sêneca de ontem vira não rolou, sem gerar filho; avulsa manual continua atrasada', async (t) => {
+  const { db, list, xp } = await setup(t);
+  const ins = db.prepare(`INSERT INTO tasks (id, title, date, time, status, priority, category, sort_order, recurrence, source)
+    VALUES (?, ?, ?, ?, 'pending', 'medium', 'rotina', ?, 'none', ?)`);
+  ins.run('fac-seneca', 'Sair para a faculdade', YESTERDAY, '18:20', 1, 'seneca');
+  ins.run('fac-hoje', 'Sair para a faculdade', TODAY, '18:20', 2, 'seneca');
+  ins.run('sem-hora', 'Gravar vídeo', YESTERDAY, '', 3, 'seneca');
+  ins.run('manual', 'Pagar boleto', YESTERDAY, '10:00', 4, 'manual');
+  const xpBefore = xp();
+
+  const tasks = await list();
+  await list();
+
+  const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get('fac-seneca');
+  assert.equal(row.status, 'cancelled');
+  assert.equal(row.day_outcome, 'missed');
+  assert.equal(row.day_outcome_date, YESTERDAY);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM tasks WHERE recurrence_parent_id = ?').get('fac-seneca').c, 0, 'não cria filho');
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get('fac-hoje').status, 'pending', 'a de hoje fica intacta');
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get('sem-hora').status, 'pending', 'sem hora continua atrasada');
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get('manual').status, 'pending', 'manual continua atrasada');
+  const openOverdue = tasks.filter((task) => task.date && task.date < TODAY && task.status === 'pending').map((task) => task.id).sort();
+  assert.deepEqual(openOverdue, ['manual', 'sem-hora']);
+  assert.equal(xp(), xpBefore);
+});

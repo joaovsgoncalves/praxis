@@ -269,13 +269,16 @@ export function createTasksRouter(ctx) {
   }
 
   /**
-   * Instância recorrente aberta de um dia anterior vira "não rolou": cancelada,
+   * Instância recorrente (ou bloco com hora criado pelo Sêneca) aberta de um dia anterior vira "não rolou": cancelada,
    * day_outcome = 'missed' na data dela, sem XP e sem mexer no Google Agenda.
    * A próxima ocorrência (hoje ou depois) fica garantida. Idempotente.
    */
   const staleRecurringStmt = db.prepare(`
     SELECT * FROM tasks
-    WHERE recurrence IS NOT NULL AND recurrence != 'none'
+    WHERE (
+        (recurrence IS NOT NULL AND recurrence != 'none')
+        OR (source = 'seneca' AND time IS NOT NULL AND time != '')
+      )
       AND date IS NOT NULL AND date != '' AND date < ?
       AND status IN ('pending', 'in_progress')
       AND category != 'ideias'
@@ -303,6 +306,8 @@ export function createTasksRouter(ctx) {
     const latestByChain = new Map();
     for (const task of stale) {
       markMissedStmt.run(task.id);
+      // Bloco com hora do Sêneca é avulso: ele cria o do dia seguinte, então não gera filho.
+      if (!task.recurrence || task.recurrence === 'none') continue;
       latestByChain.set(task.recurrence_parent_id || task.id, task);
     }
 

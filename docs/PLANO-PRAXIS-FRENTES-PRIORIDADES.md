@@ -46,7 +46,7 @@ O sistema possui contexto suficiente, mas devolve sua complexidade ao usuário. 
 - **Tarefa** guarda execução do dia.
 - **Prioridade diária** é uma recomendação datada do Sêneca, não um pin permanente.
 - João continua decidindo se começa, conclui ou muda o estado de uma frente.
-- Sêneca pode recomendar prioridade, mas não pode alterar `focus`, `column`, `live`, `kind` ou `objective`.
+- Sêneca pode mexer em tudo na Praxis, inclusive `focus`, `column`, `live`, `kind` e `objective` (decisão do João, 15/10/2026).
 - O campo legado `focus` permanece no banco e na API nesta entrega, mas deixa de ser apresentado como a verdade principal da tela.
 
 ## 5. Escopo funcional
