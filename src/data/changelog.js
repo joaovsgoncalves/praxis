@@ -8,6 +8,16 @@
  */
 export const changelog = [
   {
+    id: '2026-10-15-hoje',
+    date: '2026-10-15',
+    title: 'O Hoje com suas ferramentas',
+    items: [
+      'O Hoje agora mostra suas ferramentas: finanças, foco, frentes, metas e revisão.',
+      'Hábitos do dia viram uma linha de marcas que você toca para concluir.',
+      'Semana com barras do que foi feito em cada dia.',
+    ],
+  },
+  {
     id: '2026-10-15-evolucao',
     date: '2026-10-15',
     title: 'Praxis mais clara e mais rápida',

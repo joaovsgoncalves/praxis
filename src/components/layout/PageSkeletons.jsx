@@ -58,25 +58,28 @@ function ListColumnSkeleton({ rows = 3 }) {
   );
 }
 
-/** Hoje: faixa do dia, Agora, trilha, hábitos; no xl, coluna direita com bento 2x2 e semana. */
+/** Hoje: faixa do dia, Agora, trilha e hábitos em linha; ferramentas (6 cards) e semana em barras. */
 export function DashboardSkeleton() {
   return (
     <div className="praxis-page praxis-dashboard flex flex-col gap-4 space-y-0 sm:gap-5" role="status" aria-busy="true" aria-label="Carregando">
-      <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
+      <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.6fr)] xl:gap-6">
         <div className="min-w-0 space-y-4 sm:space-y-5">
           <Bone className="h-[70px]" />
           <Bone className="h-[403px] sm:h-[308px]" />
           <Bone className="h-[620px] sm:h-[584px]" />
-          <Bone className="h-[560px]" />
+          <div className="space-y-3">
+            <Bone className="h-8 w-40 rounded-lg" />
+            <Bone className="h-[224px]" />
+          </div>
         </div>
         <div className="min-w-0 space-y-3">
-          <Bone className="hidden h-8 w-40 rounded-lg xl:block" />
+          <Bone className="h-8 w-44 rounded-lg" />
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <Bone key={i} className="h-[140px]" />
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Bone key={i} className="h-[144px]" />
             ))}
           </div>
-          <Bone className="h-[76px]" />
+          <Bone className="h-[138px]" />
         </div>
       </div>
     </div>

@@ -5,9 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DayStrip from "@/components/dashboard/DayStrip";
 import NowBlock from "@/components/dashboard/NowBlock";
 import DayTrack from "@/components/dashboard/DayTrack";
-import TodayHabits from "@/components/dashboard/TodayHabits";
-import DayBento from "@/components/dashboard/DayBento";
-import WeekDots, { WEEK_DOTS_QUERY_KEY } from "@/components/dashboard/WeekDots";
+import HabitsGlance from "@/components/dashboard/HabitsGlance";
+import ToolsPanel from "@/components/dashboard/ToolsPanel";
+import WeekPanel, { WEEK_QUERY_KEY } from "@/components/dashboard/WeekPanel";
 import XpProgressStrip from "@/components/dashboard/XpProgressStrip";
 import WeeklyReviewPrompt from "@/components/dashboard/WeeklyReviewPrompt";
 import AvoidanceWidget from "@/components/dashboard/AvoidanceWidget";
@@ -103,12 +103,11 @@ export default function Dashboard() {
   const [editingTask, setEditingTask] = React.useState(null);
   const [showNewTaskForm, setShowNewTaskForm] = React.useState(false);
   const [taskPendingDelete, setTaskPendingDelete] = React.useState(null);
-  const [habitPendingDelete, setHabitPendingDelete] = React.useState(null);
   const [editingHabit, setEditingHabit] = React.useState(null);
 
-  // A semana em 7 pontos conta tarefas e hábitos: muda junto com eles.
+  // A semana em barras conta tarefas e hábitos: muda junto com eles.
   const invalidateWeek = React.useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [WEEK_DOTS_QUERY_KEY] });
+    queryClient.invalidateQueries({ queryKey: [WEEK_QUERY_KEY] });
   }, [queryClient]);
 
   const invalidateTaskQueries = React.useCallback(() => {
@@ -536,54 +535,6 @@ export default function Dashboard() {
     },
   });
 
-  const deleteHabitMutation = useMutation({
-    mutationFn: (id) => praxisApi.habits.delete(id),
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["habits"] });
-      await queryClient.cancelQueries({ queryKey: ["allHabits"] });
-      await queryClient.cancelQueries({ queryKey: ["habitLogs"] });
-
-      const prevHabits = queryClient.getQueriesData({ queryKey: ["habits"] });
-      const prevAllHabits = queryClient.getQueriesData({ queryKey: ["allHabits"] });
-      const prevLogs = queryClient.getQueriesData({ queryKey: ["habitLogs"] });
-
-      const filterHabitList = (old) => {
-        if (!Array.isArray(old)) return old;
-        return old
-          .filter((h) => h.id !== id)
-          .map((h) => ({
-            ...h,
-            children: Array.isArray(h.children)
-              ? h.children.filter((c) => c.id !== id)
-              : h.children,
-          }));
-      };
-
-      queryClient.setQueriesData({ queryKey: ["habits"] }, filterHabitList);
-      queryClient.setQueriesData({ queryKey: ["allHabits"] }, filterHabitList);
-      queryClient.setQueriesData({ queryKey: ["habitLogs"] }, (old) =>
-        Array.isArray(old) ? old.filter((l) => l.habit_id !== id) : old
-      );
-
-      return { prevHabits, prevAllHabits, prevLogs };
-    },
-    onError: (_err, _id, context) => {
-      context?.prevHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevAllHabits?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevLogs?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error("Erro ao excluir hábito");
-    },
-    onSuccess: () => {
-      toast.success("Hábito excluído");
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["allHabits"] });
-      queryClient.invalidateQueries({ queryKey: ["habitLogs"] });
-      invalidateWeek();
-    },
-  });
-
   const updateHabitMutation = useMutation({
     mutationFn: ({ id, data }) => praxisApi.habits.update(id, data),
     onSuccess: () => {
@@ -712,7 +663,7 @@ export default function Dashboard() {
   }, [showSkeleton, revealOnce]);
 
   if (showSkeleton) {
-    // Mesma silhueta do Hoje (e do fallback da rota): faixa, agora, trilha, hábitos; no xl, o bento.
+    // Mesma silhueta do Hoje (e do fallback da rota): faixa, agora, trilha, hábitos; ferramentas e semana.
     return <DashboardSkeleton />;
   }
 
@@ -724,7 +675,7 @@ export default function Dashboard() {
       {/* OfflineBanner vive no AppLayout — vale para todas as abas, não só o Hoje. */}
       <PwaInstallBanner />
 
-      <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
+      <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.6fr)] xl:gap-6">
         <div className="min-w-0 space-y-4 sm:space-y-5">
           <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "0ms" }}>
             <DayStrip
@@ -764,13 +715,12 @@ export default function Dashboard() {
           </div>
 
           <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "90ms" }}>
-            <TodayHabits
+            <HabitsGlance
               today={today}
               clock={clock}
-              habits={standaloneHabitsDueToday}
               compounds={compoundHabits}
+              habits={standaloneHabitsDueToday}
               sinceHabits={sinceHabits}
-              summaryHabits={essentialHabits}
               habitLogs={habitLogs}
               onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
               onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
@@ -778,32 +728,30 @@ export default function Dashboard() {
                 skipHabitMutation.mutate({ habitId, skipReason, skipNote })
               }
               onEditHabit={setEditingHabit}
-              onDeleteHabit={setHabitPendingDelete}
             />
           </div>
         </div>
 
-        {/* Dia em um olhar: fixa no xl; se passar da tela, rola por dentro. */}
+        {/* Ferramentas: fixa no xl; se passar da tela, rola por dentro. */}
         <aside
           className="praxis-dashboard-reveal praxis-hide-scrollbar min-w-0 space-y-3 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto"
           style={{ "--praxis-reveal-delay": "120ms" }}
-          aria-labelledby="day-glance-title"
-          data-testid="day-glance"
+          aria-labelledby="tools-title"
+          data-testid="day-tools"
         >
-          {/* No celular os cards se explicam sozinhos; o título só aparece na coluna do xl. */}
           <SectionHeader
-            className="hidden xl:block"
-            title={<span id="day-glance-title">Dia em um olhar</span>}
+            title={<span id="tools-title">Ferramentas</span>}
             icon={LayoutGrid}
             iconClassName="text-domain-gold"
           />
-          <DayBento
+          <ToolsPanel
             today={today}
             clock={clock}
             todayCheck={todayCheck}
             onSaveWellness={(d) => saveWellnessMutation.mutateAsync(d)}
+            focusGoalMinutes={settings?.focus_weekly_goal_minutes}
           />
-          <WeekDots today={today} />
+          <WeekPanel today={today} />
         </aside>
       </div>
 
@@ -918,38 +866,6 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={Boolean(habitPendingDelete)}
-        onOpenChange={(open) => {
-          if (!open) setHabitPendingDelete(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir hábito?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {habitPendingDelete && (
-                <>
-                  "{cleanPriorityPrefix(habitPendingDelete.title)}" será excluído permanentemente, junto com todos
-                  os check-ins e o histórico de streak. Isso não pode ser desfeito.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: "destructive" })}
-              onClick={() => {
-                if (habitPendingDelete) deleteHabitMutation.mutate(habitPendingDelete.id);
-                setHabitPendingDelete(null);
-              }}
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
