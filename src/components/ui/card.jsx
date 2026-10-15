@@ -1,6 +1,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { cardContentPadding } from "@/lib/cardPadding"
 
 const Card = React.forwardRef(({ className, ...props }, ref) => (
   <div
@@ -35,7 +36,7 @@ const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
 CardDescription.displayName = "CardDescription"
 
 const CardContent = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-5 pt-0 sm:p-6 sm:pt-0", className)} {...props} />
+  <div ref={ref} className={cn(cardContentPadding(className), className)} {...props} />
 ))
 CardContent.displayName = "CardContent"
 
