@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { praxisApi } from "@/api/praxisClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ChevronDown, LayoutGrid } from "lucide-react";
 import { SectionHeader } from "@/components/layout/PraxisPage";
+import { DashboardSkeleton } from "@/components/layout/PageSkeletons";
+import { markDashboardRevealed, shouldRevealDashboard } from "@/lib/dashboardReveal";
 import TaskForm from "@/components/habits-tasks/TaskForm";
 import HabitForm from "@/components/habits-tasks/HabitForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,6 +45,8 @@ import SuggestedGoalCard from "@/components/dashboard/SuggestedGoalCard";
 import { toast } from "sonner";
 
 export default function Dashboard() {
+  // Entrada animada só na primeira visita da sessão; nas seguintes o Hoje aparece direto.
+  const [revealOnce] = useState(shouldRevealDashboard);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -701,33 +705,22 @@ export default function Dashboard() {
     (isLoadingWellness && wellnessChecks.length === 0 && allTasks.length === 0) ||
     (isLoadingSettings && !settings && allTasks.length === 0);
 
-  if (isInitialLoading && allTasks.length === 0 && habits.length === 0) {
-    // Mesma silhueta do Hoje: faixa, agora, trilha, hábitos; no xl, a coluna "Dia em um olhar".
-    return (
-      <div className="praxis-page praxis-dashboard space-y-0" aria-busy="true">
-        <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-6">
-          <div className="min-w-0 space-y-4 sm:space-y-5">
-            <div className="praxis-skeleton h-16 rounded-2xl" />
-            <div className="praxis-skeleton h-56 rounded-2xl" />
-            <div className="praxis-skeleton h-72 rounded-2xl" />
-            <div className="praxis-skeleton h-56 rounded-2xl" />
-          </div>
-          <div className="hidden min-w-0 space-y-3 xl:block">
-            <div className="praxis-skeleton h-8 w-40 rounded-lg" />
-            <div className="grid grid-cols-2 gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="praxis-skeleton h-[140px] rounded-2xl" />
-              ))}
-            </div>
-            <div className="praxis-skeleton h-[68px] rounded-2xl" />
-          </div>
-        </div>
-      </div>
-    );
+  const showSkeleton = isInitialLoading && allTasks.length === 0 && habits.length === 0;
+
+  useEffect(() => {
+    if (!showSkeleton && revealOnce) markDashboardRevealed();
+  }, [showSkeleton, revealOnce]);
+
+  if (showSkeleton) {
+    // Mesma silhueta do Hoje (e do fallback da rota): faixa, agora, trilha, hábitos; no xl, o bento.
+    return <DashboardSkeleton />;
   }
 
   return (
-    <div className="praxis-page praxis-dashboard flex flex-col gap-4 space-y-0 sm:gap-5">
+    <div
+      className="praxis-page praxis-dashboard flex flex-col gap-4 space-y-0 sm:gap-5"
+      data-reveal={revealOnce ? "once" : undefined}
+    >
       {/* OfflineBanner vive no AppLayout — vale para todas as abas, não só o Hoje. */}
       <PwaInstallBanner />
 
@@ -743,7 +736,7 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "40ms" }}>
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "30ms" }}>
             <NowBlock
               task={nowPlan.now}
               next={nowPlan.next}
@@ -755,7 +748,7 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "80ms" }}>
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "60ms" }}>
             <DayTrack
               tasks={tasks}
               today={today}
@@ -770,7 +763,7 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "120ms" }}>
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "90ms" }}>
             <TodayHabits
               today={today}
               clock={clock}
@@ -793,7 +786,7 @@ export default function Dashboard() {
         {/* Dia em um olhar: fixa no xl; se passar da tela, rola por dentro. */}
         <aside
           className="praxis-dashboard-reveal praxis-hide-scrollbar min-w-0 space-y-3 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto"
-          style={{ "--praxis-reveal-delay": "160ms" }}
+          style={{ "--praxis-reveal-delay": "120ms" }}
           aria-labelledby="day-glance-title"
           data-testid="day-glance"
         >
@@ -817,7 +810,7 @@ export default function Dashboard() {
       <Collapsible
         defaultOpen={false}
         className="praxis-dashboard-reveal rounded-2xl border border-white/[0.055] bg-white/[0.018]"
-        style={{ "--praxis-reveal-delay": "190ms" }}
+        style={{ "--praxis-reveal-delay": "120ms" }}
       >
         <CollapsibleTrigger asChild>
           <Button variant="ghost" className="h-auto min-h-12 w-full justify-between rounded-2xl px-4 py-3 hover:bg-white/[0.025] sm:px-5">

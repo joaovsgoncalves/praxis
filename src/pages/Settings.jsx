@@ -11,6 +11,7 @@ import { PageHero } from '@/components/layout/PraxisPage';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { openWhatsNew } from '@/lib/whatsNew';
 
 const AVATAR_MAX_DIMENSION = 256;
 const AVATAR_MAX_DATA_URL_LENGTH = 80_000;
@@ -332,6 +333,16 @@ export default function Settings() {
           </Button>
         </CardContent>
       </Card>
+
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={openWhatsNew}
+          className="praxis-touch-target rounded-full px-4 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+        >
+          Últimas atualizações
+        </button>
+      </div>
     </div>
   );
 }

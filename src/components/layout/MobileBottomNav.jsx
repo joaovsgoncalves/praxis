@@ -2,6 +2,7 @@ import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, ListTodo, BookOpen, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { prefetchHandlers } from "@/lib/routePrefetch";
 
 const linkClass = ({ isActive }) =>
   cn(
@@ -22,13 +23,14 @@ export default function MobileBottomNav({ onOpenMenu }) {
       aria-label="Navegação principal"
     >
       <div className="praxis-nav-island pointer-events-auto mx-auto flex h-16 max-w-md items-stretch gap-1 rounded-[22px] p-1.5">
-        <NavLink to="/" end className={linkClass}>
+        <NavLink to="/" end className={linkClass} {...prefetchHandlers("/")}>
           <LayoutDashboard className="h-5 w-5 shrink-0" aria-hidden />
           <span>Hoje</span>
         </NavLink>
 
         <NavLink
           to="/habitos-tarefas"
+          {...prefetchHandlers("/habitos-tarefas")}
           className={({ isActive }) =>
             linkClass({ isActive: isActive || location.pathname === "/habitos-tarefas" })
           }
@@ -39,6 +41,7 @@ export default function MobileBottomNav({ onOpenMenu }) {
 
         <NavLink
           to="/revisao-semanal"
+          {...prefetchHandlers("/revisao-semanal")}
           className={({ isActive }) => linkClass({ isActive })}
         >
           <BookOpen className="h-5 w-5 shrink-0" aria-hidden />

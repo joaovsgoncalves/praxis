@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweenFast } from '@/lib/motion';
 import { CalendarClock, Columns3, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,7 +44,7 @@ export default function TaskLensSwitch({ value, onChange, className }) {
                 layoutId="praxis-task-lens-indicator"
                 aria-hidden
                 className="praxis-elev-1 absolute inset-0 rounded-full bg-secondary"
-                transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                transition={reduceMotion ? { duration: 0 } : tweenFast}
               />
             ) : null}
             <Icon

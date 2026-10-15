@@ -1,4 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+/*
+ * Fontes: o <link> fica no index.html (não bloqueia a pintura). Enquanto elas chegam, o texto usa
+ * Arial com métricas ajustadas às da Inter / Space Grotesk (medidas nos arquivos do Google Fonts),
+ * então a troca não empurra o layout.
+ */
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial'), local('ArialMT'), local('Liberation Sans'), local('Helvetica');
+  font-weight: 100 500;
+  size-adjust: 105.9%;
+  ascent-override: 91.48%;
+  descent-override: 22.78%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial Bold'), local('Arial-BoldMT'), local('Liberation Sans Bold'), local('Helvetica Bold');
+  font-weight: 600 900;
+  size-adjust: 105.9%;
+  ascent-override: 91.48%;
+  descent-override: 22.78%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Space Grotesk Fallback';
+  src: local('Arial Bold'), local('Arial-BoldMT'), local('Liberation Sans Bold'), local('Helvetica Bold');
+  font-weight: 100 900;
+  size-adjust: 101.54%;
+  ascent-override: 96.91%;
+  descent-override: 28.76%;
+  line-gap-override: 0%;
+}
 
 @tailwind base;
 @tailwind components;
@@ -6,8 +37,8 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --font-sans: 'Inter', 'Inter Fallback', sans-serif;
+    --font-display: 'Space Grotesk', 'Space Grotesk Fallback', 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
     --background: 240 6% 7%;
@@ -618,24 +649,52 @@ a:focus-visible .praxis-brand-mark {
   box-shadow: var(--elev-2);
 }
 
+/*
+ * Barra de progresso: o trilho (overflow-hidden) fica parado e o preenchimento escala no eixo X
+ * a partir da esquerda. Só transform anima (nada de width). Valor em --p, de 0 a 1.
+ */
 .praxis-progress-fill {
-  transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(var(--p, 0));
+  transition: transform 500ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* Entrada do Hoje: só na primeira visita da sessão (data-reveal="once" vem do Dashboard). */
 @keyframes praxis-dashboard-reveal {
   from {
     opacity: 0;
-    transform: translateY(9px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateY(6px);
   }
 }
 
-.praxis-dashboard-reveal {
-  animation: praxis-dashboard-reveal 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+[data-reveal='once'] .praxis-dashboard-reveal {
+  animation: praxis-dashboard-reveal 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
   animation-delay: var(--praxis-reveal-delay, 0ms);
+}
+
+/* Troca de aba: o conteúdo novo só aparece em opacidade (sem deslocar), o layout fica parado. */
+@keyframes praxis-route-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.praxis-route-fade {
+  animation: praxis-route-fade 150ms ease-out;
+}
+
+/* Skeleton das telas: pulso discreto só de opacidade. */
+@keyframes praxis-skel-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.praxis-skel {
+  background-color: hsl(0 0% 100% / 0.045);
+  animation: praxis-skel-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes praxis-soft-ping {
@@ -675,7 +734,9 @@ a:focus-visible .praxis-brand-mark {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .praxis-dashboard-reveal {
+  .praxis-dashboard-reveal,
+  .praxis-route-fade,
+  .praxis-skel {
     animation: none !important;
   }
 
@@ -712,44 +773,26 @@ a:focus-visible .praxis-brand-mark {
   transform-origin: center center;
 }
 
-@keyframes landing-float {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -7px, 0); }
+/*
+ * Seções da landing bem abaixo da dobra: o navegador só faz layout e pintura quando chegam
+ * perto da tela. A altura estimada (contain-intrinsic-size, no JSX) é a medida real.
+ */
+.landing-defer {
+  content-visibility: auto;
 }
 
-@keyframes landing-orbit {
-  0% { transform: rotate(0deg) scale(1); opacity: 0.55; }
-  50% { transform: rotate(180deg) scale(1.035); opacity: 1; }
-  100% { transform: rotate(360deg) scale(1); opacity: 0.55; }
+/* Cartões da landing: leve subida só com mouse de verdade (toque não fica "preso" no hover). */
+.landing-lift {
+  transition:
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 200ms ease-out,
+    background-color 200ms ease-out;
 }
 
-@keyframes landing-wave {
-  0%, 100% { height: 5px; opacity: 0.45; }
-  50% { height: var(--bar-height); opacity: 1; }
-}
-
-.landing-float-card {
-  animation: landing-float 5.8s ease-in-out infinite;
-  will-change: transform;
-}
-
-.landing-float-card--delay {
-  animation-delay: -2.2s;
-}
-
-.landing-orbit {
-  animation: landing-orbit 18s linear infinite;
-}
-
-.landing-orbit--reverse {
-  animation-direction: reverse;
-  animation-duration: 14s;
-}
-
-.landing-wave-bar {
-  height: 5px;
-  animation: landing-wave 1.15s ease-in-out infinite;
-  animation-delay: var(--bar-delay);
+@media (hover: hover) and (pointer: fine) {
+  .landing-lift:hover {
+    transform: translateY(-4px);
+  }
 }
 
 @media (max-width: 1023px) {
@@ -758,14 +801,31 @@ a:focus-visible .praxis-brand-mark {
   }
 }
 
+/*
+ * Movimento reduzido no sistema: nenhuma animação nem transição de verdade, rolagem sem
+ * suavizar. 0.01ms (e não 0) para eventos animationend/transitionend continuarem disparando.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .landing-float-card,
-  .landing-orbit,
-  .landing-wave-bar {
-    animation: none !important;
+  html {
+    scroll-behavior: auto !important;
   }
 
-  .landing-wave-bar {
-    height: var(--bar-height);
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Exceção de estado: o spinner precisa girar para dizer "carregando". */
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .landing-lift:hover {
+    transform: none;
   }
 }

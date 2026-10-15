@@ -35,7 +35,7 @@ export default function XpProgressStrip({ className = '' }) {
           </div>
         </div>
 
-        <Progress value={progress_pct} className="h-1.5 flex-1 [&>div]:bg-domain-gold" />
+        <Progress value={progress_pct} className="h-1.5 sm:flex-1 [&>div]:bg-domain-gold" />
 
         {unlocked > 0 ? (
           <Link

@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweenFast } from '@/lib/motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -130,7 +131,7 @@ export default function TaskWeekStrip({
                     layoutId="praxis-week-day-pill"
                     aria-hidden
                     className="praxis-elev-2 absolute inset-0 rounded-lg bg-secondary"
-                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                    transition={reduceMotion ? { duration: 0 } : tweenFast}
                   />
                 ) : null}
                 <span

@@ -138,7 +138,7 @@ function CategoryRow({ row, maxSpent, money, editing, onEdit, onDone }) {
             }
             title={hasLimit ? `${money(row.spent)} de ${money(row.limit)}` : money(row.spent)}
           >
-            <div className={cn("h-full rounded-full", BAR_FILL[hasLimit ? tone : "neutral"])} style={{ width: `${fill}%` }} />
+            <div className={cn("praxis-progress-fill rounded-full", BAR_FILL[hasLimit ? tone : "neutral"])} style={{ "--p": fill / 100 }} />
           </div>
         </div>
       </div>
@@ -588,8 +588,8 @@ function GoalsSection({ money }) {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]" aria-hidden>
                   <div
-                    className={cn("h-full rounded-full", done ? "bg-emerald-400" : "bg-primary")}
-                    style={{ width: `${Math.min(100, goal.progress || 0)}%` }}
+                    className={cn("praxis-progress-fill rounded-full", done ? "bg-emerald-400" : "bg-primary")}
+                    style={{ "--p": Math.min(100, goal.progress || 0) / 100 }}
                   />
                 </div>
               </li>

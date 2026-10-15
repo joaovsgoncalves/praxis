@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { tweenFast } from '@/lib/motion';
 import {
   Dialog,
   DialogContent,
@@ -641,7 +642,7 @@ export default function Focus() {
                               layoutId="praxis-focus-preset"
                               aria-hidden
                               className="absolute inset-0 rounded-xl bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.55)]"
-                              transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                              transition={reduceMotion ? { duration: 0 } : tweenFast}
                             />
                           ) : null}
                           <span className="relative flex items-center justify-between gap-2">
@@ -717,7 +718,7 @@ export default function Focus() {
                           </span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                          <div className="h-full rounded-full bg-primary/80" style={{ width: `${pct}%` }} />
+                          <div className="praxis-progress-fill rounded-full bg-primary/80" style={{ '--p': Math.min(100, pct) / 100 }} />
                         </div>
                       </div>
                     );

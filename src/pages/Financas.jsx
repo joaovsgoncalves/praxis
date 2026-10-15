@@ -66,7 +66,7 @@ function ProgressBar({ value, max, className }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div className={cn("h-1.5 overflow-hidden rounded-full bg-white/[0.06]", className)}>
-      <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+      <div className="praxis-progress-fill rounded-full bg-primary" style={{ "--p": pct / 100 }} />
     </div>
   );
 }

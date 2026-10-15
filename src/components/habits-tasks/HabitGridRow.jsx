@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweenPress } from '@/lib/motion';
 import { Button } from '@/components/ui/button';
 import { Check, X, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,7 +12,7 @@ export default function HabitGridRow({ habit, isDone, onToggleDone, onSkipClick 
     <motion.div
       whileHover={reduceMotion ? undefined : { scale: 1.01, y: -1 }}
       whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+      transition={tweenPress}
       className="praxis-tactile-card flex items-center justify-between p-3.5 rounded-xl border border-border/70 bg-card/60"
     >
       <div className="flex items-center gap-3.5">

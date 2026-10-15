@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { praxisApi } from '@/api/praxisClient';
+import { setSessionHint } from '@/lib/sessionHint';
 
 const AuthContext = createContext();
 
@@ -12,12 +13,18 @@ export const AuthProvider = ({ children }) => {
   const [appPublicSettings] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [webAuthEnabled, setWebAuthEnabled] = useState(true);
+  // O login pode responder antes da checagem inicial (a landing/login já pintam sem esperar
+  // por ela). Cada checagem tem um número; resposta de checagem velha é descartada.
+  const checkSeq = useRef(0);
 
   const checkUserAuth = useCallback(async () => {
+    const seq = ++checkSeq.current;
+    const stale = () => seq !== checkSeq.current;
     setIsLoadingAuth(true);
     setAuthError(null);
     try {
       const config = await praxisApi.auth.config();
+      if (stale()) return;
       setWebAuthEnabled(Boolean(config.webAuthEnabled));
       if (!config.webAuthEnabled) {
         setUser({ username: 'local', display_name: 'Local dev' });
@@ -32,21 +39,25 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       const me = await praxisApi.auth.me();
+      if (stale()) return;
       setUser(me.user);
       setIsAuthenticated(true);
       setAuthChecked(true);
+      setSessionHint(true);
     } catch (err) {
+      if (stale()) return;
       const status = err?.status || (err?.message?.includes('401') ? 401 : null);
       if (status === 401 || err?.message?.includes('401')) {
         setIsAuthenticated(false);
         setUser(null);
         setAuthError({ type: 'auth_required' });
+        setSessionHint(false);
       } else {
         setAuthError({ type: 'network', message: err?.message });
       }
       setAuthChecked(true);
     } finally {
-      setIsLoadingAuth(false);
+      if (!stale()) setIsLoadingAuth(false);
     }
   }, []);
 
@@ -61,6 +72,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setAuthError({ type: 'auth_required' });
+    setSessionHint(false);
     try {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -79,6 +91,8 @@ export const AuthProvider = ({ children }) => {
   const onLoginSuccess = (session) => {
     setAuthError(null);
     if (session?.user) {
+      checkSeq.current += 1;
+      setSessionHint(true);
       setUser(session.user);
       setIsAuthenticated(true);
       setAuthChecked(true);

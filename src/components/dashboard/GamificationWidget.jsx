@@ -7,8 +7,9 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
+import { fireConfetti, prefersReducedMotion } from '@/lib/celebration';
 import { motion } from 'framer-motion';
+import { tweenFast } from '@/lib/motion';
 
 const levelEmojis = {
   1: '🌱',
@@ -28,15 +29,16 @@ function ConfettiEffect() {
     const duration = 3000;
     const end = Date.now() + duration;
     const colors = ['#D4AF37', '#FFD700', '#FFA500', '#FFFFFF'];
+    if (prefersReducedMotion()) return;
     const frame = () => {
-      confetti({
+      fireConfetti({
         particleCount: 3,
         angle: 60,
         spread: 55,
         origin: { x: 0, y: 0.7 },
         colors,
       });
-      confetti({
+      fireConfetti({
         particleCount: 3,
         angle: 120,
         spread: 55,
@@ -120,7 +122,7 @@ export default function GamificationWidget() {
             key={level}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            transition={tweenFast}
             className="text-6xl"
           >
             {emoji}

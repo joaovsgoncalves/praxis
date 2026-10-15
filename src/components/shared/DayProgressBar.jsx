@@ -49,9 +49,9 @@ export default function DayProgressBar({ habits = [], habitLogs = [], tasks = []
       </div>
       <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full transition-[width] duration-200 ease-out"
+          className="praxis-progress-fill rounded-full"
           style={{
-            width: `${pct}%`,
+            '--p': pct / 100,
             background: pct >= 80
               ? 'linear-gradient(90deg, hsl(265 85% 65%), hsl(160 80% 50%))'
               : 'linear-gradient(90deg, hsl(40 95% 55%), hsl(35 100% 50%))',

@@ -13,7 +13,7 @@ export default function PageNotFound() {
       <Card className="glass-surface border-white/10">
         <CardContent className="p-8 sm:p-10 text-center space-y-6">
           <p className="praxis-kicker text-muted-foreground">Praxis</p>
-          <p className="text-6xl font-light tabular-nums text-muted-foreground/40" aria-hidden>
+          <p className="text-6xl font-normal tabular-nums text-muted-foreground/40" aria-hidden>
             404
           </p>
           <div className="space-y-2">

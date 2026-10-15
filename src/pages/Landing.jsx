@@ -1,6 +1,5 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   AudioLines,
@@ -21,7 +20,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PraxisLivePreview, PraxisVoiceFlowDemo } from '@/components/landing/PraxisLivePreview';
 import PraxisBrand from '@/components/brand/PraxisBrand';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -97,8 +95,82 @@ const featureCards = [
   },
 ];
 
+// O preview animado (framer-motion) não entra no caminho crítico: baixa quando o bloco
+// chega perto da tela. No celular ele fica abaixo da dobra; o título pinta sozinho, rápido.
+const PraxisLivePreview = lazy(() =>
+  import('@/components/landing/PraxisLivePreview').then((m) => ({ default: m.PraxisLivePreview })),
+);
+const PraxisVoiceFlowDemo = lazy(() =>
+  import('@/components/landing/PraxisLivePreview').then((m) => ({ default: m.PraxisVoiceFlowDemo })),
+);
+
+// No celular o preview fica embaixo do título e as animações dele não param: só carrega depois
+// do primeiro gesto (rolar, tocar, tecla). Assim a primeira tela pinta e assenta sem disputar CPU.
+const INTERACTION_EVENTS = ['scroll', 'pointerdown', 'touchstart', 'keydown'];
+
+function useFirstInteraction(skip) {
+  const [interacted, setInteracted] = useState(skip);
+
+  useEffect(() => {
+    if (interacted) return undefined;
+    const done = () => setInteracted(true);
+    INTERACTION_EVENTS.forEach((type) => window.addEventListener(type, done, { passive: true, once: true }));
+    return () => INTERACTION_EVENTS.forEach((type) => window.removeEventListener(type, done));
+  }, [interacted]);
+
+  return interacted;
+}
+
+function WhenNearViewport({ children, placeholder }) {
+  const ref = useRef(null);
+  const [near, setNear] = useState(false);
+  // No desktop o preview divide a dobra com o título: carrega na hora.
+  const [wide] = useState(() => window.matchMedia?.('(min-width: 1024px)').matches === true);
+  const armed = useFirstInteraction(wide);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || near || !armed) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      setNear(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setNear(true);
+      },
+      { rootMargin: '200px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [near, armed]);
+
+  return (
+    <div ref={ref}>
+      {near ? <Suspense fallback={placeholder}>{children}</Suspense> : placeholder}
+    </div>
+  );
+}
+
+/** Moldura vazia com a mesma altura do preview, para nada pular quando ele chega. */
+function AppPreviewPlaceholder() {
+  return (
+    <div className="relative mx-auto w-full max-w-[720px] lg:mr-0" aria-hidden>
+      <div className="landing-app-frame min-h-[620px] rounded-[1.9rem] border border-white/[0.09] bg-[#111114]/95 shadow-[0_35px_120px_rgba(0,0,0,0.58)] sm:min-h-[512px]" />
+    </div>
+  );
+}
+
+function VoiceDemoPlaceholder() {
+  return <div className="min-h-[414px] rounded-3xl border border-white/[0.06] bg-white/[0.03] sm:min-h-[431px]" aria-hidden />;
+}
+
 function AppPreview() {
-  return <PraxisLivePreview />;
+  return (
+    <WhenNearViewport placeholder={<AppPreviewPlaceholder />}>
+      <PraxisLivePreview />
+    </WhenNearViewport>
+  );
 }
 
 function SectionLabel({ children }) {
@@ -111,7 +183,6 @@ function SectionLabel({ children }) {
 }
 
 export default function Landing() {
-  const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useAuth();
 
   const handleSignOut = async () => {
@@ -181,12 +252,7 @@ export default function Landing() {
           <div className="pointer-events-none absolute -right-[15%] top-[20%] -z-10 h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.09),transparent_66%)] blur-3xl" />
 
           <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[0.86fr_1.14fr] lg:gap-12 xl:gap-20">
-            <motion.div
-              className="relative z-10 max-w-2xl"
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-            >
+            <div className="relative z-10 max-w-2xl">
               <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-domain-gold/15 bg-domain-gold/[0.065] px-3.5 py-2 text-xs font-medium text-domain-gold">
                 <WandSparkles className="h-3.5 w-3.5" aria-hidden />
                 Seu dia sai da cabeça e entra em movimento
@@ -233,16 +299,11 @@ export default function Landing() {
                   </span>
                 ))}
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              className="relative lg:pl-2"
-              initial={{ opacity: 0, y: 30, scale: 0.985 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.9, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-            >
+            <div className="relative lg:pl-2">
               <AppPreview />
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -270,17 +331,12 @@ export default function Landing() {
             </div>
 
             <div className="mt-16 grid gap-4 lg:grid-cols-3 lg:gap-5">
-              {flowSteps.map((step, index) => {
+              {flowSteps.map((step) => {
                 const Icon = step.icon;
                 return (
-                  <motion.article
+                  <article
                     key={step.number}
-                    className="group relative overflow-hidden rounded-3xl border border-white/[0.065] bg-[#0d0d0f] p-6 transition-colors hover:border-white/[0.1] hover:bg-[#111114] sm:p-7"
-                    initial={{ opacity: 0, y: 24 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.28 }}
-                    transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                    whileHover={{ y: -4 }}
+                    className="landing-lift group relative overflow-hidden rounded-3xl border border-white/[0.065] bg-[#0d0d0f] p-6 hover:border-white/[0.1] hover:bg-[#111114] sm:p-7"
                   >
                     <div className="mb-8 flex items-center justify-between gap-4">
                       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${step.shell}`}>
@@ -290,7 +346,7 @@ export default function Landing() {
                     </div>
                     <h3 className="praxis-title text-2xl font-semibold tracking-[-0.04em]">{step.title}</h3>
                     <p className="mt-3 text-sm leading-7 text-muted-foreground">{step.description}</p>
-                  </motion.article>
+                  </article>
                 );
               })}
             </div>
@@ -305,13 +361,15 @@ export default function Landing() {
                     “Hoje eu preciso treinar, responder o Breno, estudar 40 minutos e resolver o EncarteZap.” O Praxis entende a bagunça e devolve clareza.
                   </p>
                 </div>
-                <PraxisVoiceFlowDemo />
+                <WhenNearViewport placeholder={<VoiceDemoPlaceholder />}>
+                  <PraxisVoiceFlowDemo />
+                </WhenNearViewport>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="recursos" className="scroll-mt-24 border-y border-white/[0.055] bg-white/[0.016] px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
+        <section id="recursos" className="landing-defer [contain-intrinsic-size:auto_2620px] md:[contain-intrinsic-size:auto_1600px] lg:[contain-intrinsic-size:auto_1220px] scroll-mt-24 border-y border-white/[0.055] bg-white/[0.016] px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="grid items-end gap-8 lg:grid-cols-[0.9fr_1.1fr]">
               <div>
@@ -324,35 +382,30 @@ export default function Landing() {
             </div>
 
             <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {featureCards.map((feature, index) => {
+              {featureCards.map((feature) => {
                 const Icon = feature.icon;
                 return (
-                  <motion.article
+                  <article
                     key={feature.eyebrow}
-                    className={`card-domain ${feature.accent} group rounded-3xl border border-white/[0.06] bg-background/45 p-6 transition-colors hover:border-white/[0.11] hover:bg-white/[0.028] sm:p-7`}
-                    initial={{ opacity: 0, y: 26 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.2 }}
-                    transition={{ duration: 0.6, delay: (index % 3) * 0.07, ease: [0.22, 1, 0.36, 1] }}
-                    whileHover={{ y: -5 }}
+                    className={`landing-lift card-domain ${feature.accent} group rounded-3xl border border-white/[0.06] bg-background/45 p-6 hover:border-white/[0.11] hover:bg-white/[0.028] sm:p-7`}
                   >
                     <div className="mb-10 flex items-center justify-between">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.065] bg-white/[0.035]">
                         <Icon className="h-5 w-5 text-domain" aria-hidden />
                       </div>
-                      <ArrowRight className="h-4 w-4 -translate-x-1 text-muted-foreground/30 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
+                      <ArrowRight className="h-4 w-4 -translate-x-1 text-muted-foreground/30 opacity-0 transition-[opacity,transform] duration-200 ease-out group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
                     </div>
                     <p className="text-xs font-medium text-domain">{feature.eyebrow}</p>
                     <h3 className="praxis-title mt-3 text-2xl font-semibold leading-tight tracking-[-0.04em]">{feature.title}</h3>
                     <p className="mt-4 text-sm leading-7 text-muted-foreground">{feature.description}</p>
-                  </motion.article>
+                  </article>
                 );
               })}
             </div>
           </div>
         </section>
 
-        <section id="filosofia" className="scroll-mt-24 px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
+        <section id="filosofia" className="landing-defer [contain-intrinsic-size:auto_1250px] md:[contain-intrinsic-size:auto_965px] lg:[contain-intrinsic-size:auto_640px] scroll-mt-24 px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="grid items-center gap-14 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
               <div>
@@ -363,7 +416,7 @@ export default function Landing() {
                 </p>
                 <div className="mt-8 flex items-center gap-3 text-sm font-medium text-foreground/85">
                   <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-domain-gold/20 bg-[#0c0c10]">
-                    <img src="/praxis-logo.png?v=8" alt="" width={36} height={36} className="h-[86%] w-[86%] object-contain" />
+                    <img src="/praxis-logo-112.png?v=8" alt="" width={36} height={36} loading="lazy" decoding="async" className="h-[86%] w-[86%] object-contain" />
                   </span>
                   <span>Fale. Organize. Execute.</span>
                 </div>
@@ -403,7 +456,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="px-4 pb-24 sm:px-6 sm:pb-32 lg:px-8">
+        <section className="landing-defer [contain-intrinsic-size:auto_590px] lg:[contain-intrinsic-size:auto_626px] px-4 pb-24 sm:px-6 sm:pb-32 lg:px-8">
           <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2.25rem] border border-domain-gold/15 bg-[linear-gradient(135deg,hsl(var(--domain-gold)/0.085),hsl(var(--background))_48%,hsl(var(--primary)/0.06))] px-6 py-16 text-center sm:px-10 sm:py-20 lg:px-16 lg:py-24">
             <div className="landing-grid absolute inset-0 opacity-20" />
             <div className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[600px] -translate-x-1/2 bg-[radial-gradient(circle,hsl(var(--domain-gold)/0.12),transparent_66%)] blur-2xl" />

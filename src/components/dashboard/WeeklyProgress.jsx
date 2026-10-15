@@ -31,10 +31,10 @@ export default function WeeklyProgress({ habits = [], habitLogs = [] }) {
                 <div className="w-full max-w-[32px] h-24 bg-secondary rounded-lg relative overflow-hidden">
                   <div
                     className={cn(
-                      "absolute bottom-0 w-full rounded-lg transition-[height] duration-200 ease-out",
+                      "absolute inset-0 origin-bottom rounded-lg transition-transform duration-200 ease-out motion-reduce:transition-none",
                       rate > 80 ? "bg-accent" : rate > 50 ? "bg-primary" : rate > 0 ? "bg-chart-4" : "bg-transparent"
                     )}
-                    style={{ height: `${rate}%` }}
+                    style={{ transform: `scaleY(${Math.min(100, Math.max(0, rate)) / 100})` }}
                   />
                 </div>
                 <span className={cn("text-[10px] capitalize", isToday ? "text-primary font-bold" : "text-muted-foreground")}>

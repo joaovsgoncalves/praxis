@@ -12,6 +12,7 @@ import { pickWeeklyTaskTitles, taskDatesForNextWeek } from '@/lib/weeklyReviewTa
 import { PageHero } from '@/components/layout/PraxisPage';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { tweenFast } from '@/lib/motion';
 import { ChevronDown, Lightbulb, Mountain, Target, ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FocusWeeklyGoal from '@/components/focus/FocusWeeklyGoal';
@@ -423,7 +424,7 @@ export default function WeeklyReview() {
                               layoutId="praxis-review-score"
                               aria-hidden
                               className="absolute inset-0 rounded-xl bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.55)]"
-                              transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                              transition={reduceMotion ? { duration: 0 } : tweenFast}
                             />
                           ) : null}
                           <span className="relative block text-lg leading-none" aria-hidden>{opt.emoji}</span>

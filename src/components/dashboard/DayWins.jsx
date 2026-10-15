@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Timer, Sparkles, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { tweenFast } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import { isTaskDone } from '@/lib/tasks';
 import { sparkFromElement } from '@/lib/celebration';
@@ -54,7 +55,7 @@ export default function DayWins({ tasks = [], today, onToggleComplete, onEditTas
               className="h-full w-full origin-left rounded-full bg-domain-gold"
               initial={false}
               animate={{ scaleX: Math.max(0, Math.min(1, pct / 100)) }}
-              transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+              transition={tweenFast}
               style={{ transformOrigin: 'left center' }}
             />
           </div>

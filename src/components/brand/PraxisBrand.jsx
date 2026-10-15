@@ -24,7 +24,7 @@ export default function PraxisBrand({
               aria-hidden
             >
               <img
-                src="/praxis-logo.png?v=8"
+                src="/praxis-logo-112.png?v=8"
                 alt=""
                 width={40}
                 height={40}

@@ -1,0 +1,81 @@
+import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { latestRelease } from '@/data/changelog';
+import {
+  OPEN_WHATS_NEW_EVENT,
+  markReleaseSeen,
+  readLastSeenRelease,
+  shouldShowWhatsNew,
+} from '@/lib/whatsNew';
+
+// Espera a primeira tela assentar antes de abrir (não disputa a primeira pintura).
+const OPEN_DELAY_MS = 1200;
+
+function formatReleaseDate(isoDay) {
+  const [year, month, day] = isoDay.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/**
+ * "Últimas atualizações": abre uma vez por publicação, só no app logado (vive no AppLayout).
+ * Reabre pelo link em Configurações (evento OPEN_WHATS_NEW_EVENT).
+ */
+export default function WhatsNewDialog() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!shouldShowWhatsNew(readLastSeenRelease(), latestRelease)) return undefined;
+    const timer = window.setTimeout(() => setOpen(true), OPEN_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const reopen = () => setOpen(true);
+    window.addEventListener(OPEN_WHATS_NEW_EVENT, reopen);
+    return () => window.removeEventListener(OPEN_WHATS_NEW_EVENT, reopen);
+  }, []);
+
+  const handleOpenChange = (next) => {
+    setOpen(next);
+    if (!next && latestRelease) markReleaseSeen(latestRelease.id);
+  };
+
+  if (!latestRelease) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[85vh] w-[calc(100%-2rem)] overflow-y-auto rounded-2xl sm:max-w-md">
+        <DialogHeader className="space-y-1.5 text-left">
+          <p className="text-xs font-medium text-muted-foreground">
+            Últimas atualizações · {formatReleaseDate(latestRelease.date)}
+          </p>
+          <DialogTitle className="praxis-title text-xl font-semibold leading-snug text-balance">
+            {latestRelease.title}
+          </DialogTitle>
+          <DialogDescription className="sr-only">O que mudou na Praxis nesta publicação.</DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-2.5 text-sm leading-relaxed text-foreground/85">
+          {latestRelease.items.map((item) => (
+            <li key={item} className="flex gap-2.5">
+              <span className="mt-[0.55rem] h-1 w-1 shrink-0 rounded-full bg-domain-gold" aria-hidden />
+              <span className="text-pretty">{item}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button type="button" className="praxis-touch-target w-full rounded-full sm:w-auto" onClick={() => handleOpenChange(false)}>
+            Entendi
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

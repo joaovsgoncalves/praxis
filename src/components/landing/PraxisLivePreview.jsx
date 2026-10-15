@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
 import {
   AudioLines,
   BrainCircuit,
@@ -45,7 +45,7 @@ function PreviewBrand() {
   return (
     <div className="flex items-center gap-2">
       <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#0c0c10]">
-        <img src="/praxis-logo.png?v=8" alt="" width={36} height={36} className="h-[86%] w-[86%] object-contain" />
+        <img src="/praxis-logo-112.png?v=8" alt="" width={36} height={36} loading="lazy" decoding="async" className="h-[86%] w-[86%] object-contain" />
       </div>
       <span className="praxis-title hidden text-sm font-bold sm:inline">Praxis</span>
     </div>
@@ -56,11 +56,18 @@ function AnimatedWave({ active = true, compact = false }) {
   return (
     <div className={`flex items-center justify-center gap-[3px] ${compact ? 'h-7' : 'h-9'}`} aria-hidden>
       {WAVE.map((height, index) => (
+        // Altura fixa e escala no eixo Y (transform), em vez de animar height.
         <motion.span
           key={`${height}-${index}`}
           className="w-[3px] rounded-full bg-domain-gold/80"
-          animate={active ? { height: [5, height, 7, Math.max(9, height * 0.7), 5], opacity: [0.35, 1, 0.55, 0.9, 0.35] } : { height: 5, opacity: 0.35 }}
-          transition={{ duration: 1.2, repeat: Infinity, delay: index * 0.045, ease: 'easeInOut' }}
+          style={{ height }}
+          initial={false}
+          animate={
+            active
+              ? { scaleY: [5 / height, 1, 7 / height, Math.max(9, height * 0.7) / height, 5 / height], opacity: [0.35, 1, 0.55, 0.9, 0.35] }
+              : { scaleY: 5 / height, opacity: 0.35 }
+          }
+          transition={{ duration: 1.2, repeat: active ? Infinity : 0, delay: index * 0.045, ease: 'easeInOut' }}
         />
       ))}
     </div>
@@ -92,7 +99,7 @@ function StatusPill({ phase }) {
   );
 }
 
-export function PraxisLivePreview() {
+function LivePreview() {
   const [phaseIndex, setPhaseIndex] = useState(0);
   const reduceMotion = useReducedMotion();
   const phase = PHASES[phaseIndex];
@@ -278,9 +285,9 @@ export function PraxisLivePreview() {
                       </div>
                       <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
                         <motion.div
-                          className={`h-full rounded-full ${fill}`}
-                          initial={{ width: reduceMotion ? `${value}%` : 0 }}
-                          whileInView={{ width: `${value}%` }}
+                          className={`h-full w-full origin-left rounded-full ${fill}`}
+                          initial={{ scaleX: reduceMotion ? value / 100 : 0 }}
+                          whileInView={{ scaleX: value / 100 }}
                           viewport={{ once: true }}
                           transition={{ duration: 0.9, delay: 0.15 + index * 0.12, ease: 'easeOut' }}
                         />
@@ -366,7 +373,7 @@ export function PraxisLivePreview() {
   );
 }
 
-export function PraxisVoiceFlowDemo() {
+function VoiceFlowDemo() {
   const [phaseIndex, setPhaseIndex] = useState(0);
   const reduceMotion = useReducedMotion();
   const phase = PHASES[phaseIndex];
@@ -448,5 +455,22 @@ export function PraxisVoiceFlowDemo() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Movimento reduzido no sistema vale também aqui: o framer-motion corta transform/layout sozinho.
+export function PraxisLivePreview() {
+  return (
+    <MotionConfig reducedMotion="user">
+      <LivePreview />
+    </MotionConfig>
+  );
+}
+
+export function PraxisVoiceFlowDemo() {
+  return (
+    <MotionConfig reducedMotion="user">
+      <VoiceFlowDemo />
+    </MotionConfig>
   );
 }

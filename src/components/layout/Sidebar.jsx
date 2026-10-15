@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { primaryNavItems, secondaryNavItems, filterSecondaryNav } from '@/lib/praxisNav';
 import PraxisBrand from '@/components/brand/PraxisBrand';
+import { prefetchHandlers } from '@/lib/routePrefetch';
 
 function AvatarRing({ progress, level }) {
   const size = 48;
@@ -84,7 +85,7 @@ function NavLinkRow({ item, isActive, onClose, density = 'primary' }) {
   const LinkTag = item.external ? 'a' : Link;
   const linkProps = item.external
     ? { href: item.external, target: '_blank', rel: 'noopener noreferrer' }
-    : { to: item.path, 'aria-current': isActive ? 'page' : undefined };
+    : { to: item.path, 'aria-current': isActive ? 'page' : undefined, ...prefetchHandlers(item.path) };
 
   return (
     <LinkTag
