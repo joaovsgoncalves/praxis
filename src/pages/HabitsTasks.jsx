@@ -85,6 +85,7 @@ import {
 } from '@/lib/taskLenses';
 import { tasksForDay, shiftWeek, toggleSelectedDay, formatDayLabel } from '@/lib/taskWeekStrip';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useMinWidth } from '@/hooks/useMinWidth';
 import TaskBoard from '@/components/habits-tasks/TaskBoard';
 import TaskWeek from '@/components/habits-tasks/TaskWeek';
 import TaskWeekStrip from '@/components/habits-tasks/TaskWeekStrip';
@@ -123,6 +124,7 @@ export default function HabitsTasks() {
   const habitRowRefs = useRef(new Map());
   const today = fortalezaDateKey();
   const isMobile = useIsMobile();
+  const isWide = useMinWidth(1280);
   // Faixa da semana: semana mostrada e dia escolhido (Lista filtra; Linha do tempo foca no celular).
   const [weekBase, setWeekBase] = useState(today);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -1002,6 +1004,28 @@ export default function HabitsTasks() {
       ? archivableTasks.filter((t) => selectedTaskIds.has(t.id))
       : archivableTasks;
 
+  // Em Todos + Lista no desktop largo, a semana fica acima das duas colunas; no resto, dentro de Tarefas.
+  const weekStripOnTop = isWide && view === 'all' && lens === 'list';
+  let weekStripHint = 'Toque num dia para focar nele.';
+  if (lens === 'list') {
+    weekStripHint = listDay
+      ? 'Mostrando só as tarefas de ' + formatDayLabel(listDay) + '. Toque de novo para voltar.'
+      : 'Toque num dia para ver só as tarefas dele.';
+    if (view === 'all') weekStripHint += ' Hábitos seguem em hoje.';
+  }
+  const weekStrip = (
+    <TaskWeekStrip
+      weekBase={weekBase}
+      today={today}
+      tasks={categoryTasks}
+      selectedDay={selectedDay}
+      onSelectDay={handleSelectDay}
+      onWeekChange={handleWeekChange}
+      onToday={handleWeekToday}
+      hint={weekStripHint}
+    />
+  );
+
   return (
     <div className="praxis-page overflow-x-hidden">
       {lens !== 'board' && lens !== 'week' && (
@@ -1127,72 +1151,60 @@ export default function HabitsTasks() {
           />
         </section>
       ) : (
+        <div className="space-y-6">
+        {weekStripOnTop ? weekStrip : null}
         <div className={cn('grid gap-6', view === 'all' && lens === 'list' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
         {(view === 'all' || view === 'tasks') && (
           <section className="min-w-0 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="praxis-kicker">Execução</p>
-                <h2 className="praxis-title text-2xl font-semibold">
-                  Tarefas
-                  <span className="ml-2 text-base font-normal text-muted-foreground">
-                    ({lens === 'board' ? boardTasksCount : lens === 'week' ? weekTasksCount : filteredTasks.length})
-                  </span>
-                </h2>
-                {lens === 'list' && !listDay && overdueInScope > 0 && taskScope !== 'overdue' && (
-                  <p className="mt-1 text-xs text-destructive">
-                    {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste recorte
-                  </p>
-                )}
-                {listDay ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Mostrando {formatDayLabel(listDay)}. Toque no dia de novo para voltar.
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <TaskLensSwitch value={lens} onChange={handleLensChange} />
+            {/* Mesma linha de título que Hábitos: ícone, nome, contagem e ações compactas */}
+            <SectionHeader
+              title="Tarefas"
+              icon={ListTodo}
+              count={lens === 'board' ? boardTasksCount : lens === 'week' ? weekTasksCount : filteredTasks.length}
+              action={lens === 'list' ? (
+                <>
+                  <Button
+                    type="button"
+                    variant={taskSelectionMode ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="h-10 rounded-full px-3.5 transition-transform active:scale-[0.96] motion-reduce:transition-none"
+                    onClick={() => {
+                      setTaskSelectionMode((v) => !v);
+                      setSelectedTaskIds(new Set());
+                    }}
+                  >
+                    {taskSelectionMode ? 'Pronto' : 'Selecionar'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 gap-1 rounded-full px-3 transition-transform active:scale-[0.96] motion-reduce:transition-none sm:px-3.5"
+                    disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
+                    onClick={openBulkArchive}
+                    aria-label="Arquivar"
+                  >
+                    <Archive className="h-4 w-4" aria-hidden />
+                    <span className="hidden sm:inline">Arquivar</span>
+                  </Button>
+                </>
+              ) : null}
+            />
 
-                {lens === 'list' && (
-                  <>
-                    <Button
-                      type="button"
-                      variant={taskSelectionMode ? 'secondary' : 'outline'}
-                      size="sm"
-                      className="h-9 rounded-full"
-                      onClick={() => {
-                        setTaskSelectionMode((v) => !v);
-                        setSelectedTaskIds(new Set());
-                      }}
-                    >
-                      {taskSelectionMode ? 'Pronto' : 'Selecionar'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 rounded-full gap-1"
-                      disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
-                      onClick={openBulkArchive}
-                    >
-                      <Archive className="h-4 w-4" />
-                      Arquivar
-                    </Button>
-                    {taskScope === 'overdue' && noiseTasks.length > 0 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-                        onClick={() => setNoiseDialogOpen(true)}
-                      >
-                        <Eraser className="h-4 w-4" />
-                        Limpar atrasadas ({noiseTasks.length})
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <TaskLensSwitch value={lens} onChange={handleLensChange} />
+              {lens === 'list' && taskScope === 'overdue' && noiseTasks.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 rounded-full gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  onClick={() => setNoiseDialogOpen(true)}
+                >
+                  <Eraser className="h-4 w-4" />
+                  Limpar atrasadas ({noiseTasks.length})
+                </Button>
+              )}
             </div>
 
             <QuickTaskInput
@@ -1200,15 +1212,7 @@ export default function HabitsTasks() {
               isPending={createTask.isPending}
             />
 
-            <TaskWeekStrip
-              weekBase={weekBase}
-              today={today}
-              tasks={categoryTasks}
-              selectedDay={selectedDay}
-              onSelectDay={handleSelectDay}
-              onWeekChange={handleWeekChange}
-              onToday={handleWeekToday}
-            />
+            {weekStripOnTop ? null : weekStrip}
 
             {lens === 'list' && (
               <div className="praxis-scroll-x flex gap-2 pb-1">
@@ -1235,6 +1239,12 @@ export default function HabitsTasks() {
                   </button>
                 ))}
               </div>
+            )}
+
+            {lens === 'list' && !listDay && overdueInScope > 0 && taskScope !== 'overdue' && (
+              <p className="text-xs text-destructive">
+                {overdueInScope} atrasada{overdueInScope === 1 ? '' : 's'} neste recorte
+              </p>
             )}
 
             {lens === 'week' ? (
@@ -1737,6 +1747,7 @@ export default function HabitsTasks() {
             )}
           </section>
         )}
+      </div>
       </div>
       )}
 

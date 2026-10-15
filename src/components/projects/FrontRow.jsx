@@ -29,10 +29,11 @@ export default function FrontRow({
       onClick={() => onOpen?.(project)}
       aria-label={`Abrir frente ${project.name}`}
       className={cn(
-        'group flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[#141820]/70 px-3.5 py-2.5 text-left transition-colors',
+        'group flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[#141820]/70 px-3.5 py-2.5 text-left transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.99] motion-reduce:transform-none',
         'hover:border-white/15 hover:bg-[#181d27]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-domain-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        isSubfront && 'ml-3 sm:ml-5 border-l-2 border-l-white/20 pl-3 sm:pl-4 bg-[#12151c]/60'
+        // Recuo sem estourar a largura: a linha encolhe o mesmo tanto do margin.
+        isSubfront && 'ml-3 w-[calc(100%-0.75rem)] sm:ml-5 sm:w-[calc(100%-1.25rem)] border-l-2 border-l-white/20 pl-3 sm:pl-4 bg-[#12151c]/60'
       )}
     >
       <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">

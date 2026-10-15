@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Timer, Pencil, AlertCircle } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Check, ChevronDown, Timer, Pencil, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +28,10 @@ import {
   FRONT_STATUS_LABELS,
   formatProjectUpdateDate,
 } from '@/lib/projects';
+import { cn } from '@/lib/utils';
+
+const PRESS = 'transition-[transform,background-color,border-color,color] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none';
+const RECENT_UPDATES = 3;
 
 function Field({ id, label, hint, children }) {
   return (
@@ -103,6 +108,9 @@ export default function ProjectDetailDialog({
     notes: '',
   });
   const [newUpdate, setNewUpdate] = useState('');
+  const [showContext, setShowContext] = useState(false);
+  const [showAllUpdates, setShowAllUpdates] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const syncFormFromProject = () => {
     if (!project) return;
@@ -125,6 +133,12 @@ export default function ProjectDetailDialog({
     setIsEditing(false);
     setNewUpdate('');
   }, [project, open]);
+
+  // Expansões voltam fechadas ao trocar de frente (não a cada refetch da mesma).
+  useEffect(() => {
+    setShowContext(false);
+    setShowAllUpdates(false);
+  }, [project?.id, open]);
 
   const subtitle = useMemo(() => {
     if (!project) return '';
@@ -171,6 +185,19 @@ export default function ProjectDetailDialog({
   const hasObjective = Boolean(String(project.objective || '').trim());
   const hasShippedNote = Boolean(String(project.shipped_note || '').trim());
   const hasNotes = Boolean(String(project.notes || '').trim());
+  const extraContext = [
+    hasObjective && { label: 'Objetivo', text: project.objective },
+    hasShippedNote && { label: 'O que já existe', text: project.shipped_note },
+    hasNotes && { label: 'Notas', text: project.notes },
+  ].filter(Boolean);
+  const reveal = reduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.12 } }
+    : {
+        initial: { opacity: 0, y: -4 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -4, transition: { duration: 0.12, ease: 'easeOut' } },
+        transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] },
+      };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -209,7 +236,7 @@ export default function ProjectDetailDialog({
                   </Select>
                 </Field>
 
-                <Field id="project-column" label="Estado no quadro">
+                <Field id="project-column" label="Estado">
                   <Select value={form.column} onValueChange={(value) => setForm((prev) => ({ ...prev, column: value }))}>
                     <SelectTrigger id="project-column" className="w-full border-white/10 bg-black/20">
                       <SelectValue />
@@ -237,13 +264,13 @@ export default function ProjectDetailDialog({
                 <Textarea id="project-objective" value={form.objective} onChange={setField('objective')} placeholder="A razão desta frente existir" className="min-h-[82px] border-white/10 bg-black/20" />
               </Field>
 
-              <Field id="project-status" label="Estado atual" hint="Onde ficou de verdade">
+              <Field id="project-status" label="Onde ficou" hint="Resumo honesto de agora">
                 <Textarea id="project-status" value={form.status_summary} onChange={setField('status_summary')} placeholder="Resumo honesto do estado atual" className="min-h-[82px] border-white/10 bg-black/20" />
               </Field>
             </section>
 
             <section className="space-y-4 rounded-2xl border border-domain-gold/15 bg-domain-gold/[0.025] p-4">
-              <Field id="project-slice" label="Agora" hint="A fatia na mesa">
+              <Field id="project-slice" label="Mexendo agora" hint="O que está na mesa">
                 <Input id="project-slice" value={form.current_slice} onChange={setField('current_slice')} placeholder="O que está sendo trabalhado agora" className="border-white/10 bg-black/20" />
               </Field>
 
@@ -275,162 +302,166 @@ export default function ProjectDetailDialog({
             </div>
           </form>
         ) : (
-          /* MODO LEITURA (Padrão): Abre sempre em modo leitura simples */
-          <div className="mt-6 space-y-6">
-            {/* Primeira dobra: Situação atual, Fatia atual, Próximo passo e Bloqueio real */}
-            <section className="space-y-4">
-              {/* Onde ficou / Situação atual */}
-              {hasStatusSummary ? (
-                <div className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75">
-                    Situação atual
-                  </h4>
-                  <p className="text-sm leading-relaxed text-stone-200">
-                    {project.status_summary}
+          /* Leitura: próximo passo primeiro, depois onde ficou; o resto fica em "Mais contexto". */
+          <div className="mt-6 space-y-4">
+            <section
+              aria-labelledby="project-next-heading"
+              className="rounded-2xl border border-domain-gold/20 bg-domain-gold/[0.04] p-4 sm:p-5"
+            >
+              <h3 id="project-next-heading" className="text-sm font-semibold text-domain-gold">
+                Próximo passo
+              </h3>
+
+              {hasNextStep ? (
+                <>
+                  <p className="mt-2 text-base font-medium leading-snug text-stone-100 [text-wrap:pretty]">
+                    {project.next_step}
                   </p>
-                </div>
-              ) : null}
-
-              {/* Agora / Fatia atual */}
-              {hasCurrentSlice ? (
-                <div className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75">
-                    Fatia atual
-                  </h4>
-                  <p className="text-sm leading-relaxed text-stone-200">
-                    {project.current_slice}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* Próximo passo com ações de execução (Modo Foco e Fiz isso) */}
-              <div className="space-y-3 rounded-2xl border border-domain-gold/20 bg-domain-gold/[0.03] p-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-domain-gold">
-                    Próximo passo
-                  </h4>
-                  {hasNextStep ? (
-                    <Badge variant="outline" className="border-domain-gold/30 bg-domain-gold/10 text-[10px] font-medium text-domain-gold">
-                      Ação executável
-                    </Badge>
-                  ) : null}
-                </div>
-
-                {hasNextStep ? (
-                  <>
-                    <p className="text-sm font-medium leading-relaxed text-stone-100">
-                      {project.next_step}
-                    </p>
-                    <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-                      <Button
-                        type="button"
-                        className="h-10 flex-1 rounded-full text-xs font-medium"
-                        disabled={startingFocus || !hasNextStep}
-                        onClick={() => onStartFocus?.(project)}
-                      >
-                        <Timer className="mr-1.5 h-3.5 w-3.5" />
-                        {startingFocus ? 'Abrindo…' : 'Começar no Modo Foco'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 flex-1 rounded-full border-domain-gold/30 bg-domain-gold/[0.04] text-xs font-medium text-domain-gold hover:bg-domain-gold/[0.08] hover:text-domain-gold"
-                        disabled={completingNextStep || !hasNextStep}
-                        onClick={() => onCompleteNextStep?.(project)}
-                      >
-                        <Check className="mr-1.5 h-3.5 w-3.5" />
-                        {completingNextStep ? 'Registrando…' : 'Fiz isso'}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="rounded-xl border border-white/[0.05] bg-black/10 px-3 py-2.5 text-xs text-muted-foreground/60">
-                    Próximo passo pendente de revisão. Você pode definir um na edição ou aguardar o Sêneca no próximo ciclo.
-                  </p>
-                )}
-              </div>
-
-              {/* Bloqueio real (omitido de modo honesto se vazio) */}
-              {hasBlockedNote ? (
-                <div className="space-y-1.5 rounded-xl border border-rose-500/25 bg-rose-500/[0.04] p-3.5">
-                  <div className="flex items-center gap-1.5 text-rose-400">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    <h4 className="text-[11px] font-semibold uppercase tracking-wider">
-                      Bloqueio real
-                    </h4>
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      className={cn('h-10 flex-1 rounded-full text-xs font-medium', PRESS)}
+                      disabled={startingFocus || !hasNextStep}
+                      onClick={() => onStartFocus?.(project)}
+                    >
+                      <Timer className="mr-1.5 h-3.5 w-3.5" />
+                      {startingFocus ? 'Abrindo…' : 'Começar no Modo Foco'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        'h-10 flex-1 rounded-full border-domain-gold/30 bg-domain-gold/[0.04] text-xs font-medium text-domain-gold hover:bg-domain-gold/[0.08] hover:text-domain-gold',
+                        PRESS,
+                      )}
+                      disabled={completingNextStep || !hasNextStep}
+                      onClick={() => onCompleteNextStep?.(project)}
+                    >
+                      <Check className="mr-1.5 h-3.5 w-3.5" />
+                      {completingNextStep ? 'Registrando…' : 'Fiz isso'}
+                    </Button>
                   </div>
-                  <p className="text-xs leading-relaxed text-rose-200/90">
-                    {project.blocked_note}
-                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground [text-wrap:pretty]">
+                  Próximo passo pendente de revisão. Dá pra definir um em Editar estado ou esperar o Sêneca no próximo ciclo.
+                </p>
+              )}
+
+              {/* Só aparece quando existe de verdade */}
+              {hasBlockedNote ? (
+                <div className="mt-4 flex gap-2.5 border-t border-white/[0.06] pt-4">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-semibold text-rose-300">Travado por</h4>
+                    <p className="mt-0.5 text-sm leading-relaxed text-rose-100/85 [text-wrap:pretty]">
+                      {project.blocked_note}
+                    </p>
+                  </div>
                 </div>
               ) : null}
-
-              {/* Objetivo (se presente) */}
-              {hasObjective ? (
-                <div className="space-y-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75">
-                    Objetivo
-                  </h4>
-                  <p className="text-xs leading-relaxed text-stone-300">
-                    {project.objective}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* O que já existe / Capacidades consolidadas (se presente) */}
-              {hasShippedNote ? (
-                <div className="space-y-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75">
-                    O que já existe
-                  </h4>
-                  <p className="text-xs leading-relaxed text-stone-300">
-                    {project.shipped_note}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* Notas (se presente) */}
-              {hasNotes ? (
-                <div className="space-y-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/75">
-                    Notas
-                  </h4>
-                  <p className="text-xs leading-relaxed text-stone-300">
-                    {project.notes}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* Botão de transição para modo de edição */}
-              <div className="flex items-center justify-between pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-full border-white/10 px-4 text-xs font-medium text-stone-200 hover:border-white/20 hover:bg-white/[0.05]"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Editar estado
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-9 rounded-full px-4 text-xs text-muted-foreground hover:text-stone-200"
-                  onClick={() => onOpenChange?.(false)}
-                >
-                  Fechar
-                </Button>
-              </div>
             </section>
+
+            {hasStatusSummary || hasCurrentSlice ? (
+              <section className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
+                {hasStatusSummary ? (
+                  <div>
+                    <h3 className="text-xs font-medium text-muted-foreground">Onde ficou</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-stone-200 [text-wrap:pretty]">
+                      {project.status_summary}
+                    </p>
+                  </div>
+                ) : null}
+                {hasCurrentSlice ? (
+                  <div>
+                    <h3 className="text-xs font-medium text-muted-foreground">Mexendo agora</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-stone-200 [text-wrap:pretty]">
+                      {project.current_slice}
+                    </p>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {extraContext.length > 0 ? (
+              <section className="rounded-2xl border border-white/[0.06] bg-white/[0.015]">
+                <button
+                  type="button"
+                  aria-expanded={showContext}
+                  aria-controls="project-extra-context"
+                  onClick={() => setShowContext((value) => !value)}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium text-stone-200 transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-domain-gold/50 sm:px-5"
+                >
+                  <span>
+                    Mais contexto
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {extraContext.map((item) => item.label.toLowerCase()).join(', ')}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    aria-hidden
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none',
+                      showContext && 'rotate-180',
+                    )}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {showContext ? (
+                    <motion.div
+                      id="project-extra-context"
+                      key="extra"
+                      initial={reveal.initial}
+                      animate={reveal.animate}
+                      exit={reveal.exit}
+                      transition={reveal.transition}
+                      className="space-y-4 border-t border-white/[0.06] px-4 pb-4 pt-4 sm:px-5 sm:pb-5"
+                    >
+                      {extraContext.map((item) => (
+                        <div key={item.label}>
+                          <h3 className="text-xs font-medium text-muted-foreground">{item.label}</h3>
+                          <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-stone-300 [text-wrap:pretty]">
+                            {item.text}
+                          </p>
+                        </div>
+                      ))}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </section>
+            ) : null}
+
+            <div className="flex items-center justify-between pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  'h-10 rounded-full border-white/10 px-4 text-xs font-medium text-stone-200 hover:border-white/20 hover:bg-white/[0.05]',
+                  PRESS,
+                )}
+                onClick={() => setIsEditing(true)}
+              >
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                Editar estado
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 rounded-full px-4 text-xs text-muted-foreground hover:text-stone-200"
+                onClick={() => onOpenChange?.(false)}
+              >
+                Fechar
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Linha do tempo e registro de avanço (abaixo do contexto operacional) */}
+        {/* Avanços: registrar fica sempre à mão; a lista mostra os mais recentes e abre o resto sob pedido */}
         <section className="mt-7 border-t border-white/[0.06] pt-6">
           <div className="mb-4">
-            <p className="text-sm font-semibold text-stone-100">Linha do tempo</p>
+            <h3 className="text-sm font-semibold text-stone-100">Linha do tempo</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              Movimentos que ajudam a retomar a frente sem reconstruir tudo na cabeça.
+              O que já andou nesta frente, do mais recente para o mais antigo.
             </p>
           </div>
 
@@ -439,6 +470,7 @@ export default function ProjectDetailDialog({
               value={newUpdate}
               onChange={(event) => setNewUpdate(event.target.value)}
               placeholder="Registrar um avanço curto…"
+              aria-label="Registrar um avanço curto"
               className="border-white/10 bg-black/20"
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -450,7 +482,7 @@ export default function ProjectDetailDialog({
             <Button
               type="button"
               variant="outline"
-              className="shrink-0 border-white/10"
+              className={cn('shrink-0 border-white/10', PRESS)}
               disabled={addingUpdate || !newUpdate.trim()}
               onClick={handleAddUpdate}
             >
@@ -461,7 +493,20 @@ export default function ProjectDetailDialog({
           {updatesLoading ? (
             <p className="text-xs text-muted-foreground/60">Carregando histórico…</p>
           ) : (
-            <Timeline updates={updates} />
+            <>
+              <Timeline updates={showAllUpdates ? updates : updates.slice(0, RECENT_UPDATES)} />
+              {updates.length > RECENT_UPDATES ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-3 h-9 rounded-full px-3 text-xs text-muted-foreground hover:text-stone-200"
+                  aria-expanded={showAllUpdates}
+                  onClick={() => setShowAllUpdates((value) => !value)}
+                >
+                  {showAllUpdates ? 'Mostrar só os recentes' : `Ver todos os ${updates.length} avanços`}
+                </Button>
+              ) : null}
+            </>
           )}
         </section>
       </SheetContent>

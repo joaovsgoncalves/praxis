@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -42,7 +43,7 @@ function loadLabel(load) {
   return open + ', ' + done;
 }
 
-/** Faixa da semana: 7 dias com carga, setas de semana e "Hoje". */
+/** Faixa da semana: 7 dias com carga, setas de semana e "Hoje". `hint` explica o que o toque no dia faz. */
 export default function TaskWeekStrip({
   weekBase,
   today,
@@ -51,17 +52,24 @@ export default function TaskWeekStrip({
   onSelectDay,
   onWeekChange,
   onToday,
+  hint,
   className,
 }) {
+  const reduceMotion = useReducedMotion();
   const days = buildWeekStrip(weekBase, today, tasks);
   const isCurrentWeek = isSameWeek(weekBase, today);
 
   return (
     <section aria-label="Dias da semana" className={cn('praxis-panel min-w-0 rounded-2xl p-2', className)}>
       <div className="flex items-center justify-between gap-2 pb-2 pl-2">
-        <p className="min-w-0 truncate text-sm font-semibold tabular-nums text-foreground" aria-live="polite">
-          {formatWeekRangeLabel(weekBase)}
-        </p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold tabular-nums text-foreground" aria-live="polite">
+            {formatWeekRangeLabel(weekBase)}
+          </p>
+          {hint ? (
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground [text-wrap:pretty]">{hint}</p>
+          ) : null}
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           <Button
             type="button"
@@ -111,15 +119,23 @@ export default function TaskWeekStrip({
                 }
                 onClick={() => onSelectDay?.(day.date)}
                 className={cn(
-                  'flex min-h-[4.25rem] min-w-[2.75rem] flex-1 flex-col items-center justify-center gap-1.5 rounded-lg px-1 py-2 outline-none',
-                  'transition-[background-color,box-shadow] duration-150 ease-out',
+                  'relative flex min-h-[4.25rem] min-w-[2.75rem] flex-1 flex-col items-center justify-center gap-1.5 rounded-lg px-1 py-2 outline-none',
+                  'transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none',
                   'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                  selected ? 'praxis-elev-2 bg-secondary' : 'hover:bg-white/[0.04]'
+                  !selected && 'hover:bg-white/[0.04]'
                 )}
               >
+                {selected ? (
+                  <motion.span
+                    layoutId="praxis-week-day-pill"
+                    aria-hidden
+                    className="praxis-elev-2 absolute inset-0 rounded-lg bg-secondary"
+                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                  />
+                ) : null}
                 <span
                   className={cn(
-                    'text-[11px] font-medium leading-none',
+                    'relative text-[11px] font-medium leading-none',
                     day.isToday ? 'text-primary' : selected ? 'text-foreground' : 'text-muted-foreground'
                   )}
                 >
@@ -127,13 +143,15 @@ export default function TaskWeekStrip({
                 </span>
                 <span
                   className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold tabular-nums leading-none',
+                    'relative flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold tabular-nums leading-none',
                     day.isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
                   )}
                 >
                   {day.dayNum}
                 </span>
-                <LoadDots load={day.load} />
+                <span className="relative flex">
+                  <LoadDots load={day.load} />
+                </span>
               </button>
             );
           })}

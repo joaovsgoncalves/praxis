@@ -501,10 +501,10 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     await expect(dialog.getByText(/Produto · Em curso · Foco · No ar/)).toBeVisible();
 
     // Primeira dobra em linguagem natural
-    await expect(dialog.getByRole('heading', { name: 'Situação atual' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Onde ficou' })).toBeVisible();
     await expect(dialog.getByText('Produto ativo e em evolução.')).toBeVisible();
 
-    await expect(dialog.getByRole('heading', { name: 'Fatia atual' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Mexendo agora' })).toBeVisible();
     await expect(dialog.getByText('Jota Fit + continuidade das frentes')).toBeVisible();
 
     await expect(dialog.getByRole('heading', { name: 'Próximo passo' })).toBeVisible();
@@ -533,8 +533,8 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    // Bloqueio real não existe na frente -> não deve ser renderizado
-    await expect(dialog.getByRole('heading', { name: 'Bloqueio real' })).not.toBeVisible();
+    // Sem bloqueio na frente -> "Travado por" não deve ser renderizado
+    await expect(dialog.getByRole('heading', { name: 'Travado por' })).not.toBeVisible();
   });
 
   test('bloqueio real é exibido em destaque quando presente', async ({ page }) => {
@@ -549,7 +549,7 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    await expect(dialog.getByRole('heading', { name: 'Bloqueio real' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Travado por' })).toBeVisible();
     await expect(dialog.getByText('Aguardando aprovação do cliente')).toBeVisible();
   });
 
@@ -583,7 +583,8 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     await expect(dialog.locator('#project-column')).not.toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Editar estado' })).toBeVisible();
 
-    // Estado original foi preservado
+    // Estado original foi preservado (objetivo fica em "Mais contexto")
+    await dialog.getByRole('button', { name: /Mais contexto/ }).click();
     await expect(dialog.getByText('Ser o cockpit simples do dia a dia do João.')).toBeVisible();
     await expect(dialog.getByText('Texto provisório não salvo')).not.toBeVisible();
     expect(capturedCalls.patchedProjects.length).toBe(0);
