@@ -1,7 +1,5 @@
 // Praxis API Client — unified client for the Praxis backend
 import { tasksApiModule } from './tasksApi';
-import { nutritionApiModule } from './nutritionApi';
-import { workoutsApiModule } from './workoutsApi';
 import { financeApiModule } from './financeApi';
 import { projectsApiModule } from './projectsApi';
 
@@ -25,11 +23,6 @@ const OFFLINE_CACHEABLE = [
   '/api/insights/correlation',
   '/api/insights/weekly',
   '/api/insights/avoidance',
-  '/api/workouts/summary',
-  '/api/workouts/programs',
-  '/api/workouts/exercises',
-  '/api/workouts/sessions',
-  '/api/workouts/heatmap',
   '/api/weekly-reviews',
   '/api/finance/overview',
   '/api/projects',
@@ -174,9 +167,6 @@ export const praxisApi = {
   },
 
   ...tasksApiModule(request),
-  ...nutritionApiModule(request),
-  // Workouts live only in workoutsApiModule. Do not redeclare `workouts` here — it drops heatmap, agentSnapshot, exercises.stats, and sessions.addExercise.
-  ...workoutsApiModule(request),
   ...financeApiModule(request),
   ...projectsApiModule(request),
 
@@ -199,8 +189,6 @@ export const praxisApi = {
     update: (id, data) => request(`/api/purchases/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     delete: (id) => request(`/api/purchases/${id}`, { method: 'DELETE' }),
   },
-
-  // Nutrition lives only in nutritionApiModule; redeclaring it here silently drops methods.
 
   // Habits
   habits: {

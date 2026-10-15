@@ -5,9 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test",
-    "seed:catalog": "node ../scripts/seed-exercise-catalog.mjs",
-    "seed:catalog:apply": "node ../scripts/seed-exercise-catalog.mjs --apply"
+    "test": "node --test"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

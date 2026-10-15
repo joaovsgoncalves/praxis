@@ -11,9 +11,6 @@ function settingsPayload(settings) {
     notif_habits: settings.notif_habits,
     notif_goals: settings.notif_goals,
     list_density: settings.list_density || 'comfortable',
-    nutrition_enabled: settings.nutrition_enabled == null ? 1 : settings.nutrition_enabled,
-    nutrition_show_on_today:
-      settings.nutrition_show_on_today == null ? 1 : settings.nutrition_show_on_today,
   };
 }
 
@@ -39,8 +36,6 @@ export function createSettingsRouter({ db }) {
       notif_habits,
       notif_goals,
       list_density,
-      nutrition_enabled,
-      nutrition_show_on_today,
     } = req.body;
 
     const existing = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
@@ -57,15 +52,6 @@ export function createSettingsRouter({ db }) {
       density = d;
     }
 
-    const toFlag = (v) => {
-      if (v === undefined || v === null) return null;
-      if (v === true || v === 1 || v === '1') return 1;
-      if (v === false || v === 0 || v === '0') return 0;
-      return null;
-    };
-    const nutrEnabled = toFlag(nutrition_enabled);
-    const nutrToday = toFlag(nutrition_show_on_today);
-
     db.prepare(`
       UPDATE user_settings SET
         full_name = COALESCE(?, full_name),
@@ -74,9 +60,7 @@ export function createSettingsRouter({ db }) {
         pomodoro_break = COALESCE(?, pomodoro_break),
         notif_habits = COALESCE(?, notif_habits),
         notif_goals = COALESCE(?, notif_goals),
-        list_density = COALESCE(?, list_density),
-        nutrition_enabled = COALESCE(?, nutrition_enabled),
-        nutrition_show_on_today = COALESCE(?, nutrition_show_on_today)
+        list_density = COALESCE(?, list_density)
       WHERE id = 'default'
     `).run(
       full_name,
@@ -86,8 +70,6 @@ export function createSettingsRouter({ db }) {
       notif_habits,
       notif_goals,
       density ?? null,
-      nutrEnabled,
-      nutrToday,
     );
 
     const settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');

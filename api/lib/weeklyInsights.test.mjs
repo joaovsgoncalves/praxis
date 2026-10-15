@@ -129,10 +129,10 @@ test('suggested_priorities falls back to generic suggestions when no signals fir
   assert.ok(weekly.suggested_priorities.length <= 3);
 });
 
-test('nutrition falls back to null when nutrition tables are not initialized', () => {
-  const db = createTestDb(); // withNutrition: false
+test('weekly insights carry no nutrition block (food lives in Jota Fit)', () => {
+  const db = createTestDb();
   const weekly = buildWeeklyInsights(db, '2026-07-13');
-  assert.equal(weekly.nutrition, null);
+  assert.equal('nutrition' in weekly, false);
 });
 
 test('ideas new_captures and promoted are counted within the week window', () => {

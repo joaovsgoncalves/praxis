@@ -9,14 +9,14 @@ import {
   Check,
   ChevronDown,
   CircleDot,
-  Dumbbell,
+  Layers,
   Leaf,
   LogOut,
   Mic,
   MoonStar,
   MoveRight,
   Target,
-  Utensils,
+  Timer,
   WandSparkles,
   Zap,
 } from 'lucide-react';
@@ -68,17 +68,17 @@ const featureCards = [
     accent: 'domain-focus',
   },
   {
-    icon: Utensils,
-    eyebrow: 'Nutrição',
-    title: 'Macros e refeições sem virar uma planilha.',
-    description: 'Registre em gramas, acompanhe calorias e proteína e mantenha o foco no que realmente move o resultado.',
+    icon: Timer,
+    eyebrow: 'Modo Foco',
+    title: 'Um bloco de foco de cada vez.',
+    description: 'Pomodoro com a tarefa do momento. Os minutos focados ficam no histórico e aparecem na revisão da semana.',
     accent: 'domain-wellness',
   },
   {
-    icon: Dumbbell,
-    eyebrow: 'Jota Fit',
-    title: 'Seu corpo também faz parte da execução.',
-    description: 'Treino, recuperação e rotina física dentro do mesmo sistema que organiza o resto da sua vida.',
+    icon: Layers,
+    eyebrow: 'Frentes',
+    title: 'Cada área da vida no seu lugar.',
+    description: 'Veja o que vem primeiro hoje e onde cada frente ficou — trabalho, estudo, saúde, projetos — sem abrir dez listas.',
     accent: 'domain-ember',
   },
   {
@@ -319,7 +319,7 @@ export default function Landing() {
                 <h2 className="praxis-title max-w-2xl text-4xl font-bold tracking-[-0.055em] sm:text-5xl lg:text-6xl">Sua vida inteira não precisa morar em seis aplicativos.</h2>
               </div>
               <p className="max-w-2xl text-base leading-8 text-muted-foreground lg:justify-self-end lg:text-lg">
-                Tarefas, foco, hábitos, treino, nutrição, metas, rotinas e revisão compartilham o mesmo contexto. Menos troca de ferramenta. Menos recomeço. Mais continuidade.
+                Tarefas, foco, hábitos, metas, rotinas e revisão compartilham o mesmo contexto. Menos troca de ferramenta. Menos recomeço. Mais continuidade.
               </p>
             </div>
 

@@ -1,5 +1,3 @@
-import { buildNutritionSummary } from '../nutrition.js';
-
 /**
  * Agregação semanal para /api/insights/weekly (Praxis onda 8).
  */
@@ -283,27 +281,10 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
 
   const draft_next_week_focus = uniquePriorities.map((p, i) => `${i + 1}. ${p}`).join('\n');
 
-  let nutrition = null;
-  try {
-    nutrition = buildNutritionSummary(db, { from: weekStart, to: weekEnd });
-  } catch {
-    nutrition = null;
-  }
-
   return {
     week_start: weekStart,
     week_end: weekEnd,
     generated_at: new Date().toISOString(),
-    nutrition: nutrition
-      ? {
-          days_logged: nutrition.days_logged,
-          log_count: nutrition.log_count,
-          averages: nutrition.averages,
-          targets: nutrition.targets,
-          days_hit_protein: nutrition.days_hit_protein,
-          top_foods: nutrition.top_foods?.slice(0, 5) || [],
-        }
-      : null,
     victories: {
       tasks_completed_count: completedTasks.length,
       tasks_completed_samples: victoryTitles,

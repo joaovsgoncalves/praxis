@@ -10,8 +10,8 @@ import {
   Mic,
   MoonStar,
   Play,
+  Repeat,
   Sparkles,
-  Utensils,
   Zap,
 } from 'lucide-react';
 
@@ -261,15 +261,15 @@ export function PraxisLivePreview() {
 
               <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3.5">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-muted-foreground">Macros</span>
-                  <Utensils className="h-3.5 w-3.5 text-domain-wellness" aria-hidden />
+                  <span className="text-[10px] font-medium text-muted-foreground">Hábitos</span>
+                  <Repeat className="h-3.5 w-3.5 text-domain-wellness" aria-hidden />
                 </div>
-                <p className="praxis-title text-2xl font-bold tabular-nums">1.548 <span className="text-[10px] font-medium text-muted-foreground">/ 2.000 kcal</span></p>
+                <p className="praxis-title text-2xl font-bold tabular-nums">4 <span className="text-[10px] font-medium text-muted-foreground">/ 6 hoje</span></p>
                 <div className="mt-4 space-y-2.5">
                   {[
-                    ['Proteína', 78, '132g / 170g', 'bg-domain-wellness'],
-                    ['Carbo', 62, '184g / 295g', 'bg-domain-sky'],
-                    ['Gordura', 48, '42g / 88g', 'bg-domain-gold'],
+                    ['Leitura', 75, '15 / 20 min', 'bg-domain-wellness'],
+                    ['Inglês', 50, '15 / 30 min', 'bg-domain-sky'],
+                    ['Meditação', 100, '10 / 10 min', 'bg-domain-gold'],
                   ].map(([label, value, detail, fill], index) => (
                     <div key={label}>
                       <div className="mb-1 flex justify-between text-[9px] text-muted-foreground">

@@ -8,7 +8,6 @@ import TodayPriorities from "@/components/dashboard/TodayPriorities";
 import TodayTasks from "@/components/dashboard/TodayTasks";
 import TodayHabits from "@/components/dashboard/TodayHabits";
 import WellnessWidget from "@/components/dashboard/WellnessWidget";
-import NutritionTodayCard from "@/components/nutrition/NutritionTodayCard";
 import TodayFinanceCard from "@/components/finance/TodayFinanceCard";
 import TodayCalendar from "@/components/dashboard/TodayCalendar";
 import XpProgressStrip from "@/components/dashboard/XpProgressStrip";
@@ -833,11 +832,10 @@ export default function Dashboard() {
             icon={Gauge}
             eyebrow="Contexto"
             title="Como seu dia está agora"
-            description="Corpo, agenda e alimentação no mesmo quadro."
+            description="Finanças, corpo e agenda no mesmo quadro."
             tone="text-domain-wellness"
           />
           <div className="space-y-3 sm:space-y-4">
-            <NutritionTodayCard />
             <TodayFinanceCard />
             <WellnessWidget todayCheck={todayCheck} onSave={(d) => saveWellnessMutation.mutateAsync(d)} />
             <TodayCalendar />

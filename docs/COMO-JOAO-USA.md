@@ -1,6 +1,6 @@
 # Como o João usa o Praxis
 
-Atualizado: 2026-09-09 (alinhado a Frentes + nav real + URL que abre)
+Atualizado: 2026-10-15 (treino e alimentação foram para o Jota Fit)
 
 ## URL certa
 
@@ -16,7 +16,9 @@ Atualizado: 2026-09-09 (alinhado a Frentes + nav real + URL que abre)
 4. **Frentes** (`/frentes`) — o que vem primeiro hoje recomendado pelo Sêneca e onde cada área da vida ficou (detalhe sob demanda, Modo Foco manual e Fiz isso)
 
 **Revisar** = revisão semanal.
-Ferramentas (Frentes, Ideias, Modo Foco, Compras, Finanças, Jota Fit, Nutrição, Metas, Rituais, Conquistas, Histórico, Config…) ficam na **sidebar** / drawer **Menu** — **não** tem hub “Mais”.
+Ferramentas (Frentes, Ideias, Modo Foco, Compras, Finanças, Metas, Rituais, Conquistas, Histórico, Config…) ficam na **sidebar** / drawer **Menu** — **não** tem hub “Mais”.
+
+**Treino, alimentação, suplementos e remédios** ficam no app **Jota Fit** (https://jota-fit.web.app). A aba Jota Fit do menu só abre o app; links velhos (`/treinos`, `/nutricao`, `/jota-fit`) levam para lá.
 
 ## Se “sumiu” algo
 

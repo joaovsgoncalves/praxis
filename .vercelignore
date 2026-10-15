@@ -1,10 +1,10 @@
 # Backend Express roda na VPS (forja-api.service), não na Vercel.
-# Só a pasta RAIZ /api (server.js, workouts.js, nutrition.js…).
+# Só a pasta RAIZ /api (server.js, finance.js, routes/…).
 # NÃO usar o padrão "api" sem barra — isso também esconde src/api (forjaClient)
 # e quebra o build do Vite no deploy.
 #
 # Se esses arquivos entrarem no deploy, a Vercel vira cada um em serverless e
-# intercepta /api/workouts, /api/nutrition etc. ANTES do rewrite do vercel.json
+# intercepta /api/tasks, /api/finance etc. ANTES do rewrite do vercel.json
 # para o Express real → 500 no site público.
 /api
 /api/**

@@ -1,6 +1,6 @@
 # Onde estamos — Praxis (para o João)
 
-**Atualizado:** 2026-09-09 · evidência git/prod
+**Atualizado:** 2026-10-15 · evidência git/prod
 **URL que abre:** https://dopraxis.vercel.app
 **Repo:** `joaovsgoncalves1-jpg/praxis` · **HEAD:** ver `git log -1` (não este parágrafo)
 **API:** `praxis-api` · `GET /api/health` 200 · porta 18556
@@ -15,14 +15,13 @@ Entregas consolidadas das Fases 1, 2 e 3:
 
 ---
 
-## Treinos V4 (ago/2026)
+## Treino e alimentação saíram da Praxis (15/10/2026)
 
-O módulo Treinos passou a se chamar **Jota Fit**: rota canônica `/jota-fit`; `/treinos` redireciona com replace. Funcionalidade (hoje, sessão, programa, biblioteca, mapa, histórico) e tabelas `workout_*` intactas.
-
-No ar em `/jota-fit`: catálogo 1324 + customs, Biblioteca, GIF CDN (Gym visual), Mapa Balanço/Fadiga/Força, heatmap no Histórico, 1RM, superset, treino livre. Smoke: `scripts/smoke-praxis-treinos.sh`.
-Domínio canônico (entidade → `workout_*`, o que é derivado): `docs/jota-fit/DOMINIO-CANONICO.md`.
-
-Uso: mapa só fica esperto depois de séries em exercício do catálogo (custom sem alias não pinta).
+Fase 8 do PRD do Jota Fit: treino, alimentação, suplementos e medicamentos vivem só no app **Jota Fit** (https://jota-fit.web.app). A Praxis fica com rotina, metas e foco.
+- A aba Jota Fit do menu abre o app; `/jota-fit`, `/treinos` e `/nutricao` redirecionam para lá (`JotaFitRedirect`).
+- Saiu o código de treino e nutrição (páginas, componentes, libs, `api/workouts.js`, `api/nutrition*.js`, rotas, testes, smokes). `/api/workouts/*` e `/api/nutrition/*` dão 404. Hoje sem card de macros; Revisão semanal sem bloco de nutrição.
+- **Dados ficam no banco** como histórico, sem tela e sem rota: tabelas `workout_*`, `food_*`, `nutrition_*`, `body_weight_logs` e colunas `nutrition_*` de `user_settings`. Backup antes da saída: `/root/.hermes/backups/praxis/praxis-pre-fase8-20261015.db`.
+- Planos antigos de Treinos/Nutrição em `docs/` são histórico.
 
 ---
 
@@ -39,7 +38,7 @@ Working tree em 2026-07-24: **limpo** e alinhado a `origin/main`.
 
 ## Em uma frase
 
-O **plano grande (ondas 1–24)** e os módulos extras pedidos (Nutrição, Treinos, Compras, lotes de design, outcomes honestos, marca/motion, fixes de lista/foco) estão **no código e no ar**. Não há onda obrigatória aberta. Evoluir daqui = **dor tua no uso**, não “fechar o combinado”.
+O **plano grande (ondas 1–24)** e os módulos extras pedidos (Compras, lotes de design, outcomes honestos, marca/motion, fixes de lista/foco) estão **no código e no ar**. Nutrição e Treinos foram para o Jota Fit em 15/10/2026. Não há onda obrigatória aberta. Evoluir daqui = **dor tua no uso**, não “fechar o combinado”.
 
 ---
 
@@ -66,13 +65,13 @@ Doc antigo parou em 18/07. **Depois** (principalmente 20–22/07, ~22 commits) e
 | **Hoje / marca** | obsidian-âmbar; monograma P+seta ouro; favicon legível; partículas em movimento; toast X; hero `HH:mm` + memento mori/hora — `a0776b8`…`5e74d28` |
 | **Infra de dados** | migração transparente `forja.db` → `praxis.db`; backup prefere `praxis.db` — `14afca8` / `ac2b5ba` |
 | **API/UI** | modularização routes/components; haptics; fallback de voz no browser — `dc70032` |
-| **Nutrição / Treinos / Compras** | módulos shipped (barcode OFF, gramas, wishlist, PPL/sessão) — planos em `docs/` + archive |
+| **Compras** | wishlist shipped — planos em `docs/` + archive (Nutrição e Treinos saíram em 15/10/2026 → Jota Fit) |
 | **Frentes v3** | Filtro ativas/todas, limite 3 ativas, leitura direta por padrão, edição de estado isolada, Fiz isso com expected_step, 409 conflict sem perda — Fases 1–3 |
 
 Nav canônica no código (`src/lib/praxisNav.js`):
 
 - **Primary:** Hoje · Hábitos e tarefas · Revisar
-- **Secondary:** Jota Fit · Frentes · Ideias · Metas · Finanças · Compras · Modo Foco · Conquistas\* · Histórico · Configurações
+- **Secondary:** Jota Fit (link para o app) · Frentes · Ideias · Metas · Finanças · Compras · Modo Foco · Conquistas\* · Histórico · Configurações
 - **Sem** hub “Mais” e **sem** Fila no menu (`/capturas` existe por rota/banner)
 
 ---
@@ -89,7 +88,7 @@ Nav canônica no código (`src/lib/praxisNav.js`):
 
 ## Design global — checklist de shell
 
-Todas as abas de produto usam `praxis-page` + padrões Praxis onde faz sentido (Hoje, Tarefas, Ideias, Compras, Treinos, Nutrição, Metas, Rituais, Histórico, Captura, Capturas, Foco, Conquistas, Config, Revisão).
+Todas as abas de produto usam `praxis-page` + padrões Praxis onde faz sentido (Hoje, Tarefas, Ideias, Compras, Metas, Rituais, Histórico, Captura, Capturas, Foco, Conquistas, Config, Revisão).
 `/compartilhar` = PWA share mínimo — ok simples.
 
 Regra: pedido de **design geral** = **todas** as abas, não um print só. Ver `docs/DESIGN.md` + audits em `docs/PRAXIS-DESIGN-AUDIT-*.md`.
