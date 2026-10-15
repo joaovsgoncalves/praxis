@@ -1,6 +1,6 @@
 # Plano Praxis: evolução pós-auditoria (out/2026)
 
-Criado em 2026-10-15. **Atualizado em 2026-10-15, 18h10 (Fortaleza): fases A, B, C e D no ar; próxima é a E.**
+Criado em 2026-10-15. **Atualizado em 2026-10-15, 19h40 (Fortaleza): fases A a E no ar; próxima é a F (só o Hoje).**
 Substitui as fases 5 e 6 de `docs/PLANO-PRAXIS-VISUAL-PREMIUM.md` (fases 0 a 4 entregues e no ar).
 Fontes: auditoria do Sistema Forja (`audits/forja-rea-2026-10-14/RELATORIO.md`), revisão do Hoje pelo Fable 5.1 (`audits/forja-rea-2026-10-14/REVISAO-HOJE-FABLE-2026-10-15.md`), prints de produção de 15/10 e o feedback do João no mesmo dia.
 Escopo: só construção e validação. Uso, piloto e decisões de rotina ficam com o João.
@@ -14,7 +14,8 @@ Escopo: só construção e validação. Uso, piloto e decisões de rotina ficam 
 | **B** Hoje enxuto | **No ar** | `f819f65`, `309985d`, `4974a52`, `f70af44` |
 | **C** trilha e bento | **No ar** | `aa54c1b` |
 | **D** XP por evento e meta semanal de foco | **No ar** | `5708c49` |
-| **E** acabamento final | **Próxima** | |
+| **E** acabamento final | **No ar** | `01f8826` |
+| **F** Hoje com cara de produto | **Próxima** | |
 
 - `main` = `origin/main` em `f70af44`, árvore limpa. Produção: https://dopraxis.vercel.app (deploy `praxis-5sfo0lnyx`) e API `praxis-api` reiniciada depois do backup de 15/10.
 - `smoke:prod` completo verde depois de A, B e do ajuste do Sêneca. 214 testes da API verdes depois da saída de treino e alimentação.
@@ -70,12 +71,20 @@ Cada fase entra no ar completa: código, testes focados, QA da A.N.A. no navegad
 - **Verificado:** na cópia do banco real, marcar/desmarcar/marcar = +10 uma vez, desmarcar volta a 2.225, excluir tarefa concluída estorna; migração em produção gravou um evento `baseline` de 2.225 com nível 6 inalterado; `smoke:prod` deixou o XP em 2.225 (antes somava +20). Meta desligada não aparece em Foco nem Revisar; ligada mostrou "0 min nesta semana, meta 300 min"; desligar com `null` e valor inválido (400) testados. 290 testes, lint e build verdes.
 - **Limite conhecido:** tarefas concluídas antes da migração não têm evento (o XP delas está no baseline), então desmarcar uma delas não tira XP. `add-xp` ainda desbloqueia conquistas sem creditar o `xp_reward`, como antes.
 
-### Fase E: acabamento final (próxima)
+### Fase E: acabamento final (no ar)
 - Animação de entrada do Hoje uma vez por sessão (320 ms), confete respeitando movimento reduzido (`src/lib/celebration.js`), barras com `scaleX` em vez de `width`.
 - Skeletons na mesma silhueta das telas novas e transição entre rotas.
 - Modal "Últimas atualizações" depois de cada publicação.
 - Código dividido por rota e imagens leves.
 - **Pronto quando:** Lighthouse mobile acima de 85 em performance; nenhum flash branco ao navegar; com movimento reduzido ativo, nenhum confete nem spring.
+- **Verificado em produção:** Lighthouse mobile (mediana de 3) `/` = 93 e `/entrar` = 95, com FCP/LCP ~2,5 s, TBT 0 e CLS ~0 (antes: `/` não fechava o teste, `/entrar` 57 a 68). Maior chunk 380 KB (gráficos); a landing não baixa gráficos nem telas do app. 303 testes, lint, build e `smoke:prod` verdes (o smoke passou a procurar o Agora no chunk do Dashboard). Navegação por 13 rotas sem rolagem lateral nem fundo claro; entrada do Hoje só na 1ª visita; com movimento reduzido nada anima; diálogo de novidades aparece uma vez.
+
+### Fase F: Hoje com cara de produto (próxima)
+- Origem: feedback do João em 15/10 depois da C: o Hoje ficou parecido demais com Hábitos e Tarefas (trilha em cima, hábitos embaixo). A trilha em linha do tempo agrada e fica.
+- Hábitos viram linha compacta (Abertura 3/5, Fechamento 0/4) que marca ao toque; a lista completa fica na aba Hábitos.
+- O card do Jota Fit sai (é só redirecionamento). Entram cards de ferramentas reais, um número e uma ação cada: Finanças, Foco (com meta semanal se ligada), Frentes, Metas, Check-in e Revisar.
+- Semana: mini barras proporcionais ao feito mais resumo curto (foco e XP da semana), num bloco só.
+- PC: coluna da direita é o painel de ferramentas, sem espaço vazio.
 
 ## Depois (planos separados)
 - Notificação push e app offline (service worker, Web Push no servidor próprio).

@@ -31,6 +31,11 @@ JS_PATH=$(echo "$HTML" | grep -oE 'assets/index-[^"]+\.js' | head -1)
 JS_TMP=$(mktemp)
 trap 'rm -f "$COOKIE_JAR" "$JS_TMP"' EXIT
 curl -sS "$BASE/$JS_PATH" -o "$JS_TMP" || fail "download bundle $JS_PATH"
+# Código dividido por rota: o texto do Agora mora no chunk do Dashboard, referenciado pelo index.
+DASH_PATH=$(grep -oE 'Dashboard-[A-Za-z0-9_-]+\.js' "$JS_TMP" | head -1)
+if [[ -n "$DASH_PATH" ]]; then
+  curl -sS "$BASE/assets/$DASH_PATH" >> "$JS_TMP" || fail "download chunk $DASH_PATH"
+fi
 if ! grep -q 'urgente na fila' "$JS_TMP"; then
   fail "Bundle em $BASE parece ANTIGO (sem bloco Agora). Rode docs/PRAXIS-DEPLOY-ALIASES.md"
 fi
