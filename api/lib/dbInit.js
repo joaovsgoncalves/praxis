@@ -3,6 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { initXpEventsSchema } from './xpEvents.js';
 
 /**
  * Resolve o arquivo do banco preferindo praxis.db. Se ele não existir mas o
@@ -475,6 +476,9 @@ if (!settingsCols.includes('nutrition_enabled')) {
 if (!settingsCols.includes('nutrition_show_on_today')) {
   db.exec('ALTER TABLE user_settings ADD COLUMN nutrition_show_on_today INTEGER DEFAULT 1');
 }
+if (!settingsCols.includes('focus_weekly_goal_minutes')) {
+  db.exec('ALTER TABLE user_settings ADD COLUMN focus_weekly_goal_minutes INTEGER');
+}
 const tasksCols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
 if (!tasksCols.includes('goal_id')) {
   db.exec("ALTER TABLE tasks ADD COLUMN goal_id TEXT");
@@ -556,4 +560,6 @@ db.prepare(`
   WHERE status IN ('completed', 'done')
     AND completed_date IS NULL
 `).run();
+
+initXpEventsSchema(db);
 }

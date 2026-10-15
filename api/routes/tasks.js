@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { nextRecurrenceDate } from '../taskRecurrence.js';
+import { awardXp, reverseXp } from '../lib/xpEvents.js';
 
 /**
  * Tasks router — mounted at /api/tasks
@@ -16,7 +17,6 @@ export function createTasksRouter(ctx) {
     nextSortOrder,
     reorderItems,
     syncTaskToCalendar,
-    getLevel,
     SKIP_REASONS,
   } = ctx;
 
@@ -39,6 +39,13 @@ export function createTasksRouter(ctx) {
       const c = counts.get(row.id);
       return { ...row, checklist_total: c ? Number(c.total) : 0, checklist_done: c ? Number(c.done) : 0 };
     });
+  }
+
+  /** Estorna o XP ativo da tarefa; devolve xp_sync (sem leveled_up) ou null se não havia nada. */
+  function taskXpReversalSync(taskId, reason) {
+    const reversal = reverseXp(db, { sourceType: 'task', sourceId: taskId });
+    if (reversal.reversed === 0) return null;
+    return { awarded: -reversal.reversed, reason, xp_total: reversal.xp_total, level: reversal.level };
   }
 
   function findTask(id) {
@@ -381,13 +388,11 @@ export function createTasksRouter(ctx) {
     const today = getLocalDateString(now);
     let completedDate = existing.completed_date || null;
     let completedAt = existing.completed_at || null;
-    let taskXpAwarded = 0;
 
     if (status !== undefined) {
       if (willBeDone) {
         completedDate = existing.completed_date || today;
         completedAt = existing.completed_at || now.toISOString();
-        if (!wasDone) taskXpAwarded = 10;
       } else {
         completedDate = null;
         completedAt = null;
@@ -436,20 +441,21 @@ export function createTasksRouter(ctx) {
     let nextOccurrenceSync = null;
     let xpSync = null;
 
-    if (taskXpAwarded > 0) {
-      const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
-      const oldLevel = getLevel(gam.xp_total).level;
-      const newXp = gam.xp_total + taskXpAwarded;
-      const newLevelInfo = getLevel(newXp);
-      db.prepare('UPDATE gamification SET xp_total = ?, level = ?, updated_date = datetime(\'now\') WHERE id = ?')
-        .run(newXp, newLevelInfo.level, 'main');
-      xpSync = {
-        awarded: taskXpAwarded,
-        reason: task.date && task.date < today ? 'Tarefa atrasada limpa hoje' : 'Tarefa concluída',
-        xp_total: newXp,
-        level: newLevelInfo.level,
-        leveled_up: newLevelInfo.level > oldLevel,
-      };
+    // XP por evento: +10 uma vez por conclusão ativa; sair de concluída estorna.
+    if (status !== undefined && !wasDone && willBeDone) {
+      const reason = task.date && task.date < today ? 'Tarefa atrasada limpa hoje' : 'Tarefa concluída';
+      const award = awardXp(db, { sourceType: 'task', sourceId: task.id, amount: 10, reason });
+      if (award.awarded > 0) {
+        xpSync = {
+          awarded: award.awarded,
+          reason,
+          xp_total: award.xp_total,
+          level: award.level,
+          leveled_up: award.leveled_up,
+        };
+      }
+    } else if (status !== undefined && wasDone && !willBeDone) {
+      xpSync = taskXpReversalSync(task.id, 'Tarefa desmarcada');
     }
 
     const becameDone =
@@ -479,11 +485,12 @@ export function createTasksRouter(ctx) {
     if (!existing) return res.status(404).json({ error: 'Task not found' });
 
     const calendarSync = syncTaskToCalendar({ ...existing, status: 'cancelled' });
-    db.transaction((taskId) => {
+    const xpSync = db.transaction((taskId) => {
       db.prepare('DELETE FROM task_checklist_items WHERE task_id = ?').run(taskId);
       db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+      return taskXpReversalSync(taskId, 'Tarefa excluída');
     })(req.params.id);
-    res.json({ success: true, calendar_sync: calendarSync });
+    res.json({ success: true, calendar_sync: calendarSync, ...(xpSync ? { xp_sync: xpSync } : {}) });
   });
 
   /** Empurra tarefa para amanhã (local), mantém status aberto, registra day_outcome. */

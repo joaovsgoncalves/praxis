@@ -1,5 +1,15 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { getLevel, checkAchievements } from '../lib/gamification.js';
+import { awardXp, getXpSince, getXpTotal, recomputeXp } from '../lib/xpEvents.js';
+
+/** Segunda-feira 00:00 em America/Fortaleza (UTC-3, sem horário de verão) como 'YYYY-MM-DD HH:MM:SS' UTC. */
+function weekStartUtc(todayYmd) {
+  const [y, m, d] = todayYmd.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return `${date.toISOString().slice(0, 10)} 03:00:00`;
+}
 
 /** Gamification — mounted at /api/gamification */
 export function createGamificationRouter({ db, getLocalDateString }) {
@@ -7,22 +17,23 @@ export function createGamificationRouter({ db, getLocalDateString }) {
 
   router.get('/', (req, res) => {
     try {
-      const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
-      const levelInfo = getLevel(gam.xp_total);
+      const xpTotal = getXpTotal(db);
+      const levelInfo = getLevel(xpTotal);
       let progress_pct = 100;
       if (levelInfo.next_level_xp !== null) {
-        const xpInLevel = gam.xp_total - levelInfo.current_xp;
+        const xpInLevel = xpTotal - levelInfo.current_xp;
         const xpNeeded = levelInfo.next_level_xp - levelInfo.current_xp;
         progress_pct = xpNeeded > 0 ? Math.round((xpInLevel / xpNeeded) * 100) : 0;
       }
       const achievements = db.prepare('SELECT * FROM achievements ORDER BY unlocked_date DESC NULLS LAST, id').all();
       res.json({
-        xp_total: gam.xp_total,
+        xp_total: xpTotal,
         level: levelInfo.level,
         level_name: levelInfo.name,
         next_level_xp: levelInfo.next_level_xp,
         progress_pct,
         achievements,
+        xp_week: getXpSince(db, weekStartUtc(getLocalDateString())),
       });
     } catch (error) {
       console.error('Gamification GET error:', error);
@@ -37,22 +48,21 @@ export function createGamificationRouter({ db, getLocalDateString }) {
         return res.status(400).json({ error: 'amount must be a positive number' });
       }
 
-      const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
-      const oldLevel = getLevel(gam.xp_total).level;
-      const newXp = gam.xp_total + amount;
-      const newLevelInfo = getLevel(newXp);
-      const leveledUp = newLevelInfo.level > oldLevel;
-
-      db.prepare("UPDATE gamification SET xp_total = ?, level = ?, updated_date = datetime('now') WHERE id = ?")
-        .run(newXp, newLevelInfo.level, 'main');
+      const award = awardXp(db, {
+        sourceType: 'manual',
+        sourceId: randomUUID(),
+        amount,
+        reason: typeof reason === 'string' ? reason : null,
+      });
+      const newLevelInfo = getLevel(award.xp_total);
 
       const newAchievements = checkAchievements(db, { getLocalDateString });
 
       res.json({
-        xp_total: newXp,
+        xp_total: award.xp_total,
         level: newLevelInfo.level,
         level_name: newLevelInfo.name,
-        leveled_up: leveledUp,
+        leveled_up: award.leveled_up,
         new_achievements: newAchievements,
         reason: reason || null,
       });
@@ -67,16 +77,17 @@ export function createGamificationRouter({ db, getLocalDateString }) {
       const newAchievements = checkAchievements(db, { getLocalDateString });
 
       let totalBonusXp = 0;
-      for (const a of newAchievements) {
-        totalBonusXp += a.xp_reward || 0;
-      }
-      if (totalBonusXp > 0) {
-        const gam = db.prepare('SELECT * FROM gamification WHERE id = ?').get('main');
-        const newXp = gam.xp_total + totalBonusXp;
-        const newLevelInfo = getLevel(newXp);
-        db.prepare("UPDATE gamification SET xp_total = ?, level = ?, updated_date = datetime('now') WHERE id = ?")
-          .run(newXp, newLevelInfo.level, 'main');
-      }
+      db.transaction(() => {
+        for (const a of newAchievements) {
+          totalBonusXp += awardXp(db, {
+            sourceType: 'achievement',
+            sourceId: a.id,
+            amount: a.xp_reward || 0,
+            reason: `Conquista: ${a.name}`,
+          }).awarded;
+        }
+        recomputeXp(db);
+      })();
 
       res.json({
         new_achievements: newAchievements,

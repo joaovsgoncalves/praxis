@@ -14,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ChevronDown, Lightbulb, Mountain, Target, ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import FocusWeeklyGoal from '@/components/focus/FocusWeeklyGoal';
+import { fortalezaDateKey } from '@/lib/dates';
 
 const SCORE_OPTIONS = [
   { value: 1, emoji: '😞', label: 'Difícil' },
@@ -82,6 +84,8 @@ export default function WeeklyReview() {
     queryKey: ['weeklyInsights', weekStart],
     queryFn: () => praxisApi.insights.weekly(weekStart),
   });
+
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: () => praxisApi.user.getSettings() });
 
   const { data: history = [] } = useQuery({
     queryKey: ['weeklyReviewHistory'],
@@ -246,6 +250,14 @@ export default function WeeklyReview() {
                 <WeekNumber label="Foco" value={v?.focus_minutes ?? 0} detail="min" />
                 <WeekNumber label="Ideias viraram tarefa" value={v?.ideas_promoted ?? 0} />
               </dl>
+
+              <FocusWeeklyGoal
+                className="px-1"
+                goalMinutes={me?.focus_weekly_goal_minutes ?? null}
+                doneMinutes={v?.focus_minutes}
+                weekStart={weekStart}
+                today={fortalezaDateKey()}
+              />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <InsightBlock title="Padrões">
@@ -583,4 +595,4 @@ function Section({ id, icon: Icon, label, placeholder, value, onChange }) {
       />
     </div>
   );
-}
+}

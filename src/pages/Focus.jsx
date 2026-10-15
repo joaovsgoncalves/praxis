@@ -27,6 +27,8 @@ import {
   Hourglass,
 } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, SectionHeading } from '@/components/layout/PraxisPage';
+import FocusWeeklyGoal from '@/components/focus/FocusWeeklyGoal';
+import { weekRange } from '@/lib/taskLenses';
 import { cn } from '@/lib/utils';
 import { buildSnoozeTomorrowUpdate, fortalezaDateKey } from '@/lib/dates';
 import { toast } from 'sonner';
@@ -167,6 +169,17 @@ export default function Focus() {
     staleTime: 60_000,
   });
 
+  // Meta semanal opcional: sem meta, nem a semana é buscada.
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: () => praxisApi.user.getSettings() });
+  const focusGoalMinutes = me?.focus_weekly_goal_minutes ?? null;
+  const weekStart = weekRange(today).start;
+  const { data: weekInsights } = useQuery({
+    queryKey: ['weeklyInsights', weekStart],
+    queryFn: () => praxisApi.insights.weekly(weekStart),
+    enabled: focusGoalMinutes != null,
+    staleTime: 60_000,
+  });
+
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
   const activePreset = PRESETS[selectedPreset] || PRESETS[0];
 
@@ -216,6 +229,7 @@ export default function Focus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todayFocus'] });
       queryClient.invalidateQueries({ queryKey: ['focusStats'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyInsights'] });
     },
   });
 
@@ -524,6 +538,15 @@ export default function Focus() {
             />
           </StatGrid>
         )}
+        {!inSession && weekInsights ? (
+          <FocusWeeklyGoal
+            className="mt-4"
+            goalMinutes={focusGoalMinutes}
+            doneMinutes={weekInsights.victories?.focus_minutes}
+            weekStart={weekStart}
+            today={today}
+          />
+        ) : null}
       </PageHero>
 
       <Dialog open={postSessionOpen} onOpenChange={(open) => !open && dismissPostSession()}>

@@ -4,8 +4,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, User, Timer, LogOut, Bell, Camera, Database, Settings as SettingsIcon } from 'lucide-react';
+import { Save, User, Timer, LogOut, Bell, Camera, Database, Target, Settings as SettingsIcon } from 'lucide-react';
 import { PageHero } from '@/components/layout/PraxisPage';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
@@ -14,6 +15,8 @@ import { useAuth } from '@/lib/AuthContext';
 const AVATAR_MAX_DIMENSION = 256;
 const AVATAR_MAX_DATA_URL_LENGTH = 80_000;
 const AVATAR_QUALITY_STEPS = [0.82, 0.72, 0.62, 0.52];
+const FOCUS_GOAL_MIN = 30;
+const FOCUS_GOAL_MAX = 3000;
 
 function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
@@ -71,12 +74,41 @@ export default function Settings() {
   const [notifGoals, setNotifGoals] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [focusGoalOn, setFocusGoalOn] = useState(false);
+  const [focusGoalInput, setFocusGoalInput] = useState('');
+  const [savingFocusGoal, setSavingFocusGoal] = useState(false);
 
   useEffect(() => {
     if (user?.pomodoro_focus) setPomodoroFocus(String(user.pomodoro_focus));
     if (user?.pomodoro_break) setPomodoroBreak(String(user.pomodoro_break));
     setAvatarUrl(user?.avatar_url || null);
+    const goal = user?.focus_weekly_goal_minutes ?? null;
+    setFocusGoalOn(goal != null);
+    setFocusGoalInput(goal != null ? String(goal) : '');
   }, [user]);
+
+  const saveFocusGoal = async (minutes) => {
+    setSavingFocusGoal(true);
+    try {
+      await praxisApi.user.updateSettings({ focus_weekly_goal_minutes: minutes });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      toast.success(minutes == null ? 'Meta semanal de foco desligada' : 'Meta semanal de foco salva');
+    } catch (err) {
+      toast.error(err?.message || 'Não consegui salvar a meta agora.');
+    } finally {
+      setSavingFocusGoal(false);
+    }
+  };
+
+  const handleFocusGoalToggle = (on) => {
+    setFocusGoalOn(on);
+    if (!on && user?.focus_weekly_goal_minutes != null) saveFocusGoal(null);
+  };
+
+  const focusGoalValue = Number(focusGoalInput);
+  const focusGoalValid = /^\d+$/.test(focusGoalInput.trim())
+    && focusGoalValue >= FOCUS_GOAL_MIN
+    && focusGoalValue <= FOCUS_GOAL_MAX;
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
@@ -123,7 +155,7 @@ export default function Settings() {
         kicker="Conta"
         kickerIcon={SettingsIcon}
         title="Configurações"
-        description="Perfil, pomodoro, notificações e backup."
+        description="Perfil, pomodoro, foco, notificações e backup."
       />
 
       <Card className="bg-card border-border">
@@ -184,6 +216,60 @@ export default function Settings() {
           <Button onClick={saveSettings} className="w-full bg-primary hover:bg-primary/90">
             <Save className="w-4 h-4 mr-2" />Salvar Configurações
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2"><Target className="w-4 h-4" />Foco</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <Label htmlFor="focus-goal-switch" className="text-sm font-medium">Meta semanal de foco</Label>
+              <p className="text-xs text-muted-foreground">Aparece no Foco e na Revisar só quando ligada.</p>
+            </div>
+            <Switch
+              id="focus-goal-switch"
+              checked={focusGoalOn}
+              onCheckedChange={handleFocusGoalToggle}
+              disabled={savingFocusGoal}
+            />
+          </div>
+          {focusGoalOn ? (
+            <form
+              className="space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (focusGoalValid) saveFocusGoal(focusGoalValue);
+              }}
+            >
+              <Label htmlFor="focus-goal-minutes" className="text-sm text-muted-foreground">Minutos por semana</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="focus-goal-minutes"
+                  type="number"
+                  inputMode="numeric"
+                  min={FOCUS_GOAL_MIN}
+                  max={FOCUS_GOAL_MAX}
+                  step={1}
+                  placeholder="minutos"
+                  value={focusGoalInput}
+                  onChange={(e) => setFocusGoalInput(e.target.value)}
+                  className="bg-secondary/50 tabular-nums"
+                />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={!focusGoalValid || savingFocusGoal || focusGoalValue === user?.focus_weekly_goal_minutes}
+                >
+                  Salvar meta
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">De {FOCUS_GOAL_MIN} a {FOCUS_GOAL_MAX} minutos.</p>
+            </form>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -248,4 +334,4 @@ export default function Settings() {
       </Card>
     </div>
   );
-}
+}

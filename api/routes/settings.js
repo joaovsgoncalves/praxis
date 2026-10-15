@@ -11,7 +11,16 @@ function settingsPayload(settings) {
     notif_habits: settings.notif_habits,
     notif_goals: settings.notif_goals,
     list_density: settings.list_density || 'comfortable',
+    focus_weekly_goal_minutes: settings.focus_weekly_goal_minutes ?? null,
   };
+}
+
+const FOCUS_GOAL_MIN = 30;
+const FOCUS_GOAL_MAX = 3000;
+
+function isValidFocusGoal(value) {
+  return value === null
+    || (Number.isInteger(value) && value >= FOCUS_GOAL_MIN && value <= FOCUS_GOAL_MAX);
 }
 
 /** User settings — mounted at /api/user (paths: /settings) */
@@ -37,6 +46,14 @@ export function createSettingsRouter({ db }) {
       notif_goals,
       list_density,
     } = req.body;
+
+    // Meta semanal de foco: ausente preserva; null explícito desliga.
+    const hasFocusGoal = Object.prototype.hasOwnProperty.call(req.body || {}, 'focus_weekly_goal_minutes');
+    if (hasFocusGoal && !isValidFocusGoal(req.body.focus_weekly_goal_minutes)) {
+      return res.status(400).json({
+        error: `focus_weekly_goal_minutes must be an integer between ${FOCUS_GOAL_MIN} and ${FOCUS_GOAL_MAX}, or null`,
+      });
+    }
 
     const existing = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
     if (!existing) {
@@ -71,6 +88,10 @@ export function createSettingsRouter({ db }) {
       notif_goals,
       density ?? null,
     );
+    if (hasFocusGoal) {
+      db.prepare("UPDATE user_settings SET focus_weekly_goal_minutes = ? WHERE id = 'default'")
+        .run(req.body.focus_weekly_goal_minutes);
+    }
 
     const settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
     res.json(settingsPayload(settings));
