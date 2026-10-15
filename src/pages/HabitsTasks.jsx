@@ -36,7 +36,7 @@ import { CATEGORIES } from '@/lib/categories';
 import { sparkAt } from '@/lib/celebration';
 import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder, buildDragOrder } from '@/lib/taskReorder';
-import { isTaskOpen, isTaskDone, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
+import { isTaskOpen, isTaskDone, isTaskMissed, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
 import {
   SKIP_REASON_LABELS,
@@ -914,7 +914,7 @@ export default function HabitsTasks() {
   const listDay = lens === 'list' ? selectedDay : null;
   const filteredTasks = (
     listDay
-      ? tasksForDay(categoryTasks, listDay)
+      ? tasksForDay(categoryTasks, listDay, { includeMissed: true })
       : filterTasksForListPresentation(scopedTasks, categoryFilter, today)
   ).sort((a, b) => sortTasksForList(a, b, today));
 
@@ -1355,7 +1355,7 @@ export default function HabitsTasks() {
                                     }}
                                     className={cn(
                                       'block w-full rounded-sm text-left text-[15px] font-medium leading-snug outline-none focus-visible:ring-2 focus-visible:ring-ring [text-wrap:pretty]',
-                                      done ? 'text-muted-foreground line-through decoration-muted-foreground/50' : 'text-stone-100'
+                                      done ? 'text-muted-foreground line-through decoration-muted-foreground/50' : isTaskMissed(task) ? 'text-stone-300/80' : 'text-stone-100'
                                     )}
                                   >
                                     <span className="break-words">{title}</span>
@@ -1374,6 +1374,9 @@ export default function HabitsTasks() {
                                     {task.day_outcome === 'not_today'
                                       && task.day_outcome_date === addDaysToDateKey(today, -1) ? (
                                       <span className="text-amber-200/90">Empurrada de ontem</span>
+                                    ) : null}
+                                    {isTaskMissed(task) ? (
+                                      <span className="text-stone-300/80">Não rolou</span>
                                     ) : null}
                                     <TaskRecurrenceBadge task={task} allTasks={tasks} className="shrink-0" />
                                   </TaskCardMeta>

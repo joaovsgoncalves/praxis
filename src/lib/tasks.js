@@ -7,6 +7,10 @@ export const isTaskClosed = (task) =>
 export const isTaskOpen = (task) =>
   task?.status === 'pending' || task?.status === 'in_progress';
 
+/** Recorrente que passou do dia sem acontecer: decisão honesta, não falha. */
+export const isTaskMissed = (task) =>
+  task?.status === 'cancelled' && task?.day_outcome === 'missed';
+
 export const isInboxTask = (task) =>
   Boolean(isTaskOpen(task) && !(task?.date && String(task.date).trim()));
 

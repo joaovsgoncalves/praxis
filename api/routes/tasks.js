@@ -59,6 +59,9 @@ export function createTasksRouter(ctx) {
     const today = String(todayParam || getLocalDateString()).slice(0, 10);
     const mergeOverdue = include_overdue === '1' || include_overdue === 'true';
 
+    // Recorrente que passou do dia não é dívida: fecha como "não rolou" antes de montar a lista.
+    if (mergeOverdue) closeMissedRecurringTasks(getLocalDateString());
+
     let query = 'SELECT * FROM tasks WHERE 1=1';
     const params = [];
 
@@ -102,9 +105,20 @@ export function createTasksRouter(ctx) {
       LIMIT 80
     `).all(today, today);
 
+    // Desfecho "não rolou" recente, para o histórico do dia na aba Hábitos e tarefas.
+    const missedRecentRows = db.prepare(`
+      SELECT * FROM tasks
+      WHERE status = 'cancelled'
+        AND day_outcome = 'missed'
+        AND day_outcome_date >= ?
+      ORDER BY day_outcome_date DESC
+      LIMIT 60
+    `).all(addDaysLocal(today, -14));
+
     const byId = new Map();
     for (const t of operationalRows) byId.set(t.id, t);
     for (const t of completedTodayRows) byId.set(t.id, t);
+    for (const t of missedRecentRows) byId.set(t.id, t);
     // Keep any explicit filters from the base query (status/date/category) if set.
     for (const t of recent) {
       if (!category && t.category === 'ideias') continue;
@@ -212,7 +226,7 @@ export function createTasksRouter(ctx) {
     res.json({ success: true });
   });
 
-  function spawnNextRecurringTask(db, task, { completedDate, today }) {
+  function spawnNextRecurringTask(db, task, { completedDate, today, syncCalendar = true }) {
     if (!task?.recurrence || task.recurrence === 'none') return null;
     const baseForNext = task.date || completedDate || today;
     const nextDate = nextRecurrenceDate(baseForNext, task.recurrence, task.recurrence_days);
@@ -248,10 +262,63 @@ export function createTasksRouter(ctx) {
       task.recurrence_days || '[]',
       parentRef,
     );
+    if (!syncCalendar) return { id: childId, date: nextDate, created: true, calendar_sync: null };
     const childTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(childId);
     const calendarSync = syncTaskToCalendar(childTask);
     return { id: childId, date: nextDate, created: true, calendar_sync: calendarSync };
   }
+
+  /**
+   * Instância recorrente aberta de um dia anterior vira "não rolou": cancelada,
+   * day_outcome = 'missed' na data dela, sem XP e sem mexer no Google Agenda.
+   * A próxima ocorrência (hoje ou depois) fica garantida. Idempotente.
+   */
+  const staleRecurringStmt = db.prepare(`
+    SELECT * FROM tasks
+    WHERE recurrence IS NOT NULL AND recurrence != 'none'
+      AND date IS NOT NULL AND date != '' AND date < ?
+      AND status IN ('pending', 'in_progress')
+      AND category != 'ideias'
+    ORDER BY date ASC
+  `);
+  const markMissedStmt = db.prepare(`
+    UPDATE tasks SET
+      status = 'cancelled',
+      day_outcome = 'missed',
+      day_outcome_date = date,
+      updated_date = datetime('now')
+    WHERE id = ? AND status IN ('pending', 'in_progress')
+  `);
+  const openUpcomingInChainStmt = db.prepare(`
+    SELECT id FROM tasks
+    WHERE (recurrence_parent_id = ? OR id = ?) AND date >= ?
+      AND status IN ('pending', 'in_progress')
+    LIMIT 1
+  `);
+
+  const closeMissedRecurringTasks = db.transaction((today) => {
+    const stale = staleRecurringStmt.all(today);
+    if (stale.length === 0) return 0;
+
+    const latestByChain = new Map();
+    for (const task of stale) {
+      markMissedStmt.run(task.id);
+      latestByChain.set(task.recurrence_parent_id || task.id, task);
+    }
+
+    for (const [parentRef, task] of latestByChain) {
+      if (openUpcomingInChainStmt.get(parentRef, parentRef, today)) continue;
+      // Avança a base até a próxima ocorrência cair em hoje ou depois (sem criar filhos no passado).
+      let base = task.date;
+      for (let guard = 0; guard < 400; guard += 1) {
+        const next = nextRecurrenceDate(base, task.recurrence, task.recurrence_days);
+        if (!next || next >= today) break;
+        base = next;
+      }
+      spawnNextRecurringTask(db, { ...task, date: base }, { today, syncCalendar: false });
+    }
+    return stale.length;
+  });
 
   router.post('/', (req, res) => {
     const id = randomUUID();

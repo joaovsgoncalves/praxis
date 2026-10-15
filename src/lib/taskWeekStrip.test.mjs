@@ -21,3 +21,18 @@ test('com dia escolhido, mostra o dia e como voltar', () => {
 test('linha do tempo não promete filtro', () => {
   assert.equal(weekStripHint({ lens: 'week', view: 'all', selectedDay: '2026-10-14' }), 'Toque num dia para destacá-lo na linha do tempo.');
 });
+
+test('histórico do dia mostra o "não rolou" só quando pedido', async () => {
+  const { tasksForDay, dayLoad } = await import('./taskWeekStrip.js');
+  const tasks = [
+    { id: 'missed', date: '2026-10-14', status: 'cancelled', day_outcome: 'missed', category: 'pessoal' },
+    { id: 'archived', date: '2026-10-14', status: 'cancelled', category: 'pessoal' },
+    { id: 'open', date: '2026-10-14', status: 'pending', category: 'pessoal' },
+  ];
+  assert.deepEqual(tasksForDay(tasks, '2026-10-14').map((t) => t.id), ['open']);
+  assert.deepEqual(
+    tasksForDay(tasks, '2026-10-14', { includeMissed: true }).map((t) => t.id),
+    ['missed', 'open'],
+  );
+  assert.deepEqual(dayLoad(tasks, '2026-10-14'), { open: 1, done: 0, total: 1 });
+});

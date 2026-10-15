@@ -1,4 +1,4 @@
-import { isTaskDone, isTaskOpen, taskCompletionDate } from './tasks.js';
+import { isTaskDone, isTaskMissed, isTaskOpen, taskCompletionDate } from './tasks.js';
 import { weekRange } from './taskLenses.js';
 import { addDaysToDateKey } from './taskListFilters.js';
 
@@ -14,11 +14,13 @@ function isStripTask(task) {
  * Tarefas de um dia: abertas com data no dia + concluídas com data no dia
  * ou fechadas naquele dia (mesma regra do "Hoje": o check verde não some).
  */
-export function tasksForDay(tasks, day) {
+export function tasksForDay(tasks, day, { includeMissed = false } = {}) {
   if (!Array.isArray(tasks) || !day) return [];
   return tasks.filter((task) => {
-    if (!isStripTask(task)) return false;
     const date = String(task.date || '').slice(0, 10);
+    // "Não rolou" aparece no histórico do dia escolhido, nunca na carga.
+    if (includeMissed && isTaskMissed(task)) return task.category !== 'ideias' && date === day;
+    if (!isStripTask(task)) return false;
     if (isTaskOpen(task)) return date === day;
     if (isTaskDone(task)) return date === day || taskCompletionDate(task) === day;
     return false;

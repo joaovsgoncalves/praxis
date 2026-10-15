@@ -1,7 +1,7 @@
 import React from 'react';
 import { Clock, Hourglass, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isTaskDone } from '@/lib/tasks';
+import { isTaskDone, isTaskOpen } from '@/lib/tasks';
 import { fortalezaAddDays } from '@/lib/dates';
 import { CATEGORIES } from '@/lib/categories';
 
@@ -153,7 +153,7 @@ export function TaskCardMeta({ task, today, className, children }) {
   const isDone = isTaskDone(task);
   const priority = taskPriorityKey(task);
   const relativeDateText = formatTaskRelativeDate(task.date, task.time, today);
-  const isOverdue = !isDone && Boolean(task.date) && task.date < today;
+  const isOverdue = isTaskOpen(task) && Boolean(task.date) && task.date < today;
   const durationText = formatTaskDuration(task.duration_minutes);
 
   return (
