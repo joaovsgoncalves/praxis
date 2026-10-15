@@ -28,6 +28,9 @@ export default function TodayCalendar() {
 
   const events = Array.isArray(data) ? data : (data?.events ?? []);
 
+  // Agenda vazia não ocupa o Hoje: só aparece com evento ou com erro.
+  if (isLoading || (!isError && events.length === 0)) return null;
+
   return (
     <Card className="praxis-dashboard-card praxis-context-card">
       <CardContent className="p-5 sm:p-5">
@@ -39,7 +42,7 @@ export default function TodayCalendar() {
             <p className="text-[11px] font-medium text-muted-foreground">Agenda</p>
             <div className="mt-0.5 flex items-center justify-between gap-3">
               <h3 className="praxis-title text-base font-semibold tracking-[-0.025em]">Hoje</h3>
-              {!isLoading && !isError && events.length > 0 ? (
+              {!isError ? (
                 <span className="text-[11px] tabular-nums text-muted-foreground">{events.length} evento{events.length === 1 ? '' : 's'}</span>
               ) : null}
             </div>
@@ -47,25 +50,11 @@ export default function TodayCalendar() {
         </div>
 
         <div className="mt-4">
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="h-12 animate-pulse rounded-xl bg-white/[0.035]" />
-              ))}
-            </div>
-          ) : null}
-
           {isError ? (
             <p className="py-3 text-sm text-destructive">Não foi possível carregar a agenda.</p>
           ) : null}
 
-          {!isLoading && !isError && events.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/[0.06] bg-white/[0.018] px-4 py-4">
-              <p className="text-sm text-muted-foreground">Nenhum evento no Google Agenda hoje.</p>
-            </div>
-          ) : null}
-
-          {!isLoading && !isError && events.length > 0 ? (
+          {!isError ? (
             <ul className="space-y-2">
               {events.slice(0, 5).map((event, index) => (
                 <li key={event.id || `${event.start}-${index}`}>

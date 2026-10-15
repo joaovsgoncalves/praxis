@@ -2,9 +2,8 @@ import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { praxisApi } from "@/api/praxisClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import HeroDay from "@/components/dashboard/HeroDay";
+import DayStrip from "@/components/dashboard/DayStrip";
 import NowBlock from "@/components/dashboard/NowBlock";
-import TodayPriorities from "@/components/dashboard/TodayPriorities";
 import TodayTasks from "@/components/dashboard/TodayTasks";
 import TodayHabits from "@/components/dashboard/TodayHabits";
 import WellnessWidget from "@/components/dashboard/WellnessWidget";
@@ -30,19 +29,16 @@ import { ChevronDown, Gauge, ListChecks } from "lucide-react";
 import TaskForm from "@/components/habits-tasks/TaskForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from "@/lib/dates";
-import { pickNowTask } from "@/lib/nowTask";
-import { pickTodayPriorities } from "@/lib/todayPriorities";
+import { planNowTasks } from "@/lib/nowTask";
+import { computeDayLeft } from "@/lib/dayLeft";
+import { hapticLight } from "@/lib/haptics";
+import { useTimeOfDay } from "@/hooks/useTimeOfDay";
 import { isHabitDueOnDate } from "@/lib/habits";
 import { buildDragOrder } from "@/lib/taskReorder";
 import { dispatchPraxisLevelUpFromResponse } from "@/lib/praxisLevelUp";
 import { notifyPraxisRecurrenceSpawned } from "@/lib/praxisRecurrenceToast";
 import { isTaskCompletedForToday, isTaskDone, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
-import {
-  addDaysToDateKey,
-  countOpenOverdue,
-  sortTasksForList,
-} from "@/lib/taskListFilters";
-import OverdueTasksBanner from "@/components/dashboard/OverdueTasksBanner";
+import { addDaysToDateKey, sortTasksForList } from "@/lib/taskListFilters";
 import SuggestedGoalCard from "@/components/dashboard/SuggestedGoalCard";
 import { toast } from "sonner";
 
@@ -69,6 +65,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
+  const { greeting, clock } = useTimeOfDay();
 
   useEffect(() => {
     if (searchParams.get("from") === "capture") {
@@ -80,11 +77,6 @@ export default function Dashboard() {
     queryKey: ["dashboardTasks", today],
     queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: "1", today }),
   });
-
-  const overdueOpenCount = React.useMemo(
-    () => countOpenOverdue(allTasks, today),
-    [allTasks, today],
-  );
 
   const tasks = React.useMemo(() => {
     return allTasks
@@ -271,12 +263,11 @@ export default function Dashboard() {
   });
 
   const handleReorderPending = React.useCallback(
-    (fromIndex, toIndex) => {
-      const pending = tasks.filter((t) => !isTaskDone(t));
-      const orderedIds = buildDragOrder(allTasks, pending, fromIndex, toIndex);
+    (visibleTasks, fromIndex, toIndex) => {
+      const orderedIds = buildDragOrder(allTasks, visibleTasks, fromIndex, toIndex);
       if (orderedIds) reorderTasksMutation.mutate(orderedIds);
     },
-    [allTasks, tasks, reorderTasksMutation]
+    [allTasks, reorderTasksMutation]
   );
 
   const toggleHabitMutation = useMutation({
@@ -662,11 +653,8 @@ export default function Dashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wellness"] }),
   });
 
-  const nowTask = React.useMemo(() => pickNowTask(allTasks, today), [allTasks, today]);
-  const todayPriorities = React.useMemo(
-    () => pickTodayPriorities(allTasks, today),
-    [allTasks, today],
-  );
+  // O relógio da faixa também move o Agora (atualiza a cada 30 s).
+  const nowPlan = React.useMemo(() => planNowTasks(allTasks, today, clock), [allTasks, today, clock]);
 
   const compoundHabits = React.useMemo(
     () => habits.filter((habit) => habit.kind === "compound"),
@@ -701,13 +689,7 @@ export default function Dashboard() {
     [compoundHabits, standaloneHabitsDueToday, today],
   );
 
-  const completedTasks = tasks.filter((t) => isTaskDone(t)).length;
-  const todayLogs = habitLogs.filter((l) => l.date === today);
-  const completedHabits = essentialHabits.filter((h) => {
-    const log = todayLogs.find((l) => l.habit_id === h.id);
-    if (!log || log.outcome === "skipped") return false;
-    return log.outcome === "done" || log.completed === 1 || log.completed === true;
-  }).length;
+  const dayLeft = computeDayLeft({ tasks, habits: essentialHabits, habitLogs, today });
 
   const handleSnooze15 = (task) => {
     const data = buildSnooze15Update(task, today);
@@ -750,10 +732,20 @@ export default function Dashboard() {
       {/* OfflineBanner vive no AppLayout — vale para todas as abas, não só o Hoje. */}
       <PwaInstallBanner />
 
-      {/* Agora first — decisão do dia antes do resumo (lote 10a) */}
-      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "20ms" }}>
+      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "0ms" }}>
+        <DayStrip
+          greeting={greeting}
+          clock={clock}
+          userName={settings?.full_name}
+          left={dayLeft.left}
+          total={dayLeft.total}
+        />
+      </div>
+
+      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "40ms" }}>
         <NowBlock
-          task={nowTask}
+          task={nowPlan.now}
+          next={nowPlan.next}
           today={today}
           onComplete={(t) => toggleTaskMutation.mutate(t)}
           onSnooze15={handleSnooze15}
@@ -762,27 +754,9 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "45ms" }}>
-        <TodayPriorities priorities={todayPriorities} />
-      </div>
-
-      <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "70ms" }}>
-        <HeroDay
-          habitsDone={completedHabits}
-          habitsTotal={essentialHabits.length}
-          tasksDone={completedTasks}
-          tasksTotal={tasks.length}
-          userName={settings?.full_name}
-        />
-      </div>
-
-      <div className="praxis-dashboard-reveal grid gap-2" style={{ "--praxis-reveal-delay": "110ms" }}>
-        <OverdueTasksBanner count={overdueOpenCount} />
-      </div>
-
       <div
         className="praxis-dashboard-reveal grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(350px,0.9fr)] xl:gap-6"
-        style={{ "--praxis-reveal-delay": "150ms" }}
+        style={{ "--praxis-reveal-delay": "80ms" }}
       >
         <section className="min-w-0">
           <DashboardGroupHeading
@@ -797,6 +771,7 @@ export default function Dashboard() {
               <TodayTasks
                 tasks={tasks}
                 today={today}
+                behind={nowPlan.behind}
                 allTasksForRecurrence={allTasks}
                 onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
                 onEditTask={setEditingTask}

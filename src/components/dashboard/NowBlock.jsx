@@ -4,17 +4,20 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from '@/lib/categories';
-import { formatTaskTimeLabel, isTaskOverdue } from '@/lib/nowTask';
-import { Timer, CheckCircle2, Clock, AlertTriangle, Plus, Flame } from 'lucide-react';
+import { formatBehindSince, formatTaskTimeLabel, isTaskOverdue } from '@/lib/nowTask';
+import { cleanPriorityPrefix } from '@/lib/tasks';
+import { Timer, CheckCircle2, Clock, Plus, ArrowRight } from 'lucide-react';
 
 export default function NowBlock({
   task,
+  next = null,
   today,
   busy = false,
   onComplete,
   onSnooze15,
   onSnoozeTomorrow,
-  onAddTask,
+  onAddTask,
+
 }) {
   if (!task) {
       return (
@@ -85,8 +88,8 @@ export default function NowBlock({
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {overdue ? (
-                <Badge variant="outline" className="gap-1 border-destructive/30 bg-destructive/[0.08] text-destructive">
-                  <AlertTriangle className="h-3 w-3" /> Atrasada
+                <Badge variant="outline" className="border-amber-500/20 bg-amber-500/[0.06] text-amber-200/90">
+                  {formatBehindSince(task, today)}
                 </Badge>
               ) : null}
               {timeLabel ? (
@@ -148,10 +151,19 @@ export default function NowBlock({
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-2 border-t border-white/[0.055] pt-4 text-[11px] text-muted-foreground/70">
-          <Flame className="h-3.5 w-3.5 text-domain-gold/80" aria-hidden />
-          O próximo passo fica visível até sair do caminho.
-        </div>
+        {next ? (
+          <p
+            className="mt-5 flex min-w-0 items-center gap-2 border-t border-white/[0.055] pt-4 text-sm text-muted-foreground"
+            data-testid="now-next"
+          >
+            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-domain-gold/80" aria-hidden />
+            <span className="shrink-0">Depois:</span>
+            <span className="min-w-0 truncate font-medium text-foreground/85">{cleanPriorityPrefix(next.title)}</span>
+            {formatTaskTimeLabel(next) ? (
+              <span className="shrink-0 tabular-nums">· {formatTaskTimeLabel(next)}</span>
+            ) : null}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );
