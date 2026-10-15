@@ -83,7 +83,7 @@ import {
   reorderColumnIds,
   sortedBoardColumn,
 } from '@/lib/taskLenses';
-import { tasksForDay, shiftWeek, toggleSelectedDay, formatDayLabel } from '@/lib/taskWeekStrip';
+import { tasksForDay, shiftWeek, toggleSelectedDay, formatDayLabel, weekStripHint } from '@/lib/taskWeekStrip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useMinWidth } from '@/hooks/useMinWidth';
 import TaskBoard from '@/components/habits-tasks/TaskBoard';
@@ -1006,13 +1006,6 @@ export default function HabitsTasks() {
 
   // Em Todos + Lista no desktop largo, a semana fica acima das duas colunas; no resto, dentro de Tarefas.
   const weekStripOnTop = isWide && view === 'all' && lens === 'list';
-  let weekStripHint = 'Toque num dia para focar nele.';
-  if (lens === 'list') {
-    weekStripHint = listDay
-      ? 'Mostrando só as tarefas de ' + formatDayLabel(listDay) + '. Toque de novo para voltar.'
-      : 'Toque num dia para ver só as tarefas dele.';
-    if (view === 'all') weekStripHint += ' Hábitos seguem em hoje.';
-  }
   const weekStrip = (
     <TaskWeekStrip
       weekBase={weekBase}
@@ -1022,7 +1015,7 @@ export default function HabitsTasks() {
       onSelectDay={handleSelectDay}
       onWeekChange={handleWeekChange}
       onToday={handleWeekToday}
-      hint={weekStripHint}
+      hint={weekStripHint({ lens, view, selectedDay: listDay })}
     />
   );
 

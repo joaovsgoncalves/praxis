@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { praxisApi } from '@/api/praxisClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,9 @@ import { toast } from 'sonner';
 import { pickWeeklyTaskTitles, taskDatesForNextWeek } from '@/lib/weeklyReviewTasks';
 import { PageHero } from '@/components/layout/PraxisPage';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { ChevronDown, Lightbulb, Mountain, Target, ThumbsUp } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const SCORE_OPTIONS = [
   { value: 1, emoji: '😞', label: 'Difícil' },
@@ -37,6 +40,11 @@ const empty = {
   next_week_focus: '',
   overall_score: 3,
 };
+
+const FORM_KEYS = Object.keys(empty);
+const TEXT_KEYS = ['highlights', 'blockers', 'learnings', 'next_week_focus'];
+
+const PRESS = 'transition-[transform,background-color,border-color,color] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none';
 
 const AREA_LABELS = {
   rca: 'RCA / trabalho',
@@ -100,24 +108,42 @@ export default function WeeklyReview() {
   });
 
   const [form, setForm] = useState(empty);
+  const [reflectionOpen, setReflectionOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
+  // Texto digitado e não salvo não pode ser sobrescrito por refetch (foco na janela, etc.).
+  const dirtyRef = useRef(false);
 
-  useEffect(() => {
-    if (current?.review) {
-      setForm({
+  const savedForm = useMemo(() => (current?.review
+    ? {
         highlights: current.review.highlights || '',
         blockers: current.review.blockers || '',
         learnings: current.review.learnings || '',
         next_week_focus: current.review.next_week_focus || '',
         overall_score: current.review.overall_score || 3,
-      });
-    } else {
-      setForm(empty);
-    }
-  }, [current]);
+      }
+    : empty), [current]);
+
+  useEffect(() => {
+    dirtyRef.current = false;
+  }, [weekStart]);
+
+  useEffect(() => {
+    if (dirtyRef.current) return;
+    setForm(savedForm);
+  }, [savedForm]);
+
+  const updateForm = (patch) => {
+    dirtyRef.current = true;
+    setForm((f) => ({ ...f, ...patch }));
+  };
+
+  const hasUnsaved = FORM_KEYS.some((key) => form[key] !== savedForm[key]);
+  const filledCount = TEXT_KEYS.filter((key) => String(form[key] || '').trim()).length;
 
   const saveMutation = useMutation({
     mutationFn: () => praxisApi.weeklyReviews.save({ ...form, week_start: weekStart }),
     onSuccess: () => {
+      dirtyRef.current = false;
       toast.success('Revisão salva');
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewCurrent'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewHistory'] });
@@ -131,6 +157,7 @@ export default function WeeklyReview() {
       toast.success('Revisão removida');
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewCurrent'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyReviewHistory'] });
+      dirtyRef.current = false;
       setForm(empty);
     },
   });
@@ -167,6 +194,8 @@ export default function WeeklyReview() {
 
   const applyDrafts = () => {
     if (!auto?.drafts) return;
+    dirtyRef.current = true;
+    setReflectionOpen(true);
     setForm((f) => ({
       ...f,
       highlights: f.highlights.trim() ? f.highlights : auto.drafts.highlights || f.highlights,
@@ -190,7 +219,7 @@ export default function WeeklyReview() {
   const priorities = auto?.suggested_priorities || [];
 
   return (
-    <div className="praxis-page max-w-3xl">
+    <div className="praxis-page max-w-5xl">
       <PageHero
         kicker="Semana"
         kickerIcon={Sparkles}
@@ -198,15 +227,18 @@ export default function WeeklyReview() {
         description="Resumo automático + seu texto — cerca de 10 minutos."
         action={(
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={goPrev} aria-label="Semana anterior"><ChevronLeft className="h-4 w-4" /></Button>
             <Button variant="outline" size="sm" onClick={() => setWeekDate(mondayOf(new Date()))} disabled={isCurrentWeek}>
               Esta semana
             </Button>
-            <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={goNext} aria-label="Próxima semana"><ChevronRight className="h-4 w-4" /></Button>
           </div>
         )}
       />
 
+      {/* Desktop: resumo, prioridades e reflexão na coluna larga; andamento e histórico no trilho. */}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-6">
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -223,17 +255,18 @@ export default function WeeklyReview() {
             </div>
           ) : auto ? (
             <>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-black/15 px-4 py-3.5 sm:grid-cols-4">
+                <WeekNumber label="Tarefas feitas" value={v?.tasks_completed_count ?? 0} />
+                <WeekNumber
+                  label="Hábitos"
+                  value={`${v?.habits_done ?? 0}/${v?.habits_target ?? 0}`}
+                  detail={v?.habits_completion_pct != null ? `${v.habits_completion_pct}%` : null}
+                />
+                <WeekNumber label="Foco" value={v?.focus_minutes ?? 0} detail="min" />
+                <WeekNumber label="Ideias viraram tarefa" value={v?.ideas_promoted ?? 0} />
+              </dl>
+
               <div className="grid gap-3 sm:grid-cols-2">
-                <InsightBlock title="Vitórias">
-                  <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
-                    <li>{v?.tasks_completed_count ?? 0} tarefa(s) concluída(s)</li>
-                    <li>
-                      Hábitos: {v?.habits_done ?? 0}/{v?.habits_target ?? 0}
-                      {v?.habits_completion_pct != null ? ` (${v.habits_completion_pct}%)` : ''}
-                    </li>
-                    <li>{v?.focus_minutes ?? 0} min de foco · {v?.ideas_promoted ?? 0} ideia(s) viraram tarefa</li>
-                  </ul>
-                </InsightBlock>
                 <InsightBlock title="Padrões">
                   <p className="text-muted-foreground leading-relaxed">{auto.patterns?.summary}</p>
                 </InsightBlock>
@@ -288,33 +321,36 @@ export default function WeeklyReview() {
                 </InsightBlock>
               </div>
 
-              {priorities.length > 0 && (
-                <div>
-                  <p className="mb-2 font-medium text-foreground">3 prioridades sugeridas</p>
-                  <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
-                    {priorities.map((p) => (
-                      <li key={p}>{p}</li>
+              <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">Prioridades sugeridas</h3>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className={cn('h-9 rounded-full', PRESS)}
+                    disabled={createWeekTasksMutation.isPending || !auto}
+                    onClick={() => createWeekTasksMutation.mutate()}
+                  >
+                    <ListChecks className="mr-1.5 h-4 w-4" />
+                    {createWeekTasksMutation.isPending ? 'Criando…' : 'Criar 3 tarefas da semana'}
+                  </Button>
+                </div>
+                {priorities.length > 0 ? (
+                  <ol className="space-y-2">
+                    {priorities.map((p, index) => (
+                      <li key={p} className="flex gap-3 text-sm leading-relaxed text-stone-200">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold tabular-nums text-primary">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 [text-wrap:pretty]">{p}</span>
+                      </li>
                     ))}
                   </ol>
-                </div>
-              )}
-
-              <Button type="button" variant="secondary" size="sm" className="rounded-full" onClick={applyDrafts}>
-                <Wand2 className="mr-1.5 h-4 w-4" />
-                Preencher campos vazios com rascunho
-              </Button>
-
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                className="rounded-full ml-0 sm:ml-2"
-                disabled={createWeekTasksMutation.isPending || !auto}
-                onClick={() => createWeekTasksMutation.mutate()}
-              >
-                <ListChecks className="mr-1.5 h-4 w-4" />
-                {createWeekTasksMutation.isPending ? 'Criando…' : 'Criar 3 tarefas da semana'}
-              </Button>
+                ) : (
+                  <p className="text-muted-foreground">Sem sugestão nesta semana. As tarefas saem do foco que você escrever.</p>
+                )}
+              </div>
             </>
           ) : (
             <p className="text-muted-foreground">Sem dados para esta semana.</p>
@@ -322,6 +358,158 @@ export default function WeeklyReview() {
         </CardContent>
       </Card>
 
+      <Card className="border-border bg-card">
+        <button
+          type="button"
+          aria-expanded={reflectionOpen}
+          aria-controls="weekly-reflection"
+          onClick={() => setReflectionOpen((open) => !open)}
+          className="flex w-full items-center justify-between gap-4 rounded-2xl p-5 text-left transition-colors hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-6"
+        >
+          <span className="min-w-0">
+            <span className="block text-base font-semibold">Sua reflexão</span>
+            <span className="mt-1 block text-sm text-muted-foreground tabular-nums">
+              {hasUnsaved
+                ? 'Alterações não salvas'
+                : current?.review
+                  ? 'Salva'
+                  : 'Ainda não escrita'}
+              {' · '}
+              {filledCount} de {TEXT_KEYS.length} campos
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-primary">
+            {reflectionOpen ? 'Recolher' : current?.review || hasUnsaved ? 'Abrir' : 'Escrever'}
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                'h-4 w-4 transition-transform duration-200 ease-out motion-reduce:transition-none',
+                reflectionOpen && 'rotate-180',
+              )}
+            />
+          </span>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {reflectionOpen ? (
+            <motion.div
+              id="weekly-reflection"
+              key="reflection"
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, transition: { duration: 0.12, ease: 'easeOut' } }}
+              transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <CardContent className="space-y-5 border-t border-white/[0.06] pt-5 sm:pt-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground tabular-nums">{weekStart} → {weekEnd}</p>
+                  {auto ? (
+                    <Button type="button" variant="secondary" size="sm" className={cn('rounded-full', PRESS)} onClick={applyDrafts}>
+                      <Wand2 className="mr-1.5 h-4 w-4" />
+                      Preencher campos vazios com rascunho
+                    </Button>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Section
+                    id="review-highlights"
+                    icon={ThumbsUp}
+                    label="O que foi bem?"
+                    placeholder="3 vitórias, momentos de orgulho, hábitos que funcionaram…"
+                    value={form.highlights}
+                    onChange={(val) => updateForm({ highlights: val })}
+                  />
+                  <Section
+                    id="review-blockers"
+                    icon={Mountain}
+                    label="O que emperrou?"
+                    placeholder="Bloqueios, distrações, hábitos que falharam, energia baixa…"
+                    value={form.blockers}
+                    onChange={(val) => updateForm({ blockers: val })}
+                  />
+                  <Section
+                    id="review-learnings"
+                    icon={Lightbulb}
+                    label="O que aprendi?"
+                    placeholder="Padrões, descobertas, ajustes de processo…"
+                    value={form.learnings}
+                    onChange={(val) => updateForm({ learnings: val })}
+                  />
+                  <Section
+                    id="review-next-focus"
+                    icon={Target}
+                    label="Foco da próxima semana"
+                    placeholder="3 prioridades concretas, mudança de rotina, coisa nova pra testar…"
+                    value={form.next_week_focus}
+                    onChange={(val) => updateForm({ next_week_focus: val })}
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium" id="review-score-label">Como foi a semana no geral?</p>
+                  <div role="group" aria-labelledby="review-score-label" className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                    {SCORE_OPTIONS.map((opt) => {
+                      const selected = form.overall_score === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => updateForm({ overall_score: opt.value })}
+                          className={cn(
+                            'relative min-h-[3.5rem] rounded-xl px-1 py-2 text-center outline-none',
+                            'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                            PRESS,
+                            selected
+                              ? 'text-primary'
+                              : 'bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground',
+                          )}
+                        >
+                          {selected ? (
+                            <motion.span
+                              layoutId="praxis-review-score"
+                              aria-hidden
+                              className="absolute inset-0 rounded-xl bg-primary/15 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.55)]"
+                              transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                            />
+                          ) : null}
+                          <span className="relative block text-lg leading-none" aria-hidden>{opt.emoji}</span>
+                          <span className="relative mt-1.5 block text-[11px] font-medium">{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                  {current?.review && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(current.review.id)}
+                      className="h-10 rounded-full text-rose-400 hover:text-rose-400"
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => saveMutation.mutate()}
+                    disabled={saveMutation.isPending}
+                    className={cn('h-10 rounded-full px-5', PRESS)}
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    {saveMutation.isPending ? 'Salvando…' : 'Salvar revisão'}
+                  </Button>
+                </div>
+              </CardContent>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </Card>
+      </div>
+
+      <aside className="min-w-0 space-y-6">
       {auto?.life_history && (
         <Card className="border-border bg-card">
           <CardHeader className="pb-2">
@@ -386,76 +574,6 @@ export default function WeeklyReview() {
         </Card>
       )}
 
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Sua revisão · {weekStart} → {weekEnd}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Section
-            label="✨ O que foi bem?"
-            placeholder="3 vitórias, momentos de orgulho, hábitos que funcionaram…"
-            value={form.highlights}
-            onChange={(val) => setForm((f) => ({ ...f, highlights: val }))}
-          />
-          <Section
-            label="🪨 O que emperrou?"
-            placeholder="Bloqueios, distrações, hábitos que falharam, energia baixa…"
-            value={form.blockers}
-            onChange={(val) => setForm((f) => ({ ...f, blockers: val }))}
-          />
-          <Section
-            label="💡 O que aprendi?"
-            placeholder="Padrões, descobertas, ajustes de processo…"
-            value={form.learnings}
-            onChange={(val) => setForm((f) => ({ ...f, learnings: val }))}
-          />
-          <Section
-            label="🎯 Foco da próxima semana"
-            placeholder="3 prioridades concretas, mudança de rotina, coisa nova pra testar…"
-            value={form.next_week_focus}
-            onChange={(val) => setForm((f) => ({ ...f, next_week_focus: val }))}
-          />
-
-          <div>
-            <p className="mb-2 text-sm font-medium">Como foi a semana no geral?</p>
-            <div className="flex gap-2">
-              {SCORE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, overall_score: opt.value }))}
-                  className={`flex-1 rounded-lg border py-2 px-3 text-center transition-colors ${
-                    form.overall_score === opt.value
-                      ? 'border-primary bg-primary/15 text-primary'
-                      : 'border-border bg-secondary/40 hover:bg-secondary'
-                  }`}
-                >
-                  <div className="text-lg">{opt.emoji}</div>
-                  <div className="text-[10px]">{opt.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            {current?.review && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => deleteMutation.mutate(current.review.id)}
-                className="text-rose-400 hover:text-rose-400"
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
-              </Button>
-            )}
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              <Save className="mr-2 h-4 w-4" />
-              {saveMutation.isPending ? 'Salvando…' : 'Salvar revisão'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {history.length > 0 && (
         <Card className="border-border bg-card">
           <CardHeader className="pb-2">
@@ -482,28 +600,46 @@ export default function WeeklyReview() {
           </CardContent>
         </Card>
       )}
+      </aside>
+      </div>
+    </div>
+  );
+}
+
+function WeekNumber({ label, value, detail }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 flex items-baseline gap-1.5">
+        <span className="font-display text-xl font-semibold leading-none tabular-nums text-foreground">{value}</span>
+        {detail ? <span className="text-xs text-muted-foreground tabular-nums">{detail}</span> : null}
+      </dd>
     </div>
   );
 }
 
 function InsightBlock({ title, children }) {
   return (
-    <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+    <div className="rounded-xl bg-white/[0.03] px-4 py-3.5 shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.05)]">
+      <p className="mb-1.5 text-xs font-medium text-muted-foreground">{title}</p>
       {children}
     </div>
   );
 }
 
-function Section({ label, placeholder, value, onChange }) {
+function Section({ id, icon: Icon, label, placeholder, value, onChange }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium">{label}</label>
+      <label htmlFor={id} className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+        {Icon ? <Icon className="h-4 w-4 text-primary" aria-hidden /> : null}
+        {label}
+      </label>
       <Textarea
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="min-h-[80px] resize-y bg-secondary/40"
+        className="min-h-[96px] resize-y bg-secondary/40"
       />
     </div>
   );

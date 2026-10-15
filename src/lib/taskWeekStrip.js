@@ -85,3 +85,15 @@ export function formatDayLabel(dateKey) {
   const [, m, d] = String(dateKey).split('-');
   return `${(DOW_SHORT[index] || '').toLowerCase()}, ${d}/${m}`;
 }
+
+/**
+ * Dica da faixa da semana: deixa claro que o dia filtra só as tarefas.
+ * Em "Todos" os hábitos aparecem junto e continuam no dia de hoje.
+ */
+export function weekStripHint({ lens, view, selectedDay }) {
+  if (lens !== 'list') return 'Toque num dia para destacá-lo na linha do tempo.';
+  const base = selectedDay
+    ? 'Mostrando só as tarefas de ' + formatDayLabel(selectedDay) + '. Toque de novo para voltar.'
+    : 'Toque num dia para ver só as tarefas dele.';
+  return view === 'all' ? base + ' Hábitos seguem em hoje.' : base;
+}

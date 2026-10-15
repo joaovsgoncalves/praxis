@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,8 @@ const PRESETS = [
   { label: 'Sprint rápido', shortLabel: 'Rápido', focus: 15, brk: 3, Icon: Zap },
   { label: 'Maratona', shortLabel: 'Maratona', focus: 90, brk: 20, Icon: Hourglass },
 ];
+
+const PRESS = 'transition-[transform,background-color,border-color,color] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none';
 
 const STORAGE_KEY = 'praxis:focus:active-v1';
 const MAX_SESSION_AGE_MS = 12 * 60 * 60 * 1000;
@@ -116,6 +119,7 @@ export default function Focus() {
   const [postSessionOpen, setPostSessionOpen] = useState(false);
   const [postSession, setPostSession] = useState(null);
   const [hydrated] = useState(true);
+  const reduceMotion = useReducedMotion();
 
   const endsAtRef = useRef(stored?.isRunning && !stored?.isPaused ? stored.endsAt || null : null);
   const remainingSecRef = useRef(
@@ -489,6 +493,7 @@ export default function Focus() {
     : 0;
 
   const topFocusStats = focusStats.filter((s) => s.task_id).slice(0, 5);
+  const phaseKey = isBreak ? 'break' : isPaused ? 'paused' : 'focus';
 
   const todayFocusMinutes = useMemo(
     () => Math.round(todaySessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0) / 60),
@@ -550,7 +555,6 @@ export default function Focus() {
               <>
                 <Button
                   type="button"
-                  variant="outline"
                   className="w-full"
                   onClick={() => completeTaskMutation.mutate(postSession.task.id)}
                   disabled={completeTaskMutation.isPending}
@@ -581,119 +585,160 @@ export default function Focus() {
         </DialogContent>
       </Dialog>
 
-      {!inSession && topFocusStats.length > 0 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-5 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-semibold text-sm">Foco por tarefa — últimos 30 dias</h2>
-              <span className="text-[11px] text-muted-foreground shrink-0">
-                {focusStats.filter((s) => s.task_id).length} tarefa
-                {focusStats.filter((s) => s.task_id).length === 1 ? '' : 's'}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {topFocusStats.map((s) => {
-                const max = topFocusStats[0].total_minutes || 1;
-                const pct = Math.max(4, Math.round((s.total_minutes / max) * 100));
-                const hrs = Math.floor(s.total_minutes / 60);
-                const mins = s.total_minutes % 60;
-                return (
-                  <div key={s.task_id} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="truncate pr-2">{s.task_title || '(sem tarefa)'}</span>
-                      <span className="text-muted-foreground shrink-0">
-                        {hrs > 0 ? `${hrs}h${mins ? ` ${mins}m` : ''}` : `${mins}m`} · {s.sessions}x
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {!inSession ? (
-        <div className="space-y-6 mt-6">
+        <div className="space-y-6">
           <section className="space-y-3">
-            <SectionHeading kicker="Ritmo" title="Durações" />
-            <div className="grid grid-cols-2 gap-3">
-              {PRESETS.map((preset, i) => {
-                const PresetIcon = preset.Icon;
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => applyPreset(i)}
-                    className={cn(
-                      'rounded-xl border p-4 text-left transition-colors praxis-touch-target',
-                      selectedPreset === i
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-secondary/30 hover:bg-secondary/50',
-                    )}
-                  >
-                    <PresetIcon className="h-5 w-5 text-primary" aria-hidden />
-                    <p className="mt-2 font-medium">{preset.shortLabel}</p>
-                    <p className="text-sm text-muted-foreground tabular-nums">
-                      {preset.focus} min foco · {preset.brk} min pausa
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
+            <SectionHeading title="Nova sessão" />
+            <Card>
+              <CardContent className="space-y-5 p-4 sm:p-5">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground" id="focus-duration-label">Duração</p>
+                  <div role="group" aria-labelledby="focus-duration-label" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {PRESETS.map((preset, i) => {
+                      const PresetIcon = preset.Icon;
+                      const selected = selectedPreset === i;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          aria-pressed={selected}
+                          aria-label={`${preset.label}: ${preset.focus} min de foco, ${preset.brk} de pausa`}
+                          onClick={() => applyPreset(i)}
+                          className={cn(
+                            'relative rounded-xl p-3.5 text-left outline-none praxis-touch-target',
+                            'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                            PRESS,
+                            selected
+                              ? 'text-foreground'
+                              : 'bg-white/[0.02] text-muted-foreground shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.07)] hover:bg-white/[0.045] hover:text-foreground',
+                          )}
+                        >
+                          {selected ? (
+                            <motion.span
+                              layoutId="praxis-focus-preset"
+                              aria-hidden
+                              className="absolute inset-0 rounded-xl bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.55)]"
+                              transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+                            />
+                          ) : null}
+                          <span className="relative flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">{preset.shortLabel}</span>
+                            <PresetIcon className={cn('h-4 w-4', selected ? 'text-primary' : 'opacity-70')} aria-hidden />
+                          </span>
+                          <span className="relative mt-3 block font-display text-2xl font-semibold leading-none tabular-nums text-foreground">
+                            {preset.focus}
+                            <span className="ml-1 text-xs font-medium text-muted-foreground">min</span>
+                          </span>
+                          <span className="relative mt-1.5 block text-xs tabular-nums">pausa de {preset.brk} min</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="focus-task" className="text-xs font-medium text-muted-foreground">
+                    Tarefa (opcional)
+                  </Label>
+                  <Select value={selectedTaskId || 'none'} onValueChange={setSelectedTaskId}>
+                    <SelectTrigger id="focus-task" className="h-11 w-full">
+                      <SelectValue placeholder="Selecione uma tarefa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma (foco livre)</SelectItem>
+                      {tasks.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 border-t border-white/[0.06] pt-4">
+                  <p className="text-xs leading-relaxed text-muted-foreground tabular-nums [text-wrap:pretty]">
+                    {focusDuration} min de foco, depois {breakDuration} de pausa
+                    {selectedTask ? ` · ${selectedTask.title}` : ' · foco livre'}
+                  </p>
+                  <Button onClick={startSession} size="lg" className={cn('h-12 w-full gap-2 rounded-full', PRESS)}>
+                    <Play className="h-5 w-5" aria-hidden />
+                    Iniciar {activePreset.label} ({focusDuration} min)
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </section>
 
-          <section className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Vincular tarefa (opcional)</p>
-            <Select value={selectedTaskId || 'none'} onValueChange={setSelectedTaskId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione uma tarefa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma (foco livre)</SelectItem>
-                {tasks.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </section>
-
-          <Button onClick={startSession} size="lg" className="w-full gap-2">
-            <Timer className="w-5 h-5" />
-            Iniciar {activePreset.label} ({focusDuration} min)
-          </Button>
+          {topFocusStats.length > 0 && (
+            <Card>
+              <CardContent className="space-y-3 p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold">Foco por tarefa · últimos 30 dias</h2>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {focusStats.filter((s) => s.task_id).length} tarefa
+                    {focusStats.filter((s) => s.task_id).length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {topFocusStats.map((s) => {
+                    const max = topFocusStats[0].total_minutes || 1;
+                    const pct = Math.max(4, Math.round((s.total_minutes / max) * 100));
+                    const hrs = Math.floor(s.total_minutes / 60);
+                    const mins = s.total_minutes % 60;
+                    return (
+                      <div key={s.task_id} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="truncate pr-2">{s.task_title || '(sem tarefa)'}</span>
+                          <span className="shrink-0 text-muted-foreground tabular-nums">
+                            {hrs > 0 ? `${hrs}h${mins ? ` ${mins}m` : ''}` : `${mins}m`} · {s.sessions}x
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                          <div className="h-full rounded-full bg-primary/80" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
-          <Card className="bg-card border-border">
-            <CardContent className="py-12 flex flex-col items-center gap-6">
-              <Badge
-                className={cn(
-                  'gap-1.5 text-base px-4 py-1',
-                  isBreak ? 'bg-accent/20 text-accent' : 'bg-primary/20 text-primary',
-                )}
-              >
-                {isBreak ? (
-                  <>
-                    <Coffee className="h-4 w-4" aria-hidden /> Pausa
-                  </>
-                ) : isPaused ? (
-                  <>
-                    <Pause className="h-4 w-4" aria-hidden /> Pausado
-                  </>
-                ) : (
-                  <>
-                    <Brain className="h-4 w-4" aria-hidden /> Foco
-                  </>
-                )}
-              </Badge>
+          <Card>
+            <CardContent className="flex flex-col items-center gap-6 px-5 py-8 sm:py-10">
+              <div className="flex h-8 items-center" aria-live="polite">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={phaseKey}
+                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, transition: { duration: 0.12 } }}
+                    transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm font-medium',
+                      isBreak ? 'bg-accent/15 text-accent' : isPaused ? 'bg-white/[0.06] text-muted-foreground' : 'bg-primary/15 text-primary',
+                    )}
+                  >
+                    {isBreak ? (
+                      <>
+                        <Coffee className="h-4 w-4" aria-hidden /> Pausa
+                      </>
+                    ) : isPaused ? (
+                      <>
+                        <Pause className="h-4 w-4" aria-hidden /> Pausado
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="h-4 w-4" aria-hidden /> Foco
+                      </>
+                    )}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
 
-              <div className="relative mx-auto aspect-square w-48 sm:w-56 shrink-0">
+              <div className="relative mx-auto aspect-square w-56 shrink-0 sm:w-64">
                 <svg
                   viewBox="0 0 192 192"
                   className="absolute inset-0 h-full w-full -rotate-90"
@@ -705,7 +750,7 @@ export default function Focus() {
                     r="90"
                     fill="none"
                     stroke="currentColor"
-                    className="text-border"
+                    className="text-white/[0.07]"
                     strokeWidth="4"
                   />
                   <circle
@@ -714,33 +759,51 @@ export default function Focus() {
                     r="90"
                     fill="none"
                     stroke="currentColor"
-                    className={isBreak ? 'text-accent' : 'text-primary'}
+                    className={cn(
+                      'transition-[stroke-dashoffset,color] duration-300 ease-linear motion-reduce:transition-none',
+                      isBreak ? 'text-accent' : isPaused ? 'text-muted-foreground/60' : 'text-primary',
+                    )}
                     strokeWidth="4"
                     strokeDasharray={`${2 * Math.PI * 90}`}
-                    strokeDashoffset={`${2 * Math.PI * 90 * (1 - progress / 100)}`}
+                    style={{ strokeDashoffset: 2 * Math.PI * 90 * (1 - progress / 100) }}
                     strokeLinecap="round"
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span className="text-5xl sm:text-6xl font-semibold tabular-nums tracking-tight leading-none">
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
+                  <span
+                    className={cn(
+                      'font-display text-6xl font-semibold leading-none tracking-[-0.02em] tabular-nums sm:text-7xl',
+                      isPaused && 'text-muted-foreground',
+                    )}
+                    role="timer"
+                    aria-label={`Faltam ${formatTime(timeLeft)}`}
+                  >
                     {formatTime(timeLeft)}
+                  </span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {isBreak ? `pausa de ${breakDuration} min` : `de ${focusDuration} min de foco`}
                   </span>
                 </div>
               </div>
 
               {selectedTask && (
-                <p className="text-sm text-muted-foreground text-center px-4">
-                  Trabalhando em: <span className="text-foreground font-medium">{selectedTask.title}</span>
+                <p className="max-w-sm px-4 text-center text-sm text-muted-foreground [text-wrap:balance]">
+                  Trabalhando em: <span className="font-medium text-foreground">{selectedTask.title}</span>
                 </p>
               )}
 
-              <div className="flex gap-3">
-                <Button onClick={togglePause} variant="outline" size="lg">
-                  {isPaused ? <Play className="w-5 h-5 mr-2" /> : <Pause className="w-5 h-5 mr-2" />}
+              <div className="flex w-full max-w-sm gap-3">
+                <Button onClick={togglePause} size="lg" className={cn('h-12 flex-1 rounded-full', PRESS)}>
+                  {isPaused ? <Play className="mr-2 h-5 w-5" /> : <Pause className="mr-2 h-5 w-5" />}
                   {isPaused ? 'Continuar' : 'Pausar'}
                 </Button>
-                <Button onClick={endSession} variant="destructive" size="lg">
-                  <Square className="w-5 h-5 mr-2" />
+                <Button
+                  onClick={endSession}
+                  variant="outline"
+                  size="lg"
+                  className={cn('h-12 flex-1 rounded-full border-white/10', PRESS)}
+                >
+                  <Square className="mr-2 h-4 w-4" />
                   Encerrar
                 </Button>
               </div>
