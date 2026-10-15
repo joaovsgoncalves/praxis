@@ -14,6 +14,8 @@ import {
   Layers,
 } from "lucide-react";
 
+export const JOTA_FIT_URL = "https://jota-fit.web.app";
+
 /** Dia a dia — bottom nav + topo da sidebar (sem hub /mais) */
 // Falar fora do primary até o João pedir de volta
 export const primaryNavItems = [
@@ -24,7 +26,8 @@ export const primaryNavItems = [
 
 /** Ferramentas na aba lateral (sidebar / menu hambúrguer) — sem página hub */
 export const secondaryNavItems = [
-  { path: "/jota-fit", label: "Jota Fit", icon: Dumbbell },
+  // Jota Fit virou app próprio (fase 7, 2026-10-15): a aba só abre o app novo.
+  { path: "/jota-fit", label: "Jota Fit", icon: Dumbbell, external: JOTA_FIT_URL },
   { path: "/frentes", label: "Frentes", icon: Layers },
   { path: "/ideias", label: "Ideias", icon: Lightbulb },
   { path: "/metas", label: "Metas", icon: Target },

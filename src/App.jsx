@@ -6,15 +6,13 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
-import JotaFitLayout from '@/components/jota-fit/JotaFitLayout';
 import Dashboard from '@/pages/Dashboard';
 import HabitsTasks from '@/pages/HabitsTasks';
+import JotaFitRedirect from '@/components/jota-fit/JotaFitRedirect';
 import Ideas from '@/pages/Ideas';
 import Compras from '@/pages/Compras';
 import Financas from '@/pages/Financas';
 import Projects from '@/pages/Projects';
-import Nutricao from '@/pages/Nutricao';
-import Treinos from '@/pages/Treinos';
 import Focus from '@/pages/Focus';
 import Goals from '@/pages/Goals';
 import History from '@/pages/History';
@@ -101,16 +99,9 @@ const AuthenticatedApp = () => {
         <Route path="/financas" element={<Financas />} />
         <Route path="/frentes" element={<Projects />} />
         <Route path="/projetos" element={<Navigate to="/frentes" replace />} />
-        <Route path="/jota-fit" element={<JotaFitLayout />}>
-          <Route index element={<Treinos />} />
-          <Route path="programa" element={<Treinos />} />
-          <Route path="biblioteca" element={<Treinos />} />
-          <Route path="progresso" element={<Treinos />} />
-          <Route path="corpo" element={<Treinos />} />
-          <Route path="nutricao" element={<Nutricao />} />
-        </Route>
-        <Route path="/treinos" element={<Navigate to="/jota-fit" replace />} />
-        <Route path="/nutricao" element={<Navigate to="/jota-fit/nutricao" replace />} />
+        <Route path="/jota-fit/*" element={<JotaFitRedirect />} />
+        <Route path="/treinos" element={<JotaFitRedirect />} />
+        <Route path="/nutricao" element={<JotaFitRedirect />} />
         <Route path="/foco" element={<Focus />} />
         <Route path="/metas" element={<Goals />} />
         <Route path="/rituais" element={<Navigate to="/habitos-tarefas?tab=habits" replace />} />

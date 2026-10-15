@@ -81,12 +81,15 @@ function isNavActive(location, item) {
 
 function NavLinkRow({ item, isActive, onClose, density = 'primary' }) {
   const Icon = item.icon;
+  const LinkTag = item.external ? 'a' : Link;
+  const linkProps = item.external
+    ? { href: item.external, target: '_blank', rel: 'noopener noreferrer' }
+    : { to: item.path, 'aria-current': isActive ? 'page' : undefined };
 
   return (
-    <Link
-      to={item.path}
+    <LinkTag
+      {...linkProps}
       onClick={onClose}
-      aria-current={isActive ? 'page' : undefined}
       className={cn(
         'group relative flex min-h-11 items-center gap-3.5 rounded-xl border font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200',
         density === 'primary' ? 'px-3.5 py-2.5 text-[15px]' : 'px-3.5 py-2.5 text-[14px]',
@@ -107,7 +110,7 @@ function NavLinkRow({ item, isActive, onClose, density = 'primary' }) {
       {isActive ? (
         <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-domain-gold shadow-[0_0_12px_hsl(var(--domain-gold)/0.55)]" aria-hidden />
       ) : null}
-    </Link>
+    </LinkTag>
   );
 }
 

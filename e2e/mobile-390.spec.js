@@ -35,7 +35,6 @@ const AUTH_ROUTES = [
   { path: '/', name: 'Hoje' },
   { path: '/frentes', name: 'Frentes' },
   { path: '/compras', name: 'Compras' },
-  { path: '/jota-fit', name: 'Jota Fit' },
   { path: '/habitos-tarefas', name: 'Tarefas' },
   { path: '/metas', name: 'Metas' },
   { path: '/rituais', name: 'Rituais' },
