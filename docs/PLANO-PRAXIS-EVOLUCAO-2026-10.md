@@ -1,6 +1,6 @@
 # Plano Praxis: evolução pós-auditoria (out/2026)
 
-Criado em 2026-10-15. **Atualizado em 2026-10-15, 19h40 (Fortaleza): fases A a E no ar; próxima é a F (só o Hoje).**
+Criado em 2026-10-15. **Atualizado em 2026-10-15, 20h (Fortaleza): fases A a F no ar. Plano encerrado.**
 Substitui as fases 5 e 6 de `docs/PLANO-PRAXIS-VISUAL-PREMIUM.md` (fases 0 a 4 entregues e no ar).
 Fontes: auditoria do Sistema Forja (`audits/forja-rea-2026-10-14/RELATORIO.md`), revisão do Hoje pelo Fable 5.1 (`audits/forja-rea-2026-10-14/REVISAO-HOJE-FABLE-2026-10-15.md`), prints de produção de 15/10 e o feedback do João no mesmo dia.
 Escopo: só construção e validação. Uso, piloto e decisões de rotina ficam com o João.
@@ -15,7 +15,7 @@ Escopo: só construção e validação. Uso, piloto e decisões de rotina ficam 
 | **C** trilha e bento | **No ar** | `aa54c1b` |
 | **D** XP por evento e meta semanal de foco | **No ar** | `5708c49` |
 | **E** acabamento final | **No ar** | `01f8826` |
-| **F** Hoje com cara de produto | **Próxima** | |
+| **F** Hoje com cara de produto | **No ar** | `140f083` |
 
 - `main` = `origin/main` em `f70af44`, árvore limpa. Produção: https://dopraxis.vercel.app (deploy `praxis-5sfo0lnyx`) e API `praxis-api` reiniciada depois do backup de 15/10.
 - `smoke:prod` completo verde depois de A, B e do ajuste do Sêneca. 214 testes da API verdes depois da saída de treino e alimentação.
@@ -79,12 +79,14 @@ Cada fase entra no ar completa: código, testes focados, QA da A.N.A. no navegad
 - **Pronto quando:** Lighthouse mobile acima de 85 em performance; nenhum flash branco ao navegar; com movimento reduzido ativo, nenhum confete nem spring.
 - **Verificado em produção:** Lighthouse mobile (mediana de 3) `/` = 93 e `/entrar` = 95, com FCP/LCP ~2,5 s, TBT 0 e CLS ~0 (antes: `/` não fechava o teste, `/entrar` 57 a 68). Maior chunk 380 KB (gráficos); a landing não baixa gráficos nem telas do app. 303 testes, lint, build e `smoke:prod` verdes (o smoke passou a procurar o Agora no chunk do Dashboard). Navegação por 13 rotas sem rolagem lateral nem fundo claro; entrada do Hoje só na 1ª visita; com movimento reduzido nada anima; diálogo de novidades aparece uma vez.
 
-### Fase F: Hoje com cara de produto (próxima)
+### Fase F: Hoje com cara de produto (no ar)
 - Origem: feedback do João em 15/10 depois da C: o Hoje ficou parecido demais com Hábitos e Tarefas (trilha em cima, hábitos embaixo). A trilha em linha do tempo agrada e fica.
 - Hábitos viram linha compacta (Abertura 3/5, Fechamento 0/4) que marca ao toque; a lista completa fica na aba Hábitos.
 - O card do Jota Fit sai (é só redirecionamento). Entram cards de ferramentas reais, um número e uma ação cada: Finanças, Foco (com meta semanal se ligada), Frentes, Metas, Check-in e Revisar.
 - Semana: mini barras proporcionais ao feito mais resumo curto (foco e XP da semana), num bloco só.
 - PC: coluna da direita é o painel de ferramentas, sem espaço vazio.
+- **Verificado:** 313 testes, lint, build e `smoke:prod` verdes; Hoje com 2,9 telas em 390 px, seis cards de 144 px em 390 e 1440 px, sem rolagem lateral; Lighthouse da landing em produção 94. XP segue 2.225.
+- **Pendência conhecida:** a coluna esquerda no PC é bem mais alta que a direita (sticky). O card Metas usa o progresso manual quando a meta não tem tarefa nem hábito ligados.
 
 ## Depois (planos separados)
 - Notificação push e app offline (service worker, Web Push no servidor próprio).
