@@ -248,6 +248,7 @@ export default function Projects() {
 
       <ProjectDetailDialog
         project={openProject}
+        projects={projects}
         open={Boolean(openProject)}
         onOpenChange={(next) => {
           if (!next) setOpenProject(null);

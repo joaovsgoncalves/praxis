@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { buildFrontsViewModel } from '@/lib/projects';
 import FrontRow from './FrontRow';
 
@@ -11,66 +12,82 @@ export default function FrontsList({
     () => buildFrontsViewModel(projects, guidance),
     [projects, guidance]
   );
+  // Mães abertas ficam só em memória: ao sair da página tudo volta recolhido.
+  const [expanded, setExpanded] = useState(() => new Set());
+  const reduceMotion = useReducedMotion();
 
   if (!groups.length) {
     return null;
   }
 
+  const toggle = (project) => {
+    const key = project.id || project.slug;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const reveal = reduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.12 } }
+    : {
+        initial: { opacity: 0, y: -4 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -4, transition: { duration: 0.12, ease: 'easeOut' } },
+        transition: { duration: 0.2, ease: [0.23, 1, 0.32, 1] },
+      };
+
   return (
-    <section className="space-y-6">
-      <div className="flex items-center justify-between gap-4 px-0.5">
-        <div>
-          <h2 className="text-sm font-semibold text-stone-100">Suas frentes</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground/65">
-            Toque para ver contexto, avanços e próximo passo.
-          </p>
+    <section className="space-y-5">
+      <h2 className="px-0.5 text-sm font-semibold text-stone-100">Suas frentes</h2>
+
+      {groups.map((group) => (
+        <div key={group.id} className="space-y-2">
+          <h3 className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/75">
+            {group.title}
+          </h3>
+
+          <div className="space-y-1.5">
+            {group.fronts.map((root) => {
+              const key = root.id || root.slug;
+              const isOpen = expanded.has(key);
+              return (
+                <React.Fragment key={key}>
+                  <FrontRow
+                    project={root}
+                    onOpen={onOpenProject}
+                    expanded={isOpen}
+                    onToggle={toggle}
+                  />
+                  <AnimatePresence initial={false}>
+                    {isOpen && root.subfronts.length > 0 ? (
+                      <motion.div
+                        key="children"
+                        initial={reveal.initial}
+                        animate={reveal.animate}
+                        exit={reveal.exit}
+                        transition={reveal.transition}
+                        className="space-y-1.5"
+                      >
+                        {root.subfronts.map((sub) => (
+                          <FrontRow
+                            key={sub.id || sub.slug}
+                            project={sub}
+                            onOpen={onOpenProject}
+                            isSubfront
+                          />
+                        ))}
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </React.Fragment>
+              );
+            })}
+          </div>
         </div>
-      </div>
-
-      <div className="space-y-5">
-        {groups.map((group) => {
-          const totalCount = group.fronts.reduce(
-            (acc, root) => acc + 1 + (root.subfronts?.length || 0),
-            0
-          );
-
-          return (
-            <div key={group.id} className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/75">
-                  {group.title}
-                </h3>
-                <span className="text-[10px] text-muted-foreground/45 tabular-nums">
-                  {totalCount} {totalCount === 1 ? 'frente' : 'frentes'}
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                {group.fronts.map((root) => (
-                  <React.Fragment key={root.id || root.slug}>
-                    <FrontRow
-                      project={root}
-                      onOpen={onOpenProject}
-                      isSubfront={false}
-                      recommendedRank={root.recommendedRank}
-                    />
-                    {root.subfronts?.map((sub) => (
-                      <FrontRow
-                        key={sub.id || sub.slug}
-                        project={sub}
-                        onOpen={onOpenProject}
-                        isSubfront={true}
-                        parentName={root.name}
-                        recommendedRank={sub.recommendedRank}
-                      />
-                    ))}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      ))}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import { latestRelease } from '../src/data/changelog.js';
 
 function json(route, body, status = 200) {
   return route.fulfill({
@@ -121,8 +122,11 @@ const CANONICAL_PROJECTS = [
   },
 ];
 
+// A tela compara a data da orientação com hoje (Fortaleza); o mock precisa ser de hoje.
+const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
+
 const FRESH_GUIDANCE = {
-  date: '2026-09-09',
+  date: TODAY,
   summary: 'Prioridade para alavancar trabalho e entregas.',
   generated_at: '2026-09-09T08:30:00-03:00',
   fresh: true,
@@ -194,6 +198,11 @@ async function setupMocks(page, {
     createdTasks: [],
     patchedProjects: [],
   };
+
+  // O diálogo de "Últimas atualizações" cobre a tela e esconde o resto dos leitores de acessibilidade.
+  await page.addInitScript((id) => {
+    window.localStorage.setItem('praxis:last-seen-release', id);
+  }, latestRelease.id);
 
   await page.route('**/api/**', async (route) => {
     const req = route.request();
@@ -401,21 +410,37 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await abrirBtn.click();
 
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Praxis' })).toBeVisible();
-    await expect(page.getByText('O app do dia.')).toBeVisible();
+    await expect(page.getByRole('dialog').getByText('Usar a nova visão de Frentes no fluxo real.')).toBeVisible();
   });
 
   test('empty guidance: exibe copy exata sem esconder a lista de frentes', async ({ page }) => {
-    await setupMocks(page, { guidance: { date: '2026-09-09', fresh: false, priorities: [] } });
+    await setupMocks(page, { guidance: { date: TODAY, fresh: false, priorities: [] } });
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(
-      page.getByText('O Sêneca ainda não atualizou a ordem de hoje. Suas frentes continuam disponíveis abaixo.')
-    ).toBeVisible();
+    await expect(page.getByText('Ainda sem orientação de hoje.')).toBeVisible();
 
     await expect(page.getByRole('heading', { name: 'Suas frentes' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir frente Praxis' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abrir frente GoFluxo' })).toBeVisible();
+  });
+
+  test('Sêneca atualizou sem prioridades: diz que não há prioridade nova e mostra o resumo', async ({ page }) => {
+    await setupMocks(page, {
+      guidance: {
+        date: TODAY,
+        fresh: true,
+        summary: 'Hoje é só o RCA, sem nada fora dele.',
+        generated_at: `${TODAY}T07:40:00-03:00`,
+        priorities: [],
+      },
+    });
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    await expect(page.getByText('Sem prioridade nova hoje.')).toBeVisible();
+    await expect(page.getByText('Hoje é só o RCA, sem nada fora dele.')).toBeVisible();
+    await expect(page.getByText('Ainda sem orientação de hoje.')).not.toBeVisible();
   });
 
   test('error guidance: erro de rede/API nunca esconde a lista de frentes', async ({ page }) => {
@@ -432,16 +457,34 @@ test.describe('Frentes - Fase 2 E2E', () => {
     await expect(page.getByRole('button', { name: 'Abrir frente RCA' })).toBeVisible();
   });
 
-  test('subfrente Animália aparece aninhada abaixo de GoFluxo e abre drawer', async ({ page }) => {
+  test('grupos Dinheiro e Pessoal e estudo', async ({ page }) => {
     await setupMocks(page);
     await page.goto('/frentes');
     await page.waitForLoadState('domcontentloaded');
 
     const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await expect(frontsList.getByRole('heading', { name: 'Dinheiro' })).toBeVisible();
+    await expect(frontsList.getByRole('heading', { name: 'Pessoal e estudo' })).toBeVisible();
+    await expect(frontsList.getByText('Construção própria')).not.toBeVisible();
+  });
+
+  test('subfrente Animália fica recolhida dentro da GoFluxo, expande ao toque e abre drawer', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    const toggle = frontsList.getByRole('button', { name: 'Mostrar frentes de GoFluxo' });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle.getByText('1 frente · 1 bloqueada')).toBeVisible();
+    await expect(frontsList.getByRole('button', { name: 'Abrir frente Animália' })).toHaveCount(0);
+
+    await toggle.click();
     const animaliaRow = frontsList.getByRole('button', { name: 'Abrir frente Animália' });
     await expect(animaliaRow).toBeVisible();
-    await expect(animaliaRow.getByText('Cliente · GoFluxo')).toBeVisible();
     await expect(animaliaRow.getByText('Bloqueada')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
 
     await animaliaRow.click();
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Animália' })).toBeVisible();
@@ -458,7 +501,7 @@ test.describe('Frentes - Fase 2 E2E', () => {
 
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Praxis' })).toBeVisible();
 
-    const closeBtn = page.getByRole('button', { name: 'Close' });
+    const closeBtn = page.getByRole('button', { name: 'Fechar' });
     await closeBtn.click();
 
     await expect(page.getByRole('dialog')).not.toBeVisible();
@@ -496,16 +539,15 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    // Título e subtítulo em linguagem natural
+    // Título e estado
     await expect(dialog.getByRole('heading', { name: 'Praxis' })).toBeVisible();
-    await expect(dialog.getByText(/Produto · Em curso · Foco · No ar/)).toBeVisible();
+    await expect(dialog.getByText('Em curso', { exact: true })).toBeVisible();
 
-    // Primeira dobra em linguagem natural
-    await expect(dialog.getByRole('heading', { name: 'Onde ficou' })).toBeVisible();
+    // Onde ficou e Mexendo agora num bloco só
+    await expect(dialog.getByRole('heading', { name: 'Onde está' })).toBeVisible();
     await expect(dialog.getByText('Produto ativo e em evolução.')).toBeVisible();
-
-    await expect(dialog.getByRole('heading', { name: 'Mexendo agora' })).toBeVisible();
     await expect(dialog.getByText('Jota Fit + continuidade das frentes')).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Onde ficou' })).toHaveCount(0);
 
     await expect(dialog.getByRole('heading', { name: 'Próximo passo' })).toBeVisible();
     await expect(dialog.getByText('Usar a nova visão de Frentes no fluxo real.')).toBeVisible();
@@ -513,6 +555,13 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     // Ações operacionais presentes no detalhe
     await expect(dialog.getByRole('button', { name: 'Começar no Modo Foco' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Fiz isso' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Linha do tempo' })).toBeVisible();
+
+    // Objetivo e edição ficam em "Mais", recolhido
+    await expect(dialog.getByText('Ser o cockpit simples do dia a dia do João.')).not.toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Editar estado' })).not.toBeVisible();
+    await dialog.getByRole('button', { name: /^Mais/ }).click();
+    await expect(dialog.getByText('Ser o cockpit simples do dia a dia do João.')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Editar estado' })).toBeVisible();
 
     // Formulário completo de edição NÃO deve estar aberto por padrão
@@ -544,11 +593,14 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
 
     // Animália tem blocked_note: "Aguardando aprovação do cliente"
     const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Mostrar frentes de GoFluxo' }).click();
     await frontsList.getByRole('button', { name: 'Abrir frente Animália' }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Bloqueada', { exact: true })).toBeVisible();
 
+    await dialog.getByRole('button', { name: /^Mais/ }).click();
     await expect(dialog.getByRole('heading', { name: 'Travado por' })).toBeVisible();
     await expect(dialog.getByText('Aguardando aprovação do cliente')).toBeVisible();
   });
@@ -563,7 +615,8 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
 
     const dialog = page.getByRole('dialog');
 
-    // Clica em "Editar estado"
+    // Clica em "Editar estado", dentro de "Mais"
+    await dialog.getByRole('button', { name: /^Mais/ }).click();
     await dialog.getByRole('button', { name: 'Editar estado' }).click();
 
     // Formulário revelado
@@ -583,8 +636,7 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     await expect(dialog.locator('#project-column')).not.toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Editar estado' })).toBeVisible();
 
-    // Estado original foi preservado (objetivo fica em "Mais contexto")
-    await dialog.getByRole('button', { name: /Mais contexto/ }).click();
+    // Estado original foi preservado ("Mais" continua aberto com o objetivo)
     await expect(dialog.getByText('Ser o cockpit simples do dia a dia do João.')).toBeVisible();
     await expect(dialog.getByText('Texto provisório não salvo')).not.toBeVisible();
     expect(capturedCalls.patchedProjects.length).toBe(0);
@@ -655,8 +707,8 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     // Próximo passo concluído exibe fallback
     await expect(dialog.getByText('Próximo passo pendente de revisão.')).toBeVisible();
 
-    // Subtítulo mantém coluna, foco e live intactos
-    await expect(dialog.getByText(/Produto · Em curso · Foco · No ar/)).toBeVisible();
+    // Estado da frente continua intacto
+    await expect(dialog.getByText('Em curso', { exact: true })).toBeVisible();
 
     // Timeline agora exibe a conclusão
     await expect(dialog.getByText('Concluído: Usar a nova visão de Frentes no fluxo real.')).toBeVisible();
@@ -720,6 +772,7 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     await frontsList.getByRole('button', { name: 'Abrir frente Praxis' }).click();
 
     const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /^Mais/ }).click();
     await dialog.getByRole('button', { name: 'Editar estado' }).click();
     await dialog.locator('#project-column').click();
     await page.getByRole('option', { name: 'Pausado' }).click();
@@ -737,5 +790,50 @@ test.describe('Frentes - Fase 3 E2E (Detalhe simples e execução protegida)', (
     // No drawer, o estado persiste como Pausado
     await praxisRow.click();
     await expect(page.getByRole('dialog').getByText(/Pausado/)).toBeVisible();
+  });
+
+  test('editar estado: escolhe frente-mãe e tipo Pessoal, e a frente passa para dentro da mãe', async ({ page }) => {
+    const { capturedCalls } = await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente CatálogoZap' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /^Mais/ }).click();
+    await dialog.getByRole('button', { name: 'Editar estado' }).click();
+
+    await dialog.locator('#project-kind').click();
+    await expect(page.getByRole('option', { name: 'Pessoal' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await dialog.locator('#project-parent').click();
+    // Animália já é filha, então não pode ser mãe.
+    await expect(page.getByRole('option', { name: 'Animália' })).toHaveCount(0);
+    await page.getByRole('option', { name: 'GoFluxo' }).click();
+    await dialog.getByRole('button', { name: 'Salvar estado' }).click();
+
+    await expect(dialog.getByText('Editando estado da frente')).not.toBeVisible();
+    expect(capturedCalls.patchedProjects.length).toBe(1);
+    expect(capturedCalls.patchedProjects[0].patchData.parent_slug).toBe('gofluxo');
+
+    await page.getByRole('button', { name: 'Fechar' }).click();
+    await expect(frontsList.getByRole('button', { name: 'Mostrar frentes de GoFluxo' }).getByText('2 frentes · 1 bloqueada')).toBeVisible();
+  });
+
+  test('mãe com filhas não pode escolher frente-mãe', async ({ page }) => {
+    await setupMocks(page);
+    await page.goto('/frentes');
+    await page.waitForLoadState('domcontentloaded');
+
+    const frontsList = page.locator('section').filter({ hasText: 'Suas frentes' });
+    await frontsList.getByRole('button', { name: 'Abrir frente GoFluxo' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /^Mais/ }).click();
+    await dialog.getByRole('button', { name: 'Editar estado' }).click();
+    await expect(dialog.locator('#project-parent')).toBeDisabled();
+    await expect(dialog.getByText('Tem frentes dentro, então fica solta')).toBeVisible();
   });
 });

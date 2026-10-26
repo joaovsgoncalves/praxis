@@ -3,7 +3,7 @@
 import { randomUUID } from 'crypto';
 
 export const PROJECT_COLUMNS = ['andando', 'radar', 'aguardando', 'pausado'];
-export const PROJECT_KINDS = ['produto', 'cliente', 'trabalho', 'estudo'];
+export const PROJECT_KINDS = ['produto', 'cliente', 'trabalho', 'estudo', 'pessoal'];
 export const FOCUS_LIMIT = 2;
 
 export const PROJECT_COLUMN_LABELS = {
@@ -294,6 +294,47 @@ function conflict(message) {
   return err;
 }
 
+function normalizeParentSlug(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+/**
+ * Valida a frente-mãe de `slug`. Só existe um nível: a mãe não pode ser filha
+ * e uma frente com filhas não pode virar filha. Com isso não há ciclo possível,
+ * mas a subida pela cadeia fica como rede de segurança para dados antigos.
+ */
+function resolveParentSlug(db, slug, rawParent) {
+  const parentSlug = normalizeParentSlug(rawParent);
+  if (!parentSlug) return '';
+  if (parentSlug === slug) throw badRequest('Uma frente não pode ser mãe dela mesma');
+
+  const parent = db.prepare('SELECT slug, name, parent_slug FROM projects WHERE slug = ?').get(parentSlug);
+  if (!parent) throw badRequest(`Frente-mãe não encontrada: ${parentSlug}`);
+
+  const grandParent = normalizeParentSlug(parent.parent_slug);
+  if (grandParent) {
+    throw badRequest(`${parent.name} já está dentro de outra frente e não pode ter filhas`);
+  }
+
+  const children = db.prepare(
+    "SELECT COUNT(*) AS n FROM projects WHERE LOWER(TRIM(COALESCE(parent_slug, ''))) = ?",
+  ).get(slug);
+  if (children?.n) {
+    throw badRequest('Esta frente tem filhas e não pode ficar dentro de outra');
+  }
+
+  const seen = new Set([slug]);
+  let cursor = parentSlug;
+  while (cursor) {
+    if (seen.has(cursor)) throw badRequest('Essa frente-mãe criaria um ciclo');
+    seen.add(cursor);
+    const row = db.prepare('SELECT parent_slug FROM projects WHERE slug = ?').get(cursor);
+    cursor = normalizeParentSlug(row?.parent_slug);
+  }
+
+  return parentSlug;
+}
+
 export function getProject(db, idOrSlug) {
   const row = db.prepare('SELECT * FROM projects WHERE id = ? OR slug = ?').get(idOrSlug, idOrSlug);
   return mapRow(row);
@@ -394,6 +435,7 @@ export function createProject(db, body) {
 
   const column = PROJECT_COLUMNS.includes(body.column) ? body.column : 'radar';
   const kind = PROJECT_KINDS.includes(body.kind) ? body.kind : 'produto';
+  const parentSlug = resolveParentSlug(db, slug, body.parent_slug);
   const focus = body.focus ? 1 : 0;
   if (focus && countFocused(db) >= FOCUS_LIMIT) throw focusLimitError();
 
@@ -404,8 +446,8 @@ export function createProject(db, body) {
     INSERT INTO projects (
       id, slug, name, tagline, kind, column, focus, live, objective, status_summary,
       current_slice, next_step, last_move_at, last_move_note, last_reviewed_at,
-      notes, shipped_note, blocked_note, prod_url, repo_path, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      notes, shipped_note, blocked_note, prod_url, repo_path, sort_order, parent_slug
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     slug,
@@ -428,6 +470,7 @@ export function createProject(db, body) {
     String(body.prod_url || ''),
     String(body.repo_path || ''),
     sort,
+    parentSlug,
   );
 
   return getProject(db, id);
@@ -589,6 +632,9 @@ export function updateProject(db, idOrSlug, body = {}) {
   if (!PROJECT_KINDS.includes(next.kind)) next.kind = existing.kind || 'produto';
   if (body.live !== undefined) next.live = body.live ? 1 : 0;
   if (body.sort_order !== undefined) next.sort_order = Number(body.sort_order);
+  next.parent_slug = body.parent_slug !== undefined
+    ? resolveParentSlug(db, existing.slug, body.parent_slug)
+    : (existing.parent_slug || '');
 
   db.prepare(`
     UPDATE projects SET
@@ -609,6 +655,7 @@ export function updateProject(db, idOrSlug, body = {}) {
       prod_url = ?,
       repo_path = ?,
       sort_order = ?,
+      parent_slug = ?,
       updated_date = datetime('now')
     WHERE id = ?
   `).run(
@@ -629,6 +676,7 @@ export function updateProject(db, idOrSlug, body = {}) {
     next.prod_url,
     next.repo_path,
     next.sort_order,
+    next.parent_slug,
     existing.id,
   );
 

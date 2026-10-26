@@ -1,7 +1,8 @@
 import React from 'react';
 import { Compass, ArrowRight, ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { formatGuidanceTime, formatGuidanceReason } from '@/lib/projects';
+import { formatGuidanceTime, formatGuidanceReason, getGuidanceState } from '@/lib/projects';
+import { fortalezaDateKey } from '@/lib/dates';
 
 export default function ContinuityPriorityPanel({
   guidance,
@@ -43,21 +44,34 @@ export default function ContinuityPriorityPanel({
     );
   }
 
-  const isFresh = Boolean(guidance?.fresh && Array.isArray(guidance?.priorities) && guidance.priorities.length > 0);
+  const state = getGuidanceState(guidance, fortalezaDateKey());
 
-  if (!isFresh) {
+  if (state.kind !== 'ready') {
+    const updateTime = state.kind === 'empty' ? formatGuidanceTime(guidance?.generated_at) : '';
     return (
       <section
         aria-live="polite"
         className="rounded-2xl border border-white/[0.08] bg-card/25 p-4 sm:p-5"
       >
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
-          <Compass className="h-3.5 w-3.5 text-muted-foreground" />
-          <span>O que vem primeiro</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+            <Compass className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>O que vem primeiro</span>
+          </div>
+          {updateTime ? (
+            <span className="text-[11px] text-muted-foreground/70">{updateTime}</span>
+          ) : null}
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          O Sêneca ainda não atualizou a ordem de hoje. Suas frentes continuam disponíveis abaixo.
-        </p>
+        {state.kind === 'empty' ? (
+          <>
+            <p className="mt-2 text-sm font-medium text-stone-200">Sem prioridade nova hoje.</p>
+            {state.summary ? (
+              <p className="mt-1 text-sm text-muted-foreground [text-wrap:pretty]">{state.summary}</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">Ainda sem orientação de hoje.</p>
+        )}
       </section>
     );
   }

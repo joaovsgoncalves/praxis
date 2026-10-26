@@ -8,6 +8,17 @@
  */
 export const changelog = [
   {
+    id: '2026-10-26-frentes',
+    date: '2026-10-26',
+    title: 'Frentes mais simples',
+    items: [
+      'Frentes agora em dois grupos: Dinheiro e Pessoal e estudo.',
+      'Uma frente pode ficar dentro de outra. A de fora mostra quantas tem e se alguma está bloqueada.',
+      'O detalhe da frente abre no próximo passo. Objetivo, bloqueio e links ficam em Mais.',
+      'Quando o Sêneca não vê prioridade nova no dia, a tela diz isso com todas as letras.',
+    ],
+  },
+  {
     id: '2026-10-15-hoje',
     date: '2026-10-15',
     title: 'O Hoje com suas ferramentas',

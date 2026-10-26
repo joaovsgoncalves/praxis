@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Check, ChevronDown, Timer, Pencil, AlertCircle } from 'lucide-react';
+import { Check, ChevronDown, Timer, Pencil, AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,13 +25,19 @@ import {
   PROJECT_COLUMNS,
   PROJECT_COLUMN_LABELS,
   PROJECT_KIND_LABELS,
+  PROJECT_KIND_OPTIONS,
   FRONT_STATUS_LABELS,
+  buildWhereLines,
   formatProjectUpdateDate,
+  isProjectBlocked,
+  listParentOptions,
 } from '@/lib/projects';
 import { cn } from '@/lib/utils';
 
 const PRESS = 'transition-[transform,background-color,border-color,color] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none';
 const RECENT_UPDATES = 3;
+// O Select do Radix não aceita valor vazio; este marca "sem frente-mãe".
+const NO_PARENT = '__sem_mae__';
 
 function Field({ id, label, hint, children }) {
   return (
@@ -81,6 +87,7 @@ function Timeline({ updates = [] }) {
 
 export default function ProjectDetailDialog({
   project,
+  projects = [],
   open,
   onOpenChange,
   onSave,
@@ -97,6 +104,7 @@ export default function ProjectDetailDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
     kind: 'produto',
+    parent_slug: '',
     column: 'radar',
     live: false,
     objective: '',
@@ -108,7 +116,7 @@ export default function ProjectDetailDialog({
     notes: '',
   });
   const [newUpdate, setNewUpdate] = useState('');
-  const [showContext, setShowContext] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const reduceMotion = useReducedMotion();
 
@@ -116,6 +124,7 @@ export default function ProjectDetailDialog({
     if (!project) return;
     setForm({
       kind: project.kind || 'produto',
+      parent_slug: project.parent_slug || '',
       column: project.column || 'radar',
       live: Boolean(project.live),
       objective: project.objective || '',
@@ -136,20 +145,15 @@ export default function ProjectDetailDialog({
 
   // Expansões voltam fechadas ao trocar de frente (não a cada refetch da mesma).
   useEffect(() => {
-    setShowContext(false);
+    setShowMore(false);
     setShowAllUpdates(false);
   }, [project?.id, open]);
 
-  const subtitle = useMemo(() => {
-    if (!project) return '';
-    const bits = [
-      PROJECT_KIND_LABELS[project.kind] || 'Frente',
-      FRONT_STATUS_LABELS[project.column] || project.column,
-    ];
-    if (project.focus) bits.push('Foco');
-    if (project.live) bits.push('No ar');
-    return bits.join(' · ');
-  }, [project]);
+  const parentOptions = useMemo(() => listParentOptions(projects, project), [projects, project]);
+  const hasChildren = useMemo(() => {
+    const slug = String(project?.slug || '').toLowerCase();
+    return Boolean(slug) && projects.some((p) => String(p.parent_slug || '').trim().toLowerCase() === slug);
+  }, [projects, project]);
 
   if (!project) return null;
 
@@ -159,10 +163,11 @@ export default function ProjectDetailDialog({
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSave?.(project, {
-      ...form,
-      live: form.live ? 1 : 0,
-    });
+    const { parent_slug: parentSlug, ...rest } = form;
+    const data = { ...rest, live: form.live ? 1 : 0 };
+    // Só manda a mãe quando mudou, para não revalidar um vínculo antigo sem motivo.
+    if (parentSlug !== (project.parent_slug || '')) data.parent_slug = parentSlug;
+    onSave?.(project, data);
     setIsEditing(false);
   };
 
@@ -179,16 +184,15 @@ export default function ProjectDetailDialog({
   };
 
   const hasNextStep = Boolean(String(project.next_step || '').trim());
-  const hasBlockedNote = Boolean(String(project.blocked_note || '').trim());
-  const hasCurrentSlice = Boolean(String(project.current_slice || '').trim());
-  const hasStatusSummary = Boolean(String(project.status_summary || '').trim());
-  const hasObjective = Boolean(String(project.objective || '').trim());
-  const hasShippedNote = Boolean(String(project.shipped_note || '').trim());
-  const hasNotes = Boolean(String(project.notes || '').trim());
-  const extraContext = [
-    hasObjective && { label: 'Objetivo', text: project.objective },
-    hasShippedNote && { label: 'O que já existe', text: project.shipped_note },
-    hasNotes && { label: 'Notas', text: project.notes },
+  const blocked = isProjectBlocked(project);
+  const whereLines = buildWhereLines(project);
+  const statusLabel = FRONT_STATUS_LABELS[project.column] || project.column;
+  const prodUrl = String(project.prod_url || '').trim();
+  const repoPath = String(project.repo_path || '').trim();
+  const moreContext = [
+    String(project.objective || '').trim() && { label: 'Objetivo', text: project.objective },
+    String(project.shipped_note || '').trim() && { label: 'O que já existe', text: project.shipped_note },
+    String(project.notes || '').trim() && { label: 'Notas', text: project.notes },
   ].filter(Boolean);
   const reveal = reduceMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.12 } }
@@ -207,10 +211,16 @@ export default function ProjectDetailDialog({
       >
         <SheetHeader className="pr-8">
           <SheetTitle className="praxis-title text-left text-2xl">{project.name}</SheetTitle>
-          <SheetDescription className="text-left">{subtitle}</SheetDescription>
-          {project.tagline ? (
-            <p className="text-left text-sm leading-relaxed text-muted-foreground">{project.tagline}</p>
-          ) : null}
+          <SheetDescription asChild>
+            <div className="flex flex-wrap items-center gap-2 text-left">
+              <span>{statusLabel}</span>
+              {blocked ? (
+                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                  Bloqueada
+                </span>
+              ) : null}
+            </div>
+          </SheetDescription>
         </SheetHeader>
 
         {isEditing ? (
@@ -228,10 +238,11 @@ export default function ProjectDetailDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="produto">Produto</SelectItem>
-                      <SelectItem value="cliente">Cliente</SelectItem>
-                      <SelectItem value="trabalho">Trabalho</SelectItem>
-                      <SelectItem value="estudo">Faculdade</SelectItem>
+                      {PROJECT_KIND_OPTIONS.map((kind) => (
+                        <SelectItem key={kind} value={kind}>
+                          {PROJECT_KIND_LABELS[kind]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Field>
@@ -259,6 +270,33 @@ export default function ProjectDetailDialog({
                   <Switch checked={form.live} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, live: checked }))} />
                 </div>
               </div>
+
+              <Field
+                id="project-parent"
+                label="Dentro de"
+                hint={hasChildren ? 'Tem frentes dentro, então fica solta' : 'Frente-mãe, se houver'}
+              >
+                <Select
+                  value={form.parent_slug || NO_PARENT}
+                  onValueChange={(value) => setForm((prev) => ({ ...prev, parent_slug: value === NO_PARENT ? '' : value }))}
+                  disabled={hasChildren}
+                >
+                  <SelectTrigger id="project-parent" className="w-full border-white/10 bg-black/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_PARENT}>Nenhuma, frente solta</SelectItem>
+                    {parentOptions.map((option) => (
+                      <SelectItem key={option.slug} value={option.slug}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                    {form.parent_slug && !parentOptions.some((o) => o.slug === form.parent_slug) ? (
+                      <SelectItem value={form.parent_slug}>{form.parent_slug}</SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </Field>
 
               <Field id="project-objective" label="Objetivo" hint="Por que isso existe">
                 <Textarea id="project-objective" value={form.objective} onChange={setField('objective')} placeholder="A razão desta frente existir" className="min-h-[82px] border-white/10 bg-black/20" />
@@ -302,7 +340,7 @@ export default function ProjectDetailDialog({
             </div>
           </form>
         ) : (
-          /* Leitura: próximo passo primeiro, depois onde ficou; o resto fica em "Mais contexto". */
+          /* Leitura: próximo passo, onde está, linha do tempo; o resto fica em "Mais". */
           <div className="mt-6 space-y-4">
             <section
               aria-labelledby="project-next-heading"
@@ -347,168 +385,178 @@ export default function ProjectDetailDialog({
                   Próximo passo pendente de revisão. Dá pra definir um em Editar estado ou esperar o Sêneca no próximo ciclo.
                 </p>
               )}
-
-              {/* Só aparece quando existe de verdade */}
-              {hasBlockedNote ? (
-                <div className="mt-4 flex gap-2.5 border-t border-white/[0.06] pt-4">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-semibold text-rose-300">Travado por</h4>
-                    <p className="mt-0.5 text-sm leading-relaxed text-rose-100/85 [text-wrap:pretty]">
-                      {project.blocked_note}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
             </section>
 
-            {hasStatusSummary || hasCurrentSlice ? (
-              <section className="space-y-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5">
-                {hasStatusSummary ? (
-                  <div>
-                    <h3 className="text-xs font-medium text-muted-foreground">Onde ficou</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-stone-200 [text-wrap:pretty]">
-                      {project.status_summary}
-                    </p>
-                  </div>
-                ) : null}
-                {hasCurrentSlice ? (
-                  <div>
-                    <h3 className="text-xs font-medium text-muted-foreground">Mexendo agora</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-stone-200 [text-wrap:pretty]">
-                      {project.current_slice}
-                    </p>
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-
-            {extraContext.length > 0 ? (
-              <section className="rounded-2xl border border-white/[0.06] bg-white/[0.015]">
-                <button
-                  type="button"
-                  aria-expanded={showContext}
-                  aria-controls="project-extra-context"
-                  onClick={() => setShowContext((value) => !value)}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium text-stone-200 transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-domain-gold/50 sm:px-5"
-                >
-                  <span>
-                    Mais contexto
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
-                      {extraContext.map((item) => item.label.toLowerCase()).join(', ')}
-                    </span>
-                  </span>
-                  <ChevronDown
-                    aria-hidden
+            {whereLines.length > 0 ? (
+              <section
+                aria-labelledby="project-where-heading"
+                className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-5"
+              >
+                <h3 id="project-where-heading" className="text-xs font-medium text-muted-foreground">
+                  Onde está
+                </h3>
+                {whereLines.map((line, index) => (
+                  <p
+                    key={line}
                     className={cn(
-                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none',
-                      showContext && 'rotate-180',
+                      'text-sm leading-relaxed [text-wrap:pretty]',
+                      index === 0 ? 'mt-1 text-stone-200' : 'mt-2 text-stone-300/85',
                     )}
-                  />
-                </button>
-                <AnimatePresence initial={false}>
-                  {showContext ? (
-                    <motion.div
-                      id="project-extra-context"
-                      key="extra"
-                      initial={reveal.initial}
-                      animate={reveal.animate}
-                      exit={reveal.exit}
-                      transition={reveal.transition}
-                      className="space-y-4 border-t border-white/[0.06] px-4 pb-4 pt-4 sm:px-5 sm:pb-5"
-                    >
-                      {extraContext.map((item) => (
-                        <div key={item.label}>
-                          <h3 className="text-xs font-medium text-muted-foreground">{item.label}</h3>
-                          <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-stone-300 [text-wrap:pretty]">
-                            {item.text}
-                          </p>
-                        </div>
-                      ))}
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                  >
+                    {line}
+                  </p>
+                ))}
               </section>
             ) : null}
-
-            <div className="flex items-center justify-between pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                className={cn(
-                  'h-10 rounded-full border-white/10 px-4 text-xs font-medium text-stone-200 hover:border-white/20 hover:bg-white/[0.05]',
-                  PRESS,
-                )}
-                onClick={() => setIsEditing(true)}
-              >
-                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                Editar estado
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-10 rounded-full px-4 text-xs text-muted-foreground hover:text-stone-200"
-                onClick={() => onOpenChange?.(false)}
-              >
-                Fechar
-              </Button>
-            </div>
           </div>
         )}
 
-        {/* Avanços: registrar fica sempre à mão; a lista mostra os mais recentes e abre o resto sob pedido */}
-        <section className="mt-7 border-t border-white/[0.06] pt-6">
-          <div className="mb-4">
+        {/* Linha do tempo: os mais recentes à vista, o resto sob pedido */}
+        {isEditing ? null : (
+          <section className="mt-6 space-y-4">
             <h3 className="text-sm font-semibold text-stone-100">Linha do tempo</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              O que já andou nesta frente, do mais recente para o mais antigo.
-            </p>
-          </div>
 
-          <div className="mb-5 flex gap-2">
-            <Input
-              value={newUpdate}
-              onChange={(event) => setNewUpdate(event.target.value)}
-              placeholder="Registrar um avanço curto…"
-              aria-label="Registrar um avanço curto"
-              className="border-white/10 bg-black/20"
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  handleAddUpdate();
-                }
-              }}
-            />
-            <Button
+            {updatesLoading ? (
+              <p className="text-xs text-muted-foreground/60">Carregando histórico…</p>
+            ) : (
+              <div>
+                <Timeline updates={showAllUpdates ? updates : updates.slice(0, RECENT_UPDATES)} />
+                {updates.length > RECENT_UPDATES ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mt-2 h-9 rounded-full px-3 text-xs text-muted-foreground hover:text-stone-200"
+                    aria-expanded={showAllUpdates}
+                    onClick={() => setShowAllUpdates((value) => !value)}
+                  >
+                    {showAllUpdates ? 'Ver só os recentes' : `Ver todos (${updates.length})`}
+                  </Button>
+                ) : null}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Input
+                value={newUpdate}
+                onChange={(event) => setNewUpdate(event.target.value)}
+                placeholder="Registrar um avanço curto…"
+                aria-label="Registrar um avanço curto"
+                className="border-white/10 bg-black/20"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleAddUpdate();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className={cn('shrink-0 border-white/10', PRESS)}
+                disabled={addingUpdate || !newUpdate.trim()}
+                onClick={handleAddUpdate}
+              >
+                Registrar
+              </Button>
+            </div>
+          </section>
+        )}
+
+        {/* Mais: objetivo, bloqueio, links e edição, recolhidos por padrão */}
+        {isEditing ? null : (
+          <section className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.015]">
+            <button
               type="button"
-              variant="outline"
-              className={cn('shrink-0 border-white/10', PRESS)}
-              disabled={addingUpdate || !newUpdate.trim()}
-              onClick={handleAddUpdate}
+              aria-expanded={showMore}
+              aria-controls="project-more"
+              onClick={() => setShowMore((value) => !value)}
+              className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium text-stone-200 transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-domain-gold/50 sm:px-5"
             >
-              Registrar
-            </Button>
-          </div>
-
-          {updatesLoading ? (
-            <p className="text-xs text-muted-foreground/60">Carregando histórico…</p>
-          ) : (
-            <>
-              <Timeline updates={showAllUpdates ? updates : updates.slice(0, RECENT_UPDATES)} />
-              {updates.length > RECENT_UPDATES ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="mt-3 h-9 rounded-full px-3 text-xs text-muted-foreground hover:text-stone-200"
-                  aria-expanded={showAllUpdates}
-                  onClick={() => setShowAllUpdates((value) => !value)}
+              <span>
+                Mais
+                {blocked ? (
+                  <span className="ml-2 text-xs font-normal text-amber-400">tem bloqueio</span>
+                ) : null}
+              </span>
+              <ChevronDown
+                aria-hidden
+                className={cn(
+                  'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none',
+                  showMore && 'rotate-180',
+                )}
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {showMore ? (
+                <motion.div
+                  id="project-more"
+                  key="more"
+                  initial={reveal.initial}
+                  animate={reveal.animate}
+                  exit={reveal.exit}
+                  transition={reveal.transition}
+                  className="space-y-4 border-t border-white/[0.06] px-4 pb-4 pt-4 sm:px-5 sm:pb-5"
                 >
-                  {showAllUpdates ? 'Mostrar só os recentes' : `Ver todos os ${updates.length} avanços`}
-                </Button>
+                  {blocked ? (
+                    <div className="flex gap-2.5">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" aria-hidden />
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-semibold text-rose-300">Travado por</h4>
+                        <p className="mt-0.5 text-sm leading-relaxed text-rose-100/85 [text-wrap:pretty]">
+                          {project.blocked_note}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {moreContext.map((item) => (
+                    <div key={item.label}>
+                      <h4 className="text-xs font-medium text-muted-foreground">{item.label}</h4>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-stone-300 [text-wrap:pretty]">
+                        {item.text}
+                      </p>
+                    </div>
+                  ))}
+
+                  {prodUrl || repoPath ? (
+                    <div>
+                      <h4 className="text-xs font-medium text-muted-foreground">Links</h4>
+                      <div className="mt-1 space-y-1 text-sm">
+                        {prodUrl ? (
+                          <a
+                            href={prodUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex max-w-full items-center gap-1.5 text-domain-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-domain-gold/50"
+                          >
+                            <span className="truncate">{prodUrl.replace(/^https?:\/\//, '')}</span>
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          </a>
+                        ) : null}
+                        {repoPath ? (
+                          <p className="break-all text-xs text-muted-foreground">Código em {repoPath}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      'h-10 rounded-full border-white/10 px-4 text-xs font-medium text-stone-200 hover:border-white/20 hover:bg-white/[0.05]',
+                      PRESS,
+                    )}
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                    Editar estado
+                  </Button>
+                </motion.div>
               ) : null}
-            </>
-          )}
-        </section>
+            </AnimatePresence>
+          </section>
+        )}
       </SheetContent>
     </Sheet>
   );
