@@ -15,6 +15,7 @@ import { CATEGORIES, enrichCategory } from './lib/categories.js';
 import { getLevel } from './lib/gamification.js';
 import { createCalendarServices } from './lib/calendarSync.js';
 import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
+import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
 import { createTasksRouter, registerIdeaToTaskRoute } from './routes/tasks.js';
 import { createHabitsRouter, registerHabitLogRoutes } from './routes/habits.js';
 import { createWellnessRouter } from './routes/wellness.js';
@@ -121,6 +122,7 @@ const HABIT_OUTCOMES = new Set(['done', 'skipped']);
 const SKIP_REASONS = new Set(['time', 'energy', 'context', 'other']);
 
 app.use(cors({ origin: true, credentials: true }));
+app.use(createRequestLog({ version: resolveApiVersion(__dirname) }));
 app.use(express.json());
 
 const COOKIE_SECURE = !['0', 'false', 'no'].includes(

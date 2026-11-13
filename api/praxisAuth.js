@@ -100,6 +100,24 @@ export function getSessionFromRequest(db, req) {
   return row || null;
 }
 
+/**
+ * Por que a sessão foi recusada. Só para o registro e para o cliente explicar o que houve.
+ * "sessao_desconhecida" cobre revogada, apagada (o login limpa as vencidas) ou de outro ambiente.
+ */
+export function describeSessionFailure(db, req) {
+  const token = parseCookies(req)[SESSION_COOKIE];
+  if (!token) return 'sem_cookie';
+  const row = db.prepare('SELECT expires_at FROM praxis_sessions WHERE token = ?').get(token);
+  if (!row) return 'sessao_desconhecida';
+  return 'sessao_expirada';
+}
+
+function rejectSession(db, req, res) {
+  const reason = describeSessionFailure(db, req);
+  res.locals.authFailure = reason;
+  return res.status(401).json({ error: 'Unauthorized', code: 'auth_required', reason });
+}
+
 function purgeExpiredSessions(db) {
   db.prepare("DELETE FROM praxis_sessions WHERE datetime(expires_at) <= datetime('now')").run();
 }
@@ -162,6 +180,7 @@ export function createApiAuthMiddleware({ db, apiKey }) {
         const header = req.headers.authorization || '';
         const provided = header.startsWith('Bearer ') ? header.slice(7) : req.headers['x-forja-key'];
         if (!provided || !safeEqual(provided, apiKey)) {
+          res.locals.authFailure = 'chave_invalida';
           return res.status(401).json({ error: 'Unauthorized' });
         }
       }
@@ -184,7 +203,7 @@ export function createApiAuthMiddleware({ db, apiKey }) {
       return next();
     }
 
-    return res.status(401).json({ error: 'Unauthorized', code: 'auth_required' });
+    return rejectSession(db, req, res);
   };
 }
 
@@ -209,7 +228,7 @@ export function registerAuthRoutes(app, db, { secureCookie = true } = {}) {
       return res.json({ user: { username: 'local', display_name: 'Local dev' }, auth: 'open' });
     }
     const session = getSessionFromRequest(db, req);
-    if (!session) return res.status(401).json({ error: 'Unauthorized', code: 'auth_required' });
+    if (!session) return rejectSession(db, req, res);
     res.json({
       user: { username: session.username, display_name: session.display_name },
       auth: 'session',
@@ -230,6 +249,7 @@ export function registerAuthRoutes(app, db, { secureCookie = true } = {}) {
       return res.status(503).json({ error: 'Login not configured. Set PRAXIS_APP_PASSWORD on the server.' });
     }
     if (!bcrypt.compareSync(normalized, user.password_hash)) {
+      res.locals.authFailure = 'senha_incorreta';
       return res.status(401).json({ error: 'Invalid password' });
     }
     createSession(db, user.id, res, { secureCookie });
