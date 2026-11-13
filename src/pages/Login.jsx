@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Hammer, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +8,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { praxisApi } from '@/api/praxisClient';
 import { PraxisCenteredShell } from '@/components/layout/PraxisPage';
+import { readPendingIntent } from '@/lib/pendingIntent';
 
-export default function Login({ onSuccess }) {
+export default function Login({ onSuccess, sessionLost = false }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pending] = useState(() => (sessionLost ? readPendingIntent() : null));
+
+  // Os erros genéricos das chamadas que estavam no ar perdem o sentido: o aviso é este.
+  useEffect(() => {
+    if (!sessionLost) return undefined;
+    toast.dismiss();
+    const timer = setTimeout(() => toast.dismiss(), 1500);
+    return () => clearTimeout(timer);
+  }, [sessionLost]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +64,15 @@ export default function Login({ onSuccess }) {
               Uso pessoal — a senha fica só no servidor, não no navegador.
             </p>
           </div>
+
+          {sessionLost ? (
+            <Alert className="border-amber-500/30 bg-amber-500/[0.06] text-left" data-testid="session-lost-notice">
+              <AlertDescription role="status">
+                Sua sessão terminou. Entre de novo para continuar de onde parou.
+                {pending?.title ? ` A tarefa "${pending.title}" ainda não foi alterada.` : ''}
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">

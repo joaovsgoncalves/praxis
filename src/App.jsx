@@ -60,7 +60,10 @@ const AuthenticatedApp = () => {
     return <PraxisLoadingSplash message="Carregando o Praxis…" />;
   }
 
-  if (isLandingPath && !isAuthenticated) {
+  // Sessão que caiu no meio do uso não é visita: pede login na mesma tela, sem ir para a landing.
+  const sessionLost = Boolean(authError?.sessionLost);
+
+  if (isLandingPath && !isAuthenticated && !sessionLost) {
     return (
       <PublicPage>
         <Landing />
@@ -84,7 +87,7 @@ const AuthenticatedApp = () => {
       if (webAuthEnabled) {
         return (
           <PublicPage>
-            <Login onSuccess={onLoginSuccess} />
+            <Login onSuccess={onLoginSuccess} sessionLost={sessionLost} />
           </PublicPage>
         );
       }

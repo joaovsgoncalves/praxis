@@ -2,6 +2,8 @@
 import { tasksApiModule } from './tasksApi';
 import { financeApiModule } from './financeApi';
 import { projectsApiModule } from './projectsApi';
+import { kindFromStatus } from '@/lib/apiFailure';
+import { isSessionLost, markSessionLost } from '@/lib/sessionGate';
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
 // Em dev local, .env define VITE_PRAXIS_API/VITE_FORJA_API para o backend da Praxis.
@@ -109,23 +111,77 @@ export function subscribeStaleState(listener) {
   return () => window.removeEventListener(OFFLINE_STATE_EVENT, handler);
 }
 
-async function request(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
+// Versão do front que fez a chamada; aparece no registro da API junto da correlação.
+const CLIENT_TAG = `web-${import.meta.env.VITE_PRAXIS_BUILD || 'dev'}`;
+// Rotas que funcionam sem sessão: nunca são cortadas nem contam como "sessão perdida".
+const SESSION_FREE = ['/api/auth/', '/api/health'];
 
-  const isGet = !options.method || options.method === 'GET';
+function newRequestId() {
+  try {
+    return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+  } catch {
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function apiError(message, fields) {
+  return Object.assign(new Error(message), fields);
+}
+
+/** Cabeçalhos de correlação, também para as chamadas com fetch direto (áudio). */
+function traceHeaders(requestId = newRequestId()) {
+  return { 'X-Request-Id': requestId, 'X-Praxis-Client': CLIENT_TAG };
+}
+
+/** Resposta com erro vira Error com status, classe e correlação; 401 protegido fecha a sessão. */
+function failedResponse(res, body, path, requestId, fallbackMessage) {
+  const sessionFree = SESSION_FREE.some((prefix) => path.startsWith(prefix));
+  if (res.status === 401 && !sessionFree) markSessionLost(body?.reason || null);
+  return apiError(body?.error || body?.detail || fallbackMessage || `API error: ${res.status}`, {
+    status: res.status,
+    kind: kindFromStatus(res.status),
+    body,
+    requestId,
+  });
+}
+
+/**
+ * Opções além das do fetch:
+ *  - fresh: GET que não aceita resposta do cache offline (confirmar estado real).
+ *  - requestId: correlação escolhida por quem chama.
+ */
+async function request(path, options = {}) {
+  const { fresh = false, requestId: givenRequestId, ...fetchOptions } = options;
+  const requestId = givenRequestId || newRequestId();
+  const headers = { 'Content-Type': 'application/json', ...traceHeaders(requestId), ...fetchOptions.headers };
+
+  const isGet = !fetchOptions.method || fetchOptions.method === 'GET';
+  const sessionFree = SESSION_FREE.some((prefix) => path.startsWith(prefix));
+
+  // A sessão já caiu: mandar mais chamadas só renderia uma fila de 401.
+  if (!sessionFree && isSessionLost()) {
+    throw apiError('Sessão encerrada', { status: 401, kind: 'session', blocked: true, requestId });
+  }
+  // Sem rede, escrita não sai: quem chamou fica sabendo na hora, sem "talvez tenha ido".
+  if (!isGet && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw apiError('Sem conexão', { kind: 'offline', sent: false, requestId });
+  }
 
   try {
-    const res = await fetch(`${PRAXIS_API}${path}`, {
-      ...options,
-      headers,
-      credentials: 'include',
-    });
+    let res;
+    try {
+      res = await fetch(`${PRAXIS_API}${path}`, {
+        ...fetchOptions,
+        headers,
+        credentials: 'include',
+      });
+    } catch (cause) {
+      // Saiu do aparelho e a resposta não voltou: o resultado é desconhecido.
+      throw apiError(cause?.message || 'Falha de rede', { kind: 'network', sent: true, requestId, cause });
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      const err = new Error(body?.error || body?.detail || `API error: ${res.status}`);
-      err.status = res.status;
-      err.body = body;
-      throw err;
+      throw failedResponse(res, body, path, requestId);
     }
     if (res.status === 204) return null;
     const data = await res.json();
@@ -135,9 +191,10 @@ async function request(path, options = {}) {
     }
     return data;
   } catch (err) {
-    if (err?.status === 401 || err?.status === 403) throw err;
+    // Resposta do servidor não é falta de rede: sessão, permissão e "não existe" sobem como são.
+    if (err?.status === 401 || err?.status === 403 || err?.status === 404) throw err;
     // Fall back to cached payload only on cacheable GETs — never silently swallow writes.
-    if (isGet && isCacheable(path)) {
+    if (isGet && !fresh && isCacheable(path)) {
       const cached = readOfflineCache(path);
       if (cached) {
         emitOfflineState(true, cached.timestamp);
@@ -277,16 +334,11 @@ export const praxisApi = {
       const res = await fetch(`${PRAXIS_API}/api/captures/${id}/retry`, {
         method: 'POST',
         body: '{}',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...traceHeaders() },
         credentials: 'include',
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const err = new Error(body.detail || body.error || 'Retry failed');
-        err.status = res.status;
-        err.body = body;
-        throw err;
-      }
+      if (!res.ok) throw failedResponse(res, body, '/api/captures', res.headers.get('x-request-id'), 'Retry failed');
       return body;
     },
     saveParsed: (id, parsedItems) =>
@@ -305,15 +357,11 @@ export const praxisApi = {
       const res = await fetch(`${PRAXIS_API}/api/captures`, {
         method: 'POST',
         body: formData,
+        headers: traceHeaders(),
         credentials: 'include',
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const err = new Error(body.detail || body.error || 'Capture failed');
-        err.status = res.status;
-        err.body = body;
-        throw err;
-      }
+      if (!res.ok) throw failedResponse(res, body, '/api/captures', res.headers.get('x-request-id'), 'Capture failed');
       return body;
     },
   },
@@ -367,9 +415,13 @@ export const praxisApi = {
     const res = await fetch(`${PRAXIS_API}/api/transcribe`, {
       method: 'POST',
       body: formData,
+      headers: traceHeaders(),
       credentials: 'include',
     });
-    if (!res.ok) throw new Error('Transcription failed');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw failedResponse(res, body, '/api/transcribe', res.headers.get('x-request-id'), 'Transcription failed');
+    }
     return res.json();
   },
 };

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { praxisApi } from '@/api/praxisClient';
-import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,6 +32,9 @@ import { weekRange } from '@/lib/taskLenses';
 import { cn } from '@/lib/utils';
 import { buildSnoozeTomorrowUpdate, fortalezaDateKey } from '@/lib/dates';
 import { toast } from 'sonner';
+import { useTaskStatus } from '@/hooks/useTaskStatus';
+import { useTaskBusy } from '@/lib/taskBusy';
+import { reportTaskWriteFailure } from '@/lib/taskStatus';
 
 const PRESETS = [
   { label: 'Pomodoro clássico', shortLabel: 'Clássico', focus: 25, brk: 5, Icon: Timer },
@@ -234,55 +236,48 @@ export default function Focus() {
     },
   });
 
-  const completeTaskMutation = useMutation({
-    mutationFn: async (taskId) => {
-      const originalTask = tasks.find((item) => item.id === taskId) || postSession?.task || null;
-      const task = await praxisApi.tasks.update(taskId, { status: 'completed' });
-      const projectSlug = projectSlugFromTaskSource(originalTask?.source);
-      let projectSync = null;
-      let projectSyncError = null;
+  // Concluir a tarefa do foco: mesmo caminho de status das outras telas (sessão, rede, ocupado).
+  const { setStatus: setTaskStatus } = useTaskStatus();
+  const completingTask = Boolean(useTaskBusy(postSession?.task?.id));
 
-      if (projectSlug && originalTask?.title) {
-        try {
-          projectSync = await praxisApi.projects.completeNextStep(projectSlug, {
-            expected_step: originalTask.title,
-            summary: originalTask.title,
-            source: 'conclusao',
-            created_by: 'joao',
-          });
-        } catch (err) {
-          projectSyncError = err;
-        }
-      }
+  const completeLinkedTask = async (taskId) => {
+    const originalTask = tasks.find((item) => item.id === taskId) || postSession?.task || null;
+    if (!originalTask) return;
+    const outcome = await setTaskStatus(originalTask, 'completed');
+    if (!outcome.ok) return;
 
-      return { task, projectSlug, projectSync, projectSyncError };
-    },
-    onSuccess: (result) => {
-      const task = result?.task;
-      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      if (result?.projectSlug) {
-        queryClient.invalidateQueries({ queryKey: ['project-updates'] });
-      }
-      dispatchPraxisLevelUpFromResponse(task);
-      setPostSessionOpen(false);
-
-      if (result?.projectSync) {
-        toast.success('Tarefa e avanço concluídos', {
-          description: 'A Continuidade já registrou esse passo. O Sêneca recalcula o próximo no ciclo seguinte.',
+    const projectSlug = projectSlugFromTaskSource(originalTask.source);
+    let projectSync = null;
+    let projectSyncError = null;
+    if (projectSlug && originalTask.title) {
+      try {
+        projectSync = await praxisApi.projects.completeNextStep(projectSlug, {
+          expected_step: originalTask.title,
+          summary: originalTask.title,
+          source: 'conclusao',
+          created_by: 'joao',
         });
-      } else if (result?.projectSlug && result?.projectSyncError) {
-        toast.success('Tarefa concluída', {
-          description: 'O passo mudou na Continuidade enquanto você focava. O Sêneca reconcilia sem apagar o estado novo.',
-        });
-      } else {
-        toast.success('Tarefa concluída', { description: task?.title || 'Marcada como feita no Praxis.' });
+      } catch (err) {
+        projectSyncError = err;
       }
-    },
-  });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+    if (projectSlug) queryClient.invalidateQueries({ queryKey: ['project-updates'] });
+    setPostSessionOpen(false);
+
+    if (projectSync) {
+      toast.success('Tarefa e avanço concluídos', {
+        description: 'A Continuidade já registrou esse passo. O Sêneca recalcula o próximo no ciclo seguinte.',
+      });
+    } else if (projectSlug && projectSyncError) {
+      toast.success('Tarefa concluída', {
+        description: 'O passo mudou na Continuidade enquanto você focava. O Sêneca reconcilia sem apagar o estado novo.',
+      });
+    } else {
+      toast.success('Tarefa concluída', { description: originalTask.title || 'Marcada como feita no Praxis.' });
+    }
+  };
 
   const snoozeTaskMutation = useMutation({
     mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
@@ -293,6 +288,7 @@ export default function Focus() {
       setPostSessionOpen(false);
       toast.success('Adiada para amanhã', { description: task?.title ? `"${task.title}" volta amanhã.` : 'Tarefa reagendada.' });
     },
+    onError: (err) => reportTaskWriteFailure(err, { fallback: 'Não deu para adiar a tarefa. Tente de novo.' }),
   });
 
   const applyPreset = (index) => {
@@ -580,11 +576,11 @@ export default function Focus() {
                 <Button
                   type="button"
                   className="w-full"
-                  onClick={() => completeTaskMutation.mutate(postSession.task.id)}
-                  disabled={completeTaskMutation.isPending}
+                  onClick={() => completeLinkedTask(postSession.task.id)}
+                  disabled={completingTask}
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
-                  {completeTaskMutation.isPending ? 'Concluindo…' : 'Concluir tarefa'}
+                  {completingTask ? 'Concluindo…' : 'Concluir tarefa'}
                 </Button>
                 <Button
                   type="button"

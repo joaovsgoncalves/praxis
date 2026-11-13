@@ -38,6 +38,9 @@ import { fortalezaDateKey } from '@/lib/dates';
 import { buildMovedOrder, buildDragOrder } from '@/lib/taskReorder';
 import { isTaskOpen, isTaskDone, isTaskMissed, isInboxTask, cleanPriorityPrefix } from '@/lib/tasks';
 import { toast } from 'sonner';
+import { useTaskStatus } from '@/hooks/useTaskStatus';
+import { clearTaskBusy, getTaskBusy, setTaskBusy, useBusyTasks } from '@/lib/taskBusy';
+import { reportTaskWriteFailure } from '@/lib/taskStatus';
 import {
   countHabitDayOutcomes,
   getHabitDayOutcome,
@@ -222,8 +225,8 @@ export default function HabitsTasks() {
           }
           toast.success('Foi pra Caixa');
         },
-        onError: () => {
-          toast.error('Erro ao criar tarefa');
+        onError: (err) => {
+          reportTaskWriteFailure(err, { fallback: 'Não deu para criar a tarefa. Tente de novo.' });
         },
       }
     );
@@ -353,6 +356,7 @@ export default function HabitsTasks() {
       return updated;
     },
     onMutate: async ({ task, patch, orderedIds }) => {
+      setTaskBusy(task.id, 'saving');
       await queryClient.cancelQueries({ queryKey: ['tasks'] });
       await queryClient.cancelQueries({ queryKey: ['allTasks'] });
       await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
@@ -371,18 +375,26 @@ export default function HabitsTasks() {
 
       return { prevTasks, prevAllTasks, prevDashboard };
     },
-    onError: (_err, _vars, context) => {
+    onError: (err, { task, patch }, context) => {
       context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
       context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
       context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error('Não deu pra mover a tarefa. Tente de novo.');
+      // Só concluir/reabrir vira pergunta depois do login; mudança de coluna o usuário refaz.
+      const closes = patch?.status === 'completed' && !isTaskDone(task);
+      const reopens = patch?.status === 'pending' && isTaskDone(task);
+      reportTaskWriteFailure(err, {
+        task,
+        nextStatus: closes || reopens ? patch.status : null,
+        fallback: 'Não deu pra mover a tarefa. Tente de novo.',
+      });
     },
     onSuccess: (data) => {
       if (!data) return;
       dispatchPraxisLevelUpFromResponse(data);
       notifyPraxisRecurrenceSpawned(data);
     },
-    onSettled: () => {
+    onSettled: (_data, _err, { task }) => {
+      clearTaskBusy(task.id);
       queryClient.invalidateQueries({ queryKey: ['allTasks'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
@@ -390,6 +402,12 @@ export default function HabitsTasks() {
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });
+
+  // Um item com gravação em andamento não aceita outro movimento até a resposta chegar.
+  const moveTaskOnBoard = (move) => {
+    if (!move?.task || getTaskBusy(move.task.id)) return;
+    moveBoardTask.mutate(move);
+  };
 
   const BOARD_CREATE_FIELDS = {
     inbox: { date: null, status: 'pending' },
@@ -402,7 +420,7 @@ export default function HabitsTasks() {
     createTask
       .mutateAsync({ title, source: 'manual', ...(BOARD_CREATE_FIELDS[columnId] || BOARD_CREATE_FIELDS.inbox) })
       .catch((err) => {
-        toast.error('Erro ao criar tarefa');
+        reportTaskWriteFailure(err, { fallback: 'Não deu para criar a tarefa. Tente de novo.' });
         throw err;
       });
 
@@ -410,7 +428,7 @@ export default function HabitsTasks() {
   const handleMoveTaskToColumn = (task, columnId) => {
     const orderedIds = reorderColumnIds(sortedBoardColumn(tasks, columnId, today), task.id, Infinity);
     const patch = moveTaskToColumn(task, columnId, today);
-    moveBoardTask.mutate({ task, patch, orderedIds });
+    moveTaskOnBoard({ task, patch, orderedIds });
   };
 
   const listOpenTask = openTaskId ? tasks.find((t) => String(t.id) === openTaskId) : null;
@@ -436,61 +454,9 @@ export default function HabitsTasks() {
     },
   });
 
-  const toggleTask = useMutation({
-    mutationFn: (task) => {
-      const nextStatus = isTaskDone(task) ? 'pending' : 'completed';
-      return praxisApi.tasks.update(task.id, { status: nextStatus });
-    },
-    onMutate: async (task) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks'] });
-      await queryClient.cancelQueries({ queryKey: ['allTasks'] });
-      await queryClient.cancelQueries({ queryKey: ['dashboardTasks'] });
-
-      const prevTasks = queryClient.getQueriesData({ queryKey: ['tasks'] });
-      const prevAllTasks = queryClient.getQueriesData({ queryKey: ['allTasks'] });
-      const prevDashboard = queryClient.getQueriesData({ queryKey: ['dashboardTasks'] });
-
-      const nextStatus = isTaskDone(task) ? 'pending' : 'completed';
-      if (nextStatus === 'completed') hapticLight();
-
-      const updateList = (old) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((t) =>
-          t.id === task.id
-            ? {
-                ...t,
-                status: nextStatus,
-                completed_date: nextStatus === 'completed' ? today : null,
-                completed_at: nextStatus === 'completed' ? new Date().toISOString() : null,
-              }
-            : t
-        );
-      };
-
-      queryClient.setQueriesData({ queryKey: ['tasks'] }, updateList);
-      queryClient.setQueriesData({ queryKey: ['allTasks'] }, updateList);
-      queryClient.setQueriesData({ queryKey: ['dashboardTasks'] }, updateList);
-
-      return { prevTasks, prevAllTasks, prevDashboard };
-    },
-    onError: (_err, _task, context) => {
-      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error('Erro ao atualizar tarefa');
-    },
-    onSuccess: (data) => {
-      dispatchPraxisLevelUpFromResponse(data);
-      notifyPraxisRecurrenceSpawned(data);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
-    },
-  });
+  // Marcar/reabrir: caminho único (sessão, rede, item ocupado) em src/lib/taskStatus.js.
+  const { toggle: toggleTaskStatus } = useTaskStatus();
+  const busyTasks = useBusyTasks();
 
   const toggleHabit = useMutation({
     mutationFn: async ({ habitId, isDone, value }) => {
@@ -1132,9 +1098,9 @@ export default function HabitsTasks() {
           <TaskBoard
             tasks={tasks}
             today={today}
-            onMoveTask={(move) => moveBoardTask.mutate(move)}
+            onMoveTask={moveTaskOnBoard}
             onCreateInColumn={handleCreateInColumn}
-            onToggleComplete={(task) => toggleTask.mutate(task)}
+            onToggleComplete={toggleTaskStatus}
             onEditTask={openTask}
             onDeleteTask={(task) => confirmDeleteTask(task)}
             onNotToday={(task) => notTodayTask.mutate(task.id)}
@@ -1339,8 +1305,10 @@ export default function HabitsTasks() {
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => toggleTask.mutate(task)}
-                                  className="praxis-touch-target flex shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                                  onClick={() => toggleTaskStatus(task)}
+                                  disabled={busyTasks.has(task.id)}
+                                  aria-busy={busyTasks.has(task.id) || undefined}
+                                  className="praxis-touch-target flex shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
                                   aria-label={(done ? 'Reabrir ' : 'Concluir ') + title}
                                 >
                                   {done ? (

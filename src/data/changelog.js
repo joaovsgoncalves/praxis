@@ -8,6 +8,18 @@
  */
 export const changelog = [
   {
+    id: '2026-11-13-check-do-dia',
+    date: '2026-11-13',
+    title: 'Concluir tarefa sem susto',
+    items: [
+      'Se a sessão terminar, a Praxis pede a senha uma vez, na mesma tela, e pergunta se você ainda quer concluir a tarefa.',
+      'Sem conexão a tarefa não é marcada: aparece o aviso e nada fica concluído só na tela.',
+      'Se a conexão cair no meio, a Praxis confere se salvou antes de avisar.',
+      'Toque duplo conclui só a tarefa tocada, não a de baixo.',
+      'Concluir vale inteiro: tarefa, pontos e próxima repetição juntos. A agenda sincroniza depois.',
+    ],
+  },
+  {
     id: '2026-10-26-frentes',
     date: '2026-10-26',
     title: 'Frentes mais simples',

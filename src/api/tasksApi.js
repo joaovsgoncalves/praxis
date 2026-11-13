@@ -6,6 +6,8 @@ export const tasksApiModule = (request) => ({
       return request(`/api/tasks${query ? '?' + query : ''}`);
     },
     get: (id) => request(`/api/tasks/${id}`),
+    /** Estado real no servidor: nunca devolve o cache offline. */
+    getFresh: (id) => request(`/api/tasks/${id}`, { fresh: true }),
     create: (data) => request('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => request(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     reorder: (orderedIds) => request('/api/tasks/reorder', { method: 'PATCH', body: JSON.stringify({ ordered_ids: orderedIds }) }),

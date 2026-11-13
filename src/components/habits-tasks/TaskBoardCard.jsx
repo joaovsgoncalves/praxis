@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { isTaskOpen, cleanPriorityPrefix } from '@/lib/tasks';
 import { BOARD_COLUMNS } from '@/lib/taskLenses';
+import { useTaskBusy } from '@/lib/taskBusy';
 import { PRIORITY_CONFIG, TaskCardMeta, TaskPriorityRuler, taskPriorityKey } from './TaskCardParts';
 
 export const BOARD_COLUMN_NAMES = {
@@ -44,6 +45,7 @@ export default function TaskBoardCard({
   onNotToday,
 }) {
   const isDone = task.status === 'completed' || task.status === 'done';
+  const busy = Boolean(useTaskBusy(task.id));
   const showNotToday =
     isTaskOpen(task) &&
     task.category !== 'ideias' &&
@@ -89,6 +91,8 @@ export default function TaskBoardCard({
         <div className="flex min-w-0 items-start gap-2.5">
           <Checkbox
             checked={isDone}
+            disabled={busy}
+            aria-busy={busy || undefined}
             onCheckedChange={() => onToggleComplete?.(task)}
             className={cn(
               'mt-[3px] h-4 w-4 shrink-0 rounded-[5px] border-white/25 touch-manipulation',

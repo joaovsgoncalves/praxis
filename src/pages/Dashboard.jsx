@@ -38,11 +38,13 @@ import { hapticLight } from "@/lib/haptics";
 import { useTimeOfDay } from "@/hooks/useTimeOfDay";
 import { isHabitDueOnDate } from "@/lib/habits";
 import { dispatchPraxisLevelUpFromResponse } from "@/lib/praxisLevelUp";
-import { notifyPraxisRecurrenceSpawned } from "@/lib/praxisRecurrenceToast";
-import { isTaskCompletedForToday, isTaskDone, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
+import { isTaskCompletedForToday, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
 import { addDaysToDateKey, sortTasksForList } from "@/lib/taskListFilters";
 import SuggestedGoalCard from "@/components/dashboard/SuggestedGoalCard";
 import { toast } from "sonner";
+import { useTaskStatus } from "@/hooks/useTaskStatus";
+import { useBusyTasks } from "@/lib/taskBusy";
+import { reportTaskWriteFailure } from "@/lib/taskStatus";
 
 export default function Dashboard() {
   // Entrada animada só na primeira visita da sessão; nas seguintes o Hoje aparece direto.
@@ -119,55 +121,9 @@ export default function Dashboard() {
     invalidateWeek();
   }, [queryClient, invalidateWeek]);
 
-  const toggleTaskMutation = useMutation({
-    mutationFn: (task) => {
-      const newStatus = isTaskDone(task) ? "pending" : "completed";
-      return praxisApi.tasks.update(task.id, { status: newStatus });
-    },
-    onMutate: async (task) => {
-      await queryClient.cancelQueries({ queryKey: ["dashboardTasks"] });
-      await queryClient.cancelQueries({ queryKey: ["tasks"] });
-      await queryClient.cancelQueries({ queryKey: ["allTasks"] });
-
-      const prevDashboard = queryClient.getQueriesData({ queryKey: ["dashboardTasks"] });
-      const prevTasks = queryClient.getQueriesData({ queryKey: ["tasks"] });
-      const prevAllTasks = queryClient.getQueriesData({ queryKey: ["allTasks"] });
-
-      const nextStatus = isTaskDone(task) ? "pending" : "completed";
-      const updateList = (old) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((t) =>
-          t.id === task.id
-            ? {
-                ...t,
-                status: nextStatus,
-                completed_date: nextStatus === "completed" ? today : null,
-                completed_at: nextStatus === "completed" ? new Date().toISOString() : null,
-              }
-            : t
-        );
-      };
-
-      queryClient.setQueriesData({ queryKey: ["dashboardTasks"] }, updateList);
-      queryClient.setQueriesData({ queryKey: ["tasks"] }, updateList);
-      queryClient.setQueriesData({ queryKey: ["allTasks"] }, updateList);
-
-      return { prevDashboard, prevTasks, prevAllTasks };
-    },
-    onError: (_err, _task, context) => {
-      context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error("Erro ao atualizar tarefa");
-    },
-    onSuccess: (updated) => {
-      dispatchPraxisLevelUpFromResponse(updated);
-      notifyPraxisRecurrenceSpawned(updated);
-    },
-    onSettled: () => {
-      invalidateTaskQueries();
-    },
-  });
+  // Marcar/reabrir: caminho único (sessão, rede, item ocupado) em src/lib/taskStatus.js.
+  const { toggle: toggleTaskStatus } = useTaskStatus({ onSettled: invalidateWeek });
+  const busyTasks = useBusyTasks();
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }) => praxisApi.tasks.update(id, data),
@@ -191,11 +147,11 @@ export default function Dashboard() {
 
       return { prevDashboard, prevTasks, prevAllTasks };
     },
-    onError: (_err, _vars, context) => {
+    onError: (err, _vars, context) => {
       context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
       context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
       context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error("Erro ao atualizar tarefa");
+      reportTaskWriteFailure(err, { fallback: "Não deu para atualizar a tarefa. Tente de novo." });
     },
     onSuccess: () => {
       setEditingTask(null);
@@ -227,11 +183,11 @@ export default function Dashboard() {
 
       return { prevDashboard, prevTasks, prevAllTasks };
     },
-    onError: (_err, _id, context) => {
+    onError: (err, _id, context) => {
       context?.prevDashboard?.forEach(([key, val]) => queryClient.setQueryData(key, val));
       context?.prevTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
       context?.prevAllTasks?.forEach(([key, val]) => queryClient.setQueryData(key, val));
-      toast.error("Erro ao excluir tarefa");
+      reportTaskWriteFailure(err, { fallback: "Não deu para excluir a tarefa. Tente de novo." });
     },
     onSuccess: () => {
       toast.success("Tarefa excluída");
@@ -692,7 +648,8 @@ export default function Dashboard() {
               task={nowPlan.now}
               next={nowPlan.next}
               today={today}
-              onComplete={(t) => toggleTaskMutation.mutate(t)}
+              busy={Boolean(nowPlan.now && busyTasks.has(nowPlan.now.id))}
+              onComplete={toggleTaskStatus}
               onSnooze15={handleSnooze15}
               onSnoozeTomorrow={handleSnoozeTomorrow}
               onAddTask={() => setShowNewTaskForm(true)}
@@ -705,7 +662,7 @@ export default function Dashboard() {
               today={today}
               clock={clock}
               behind={nowPlan.behind}
-              onToggleComplete={(t) => toggleTaskMutation.mutate(t)}
+              onToggleComplete={toggleTaskStatus}
               onEditTask={setEditingTask}
               onDeleteTask={setTaskPendingDelete}
               onNotToday={(t) => notTodayTaskMutation.mutate(t.id)}

@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { latestRelease } from '@/data/changelog';
+import { readPendingIntent } from '@/lib/pendingIntent';
 import {
   OPEN_WHATS_NEW_EVENT,
   markReleaseSeen,
@@ -33,6 +34,8 @@ export default function WhatsNewDialog() {
 
   useEffect(() => {
     if (!shouldShowWhatsNew(readLastSeenRelease(), latestRelease)) return undefined;
+    // Voltando de sessão perdida há uma pergunta mais urgente na tela; as novidades ficam para depois.
+    if (readPendingIntent()) return undefined;
     const timer = window.setTimeout(() => setOpen(true), OPEN_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, []);

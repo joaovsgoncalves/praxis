@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import path from 'path'
+import { execFileSync } from 'child_process'
 
 // Vendors em chunks estáveis: mudam pouco entre publicações (cache longo) e baixam em paralelo.
 // Só o que é de fato compartilhado; o resto o Rollup coloca junto da tela que usa.
@@ -67,9 +68,23 @@ function publicRoutePreload() {
   }
 }
 
+/** Commit do build: vai no cabeçalho X-Praxis-Client e casa a chamada com a versão do front. */
+function buildVersion() {
+  const fromEnv = process.env.VERCEL_GIT_COMMIT_SHA || process.env.PRAXIS_BUILD
+  if (fromEnv) return String(fromEnv).slice(0, 7)
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || 'dev'
+  } catch {
+    return 'dev'
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   logLevel: 'error',
+  define: {
+    'import.meta.env.VITE_PRAXIS_BUILD': JSON.stringify(buildVersion()),
+  },
   plugins: [
     react(),
     publicRoutePreload(),

@@ -9,6 +9,7 @@ import ParticleBackground from '@/components/shared/ParticleBackground';
 import PraxisLevelUpListener from '@/components/gamification/PraxisLevelUpListener';
 import OfflineBanner from '@/components/shared/OfflineBanner';
 import WhatsNewDialog from '@/components/shared/WhatsNewDialog';
+import PendingIntentPrompt from '@/components/shared/PendingIntentPrompt';
 import { tweenFast } from '@/lib/motion';
 import { primaryNavItems } from '@/lib/praxisNav';
 import { prefetchWhenIdle } from '@/lib/routePrefetch';
@@ -61,6 +62,7 @@ export default function AppLayout() {
 
         {!isLogin ? <MobileBottomNav onOpenMenu={() => setSidebarOpen(true)} /> : null}
         <WhatsNewDialog />
+        <PendingIntentPrompt />
       </div>
     </MotionConfig>
   );

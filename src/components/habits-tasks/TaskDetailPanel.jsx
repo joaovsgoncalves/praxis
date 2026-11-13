@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
   ArrowRightLeft,
@@ -35,9 +34,11 @@ import { CATEGORIES } from '@/lib/categories';
 import { cleanPriorityPrefix, isTaskDone, isTaskOpen } from '@/lib/tasks';
 import { fortalezaAddDays } from '@/lib/dates';
 import { BOARD_COLUMNS, boardColumnForTask } from '@/lib/taskLenses';
-import { hapticLight } from '@/lib/haptics';
 import { dispatchPraxisLevelUpFromResponse } from '@/lib/praxisLevelUp';
 import { notifyPraxisRecurrenceSpawned } from '@/lib/praxisRecurrenceToast';
+import { useTaskStatus } from '@/hooks/useTaskStatus';
+import { useTaskBusy } from '@/lib/taskBusy';
+import { reportTaskWriteFailure } from '@/lib/taskStatus';
 import TaskChecklist from './TaskChecklist';
 import { BOARD_COLUMN_NAMES } from './TaskBoardCard';
 import { PRIORITY_CONFIG, taskPriorityKey } from './TaskCardParts';
@@ -161,6 +162,8 @@ function TaskDetailBody({ task, today, onClose, onDelete, onNotToday, onMoveToCo
   const [draft, setDraft] = useState(() => draftFromTask(task));
   const [saveState, setSaveState] = useState('idle');
   const [dateOpen, setDateOpen] = useState(false);
+  const { setStatus } = useTaskStatus();
+  const statusBusy = Boolean(useTaskBusy(task?.id));
   const taskRef = useRef(task);
   const pendingRef = useRef({});
   const timerRef = useRef(null);
@@ -184,7 +187,7 @@ function TaskDetailBody({ task, today, onClose, onDelete, onNotToday, onMoveToCo
       applyToCaches(id, cache);
       return { id, previous };
     },
-    onError: (_err, _vars, context) => {
+    onError: (err, _vars, context) => {
       if (context) {
         // Rollback só dos campos desta gravação — outras edições em voo ficam intactas.
         applyToCaches(context.id, context.previous);
@@ -197,7 +200,7 @@ function TaskDetailBody({ task, today, onClose, onDelete, onNotToday, onMoveToCo
         });
       }
       setSaveState('error');
-      toast.error('Não deu pra salvar. Voltei o valor anterior.');
+      reportTaskWriteFailure(err, { fallback: 'Não deu pra salvar. Voltei o valor anterior.' });
     },
     onSuccess: (data) => {
       dispatchPraxisLevelUpFromResponse(data);
@@ -293,10 +296,14 @@ function TaskDetailBody({ task, today, onClose, onDelete, onNotToday, onMoveToCo
   const showNotToday = isTaskOpen(task) && !isIdea && (!task.date || task.date <= today);
   const dateValue = task.date ? new Date(String(task.date).slice(0, 10) + 'T12:00:00') : undefined;
 
-  const toggleDone = () => {
-    const status = isDone ? 'pending' : 'completed';
-    if (status === 'completed') hapticLight();
-    queue({ status }, { immediate: true });
+  // Concluir/reabrir usa o mesmo caminho das outras telas; o texto pendente é gravado antes.
+  const toggleDone = async () => {
+    if (statusBusy) return;
+    flush();
+    setSaveState('saving');
+    const outcome = await setStatus(taskRef.current, isDone ? 'pending' : 'completed');
+    if (outcome.kind === 'ignored') return;
+    setSaveState(outcome.ok ? 'saved' : 'error');
   };
 
   const setDate = (dateKey) => {
@@ -326,6 +333,8 @@ function TaskDetailBody({ task, today, onClose, onDelete, onNotToday, onMoveToCo
           <div className="flex h-9 w-6 shrink-0 items-center justify-center">
             <Checkbox
               checked={isDone}
+              disabled={statusBusy}
+              aria-busy={statusBusy || undefined}
               onCheckedChange={toggleDone}
               aria-label={(isDone ? 'Reabrir ' : 'Concluir ') + title}
               className="h-5 w-5 rounded-md border-white/30 data-[state=checked]:border-domain-wellness data-[state=checked]:bg-domain-wellness data-[state=checked]:text-black"

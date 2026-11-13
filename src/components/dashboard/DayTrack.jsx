@@ -34,6 +34,7 @@ import { sparkFromElement } from '@/lib/celebration';
 import { buildDayTrack } from '@/lib/dayTrack';
 import { formatBehindSince, formatTaskTimeLabel } from '@/lib/nowTask';
 import { cleanPriorityPrefix } from '@/lib/tasks';
+import { useBusyTasks } from '@/lib/taskBusy';
 
 /** Coluna de horário: largura fixa, números alinhados. */
 function TimeCell({ children, className }) {
@@ -116,7 +117,7 @@ function TaskMenu({ task, done = false, actions }) {
   );
 }
 
-function TaskRow({ task, time, behindLabel, tone = 'default', rowRef, onComplete, actions }) {
+function TaskRow({ task, time, behindLabel, tone = 'default', rowRef, onComplete, actions, busy = false }) {
   const title = cleanPriorityPrefix(task.title);
   return (
     <li
@@ -130,6 +131,8 @@ function TaskRow({ task, time, behindLabel, tone = 'default', rowRef, onComplete
       <span className="flex h-11 w-11 shrink-0 items-center justify-center">
         <Checkbox
           checked={false}
+          disabled={busy}
+          aria-busy={busy || undefined}
           onCheckedChange={() => onComplete(task)}
           aria-label={`Concluir ${title}`}
           className="h-5 w-5 border-muted-foreground/40 touch-manipulation"
@@ -251,7 +254,9 @@ export default function DayTrack({
     if (el) rowRefs.current.set(id, el);
     else rowRefs.current.delete(id);
   };
+  const busyTasks = useBusyTasks();
   const complete = (task) => {
+    if (busyTasks.has(task.id)) return;
     sparkFromElement(rowRefs.current.get(task.id), 'ember');
     onToggleComplete?.(task);
   };
@@ -268,6 +273,7 @@ export default function DayTrack({
         rowRef={setRowRef(item.task.id)}
         onComplete={complete}
         actions={actions}
+        busy={busyTasks.has(item.task.id)}
       />
     ) : (
       <EventRow key={item.key} item={item} />
@@ -300,6 +306,7 @@ export default function DayTrack({
                     rowRef={setRowRef(task.id)}
                     onComplete={complete}
                     actions={actions}
+                    busy={busyTasks.has(task.id)}
                   />
                 ))}
               </ul>
@@ -319,6 +326,7 @@ export default function DayTrack({
                       rowRef={setRowRef(item.task.id)}
                       onComplete={complete}
                       actions={actions}
+                      busy={busyTasks.has(item.task.id)}
                     />
                   ) : (
                     <EventRow key={item.key} item={item} />
@@ -370,6 +378,8 @@ export default function DayTrack({
                         <span className="flex h-11 w-11 shrink-0 items-center justify-center">
                           <Checkbox
                             checked
+                            disabled={busyTasks.has(task.id)}
+                            aria-busy={busyTasks.has(task.id) || undefined}
                             onCheckedChange={() => onToggleComplete?.(task)}
                             aria-label={`Reabrir ${title}`}
                             className="h-5 w-5 border-domain-wellness touch-manipulation data-[state=checked]:bg-domain-wellness"

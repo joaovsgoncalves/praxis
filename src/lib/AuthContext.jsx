@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { praxisApi } from '@/api/praxisClient';
 import { setSessionHint } from '@/lib/sessionHint';
+import { clearSessionLost, subscribeSessionLost } from '@/lib/sessionGate';
+import { clearPendingIntent, userKeyOf } from '@/lib/pendingIntent';
+import { queryClientInstance } from '@/lib/query-client';
 
 const AuthContext = createContext();
 
@@ -16,6 +19,20 @@ export const AuthProvider = ({ children }) => {
   // O login pode responder antes da checagem inicial (a landing/login já pintam sem esperar
   // por ela). Cada checagem tem um número; resposta de checagem velha é descartada.
   const checkSeq = useRef(0);
+  const authedRef = useRef(false);
+  authedRef.current = isAuthenticated;
+
+  // A sessão caiu no meio do uso (401 em qualquer chamada protegida): um pedido de login só,
+  // na mesma tela. O usuário anterior fica guardado para conferir quem entra de volta.
+  useEffect(
+    () =>
+      subscribeSessionLost(({ reason }) => {
+        if (!authedRef.current) return;
+        setIsAuthenticated(false);
+        setAuthError({ type: 'auth_required', sessionLost: true, reason });
+      }),
+    [],
+  );
 
   const checkUserAuth = useCallback(async () => {
     const seq = ++checkSeq.current;
@@ -40,6 +57,7 @@ export const AuthProvider = ({ children }) => {
       }
       const me = await praxisApi.auth.me();
       if (stale()) return;
+      clearSessionLost();
       setUser(me.user);
       setIsAuthenticated(true);
       setAuthChecked(true);
@@ -73,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     setAuthError({ type: 'auth_required' });
     setSessionHint(false);
+    clearPendingIntent();
     try {
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -90,6 +109,15 @@ export const AuthProvider = ({ children }) => {
 
   const onLoginSuccess = (session) => {
     setAuthError(null);
+    clearSessionLost();
+    // Entrou outra pessoa: nada do que estava em memória ou pendente vale para ela.
+    const sameUser = !user || !session?.user || userKeyOf(user) === userKeyOf(session.user);
+    if (sameUser) {
+      queryClientInstance.invalidateQueries();
+    } else {
+      clearPendingIntent();
+      queryClientInstance.clear();
+    }
     if (session?.user) {
       checkSeq.current += 1;
       setSessionHint(true);
