@@ -1,7 +1,7 @@
 // @ts-check
 import { defineConfig } from '@playwright/test';
 
-const baseURL = process.env.PRAXIS_E2E_BASE || 'https://praxis-jota.vercel.app';
+const baseURL = process.env.PRAXIS_E2E_BASE || 'https://dopraxis.vercel.app';
 const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '';
 
 export default defineConfig({
