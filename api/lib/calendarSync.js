@@ -79,6 +79,12 @@ export function createCalendarServices({ db, getLocalDateString }) {
     return true;
   }
 
+  /** Há algo para mexer no Google? Evento já ligado (atualizar/apagar) ou tarefa de hoje com hora. */
+  function taskNeedsCalendarSync(task) {
+    if (!FORJA_CALENDAR_SYNC_ENABLED || !task) return false;
+    return Boolean(task.calendar_event_id) || shouldSyncTaskToCalendar(task);
+  }
+
   function taskIdFromEventDescription(description) {
     const match = /Task ID:\s*(\S+)/.exec(String(description || ''));
     return match ? match[1] : null;
@@ -288,6 +294,7 @@ export function createCalendarServices({ db, getLocalDateString }) {
     ensureTodayTasksOnCalendar,
     runCalendarMaintenance,
     shouldSyncTaskToCalendar,
+    taskNeedsCalendarSync,
     createCalendarRouter,
   };
 }

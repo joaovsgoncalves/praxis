@@ -14,6 +14,7 @@ import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
 import { getLevel } from './lib/gamification.js';
 import { createCalendarServices } from './lib/calendarSync.js';
+import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
 import { createTasksRouter, registerIdeaToTaskRoute } from './routes/tasks.js';
 import { createHabitsRouter, registerHabitLogRoutes } from './routes/habits.js';
 import { createWellnessRouter } from './routes/wellness.js';
@@ -171,7 +172,11 @@ const {
   syncTaskToCalendar,
   runCalendarMaintenance,
   createCalendarRouter,
+  taskNeedsCalendarSync,
 } = createCalendarServices({ db, getLocalDateString });
+
+// Agenda fora da transação da tarefa: as rotas gravam a intenção, a fila sincroniza depois.
+const calendarQueue = createTaskCalendarQueue({ db, syncTaskToCalendar });
 
 const routeCtx = {
   db,
@@ -182,6 +187,8 @@ const routeCtx = {
   nextSortOrder,
   reorderItems,
   syncTaskToCalendar,
+  taskNeedsCalendarSync,
+  calendarQueue,
   getLevel,
   SKIP_REASONS,
   HABIT_OUTCOMES,
@@ -220,5 +227,10 @@ const HOST = process.env.HOST || '127.0.0.1';
 app.listen(PORT, HOST, () => {
   console.log(`🔥 Praxis API running on ${HOST}:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
-  setImmediate(() => runCalendarMaintenance());
+  setImmediate(() => {
+    runCalendarMaintenance();
+    calendarQueue.drain();
+  });
+  // Retentativa das intenções de agenda que falharam (a espera entre tentativas fica na fila).
+  setInterval(() => calendarQueue.drain(), 60 * 1000).unref();
 });

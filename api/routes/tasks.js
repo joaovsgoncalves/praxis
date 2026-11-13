@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { nextRecurrenceDate } from '../taskRecurrence.js';
 import { awardXp, reverseXp } from '../lib/xpEvents.js';
+import { createTaskCalendarQueue } from '../lib/taskCalendarQueue.js';
 
 /**
  * Tasks router — mounted at /api/tasks
@@ -21,6 +22,18 @@ export function createTasksRouter(ctx) {
   } = ctx;
 
   const router = Router();
+
+  // A agenda nunca roda dentro da transação da tarefa: a rota grava a intenção e responde.
+  const calendarQueue = ctx.calendarQueue || createTaskCalendarQueue({ db, syncTaskToCalendar });
+  const kickCalendar = ctx.scheduleCalendarDrain || (() => setImmediate(() => calendarQueue.drain()));
+
+  /** Registra a intenção de agenda da tarefa. Chamar dentro da transação que a alterou. */
+  function queueCalendar(task, options) {
+    if (!task) return { skipped: true };
+    // Sem evento ligado e fora do critério de hoje não há o que mexer no Google.
+    if (ctx.taskNeedsCalendarSync && !ctx.taskNeedsCalendarSync(task)) return { skipped: true };
+    return calendarQueue.enqueue(task.id, options);
+  }
 
   // Uma consulta agregada para a lista inteira (json_each evita estourar o limite de parâmetros).
   const checklistCountsStmt = db.prepare(`
@@ -233,21 +246,27 @@ export function createTasksRouter(ctx) {
     res.json({ success: true });
   });
 
-  function spawnNextRecurringTask(db, task, { completedDate, today, syncCalendar = true }) {
+  /**
+   * Garante a próxima ocorrência da série. Uma ocorrência por série e data, em qualquer
+   * estado: concluir, reabrir e concluir de novo nunca cria a segunda na mesma data.
+   * Só grava no banco; quem chama decide a agenda.
+   */
+  function spawnNextRecurringTask(db, task, { completedDate, today }) {
     if (!task?.recurrence || task.recurrence === 'none') return null;
     const baseForNext = task.date || completedDate || today;
     const nextDate = nextRecurrenceDate(baseForNext, task.recurrence, task.recurrence_days);
     if (!nextDate) return null;
 
     const parentRef = task.recurrence_parent_id || task.id;
-    const existingChild = db
+    const existingOccurrence = db
       .prepare(
         `SELECT id FROM tasks
-         WHERE recurrence_parent_id = ? AND date = ?
-         AND status NOT IN ('completed', 'done', 'cancelled')`,
+         WHERE (recurrence_parent_id = ? OR id = ?) AND date = ? AND id != ?
+         ORDER BY created_date ASC
+         LIMIT 1`,
       )
-      .get(parentRef, nextDate);
-    if (existingChild) return { id: existingChild.id, date: nextDate, created: false };
+      .get(parentRef, parentRef, nextDate, task.id);
+    if (existingOccurrence) return { id: existingOccurrence.id, date: nextDate, created: false };
 
     const childId = randomUUID();
     db.prepare(`
@@ -269,10 +288,50 @@ export function createTasksRouter(ctx) {
       task.recurrence_days || '[]',
       parentRef,
     );
-    if (!syncCalendar) return { id: childId, date: nextDate, created: true, calendar_sync: null };
-    const childTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(childId);
-    const calendarSync = syncTaskToCalendar(childTask);
-    return { id: childId, date: nextDate, created: true, calendar_sync: calendarSync };
+    return { id: childId, date: nextDate, created: true };
+  }
+
+  /**
+   * Efeitos de entrar ou sair de concluída: XP (+10 uma vez, estorno ao reabrir) e próxima
+   * ocorrência. Roda DENTRO da transação que gravou o status, para a operação inteira valer
+   * uma vez ou ser desfeita. Usada por criar-já-feita e por atualizar.
+   */
+  function applyStatusTransition({ wasDone, task, today }) {
+    const isDone = task.status === 'completed' || task.status === 'done';
+    let xpSync = null;
+    let nextOccurrence = null;
+
+    if (!wasDone && isDone) {
+      const reason = task.date && task.date < today ? 'Tarefa atrasada limpa hoje' : 'Tarefa concluída';
+      const award = awardXp(db, { sourceType: 'task', sourceId: task.id, amount: 10, reason });
+      if (award.awarded > 0) {
+        xpSync = {
+          awarded: award.awarded,
+          reason,
+          xp_total: award.xp_total,
+          level: award.level,
+          leveled_up: award.leveled_up,
+        };
+      }
+      const spawned = spawnNextRecurringTask(db, task, { completedDate: task.completed_date, today });
+      if (spawned) {
+        nextOccurrence = { id: spawned.id, date: spawned.date, created: spawned.created };
+        if (spawned.created) queueCalendar(findTask(spawned.id));
+      }
+    } else if (wasDone && !isDone) {
+      xpSync = taskXpReversalSync(task.id, 'Tarefa desmarcada');
+    }
+
+    return { xpSync, nextOccurrence };
+  }
+
+  /** Falha no meio da gravação: a transação já desfez tudo; o cliente pode repetir sem medo. */
+  function sendWriteFailure(res, where, error) {
+    console.error(`[tasks] ${where} falhou e foi desfeito:`, error?.message || error);
+    return res.status(500).json({
+      error: 'Não foi possível salvar a tarefa. Nada foi alterado.',
+      code: 'task_write_failed',
+    });
   }
 
   /**
@@ -327,7 +386,7 @@ export function createTasksRouter(ctx) {
         if (!next || next >= today) break;
         base = next;
       }
-      spawnNextRecurringTask(db, { ...task, date: base }, { today, syncCalendar: false });
+      spawnNextRecurringTask(db, { ...task, date: base }, { today });
     }
     return stale.length;
   });
@@ -355,25 +414,40 @@ export function createTasksRouter(ctx) {
     const taskTitle = stripPriorityPrefix(title);
     const taskSortOrder = sort_order !== undefined ? Number(sort_order) : nextSortOrder('tasks');
 
-    db.prepare(`
-      INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at, idea_status, source_idea_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id, taskTitle, description, taskDate || null, taskTime || null, status, taskPriority, category,
-      goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
-      calendar_event_id || null, taskSortOrder, recurrence,
-      JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
-      recurrence_parent_id || null,
-      completedDate,
-      completedAt,
-      taskIdeaStatus,
-      source_idea_id || null,
-    );
+    let outcome;
+    try {
+      outcome = db.transaction(() => {
+        db.prepare(`
+          INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, recurrence_parent_id, completed_date, completed_at, idea_status, source_idea_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          id, taskTitle, description, taskDate || null, taskTime || null, status, taskPriority, category,
+          goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
+          calendar_event_id || null, taskSortOrder, recurrence,
+          JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
+          recurrence_parent_id || null,
+          completedDate,
+          completedAt,
+          taskIdeaStatus,
+          source_idea_id || null,
+        );
 
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-    const calendarSync = syncTaskToCalendar(task);
-    const savedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-    res.status(201).json({ ...savedTask, calendar_sync: calendarSync });
+        const task = findTask(id);
+        // Nascer concluída passa pela mesma transição de quem é concluída depois.
+        const effects = applyStatusTransition({ wasDone: false, task, today: getLocalDateString() });
+        return { ...effects, calendarSync: queueCalendar(task) };
+      })();
+    } catch (error) {
+      return sendWriteFailure(res, 'POST', error);
+    }
+
+    kickCalendar();
+    res.status(201).json({
+      ...findTask(id),
+      calendar_sync: outcome.calendarSync,
+      next_occurrence: outcome.nextOccurrence,
+      xp_sync: outcome.xpSync,
+    });
   });
 
   router.put('/:id', (req, res) => {
@@ -399,83 +473,59 @@ export function createTasksRouter(ctx) {
       }
     }
 
-    db.prepare(`
-      UPDATE tasks SET
-        title = COALESCE(?, title),
-        description = COALESCE(?, description),
-        date = COALESCE(?, date),
-        time = COALESCE(?, time),
-        status = COALESCE(?, status),
-        priority = COALESCE(?, priority),
-        category = COALESCE(?, category),
-        goal_id = COALESCE(?, goal_id),
-        source = COALESCE(?, source),
-        duration_minutes = COALESCE(?, duration_minutes),
-        calendar_event_id = COALESCE(?, calendar_event_id),
-        sort_order = COALESCE(?, sort_order),
-        recurrence = COALESCE(?, recurrence),
-        recurrence_days = COALESCE(?, recurrence_days),
-        idea_status = COALESCE(?, idea_status),
-        source_idea_id = COALESCE(?, source_idea_id),
-        completed_date = ?,
-        completed_at = ?,
-        updated_date = datetime('now')
-      WHERE id = ?
-    `).run(
-      title !== undefined ? stripPriorityPrefix(title) : null, description, date, time, status, priority, category,
-      goal_id, source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
-      sort_order !== undefined ? Number(sort_order) : null,
-      recurrence,
-      recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
-      idea_status !== undefined ? idea_status : null,
-      source_idea_id !== undefined ? source_idea_id : null,
-      completedDate,
-      completedAt,
-      req.params.id
-    );
+    let outcome;
+    try {
+      outcome = db.transaction(() => {
+        db.prepare(`
+          UPDATE tasks SET
+            title = COALESCE(?, title),
+            description = COALESCE(?, description),
+            date = COALESCE(?, date),
+            time = COALESCE(?, time),
+            status = COALESCE(?, status),
+            priority = COALESCE(?, priority),
+            category = COALESCE(?, category),
+            goal_id = COALESCE(?, goal_id),
+            source = COALESCE(?, source),
+            duration_minutes = COALESCE(?, duration_minutes),
+            calendar_event_id = COALESCE(?, calendar_event_id),
+            sort_order = COALESCE(?, sort_order),
+            recurrence = COALESCE(?, recurrence),
+            recurrence_days = COALESCE(?, recurrence_days),
+            idea_status = COALESCE(?, idea_status),
+            source_idea_id = COALESCE(?, source_idea_id),
+            completed_date = ?,
+            completed_at = ?,
+            updated_date = datetime('now')
+          WHERE id = ?
+        `).run(
+          title !== undefined ? stripPriorityPrefix(title) : null, description, date, time, status, priority, category,
+          goal_id, source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
+          sort_order !== undefined ? Number(sort_order) : null,
+          recurrence,
+          recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
+          idea_status !== undefined ? idea_status : null,
+          source_idea_id !== undefined ? source_idea_id : null,
+          completedDate,
+          completedAt,
+          req.params.id
+        );
 
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    const calendarSync = syncTaskToCalendar(task);
-    const syncedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    let nextOccurrence = null;
-    let nextOccurrenceSync = null;
-    let xpSync = null;
-
-    // XP por evento: +10 uma vez por conclusão ativa; sair de concluída estorna.
-    if (status !== undefined && !wasDone && willBeDone) {
-      const reason = task.date && task.date < today ? 'Tarefa atrasada limpa hoje' : 'Tarefa concluída';
-      const award = awardXp(db, { sourceType: 'task', sourceId: task.id, amount: 10, reason });
-      if (award.awarded > 0) {
-        xpSync = {
-          awarded: award.awarded,
-          reason,
-          xp_total: award.xp_total,
-          level: award.level,
-          leveled_up: award.leveled_up,
-        };
-      }
-    } else if (status !== undefined && wasDone && !willBeDone) {
-      xpSync = taskXpReversalSync(task.id, 'Tarefa desmarcada');
+        const task = findTask(req.params.id);
+        // Status, XP e próxima ocorrência valem juntos ou nenhum vale.
+        const effects = applyStatusTransition({ wasDone, task, today });
+        return { ...effects, calendarSync: queueCalendar(task) };
+      })();
+    } catch (error) {
+      return sendWriteFailure(res, 'PUT', error);
     }
 
-    const becameDone =
-      (status === 'completed' || status === 'done') &&
-      existing.status !== 'completed' &&
-      existing.status !== 'done';
-    if (becameDone) {
-      const spawned = spawnNextRecurringTask(db, task, { completedDate, today });
-      if (spawned) {
-        nextOccurrence = { id: spawned.id, date: spawned.date, created: spawned.created };
-        nextOccurrenceSync = spawned.calendar_sync || null;
-      }
-    }
-
+    kickCalendar();
     res.json({
-      ...syncedTask,
-      calendar_sync: calendarSync,
-      next_occurrence: nextOccurrence,
-      next_occurrence_sync: nextOccurrenceSync,
-      xp_sync: xpSync,
+      ...findTask(req.params.id),
+      calendar_sync: outcome.calendarSync,
+      next_occurrence: outcome.nextOccurrence,
+      xp_sync: outcome.xpSync,
     });
   });
 
@@ -484,13 +534,27 @@ export function createTasksRouter(ctx) {
     const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-    const calendarSync = syncTaskToCalendar({ ...existing, status: 'cancelled' });
-    const xpSync = db.transaction((taskId) => {
-      db.prepare('DELETE FROM task_checklist_items WHERE task_id = ?').run(taskId);
-      db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
-      return taskXpReversalSync(taskId, 'Tarefa excluída');
-    })(req.params.id);
-    res.json({ success: true, calendar_sync: calendarSync, ...(xpSync ? { xp_sync: xpSync } : {}) });
+    let outcome;
+    try {
+      outcome = db.transaction((taskId) => {
+        db.prepare('DELETE FROM task_checklist_items WHERE task_id = ?').run(taskId);
+        db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+        const xpSync = taskXpReversalSync(taskId, 'Tarefa excluída');
+        // A tarefa some agora; o evento sai da agenda depois, pelo retrato guardado na fila.
+        const calendarSync = existing.calendar_event_id
+          ? calendarQueue.enqueue(taskId, { snapshot: { id: taskId, calendar_event_id: existing.calendar_event_id } })
+          : { skipped: true };
+        return { xpSync, calendarSync };
+      })(req.params.id);
+    } catch (error) {
+      return sendWriteFailure(res, 'DELETE', error);
+    }
+    kickCalendar();
+    res.json({
+      success: true,
+      calendar_sync: outcome.calendarSync,
+      ...(outcome.xpSync ? { xp_sync: outcome.xpSync } : {}),
+    });
   });
 
   /** Empurra tarefa para amanhã (local), mantém status aberto, registra day_outcome. */
@@ -519,22 +583,28 @@ export function createTasksRouter(ctx) {
     // Keep open status (pending / in_progress); only move date forward
     const status = existing.status === 'in_progress' ? 'in_progress' : 'pending';
 
-    db.prepare(`
-      UPDATE tasks SET
-        date = ?,
-        status = ?,
-        day_outcome = 'not_today',
-        day_outcome_date = ?,
-        day_outcome_reason = ?,
-        updated_date = datetime('now')
-      WHERE id = ?
-    `).run(tomorrow, status, today, reason, req.params.id);
+    let calendarSync;
+    try {
+      calendarSync = db.transaction(() => {
+        db.prepare(`
+          UPDATE tasks SET
+            date = ?,
+            status = ?,
+            day_outcome = 'not_today',
+            day_outcome_date = ?,
+            day_outcome_reason = ?,
+            updated_date = datetime('now')
+          WHERE id = ?
+        `).run(tomorrow, status, today, reason, req.params.id);
+        return queueCalendar(findTask(req.params.id));
+      })();
+    } catch (error) {
+      return sendWriteFailure(res, 'not-today', error);
+    }
 
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
-    const calendarSync = syncTaskToCalendar(task);
-    const syncedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
+    kickCalendar();
     res.json({
-      ...syncedTask,
+      ...findTask(req.params.id),
       calendar_sync: calendarSync,
     });
   });
@@ -552,6 +622,9 @@ export function registerIdeaToTaskRoute(app, ctx) {
     syncTaskToCalendar,
   } = ctx;
 
+  const calendarQueue = ctx.calendarQueue || createTaskCalendarQueue({ db, syncTaskToCalendar });
+  const kickCalendar = ctx.scheduleCalendarDrain || (() => setImmediate(() => calendarQueue.drain()));
+
   app.post('/api/ideas/:id/to-task', (req, res) => {
     const idea = db.prepare('SELECT * FROM tasks WHERE id = ? AND category = ?').get(req.params.id, 'ideias');
     if (!idea) return res.status(404).json({ error: 'Idea not found' });
@@ -564,25 +637,39 @@ export function registerIdeaToTaskRoute(app, ctx) {
     const taskDate = date || getLocalDateString();
     const sort = nextSortOrder('tasks');
 
-    db.prepare(`
-      INSERT INTO tasks (id, title, description, date, time, status, priority, category, source, sort_order, source_idea_id)
-      VALUES (?, ?, ?, ?, NULL, 'pending', ?, ?, 'from_idea', ?, ?)
-    `).run(
-      newId,
-      idea.title,
-      idea.description || '',
-      taskDate,
-      priority,
-      category,
-      sort,
-      idea.id,
-    );
+    let calendarSync;
+    try {
+      calendarSync = db.transaction(() => {
+        db.prepare(`
+          INSERT INTO tasks (id, title, description, date, time, status, priority, category, source, sort_order, source_idea_id)
+          VALUES (?, ?, ?, ?, NULL, 'pending', ?, ?, 'from_idea', ?, ?)
+        `).run(
+          newId,
+          idea.title,
+          idea.description || '',
+          taskDate,
+          priority,
+          category,
+          sort,
+          idea.id,
+        );
 
-    db.prepare(`UPDATE tasks SET idea_status = 'virou_tarefa', updated_date = datetime('now') WHERE id = ?`).run(idea.id);
+        db.prepare(`UPDATE tasks SET idea_status = 'virou_tarefa', updated_date = datetime('now') WHERE id = ?`).run(idea.id);
 
-    let task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newId);
-    const calendarSync = syncTaskToCalendar(task);
-    task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newId);
+        const created = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newId);
+        if (ctx.taskNeedsCalendarSync && !ctx.taskNeedsCalendarSync(created)) return { skipped: true };
+        return calendarQueue.enqueue(newId);
+      })();
+    } catch (error) {
+      console.error('[ideas] to-task falhou e foi desfeito:', error?.message || error);
+      return res.status(500).json({
+        error: 'Não foi possível virar tarefa. Nada foi alterado.',
+        code: 'task_write_failed',
+      });
+    }
+
+    kickCalendar();
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(newId);
     const updatedIdea = db.prepare('SELECT * FROM tasks WHERE id = ?').get(idea.id);
     res.status(201).json({
       task: enrichCategory(task),
