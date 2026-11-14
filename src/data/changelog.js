@@ -8,6 +8,19 @@
  */
 export const changelog = [
   {
+    id: '2026-11-14-hoje-habitos-tarefas',
+    date: '2026-11-14',
+    title: 'Hoje, Hábitos e Tarefas mais curtos',
+    items: [
+      'A barra de baixo agora tem Hoje, Hábitos, Tarefas e Finanças. O resto continua no menu.',
+      'No Hoje, a próxima tarefa e o primeiro hábito aparecem sem rolar a tela.',
+      'Hábitos e Tarefas abrem direto na lista. Filtros e planejamento ficam em um botão.',
+      'Hábito com quantidade só conta como feito quando bate a meta.',
+      'Se algo não carregar, a tela avisa e oferece Tentar novamente, em vez de parecer vazia.',
+      'O aviso de novidades espera você terminar o que está preenchendo.',
+    ],
+  },
+  {
     id: '2026-11-13-check-do-dia',
     date: '2026-11-13',
     title: 'Concluir tarefa sem susto',
