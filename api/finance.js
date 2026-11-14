@@ -315,6 +315,31 @@ export function initFinanceSchema(db) {
   if (!txCols.includes('note')) {
     db.exec("ALTER TABLE finance_transactions ADD COLUMN note TEXT DEFAULT ''");
   }
+
+  // fase 3 do PRD (nov/2026): uma baixa por intenção e lançamento ligado à baixa — só aditivo
+  if (!txCols.includes('payment_id')) {
+    db.exec('ALTER TABLE finance_transactions ADD COLUMN payment_id TEXT');
+  }
+  if (!txCols.includes('intent_key')) {
+    db.exec('ALTER TABLE finance_transactions ADD COLUMN intent_key TEXT');
+  }
+  const payCols = db.prepare('PRAGMA table_info(finance_payments)').all().map((c) => c.name);
+  if (!payCols.includes('intent_key')) {
+    db.exec('ALTER TABLE finance_payments ADD COLUMN intent_key TEXT');
+  }
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_payments_intent
+      ON finance_payments(intent_key)
+      WHERE intent_key IS NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_tx_intent
+      ON finance_transactions(intent_key)
+      WHERE intent_key IS NOT NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_finance_tx_payment
+      ON finance_transactions(payment_id);
+  `);
+  linkPaymentsToTransactions(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS finance_fixed_expenses (
       id TEXT PRIMARY KEY,
@@ -360,6 +385,58 @@ export const BRAND_COLOR_IDS = [
 ];
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 const LAST4_RE = /^\d{4}$/;
+
+const INTENT_KEY_RE = /^[A-Za-z0-9_-]{8,80}$/;
+
+/**
+ * Chave de intenção: quem chama gera uma por tentativa do usuário e repete a mesma no reenvio.
+ * Ausente = null (contrato antigo, sem proteção); malformada = 400.
+ */
+export function parseIntentKey(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !INTENT_KEY_RE.test(value)) {
+    throw badRequest('intent_key inválida: use de 8 a 80 letras, números, - ou _');
+  }
+  return value;
+}
+
+function intentConflict(message) {
+  const err = new Error(message);
+  err.status = 409;
+  err.code = 'intent_conflict';
+  return err;
+}
+
+/**
+ * Liga cada baixa ao lançamento que ela gerou (mesma dívida, data e valor, em ordem de criação).
+ * Roda na subida para as baixas antigas; não muda valor nenhum. Idempotente.
+ */
+export function linkPaymentsToTransactions(db) {
+  const payments = db.prepare(`
+    SELECT p.id, p.debt_id, p.paid_on, p.amount FROM finance_payments p
+    WHERE NOT EXISTS (SELECT 1 FROM finance_transactions t WHERE t.payment_id = p.id)
+    ORDER BY p.created_at ASC, p.id ASC
+  `).all();
+  if (!payments.length) return 0;
+  const find = db.prepare(`
+    SELECT id FROM finance_transactions
+    WHERE payment_id IS NULL AND debt_id = ? AND posted_on = ? AND direction = 'outflow'
+      AND ABS(ABS(amount) - ?) < 0.005
+    ORDER BY created_at ASC, id ASC
+    LIMIT 1
+  `);
+  const link = db.prepare('UPDATE finance_transactions SET payment_id = ? WHERE id = ?');
+  let linked = 0;
+  db.transaction(() => {
+    for (const payment of payments) {
+      const tx = find.get(payment.debt_id, payment.paid_on, Number(payment.amount));
+      if (!tx) continue;
+      link.run(payment.id, tx.id);
+      linked += 1;
+    }
+  })();
+  return linked;
+}
 
 function badRequest(message) {
   const err = new Error(message);
@@ -975,8 +1052,8 @@ export function createTransaction(db, body) {
   db.prepare(`
     INSERT INTO finance_transactions
       (id, pierre_tx_id, external_id, account_id, posted_on, amount, direction, raw_description,
-       merchant, category, subscription_id, debt_id, source, note, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       merchant, category, subscription_id, debt_id, source, note, created_at, payment_id, intent_key)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     body.pierre_tx_id || null,
@@ -993,8 +1070,30 @@ export function createTransaction(db, body) {
     pick(body.source, SOURCES, 'joao'),
     String(body.note || '').slice(0, 500),
     nowIso(),
+    body.payment_id || null,
+    body.intent_key || null,
   );
   return db.prepare('SELECT * FROM finance_transactions WHERE id = ?').get(id);
+}
+
+/**
+ * Lançamento manual com chave de intenção: o reenvio da mesma chave devolve o primeiro lançamento
+ * em vez de criar outro. Sem chave, cria sempre (contrato antigo).
+ */
+export function createTransactionOnce(db, body = {}) {
+  const intentKey = parseIntentKey(body.intent_key);
+  if (!intentKey) return { row: createTransaction(db, { ...body, intent_key: null }), replayed: false };
+  return db.transaction(() => {
+    const first = db.prepare('SELECT * FROM finance_transactions WHERE intent_key = ?').get(intentKey);
+    if (first) {
+      const sent = Number(typeof body.amount === 'string' ? body.amount.trim().replace(',', '.') : body.amount);
+      if (Number.isFinite(sent) && Math.abs(Math.abs(sent) - Math.abs(Number(first.amount))) >= 0.005) {
+        throw intentConflict('essa intenção já registrou outro lançamento');
+      }
+      return { row: first, replayed: true };
+    }
+    return { row: createTransaction(db, { ...body, intent_key: intentKey }), replayed: false };
+  })();
 }
 
 export function updateTransaction(db, id, body = {}) {
@@ -1054,28 +1153,49 @@ function addDays(ymd, days) {
   return dt.toISOString().slice(0, 10);
 }
 
+/**
+ * Baixa de dívida. Com chave de intenção (body.intent_key), o reenvio devolve a primeira baixa
+ * com replayed: true e não mexe em nada; outra chave é outra baixa, mesmo com o mesmo valor.
+ * Baixa, lançamento, meta e ajustes entram juntos ou não entram.
+ */
 export function payDebt(db, id, body = {}) {
-  const debt = db.prepare('SELECT * FROM finance_debts WHERE id = ?').get(id);
-  if (!debt) return null;
-  const amount = money(body.amount ?? debt.balance);
-  if (amount <= 0) {
-    const err = new Error('amount must be positive');
-    err.status = 400;
-    throw err;
-  }
-  const paidOn = isValidDateString(body.paid_on) ? body.paid_on : todayFortaleza();
-  const nextBalance = money(Math.max(0, Number(debt.balance) - amount));
-  const nextStatus = nextBalance <= 0.009 ? 'clean' : debt.status;
+  const intentKey = parseIntentKey(body.intent_key);
 
   const run = db.transaction(() => {
+    const debt = db.prepare('SELECT * FROM finance_debts WHERE id = ?').get(id);
+    if (!debt) return null;
+
+    if (intentKey) {
+      const first = db.prepare('SELECT * FROM finance_payments WHERE intent_key = ?').get(intentKey);
+      if (first) {
+        const sameAmount = body.amount === undefined || body.amount === null
+          || Math.abs(money(body.amount) - money(first.amount)) < 0.005;
+        if (first.debt_id !== id || !sameAmount) {
+          throw intentConflict('essa intenção já registrou outra baixa');
+        }
+        return { paymentId: first.id, replayed: true };
+      }
+    }
+
+    const amount = money(body.amount ?? debt.balance);
+    if (amount <= 0) {
+      const err = new Error('amount must be positive');
+      err.status = 400;
+      throw err;
+    }
+    const paidOn = isValidDateString(body.paid_on) ? body.paid_on : todayFortaleza();
+    const nextBalance = money(Math.max(0, Number(debt.balance) - amount));
+    const nextStatus = nextBalance <= 0.009 ? 'clean' : debt.status;
+
     db.prepare(`
       UPDATE finance_debts SET balance = ?, status = ?, updated_at = ? WHERE id = ?
     `).run(nextBalance, nextStatus, nowIso(), id);
 
     const paymentId = randomUUID();
     db.prepare(`
-      INSERT INTO finance_payments (id, debt_id, account_id, amount, paid_on, method, confirmed, note, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+      INSERT INTO finance_payments
+        (id, debt_id, account_id, amount, paid_on, method, confirmed, note, created_at, intent_key)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
     `).run(
       paymentId,
       id,
@@ -1085,6 +1205,7 @@ export function payDebt(db, id, body = {}) {
       String(body.method || 'pix'),
       String(body.note || ''),
       nowIso(),
+      intentKey,
     );
 
     createTransaction(db, {
@@ -1096,6 +1217,7 @@ export function payDebt(db, id, body = {}) {
       // fatura de cartão só muda o dinheiro de lugar: as compras já contam no cartão
       category: debt.kind === 'card' ? 'Pagamento de fatura' : 'Dívidas',
       debt_id: id,
+      payment_id: paymentId,
       source: 'joao',
       raw_description: `Pagamento ${debt.title}`,
     });
@@ -1114,13 +1236,16 @@ export function payDebt(db, id, body = {}) {
       updateSettings(db, { snapshot_label: '' });
     }
 
-    return paymentId;
+    return { paymentId, replayed: false };
   });
 
-  const paymentId = run();
+  const result = run();
+  if (!result) return null;
   return {
     debt: listDebts(db, { status: 'all' }).find((d) => d.id === id),
-    payment: db.prepare('SELECT * FROM finance_payments WHERE id = ?').get(paymentId),
+    payment: db.prepare('SELECT * FROM finance_payments WHERE id = ?').get(result.paymentId),
+    transaction: db.prepare('SELECT * FROM finance_transactions WHERE payment_id = ?').get(result.paymentId) || null,
+    replayed: result.replayed,
   };
 }
 

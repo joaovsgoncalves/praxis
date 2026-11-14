@@ -8,7 +8,7 @@ import {
   createSubscription,
   deleteInstallment,
   deleteSubscription,
-  createTransaction,
+  createTransactionOnce,
   createFixedExpense,
   deleteFixedExpense,
   getInsights,
@@ -43,7 +43,14 @@ import { syncPierre } from '../pierreSync.js';
 
 function sendError(res, err) {
   const status = err.status || 500;
-  res.status(status).json({ error: err.message || 'error' });
+  res.status(status).json({ error: err.message || 'error', ...(err.code ? { code: err.code } : {}) });
+}
+
+/** Chave de intenção: cabeçalho Idempotency-Key ou intent_key no corpo (o cabeçalho vence). */
+function withIntentKey(req) {
+  const body = req.body || {};
+  const header = req.get('Idempotency-Key');
+  return header ? { ...body, intent_key: header } : body;
 }
 
 /** Finanças — mounted at /api/finance */
@@ -190,7 +197,7 @@ export function createFinanceRouter({ db, getLocalDateString }) {
 
   router.post('/debts/:id/pay', (req, res) => {
     try {
-      const row = payDebt(db, req.params.id, req.body || {});
+      const row = payDebt(db, req.params.id, withIntentKey(req));
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
@@ -259,8 +266,10 @@ export function createFinanceRouter({ db, getLocalDateString }) {
 
   router.post('/transactions', (req, res) => {
     try {
-      const body = req.body || {};
-      res.status(201).json(createTransaction(db, { ...body, posted_on: body.posted_on ?? localToday() }));
+      const body = withIntentKey(req);
+      const { row, replayed } = createTransactionOnce(db, { ...body, posted_on: body.posted_on ?? localToday() });
+      // reenvio da mesma intenção: devolve o primeiro lançamento, sem criar outro
+      res.status(replayed ? 200 : 201).json(replayed ? { ...row, replayed: true } : row);
     } catch (err) {
       sendError(res, err);
     }
