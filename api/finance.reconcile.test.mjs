@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
-import { createTransaction, initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
+import { createTransaction, getOverview, initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
 import { diffTotals, financeTotals, toCents } from './lib/financeReconcile.js';
 import { ingestPluggy } from './pluggyIngest.js';
 import { syncPierre } from './pierreSync.js';
@@ -177,4 +177,35 @@ test('subir a migração de novo e reenviar a mesma baixa não mexem em nenhum t
     diffTotals(once, twice).map((line) => line.split(' ')[0]).sort(),
     ['baixas', 'dívida', 'lançamentos'],
   );
+});
+
+test('"O banco mostrou": uma linha por conta, a origem mais recente vence e conta só com Pluggy entra', (t) => {
+  const db = seeded(t);
+  db.prepare("DELETE FROM finance_balances").run();
+  const put = (account, kind, amount, source, asOf, createdAt) => db.prepare(`
+    INSERT INTO finance_balances (id, account_id, amount, amount_kind, source, as_of, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(`${account}-${kind}-${source}-${asOf}`, account, amount, kind, source, asOf, createdAt || `${asOf}T12:00:00.000Z`);
+  // Inter: Pierre antigo, Pluggy novo e, por último, um saldo digitado
+  put('acc-inter', 'available', 100, 'pierre', '2026-09-14');
+  put('acc-inter', 'available', 250.5, 'pluggy', '2026-11-13');
+  put('acc-inter', 'available', 999, 'joao', '2026-11-14');
+  put('acc-inter', 'invested', 40, 'pierre', '2026-09-14');
+  // Nubank: só Pluggy, sem vínculo com o Pierre (era a conta que ficava de fora)
+  put('acc-nubank', 'available', 0, 'pluggy', '2026-11-14');
+  // C6: só Pierre, velho
+  put('acc-c6', 'available', 12, 'pierre', '2026-08-27');
+  // PicPay: só digitado; Santander: arquivada
+  put('acc-picpay', 'available', 70, 'joao', '2026-11-14');
+  put('acc-santander', 'available', 5, 'pluggy', '2026-11-14');
+  db.prepare("UPDATE finance_accounts SET status = 'archived' WHERE id = 'acc-santander'").run();
+
+  const shown = getOverview(db, { today: TODAY }).bank_shown;
+  assert.deepEqual(shown.map((e) => [e.account_id, e.amount_kind, e.amount, e.source, e.as_of, e.stale]), [
+    ['acc-inter', 'available', 250.5, 'pluggy', '2026-11-13', false],
+    ['acc-inter', 'invested', 40, 'pierre', '2026-09-14', true],
+    ['acc-c6', 'available', 12, 'pierre', '2026-08-27', true],
+    ['acc-nubank', 'available', 0, 'pluggy', '2026-11-14', false],
+  ]);
+  assert.equal(new Set(shown.map((e) => e.id)).size, shown.length, 'nenhuma conta contada duas vezes');
 });

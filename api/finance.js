@@ -2238,10 +2238,59 @@ export function getOverview(db, { today } = {}) {
     next_step: nextStep,
     accounts,
     debts,
+    bank_shown: listBankShown(db, { today: day }),
     last_sync: lastSync || null,
     last_midas_sync: lastMidasSync(db),
     settings,
   };
+}
+
+const BANK_BALANCE_SOURCES = ['pierre', 'pluggy'];
+const BANK_STALE_DAYS = 3;
+
+/**
+ * "O banco mostrou": o saldo mais recente que veio de banco, uma linha por conta e tipo.
+ * A conta é a identidade; Pierre e Pluggy disputam pela data, então a mesma conta nunca aparece
+ * (nem soma) duas vezes e conta só com Pluggy não fica de fora. Saldo digitado não entra aqui.
+ */
+export function listBankShown(db, { today } = {}) {
+  const day = isValidDateString(today) ? today : todayFortaleza();
+  const marks = BANK_BALANCE_SOURCES.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT b.account_id, b.amount_kind, b.amount, b.source, b.as_of, b.created_at,
+           a.name, a.institution, a.kind AS account_kind
+    FROM finance_balances b
+    JOIN finance_accounts a ON a.id = b.account_id
+    WHERE a.status = 'active'
+      AND b.amount_kind IN ('available', 'invested')
+      AND b.source IN (${marks})
+    ORDER BY a.sort_order ASC, a.name ASC, b.amount_kind ASC, b.as_of DESC, b.created_at DESC
+  `).all(...BANK_BALANCE_SOURCES);
+  const seen = new Set();
+  const entries = [];
+  for (const row of rows) {
+    const key = `${row.account_id}|${row.amount_kind}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // investido zerado não vira linha; disponível zerado é informação
+    if (row.amount_kind === 'invested' && !(Number(row.amount) > 0)) continue;
+    const ageDays = Math.max(0, Math.round((Date.parse(`${day}T12:00:00Z`) - Date.parse(`${row.as_of}T12:00:00Z`)) / 86400000));
+    entries.push({
+      id: key,
+      account_id: row.account_id,
+      name: row.name,
+      institution: row.institution,
+      account_kind: row.account_kind,
+      amount_kind: row.amount_kind,
+      amount: money(row.amount),
+      source: row.source,
+      as_of: row.as_of,
+      received_at: row.created_at,
+      age_days: Number.isFinite(ageDays) ? ageDays : null,
+      stale: Number.isFinite(ageDays) ? ageDays >= BANK_STALE_DAYS : true,
+    });
+  }
+  return entries;
 }
 
 export function lastSync(db) {
