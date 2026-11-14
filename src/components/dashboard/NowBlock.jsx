@@ -6,12 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from '@/lib/categories';
 import { formatBehindSince, formatTaskTimeLabel, isTaskOverdue } from '@/lib/nowTask';
 import { cleanPriorityPrefix } from '@/lib/tasks';
+import { staleCopyLabel } from '@/lib/readState';
+import { SectionLoadError, SectionLoading } from '@/components/shared/SectionRead';
 import { Timer, CheckCircle2, Clock, Plus, ArrowRight } from 'lucide-react';
 
 export default function NowBlock({
   task,
   next = null,
   today,
+  read = null,
   busy = false,
   onComplete,
   onSnooze15,
@@ -19,6 +22,23 @@ export default function NowBlock({
   onAddTask,
 
 }) {
+  // Sem leitura não existe "nada na fila": ou falhou, ou ainda não chegou.
+  if (!task && read?.status === 'error') {
+    return <SectionLoadError what="a próxima tarefa" read={read} testId="now-error" />;
+  }
+  if (!task && read?.status === 'loading') {
+    return <SectionLoading className="h-[250px] sm:h-[308px]" label="Carregando a próxima tarefa" />;
+  }
+  const staleBadge = read?.status === 'stale' ? (
+    <Badge
+      variant="outline"
+      className="border-amber-500/20 bg-amber-500/[0.06] text-amber-200/90"
+      data-testid="now-stale"
+    >
+      {staleCopyLabel(read.cachedAt)}
+    </Badge>
+  ) : null;
+
   if (!task) {
       return (
         <Card className="praxis-now-card praxis-tactile-card relative overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.10),hsl(var(--card)/0.92)_52%,rgba(245,158,11,0.03))]">
@@ -38,6 +58,8 @@ export default function NowBlock({
                 <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
                   Bom momento para capturar o que está na cabeça ou criar o próximo passo de forma consciente.
                 </p>
+
+                {staleBadge ? <div className="mt-3">{staleBadge}</div> : null}
 
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <Button
@@ -102,6 +124,7 @@ export default function NowBlock({
                   <Badge className="border border-destructive/15 bg-destructive/10 text-xs text-destructive shadow-none">Prioridade alta</Badge>
                 ) : null}
                 <CategoryBadge category={task.category} />
+                {staleBadge}
               </div>
 
               {/* Título longo corta em duas linhas no celular; inteiro, ele está na trilha logo abaixo. */}

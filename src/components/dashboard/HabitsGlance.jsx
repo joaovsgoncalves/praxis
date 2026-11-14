@@ -6,6 +6,8 @@ import { SectionHeader } from '@/components/layout/PraxisPage';
 import QuantLogSheet from '@/components/habits-tasks/QuantLogSheet';
 import SkipHabitSheet from '@/components/habits-tasks/SkipHabitSheet';
 import SinceHabitCard from '@/components/dashboard/SinceHabitCard';
+import { SectionLoadError, SectionLoading, StaleCopyNote } from '@/components/shared/SectionRead';
+import { isReadable } from '@/lib/readState';
 import { cn } from '@/lib/utils';
 import { sparkAt } from '@/lib/celebration';
 import { cleanPriorityPrefix } from '@/lib/tasks';
@@ -254,6 +256,7 @@ export default function HabitsGlance({
   habits = [],
   sinceHabits = [],
   habitLogs = [],
+  read = null,
   onToggleHabit,
   onQuickIncrement,
   onSkipHabit,
@@ -343,7 +346,7 @@ export default function HabitsGlance({
         title={<span id="today-habits-title">Hábitos</span>}
         icon={Flame}
         iconClassName="text-domain-wellness"
-        count={total > 0 ? `${done}/${total}` : undefined}
+        count={isReadable(read) && total > 0 ? `${done}/${total}` : undefined}
         action={(
           <Link
             to="/habitos"
@@ -355,6 +358,12 @@ export default function HabitsGlance({
         )}
       />
 
+      <StaleCopyNote read={read} testId="habits-stale" />
+      {read?.status === 'error' ? (
+        <SectionLoadError what="os hábitos" read={read} testId="habits-error" />
+      ) : read?.status === 'loading' ? (
+        <SectionLoading className="h-[150px]" label="Carregando os hábitos" />
+      ) : (
       <div className="praxis-panel rounded-2xl py-0.5">
         {routines.length === 0 && !hasOthers ? (
           <p className="px-4 py-3 text-sm text-muted-foreground">Nenhum hábito para hoje.</p>
@@ -389,6 +398,7 @@ export default function HabitsGlance({
           />
         ) : null}
       </div>
+      )}
 
       <SkipHabitSheet
         open={Boolean(skipSheetHabit)}

@@ -36,6 +36,7 @@ import { planNowTasks } from "@/lib/nowTask";
 import { computeDayLeft } from "@/lib/dayLeft";
 import { useTimeOfDay } from "@/hooks/useTimeOfDay";
 import { useMinWidth } from "@/hooks/useMinWidth";
+import { buildSectionRead, isReadable } from "@/lib/readState";
 import { isHabitDueOnDate } from "@/lib/habits";
 import { isTaskCompletedForToday, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
 import { addDaysToDateKey, sortTasksForList } from "@/lib/taskListFilters";
@@ -63,10 +64,11 @@ export default function Dashboard() {
     }
   }, [searchParams, navigate]);
 
-  const { data: allTasks = [], isLoading: isLoadingTasks } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ["dashboardTasks", today],
     queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: "1", today }),
   });
+  const { data: allTasks = [], isLoading: isLoadingTasks } = tasksQuery;
 
   const tasks = React.useMemo(() => {
     return allTasks
@@ -82,20 +84,23 @@ export default function Dashboard() {
       .sort((a, b) => sortTasksForList(a, b, today));
   }, [allTasks, today]);
 
-  const { data: habits = [], isLoading: isLoadingHabits } = useQuery({
+  const habitsQuery = useQuery({
     queryKey: ["habits", today],
     queryFn: () => praxisApi.habits.list({ status: "active", date: today }),
   });
+  const { data: habits = [], isLoading: isLoadingHabits } = habitsQuery;
 
-  const { data: habitLogs = [], isLoading: isLoadingLogs } = useQuery({
+  const habitLogsQuery = useQuery({
     queryKey: ["habitLogs", today],
     queryFn: () => praxisApi.habitLogs.list({ date: today }),
   });
+  const { data: habitLogs = [], isLoading: isLoadingLogs } = habitLogsQuery;
 
-  const { data: wellnessChecks = [], isLoading: isLoadingWellness } = useQuery({
+  const wellnessQuery = useQuery({
     queryKey: ["wellness", today],
     queryFn: () => praxisApi.wellness.list({ date: today }),
   });
+  const { data: wellnessChecks = [], isLoading: isLoadingWellness } = wellnessQuery;
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ["userSettings"],
@@ -322,6 +327,12 @@ export default function Dashboard() {
 
   const dayLeft = computeDayLeft({ tasks, habits: essentialHabits, habitLogs, today });
 
+  // Lista vazia só quer dizer "nada para hoje" quando a leitura deu certo.
+  const tasksRead = buildSectionRead([tasksQuery]);
+  // Sem os registros do dia não dá para dizer o que está feito: a seção inteira espera.
+  const habitsRead = buildSectionRead([habitsQuery, habitLogsQuery]);
+  const dayCountKnown = isReadable(tasksRead) && isReadable(habitsRead);
+
   const handleSnooze15 = (task) => {
     const data = buildSnooze15Update(task, today);
     updateTaskMutation.mutate({ id: task.id, data });
@@ -359,6 +370,7 @@ export default function Dashboard() {
         habits={standaloneHabitsDueToday}
         sinceHabits={sinceHabits}
         habitLogs={habitLogs}
+        read={habitsRead}
         onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
         onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
         onSkipHabit={(habitId, skipReason, skipNote) =>
@@ -386,6 +398,7 @@ export default function Dashboard() {
               userName={settings?.full_name}
               left={dayLeft.left}
               total={dayLeft.total}
+              unknown={!dayCountKnown}
             />
           </div>
 
@@ -394,6 +407,7 @@ export default function Dashboard() {
               task={nowPlan.now}
               next={nowPlan.next}
               today={today}
+              read={tasksRead}
               busy={Boolean(nowPlan.now && busyTasks.has(nowPlan.now.id))}
               onComplete={toggleTaskStatus}
               onSnooze15={handleSnooze15}
@@ -410,6 +424,7 @@ export default function Dashboard() {
               tasks={tasks}
               today={today}
               clock={clock}
+              read={tasksRead}
               behind={nowPlan.behind}
               onToggleComplete={toggleTaskStatus}
               onEditTask={setEditingTask}
@@ -439,6 +454,7 @@ export default function Dashboard() {
             today={today}
             clock={clock}
             todayCheck={todayCheck}
+            wellnessQuery={wellnessQuery}
             onSaveWellness={(d) => saveWellnessMutation.mutateAsync(d)}
             focusGoalMinutes={settings?.focus_weekly_goal_minutes}
           />

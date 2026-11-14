@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { praxisApi } from '@/api/praxisClient';
+import { SectionLoadError, StaleCopyNote } from '@/components/shared/SectionRead';
+import { buildSectionRead } from '@/lib/readState';
 import { cn } from '@/lib/utils';
 import { weekRange } from '@/lib/taskLenses';
 import { weekDayHref } from '@/lib/urlDeepLinks';
@@ -52,16 +54,19 @@ function DayBar({ day }) {
 /** Semana em barras (seg a dom) e um resumo curto; o toque num dia abre a semana em Tarefas. */
 export default function WeekPanel({ today }) {
   const weekStart = weekRange(today).start;
-  const { data, isLoading, isError } = useQuery({
+  const query = useQuery({
     queryKey: [WEEK_QUERY_KEY, weekStart],
     queryFn: () => praxisApi.insights.weekly(weekStart),
     staleTime: 2 * 60 * 1000,
     retry: 1,
   });
+  const { data, isLoading } = query;
+  const read = buildSectionRead([query]);
   const days = Array.isArray(data?.days) ? data.days : [];
 
-  // Sem a semana (erro ou API antiga sem days[]), o bloco não ocupa o Hoje.
-  if (isError || (!isLoading && days.length !== 7)) return null;
+  if (read.status === 'error') return <SectionLoadError what="a semana" read={read} testId="week-error" />;
+  // API antiga sem days[]: o bloco não ocupa o Hoje.
+  if (!isLoading && days.length !== 7) return null;
 
   const summary = weekSummaryParts(data?.victories);
 
@@ -86,6 +91,7 @@ export default function WeekPanel({ today }) {
       <p className="mt-1.5 min-h-[18px] px-1.5 pb-0.5 text-xs leading-[18px] tabular-nums text-muted-foreground">
         {isLoading ? <span className="praxis-skel inline-block h-3 w-48 rounded-md align-middle" /> : summary.join(' · ')}
       </p>
+      <StaleCopyNote read={read} className="px-1.5" testId="week-stale" />
     </nav>
   );
 }

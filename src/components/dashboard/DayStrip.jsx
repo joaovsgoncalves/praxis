@@ -11,11 +11,12 @@ const RING_C = 2 * Math.PI * RING_R;
  * Faixa do dia: data, hora, saudação e quanto falta pra fechar o dia.
  * Fechado = feito, não rolou ou não hoje.
  */
-export default function DayStrip({ greeting, clock, userName, left = 0, total = 0 }) {
+/** `unknown`: tarefas ou hábitos não foram lidos; zero ali seria mentira. */
+export default function DayStrip({ greeting, clock, userName, left = 0, total = 0, unknown = false }) {
   const dateStr = format(fortalezaDisplayDate(), 'EEE d MMM', { locale: ptBR });
   const firstName = userName ? String(userName).split(' ')[0] : '';
-  const closedRatio = total > 0 ? (total - left) / total : 0;
-  const dayClosed = total > 0 && left === 0;
+  const closedRatio = !unknown && total > 0 ? (total - left) / total : 0;
+  const dayClosed = !unknown && total > 0 && left === 0;
 
   return (
     <section
@@ -37,10 +38,10 @@ export default function DayStrip({ greeting, clock, userName, left = 0, total = 
       <div
         className="flex shrink-0 items-center gap-2.5"
         role="img"
-        aria-label={dayClosed ? 'Dia fechado' : `Faltam ${left} pra fechar o dia`}
+        aria-label={unknown ? 'Contagem do dia indisponível' : dayClosed ? 'Dia fechado' : `Faltam ${left} pra fechar o dia`}
       >
         <span className="text-right text-xs leading-tight text-muted-foreground" aria-hidden>
-          {dayClosed ? 'dia fechado' : 'faltam'}
+          {unknown ? '' : dayClosed ? 'dia fechado' : 'faltam'}
         </span>
         <span className="relative flex h-12 w-12 items-center justify-center" aria-hidden>
           <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48">
@@ -58,7 +59,7 @@ export default function DayStrip({ greeting, clock, userName, left = 0, total = 
             />
           </svg>
           <span className="absolute text-base font-semibold tabular-nums text-foreground" data-testid="day-left">
-            {dayClosed ? <Check className="h-4 w-4 text-domain-gold" /> : left}
+            {unknown ? '–' : dayClosed ? <Check className="h-4 w-4 text-domain-gold" /> : left}
           </span>
         </span>
       </div>

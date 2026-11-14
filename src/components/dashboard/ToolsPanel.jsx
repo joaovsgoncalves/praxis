@@ -10,6 +10,7 @@ import { formatShortDay } from '@/lib/finance';
 import { weekRange } from '@/lib/taskLenses';
 import { computeGoalProgress } from '@/lib/goalProgress';
 import { focusWeeklyGoalView } from '@/lib/focusWeeklyGoal';
+import { buildSectionRead, staleCopyLabel } from '@/lib/readState';
 import { formatMinutesShort, pickFocusFront, pickMainGoal, pickReviewCard } from '@/lib/todayGlance';
 import { useHideMoney } from '@/hooks/useHideMoney';
 import SpendSheet from '@/components/finance/SpendSheet';
@@ -23,6 +24,17 @@ const actionClass =
   'h-11 w-full rounded-full px-3 text-xs font-semibold transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transition-none';
 
 const goldRing = 'shadow-[inset_0_0_0_1px_hsl(var(--domain-gold)/0.3)]';
+
+/** Leitura de um card: falhou (sem dado nenhum) ou está mostrando cópia salva. */
+function toolRead(query) {
+  const read = buildSectionRead([query]);
+  return {
+    failed: read.status === 'error',
+    stale: read.status === 'stale' ? staleCopyLabel(read.cachedAt) : null,
+    retry: read.retry,
+    retrying: read.retrying,
+  };
+}
 
 function ValueSkeleton() {
   return (
@@ -52,7 +64,10 @@ function ToolCard({
   action,
   className,
   testId,
+  read = null,
 }) {
+  // Card que não leu não mostra número nem a ação de sempre: mostra que falhou e como reler.
+  const failed = Boolean(read?.failed);
   // Quando a ação já leva ao mesmo lugar, a camada do card não entra no Tab (sem parada dupla).
   const overlayClass =
     'absolute inset-0 rounded-[inherit] transition-colors duration-150 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -75,6 +90,14 @@ function ToolCard({
       <div className="pointer-events-none relative flex min-w-0 items-start gap-1.5 text-xs leading-tight text-muted-foreground">
         <Icon className={cn('mt-px h-3.5 w-3.5 shrink-0', iconClassName)} aria-hidden />
         <span className={cn('min-w-0 flex-1 truncate', labelClassName)}>{label}</span>
+        {read?.stale ? (
+          <span
+            className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-px text-[10px] font-medium leading-tight text-amber-200/90"
+            data-testid="tool-stale"
+          >
+            cópia<span className="sr-only">: {read.stale}</span>
+          </span>
+        ) : null}
       </div>
       <div className="pointer-events-none relative mt-auto min-w-0">
         {loading ? (
@@ -86,16 +109,30 @@ function ToolCard({
               valueClassName,
             )}
           >
-            {value}
+            {failed ? '–' : value}
           </p>
         )}
-        {detail && !loading ? (
+        {failed && !loading ? (
+          <div className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">Não carregou</div>
+        ) : detail && !loading ? (
           <div className={cn('mt-0.5 text-[11px] leading-tight text-muted-foreground', detailClassName || 'truncate')}>
             {detail}
           </div>
         ) : null}
       </div>
-      <div className="relative z-10 mt-2">{action}</div>
+      <div className="relative z-10 mt-2">
+        {failed ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className={actionClass}
+            disabled={read.retrying}
+            onClick={() => read.retry?.()}
+          >
+            Tentar novamente
+          </Button>
+        ) : action}
+      </div>
     </div>
   );
 }
@@ -103,12 +140,15 @@ function ToolCard({
 function FinanceCard() {
   const { money } = useHideMoney();
   const [spendOpen, setSpendOpen] = useState(false);
-  const { data, isLoading, isError } = useQuery({
+  const query = useQuery({
     queryKey: ['finance', 'overview'],
     queryFn: () => praxisApi.finance.overview(),
     retry: 1,
     staleTime: 30_000,
   });
+  const { data, isLoading } = query;
+  const read = toolRead(query);
+  const isError = read.failed;
 
   // livre menos os compromissos até o salário; API antiga sem o campo cai no caixa
   const hasSafe = data?.safe_to_spend != null;
@@ -118,13 +158,14 @@ function FinanceCard() {
     <>
       <ToolCard
         testId="tool-finance"
+        read={read}
         to="/financas"
         openLabel="Abrir Finanças"
         icon={Wallet}
         iconClassName="text-primary"
         label={hasSafe || isLoading || isError ? `Pode gastar${until}` : 'Caixa'}
         loading={isLoading}
-        value={isError ? '—' : money(hasSafe ? data.safe_to_spend : data?.caixa)}
+        value={money(hasSafe ? data.safe_to_spend : data?.caixa)}
         action={(
           <Button type="button" className={actionClass} disabled={!data} onClick={() => setSpendOpen(true)}>
             <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
@@ -141,11 +182,13 @@ function FinanceCard() {
 
 function FocusCard({ today, focusGoalMinutes }) {
   const weekStart = weekRange(today).start;
-  const { data: sessions, isLoading, isError } = useQuery({
+  const query = useQuery({
     queryKey: ['todayFocus', today],
     queryFn: () => praxisApi.focus.list({ date: today }),
     ...LIGHT,
   });
+  const { data: sessions, isLoading } = query;
+  const read = toolRead(query);
   const goalOn = Number(focusGoalMinutes) > 0;
   const { data: week } = useQuery({
     queryKey: ['weeklyInsights', weekStart],
@@ -169,12 +212,13 @@ function FocusCard({ today, focusGoalMinutes }) {
   return (
     <ToolCard
       testId="tool-focus"
+      read={read}
       to="/foco"
       icon={Timer}
       iconClassName="text-domain-focus"
       label="Foco hoje"
       loading={isLoading}
-      value={isError ? '—' : formatMinutesShort(minutes)}
+      value={formatMinutesShort(minutes)}
       detail={goal ? `${goal.done} de ${goal.goal} min na semana` : null}
       action={(
         <Button asChild variant="secondary" className={actionClass}>
@@ -186,22 +230,25 @@ function FocusCard({ today, focusGoalMinutes }) {
 }
 
 function FrontCard() {
-  const { data: projects, isLoading, isError } = useQuery({
+  const query = useQuery({
     queryKey: ['projects'],
     queryFn: () => praxisApi.projects.list(),
     ...LIGHT,
   });
+  const { data: projects, isLoading } = query;
+  const read = toolRead(query);
   const front = pickFocusFront(projects);
 
   return (
     <ToolCard
       testId="tool-fronts"
+      read={read}
       to="/frentes"
       icon={Compass}
       iconClassName="text-domain-gold"
       label="Frentes"
       loading={isLoading}
-      value={isError ? '—' : front ? front.name : 'Nenhuma frente em foco'}
+      value={front ? front.name : 'Nenhuma frente em foco'}
       valueClassName={front ? 'text-base sm:text-base' : 'whitespace-normal text-sm font-medium tracking-normal sm:text-sm'}
       detail={front ? front.next_step : null}
       detailClassName="line-clamp-2 whitespace-normal [text-wrap:pretty]"
@@ -215,11 +262,13 @@ function FrontCard() {
 }
 
 function GoalCard({ today }) {
-  const { data: goals, isLoading, isError } = useQuery({
+  const query = useQuery({
     queryKey: ['allGoals'],
     queryFn: () => praxisApi.goals.list(),
     ...LIGHT,
   });
+  const { data: goals, isLoading } = query;
+  const read = toolRead(query);
   const hasActive = Array.isArray(goals) && goals.some((g) => g.status === 'active');
   // Mesmas listas (e chaves) da tela Metas: o cache serve às duas, sem uma chamada por meta.
   const linked = { enabled: hasActive, ...LIGHT, staleTime: 5 * 60 * 1000 };
@@ -240,12 +289,13 @@ function GoalCard({ today }) {
   return (
     <ToolCard
       testId="tool-goals"
+      read={read}
       to="/metas"
       icon={Target}
       iconClassName="text-primary"
       label="Metas"
       loading={isLoading}
-      value={isError ? '—' : goal ? goal.title : 'Sem meta ativa'}
+      value={goal ? goal.title : 'Sem meta ativa'}
       valueClassName={goal ? 'text-base sm:text-base' : 'whitespace-normal text-sm font-medium tracking-normal sm:text-sm'}
       detailClassName="overflow-hidden"
       detail={goal ? (
@@ -268,17 +318,19 @@ function GoalCard({ today }) {
       ) : null}
       action={(
         <Button asChild variant="secondary" className={actionClass}>
-          <Link to="/metas">{goal || isError ? 'Abrir' : 'Criar meta'}</Link>
+          <Link to="/metas">{goal ? 'Abrir' : 'Criar meta'}</Link>
         </Button>
       )}
     />
   );
 }
 
-function CheckinCard({ todayCheck, onSave, clock }) {
+function CheckinCard({ todayCheck, onSave, clock, wellnessQuery }) {
   const [open, setOpen] = useState(false);
   const [savedCheck, setSavedCheck] = useState(null);
   const check = todayCheck || savedCheck;
+  // Sem ler o check-in de hoje, "Falta fazer" seria chute.
+  const read = toolRead(wellnessQuery);
   const evening = !check && Number(String(clock || '').slice(0, 2)) >= EVENING_HOUR;
   const mood = Number(check?.mood) || 3;
 
@@ -286,6 +338,7 @@ function CheckinCard({ todayCheck, onSave, clock }) {
     <>
       <ToolCard
         testId="tool-checkin"
+        read={check ? { ...read, failed: false } : read}
         onOpen={() => setOpen(true)}
         icon={Heart}
         iconClassName={evening ? 'text-domain-gold' : 'text-domain-wellness'}
@@ -366,14 +419,14 @@ function ReviewCard({ today }) {
 }
 
 /** Ferramentas do Hoje, 2 colunas: Finanças, Foco, Frentes, Metas, Check-in e Revisar. */
-export default function ToolsPanel({ today, clock, todayCheck, onSaveWellness, focusGoalMinutes }) {
+export default function ToolsPanel({ today, clock, todayCheck, wellnessQuery, onSaveWellness, focusGoalMinutes }) {
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:gap-3" data-testid="tools-panel">
       <FinanceCard />
       <FocusCard today={today} focusGoalMinutes={focusGoalMinutes} />
       <FrontCard />
       <GoalCard today={today} />
-      <CheckinCard todayCheck={todayCheck} onSave={onSaveWellness} clock={clock} />
+      <CheckinCard todayCheck={todayCheck} onSave={onSaveWellness} clock={clock} wellnessQuery={wellnessQuery} />
       <ReviewCard today={today} />
     </div>
   );

@@ -17,6 +17,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { praxisApi } from '@/api/praxisClient';
+import { SectionLoadError, SectionLoading, StaleCopyNote } from '@/components/shared/SectionRead';
+import { isReadable } from '@/lib/readState';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -225,6 +227,7 @@ export default function DayTrack({
   tasks,
   today,
   clock,
+  read = null,
   behind = [],
   onToggleComplete,
   onEditTask,
@@ -286,7 +289,7 @@ export default function DayTrack({
         title="Trilha do dia"
         icon={Route}
         iconClassName="text-domain-gold"
-        count={trailCount + behind.length || undefined}
+        count={isReadable(read) ? trailCount + behind.length || undefined : undefined}
         action={(
           <Link
             to="/tarefas"
@@ -298,6 +301,12 @@ export default function DayTrack({
           </Link>
         )}
       />
+      <StaleCopyNote read={read} testId="track-stale" />
+      {read?.status === 'error' ? (
+        <SectionLoadError what="as tarefas" read={read} testId="track-error" />
+      ) : read?.status === 'loading' ? (
+        <SectionLoading className="h-[220px]" label="Carregando as tarefas" />
+      ) : (
       <Card className="praxis-dashboard-card">
         <CardContent className="space-y-1 px-2 py-2 sm:px-3 sm:py-3">
           {isEmpty ? <p className="px-3 py-3 text-sm text-muted-foreground">Dia livre</p> : null}
@@ -409,6 +418,7 @@ export default function DayTrack({
           ) : null}
         </CardContent>
       </Card>
+      )}
     </section>
   );
 }
