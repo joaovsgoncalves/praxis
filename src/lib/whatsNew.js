@@ -8,6 +8,18 @@ export function shouldShowWhatsNew(lastSeenId, release) {
   return lastSeenId !== release.id;
 }
 
+/** Sem digitar por este tempo, a pessoa parou de editar. */
+export const EDIT_QUIET_MS = 8000;
+
+/**
+ * A pessoa está no meio de alguma coisa? Painel aberto, cursor num campo ou digitou há pouco.
+ * O aviso automático espera: abrir por cima de um formulário rouba o toque em Salvar.
+ */
+export function isUserBusy({ overlayOpen = false, focusInField = false, msSinceLastInput = null } = {}) {
+  if (overlayOpen || focusInField) return true;
+  return msSinceLastInput !== null && msSinceLastInput < EDIT_QUIET_MS;
+}
+
 export function readLastSeenRelease() {
   try {
     return localStorage.getItem(LAST_SEEN_RELEASE_KEY);

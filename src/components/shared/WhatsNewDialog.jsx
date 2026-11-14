@@ -12,6 +12,7 @@ import { latestRelease } from '@/data/changelog';
 import { readPendingIntent } from '@/lib/pendingIntent';
 import {
   OPEN_WHATS_NEW_EVENT,
+  isUserBusy,
   markReleaseSeen,
   readLastSeenRelease,
   shouldShowWhatsNew,
@@ -19,6 +20,20 @@ import {
 
 // Espera a primeira tela assentar antes de abrir (não disputa a primeira pintura).
 const OPEN_DELAY_MS = 1200;
+// Pessoa ocupada: confere de novo neste intervalo até ela terminar.
+const RECHECK_MS = 1000;
+
+const OVERLAY_SELECTOR = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+const FIELD_SELECTOR =
+  'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select, [contenteditable="true"]';
+
+function readUserBusy(lastInputAt) {
+  return isUserBusy({
+    overlayOpen: Boolean(document.querySelector(OVERLAY_SELECTOR)),
+    focusInField: Boolean(document.activeElement?.matches?.(FIELD_SELECTOR)),
+    msSinceLastInput: lastInputAt ? Date.now() - lastInputAt : null,
+  });
+}
 
 function formatReleaseDate(isoDay) {
   const [year, month, day] = isoDay.split('-').map(Number);
@@ -26,7 +41,8 @@ function formatReleaseDate(isoDay) {
 }
 
 /**
- * "Últimas atualizações": abre uma vez por publicação, só no app logado (vive no AppLayout).
+ * "Últimas atualizações": abre uma vez por publicação, só no app logado (vive no AppLayout),
+ * e só quando a pessoa não está editando nada.
  * Reabre pelo link em Configurações (evento OPEN_WHATS_NEW_EVENT).
  */
 export default function WhatsNewDialog() {
@@ -36,8 +52,23 @@ export default function WhatsNewDialog() {
     if (!shouldShowWhatsNew(readLastSeenRelease(), latestRelease)) return undefined;
     // Voltando de sessão perdida há uma pergunta mais urgente na tela; as novidades ficam para depois.
     if (readPendingIntent()) return undefined;
-    const timer = window.setTimeout(() => setOpen(true), OPEN_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    // O aviso nunca abre por cima de formulário, painel ou menu: espera a pessoa terminar.
+    let lastInputAt = 0;
+    const onInput = () => { lastInputAt = Date.now(); };
+    document.addEventListener('input', onInput, true);
+    let timer = 0;
+    const tryOpen = () => {
+      if (readUserBusy(lastInputAt)) {
+        timer = window.setTimeout(tryOpen, RECHECK_MS);
+        return;
+      }
+      setOpen(true);
+    };
+    timer = window.setTimeout(tryOpen, OPEN_DELAY_MS);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('input', onInput, true);
+    };
   }, []);
 
   useEffect(() => {
