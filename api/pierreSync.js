@@ -5,6 +5,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { recordStatementCoverage } from './lib/financeCoverage.js';
 import {
   FINANCE_CATEGORIES,
   createAccount,
@@ -126,7 +127,8 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
       fetchJson('get-accounts').catch((err) => ({ _error: err.message, accounts: [] })),
       fetchJson('get-balance').catch((err) => ({ _error: err.message, balances: [] })),
       fetchJson('get-bill').catch(() => ({ bills: [] })),
-      fetchJson(`get-bank-statement?startDate=${startDate}&endDate=${endDate}`).catch(() => ({ transactions: [] })),
+      // extrato que falha não é extrato vazio: sem _error é que o período conta como coberto
+      fetchJson(`get-bank-statement?startDate=${startDate}&endDate=${endDate}`).catch((err) => ({ _error: err.message, transactions: [] })),
       fetchJson('get-installments').catch(() => ({ installments: [] })),
     ]);
 
@@ -363,6 +365,13 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
         });
       }
       txCount++;
+    }
+
+    if (!statementData._error) {
+      const at = new Date().toISOString();
+      for (const accountId of new Set(pierreToLocalAccount.values())) {
+        recordStatementCoverage(db, { accountId, source: 'pierre', from: startDate, to: endDate, at });
+      }
     }
 
     const rawInsts = asList(installmentsData, ['purchases', 'installments']);

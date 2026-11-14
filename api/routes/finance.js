@@ -38,6 +38,7 @@ import {
   updateSubscription,
   updateTransaction,
 } from '../finance.js';
+import { getStatementCoverage } from '../lib/financeCoverage.js';
 import { ingestPluggy } from '../pluggyIngest.js';
 import { syncPierre } from '../pierreSync.js';
 
@@ -282,7 +283,7 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/insights', (req, res) => {
-    res.json(getInsights(db, { from: req.query.from, to: req.query.to }));
+    res.json(getInsights(db, { from: req.query.from, to: req.query.to, today: localToday() }));
   });
 
   router.get('/goals', (_req, res) => {
@@ -315,6 +316,11 @@ export function createFinanceRouter({ db, getLocalDateString }) {
     } catch (err) {
       sendError(res, err);
     }
+  });
+
+  /** O que se sabe do extrato no período (separado da data do saldo). */
+  router.get('/coverage', (req, res) => {
+    res.json(getStatementCoverage(db, { from: req.query.from, to: req.query.to, today: localToday() }));
   });
 
   router.get('/sync/last', (_req, res) => {

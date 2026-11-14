@@ -1,6 +1,7 @@
 /** Finanças — schema, seed da conversa 12/08 e queries da aba. */
 
 import { randomUUID } from 'crypto';
+import { getStatementCoverage, initCoverageSchema } from './lib/financeCoverage.js';
 
 export const ACCOUNT_KINDS = ['checking', 'prepaid', 'credit', 'cash', 'other'];
 export const AMOUNT_KINDS = ['available', 'invested', 'used_limit', 'official_bill', 'projected_bill'];
@@ -340,6 +341,7 @@ export function initFinanceSchema(db) {
       ON finance_transactions(payment_id);
   `);
   linkPaymentsToTransactions(db);
+  initCoverageSchema(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS finance_fixed_expenses (
       id TEXT PRIMARY KEY,
@@ -1511,8 +1513,8 @@ export function updateGoal(db, id, body = {}) {
   return listGoals(db).find((g) => g.id === id);
 }
 
-export function getInsights(db, { from, to } = {}) {
-  const today = todayFortaleza();
+export function getInsights(db, { from, to, today: todayArg } = {}) {
+  const today = isValidDateString(todayArg) ? todayArg : todayFortaleza();
   const start = isValidDateString(from) ? from : addDays(today, -30);
   const end = isValidDateString(to) ? to : today;
   const rows = db.prepare(`
@@ -1526,6 +1528,10 @@ export function getInsights(db, { from, to } = {}) {
   const byDay = new Map();
   let cardOut = 0;
   let cashOut = 0;
+  // o que foi lançado à mão, dentro dos mesmos totais: subtotal identificado para a tela
+  let manualOut = 0;
+  let manualIn = 0;
+  let manualCount = 0;
 
   const accountKind = new Map(
     db.prepare('SELECT id, kind FROM finance_accounts').all().map((a) => [a.id, a.kind]),
@@ -1534,11 +1540,15 @@ export function getInsights(db, { from, to } = {}) {
   for (const tx of rows) {
     const amt = money(tx.amount);
     if (tx.direction === 'internal') continue;
+    const manual = MANUAL_SOURCES.includes(tx.source);
+    if (manual) manualCount += 1;
     if (tx.direction === 'inflow' || amt > 0) {
       inflow += Math.abs(amt);
+      if (manual) manualIn += Math.abs(amt);
     } else {
       const spent = Math.abs(amt);
       outflow += spent;
+      if (manual) manualOut += spent;
       const cat = tx.category || 'Outros';
       byCategory.set(cat, money((byCategory.get(cat) || 0) + spent));
       byDay.set(tx.posted_on, money((byDay.get(tx.posted_on) || 0) + spent));
@@ -1562,9 +1572,14 @@ export function getInsights(db, { from, to } = {}) {
     inflow: money(inflow),
     card_outflow: money(cardOut),
     cash_outflow: money(cashOut),
+    manual_outflow: money(manualOut),
+    manual_inflow: money(manualIn),
+    manual_tx_count: manualCount,
     categories,
     days,
     tx_count: rows.length,
+    // saldo em dia não prova extrato: a tela só chama zero de zero com coverage.zero_is_real
+    coverage: getStatementCoverage(db, { from: start, to: end, today }),
   };
 }
 
@@ -1953,7 +1968,7 @@ export function getMonthSummary(db, { month, today } = {}) {
   const from = `${ym}-01`;
   const to = ymdOf(y, m, daysInMonth(y, m));
   const rows = db.prepare(`
-    SELECT category, direction, amount FROM finance_transactions
+    SELECT category, direction, amount, source FROM finance_transactions
     WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL AND direction != 'internal'
   `).all(from, to);
 
@@ -1962,6 +1977,9 @@ export function getMonthSummary(db, { month, today } = {}) {
   let totalOut = 0;
   let totalIn = 0;
   let offBudget = 0;
+  let manualOut = 0;
+  let manualIn = 0;
+  let manualCount = 0;
   for (const tx of rows) {
     const amt = Math.abs(Number(tx.amount) || 0);
     const out = tx.direction === 'outflow' || Number(tx.amount) < 0;
@@ -1969,12 +1987,16 @@ export function getMonthSummary(db, { month, today } = {}) {
       if (out) offBudget += amt;
       continue;
     }
+    const manual = MANUAL_SOURCES.includes(tx.source);
+    if (manual) manualCount += 1;
     if (!out) {
       totalIn += amt;
+      if (manual) manualIn += amt;
       continue;
     }
     const cat = tx.category || 'Outros';
     totalOut += amt;
+    if (manual) manualOut += amt;
     spent.set(cat, (spent.get(cat) || 0) + amt);
     count.set(cat, (count.get(cat) || 0) + 1);
   }
@@ -2000,6 +2022,10 @@ export function getMonthSummary(db, { month, today } = {}) {
     total_out: money(totalOut),
     total_in: money(totalIn),
     off_budget_out: money(offBudget),
+    manual_out: money(manualOut),
+    manual_in: money(manualIn),
+    manual_tx_count: manualCount,
+    coverage: getStatementCoverage(db, { from, to, today: day }),
     budget_total: money([...budgets.values()].reduce((s, v) => s + v, 0)),
     categories,
   };

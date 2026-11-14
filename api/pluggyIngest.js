@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { recordStatementCoverage } from './lib/financeCoverage.js';
 import {
   MANUAL_SOURCES,
   cleanMerchant,
@@ -103,6 +104,19 @@ function parseBill(bill, path) {
   };
 }
 
+/**
+ * statement (opcional, por instituição): { from, to } — o intervalo de datas do extrato que o Midas
+ * leu no banco. Sem isso a Praxis sabe o saldo, mas não afirma nada sobre o extrato do período.
+ */
+function parseStatement(statement, path) {
+  if (statement === null || statement === undefined) return null;
+  if (!isPlainObject(statement)) throw invalid(path, 'objeto ou null');
+  const from = ymd(statement.from, `${path}.from`);
+  const to = ymd(statement.to, `${path}.to`);
+  if (to < from) throw invalid(`${path}.to`, 'não pode vir antes de from');
+  return { from, to };
+}
+
 function parseCard(card, path) {
   if (card === null || card === undefined) return null;
   if (!isPlainObject(card)) throw invalid(path, 'objeto ou null');
@@ -142,6 +156,7 @@ export function parsePluggyPayload(body) {
       status: shortText(raw.status, `${path}.status`, { max: 40, nullable: false }),
       bank: parseBank(raw.bank, `${path}.bank`),
       card: parseCard(raw.card, `${path}.card`),
+      statement: parseStatement(raw.statement, `${path}.statement`),
     };
   });
   return { fetched_at: fetchedAt, institutions, transactions: parseTransactions(body.transactions) };
@@ -376,6 +391,23 @@ function matchManual(db, bankTx) {
   `).get(...MANUAL_SOURCES, Math.abs(bankTx.amount), bankTx.posted_on, bankTx.posted_on, bankTx.account_id, bankTx.posted_on) || null;
 }
 
+/** Extrato lido pelo Midas: vale para a conta do dia a dia e para o cartão da instituição. */
+function applyStatementCoverage(db, item, now) {
+  if (!item.statement) return [];
+  const op = operationalAccount(db, item.institution);
+  const credit = db.prepare(`
+    SELECT id FROM finance_accounts
+    WHERE kind = 'credit' AND status = 'active' AND institution = ?
+  `).all(item.institution);
+  const ids = [...new Set([op?.id, ...credit.map((c) => c.id)].filter(Boolean))];
+  for (const accountId of ids) {
+    recordStatementCoverage(db, {
+      accountId, source: 'pluggy', from: item.statement.from, to: item.statement.to, at: now,
+    });
+  }
+  return ids;
+}
+
 function applyTransactions(db, list) {
   const summary = { received: list.length, inserted: 0, duplicates: 0, matched: 0, skipped: [] };
   const exists = db.prepare('SELECT id FROM finance_transactions WHERE external_id = ?');
@@ -447,8 +479,12 @@ export function ingestPluggy(db, body, { today } = {}) {
         continue;
       }
       const result = applyInstitution(db, item, now);
-      if (result.applied) applied.push(result.applied);
-      else skipped.push(result.skipped);
+      if (result.applied) {
+        result.applied.statement_accounts = applyStatementCoverage(db, item, now);
+        applied.push(result.applied);
+      } else {
+        skipped.push(result.skipped);
+      }
     }
     if (applied.some((a) => a.balance !== null)) {
       // dado vivo do banco: deixa de ser "foto"
