@@ -18,6 +18,9 @@ import {
   shiftMonthYm,
 } from "@/lib/finance";
 import { BUDGET_CATEGORIES, categoryIcon } from "@/lib/financeCategories";
+import { coverageView, manualSubtotal } from "@/lib/financeCoverage";
+import { useHideMoney } from "@/hooks/useHideMoney";
+import { CoverageNote, CoveredMoney, ManualSubtotal } from "@/components/finance/CoverageNote";
 import { cn } from "@/lib/utils";
 
 const BAR_FILL = {
@@ -34,6 +37,7 @@ function useInvalidateFinance() {
 
 function LimitEditor({ category, limit, onDone }) {
   const [value, setValue] = useState(limit != null ? String(limit).replace(".", ",") : "");
+  const { hidden } = useHideMoney();
   const inputRef = useRef(null);
   const invalidate = useInvalidateFinance();
   const mutation = useMutation({
@@ -77,6 +81,8 @@ function LimitEditor({ category, limit, onDone }) {
       <Input
         id={`limit-${category}`}
         ref={inputRef}
+        type={hidden ? "password" : "text"}
+        autoComplete="off"
         inputMode="decimal"
         placeholder="Limite/mês"
         value={value}
@@ -172,10 +178,16 @@ function CategoryRow({ row, maxSpent, money, editing, onEdit, onDone }) {
   );
 }
 
-function MonthSection({ currentMonth, money }) {
-  const [month, setMonth] = useState(currentMonth);
+function MonthSection({ currentMonth, month: monthProp, onMonthChange, money }) {
+  const [localMonth, setLocalMonth] = useState(currentMonth);
+  const month = monthProp || localMonth;
+  const setMonth = (update) => {
+    const next = typeof update === "function" ? update(month) : update;
+    if (onMonthChange) onMonthChange(next);
+    else setLocalMonth(next);
+  };
   const [editing, setEditing] = useState(null);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["finance", "month", month],
     queryFn: () => praxisApi.finance.month({ month }),
     placeholderData: keepPreviousData,
@@ -188,6 +200,12 @@ function MonthSection({ currentMonth, money }) {
   const allRows = [...rows, ...extra];
   const maxSpent = Math.max(0, ...rows.map((r) => r.spent));
   const missing = BUDGET_CATEGORIES.filter((c) => !allRows.some((r) => r.category === c));
+  // enquanto troca de mês, o número antigo não pode passar por total do mês novo
+  const fresh = data?.month === month;
+  const coverage = coverageView(fresh ? data?.coverage : null, { loading: isLoading || !fresh, failed: isError });
+  const manual = fresh
+    ? manualSubtotal(coverage, { out: data?.manual_out, inn: data?.manual_in, count: data?.manual_tx_count })
+    : null;
 
   return (
     <section className="space-y-4">
@@ -206,7 +224,9 @@ function MonthSection({ currentMonth, money }) {
             >
               <ChevronLeft className="h-4 w-4" aria-hidden />
             </Button>
-            <span className="min-w-[8.5rem] text-center text-sm font-medium tabular-nums">{monthLabel(month)}</span>
+            <span className="min-w-[8.5rem] text-center text-sm font-medium tabular-nums" aria-live="polite" data-testid="finance-month">
+              {monthLabel(month)}
+            </span>
             <Button
               type="button"
               size="icon"
@@ -228,11 +248,21 @@ function MonthSection({ currentMonth, money }) {
           <>
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-white/[0.06] pb-3">
               <p className="text-sm text-muted-foreground">
-                Saiu no mês <span className="text-lg font-semibold tabular-nums text-foreground">{money(data?.total_out ?? 0)}</span>
+                Saiu no mês{" "}
+                <CoveredMoney
+                  view={coverage}
+                  value={data?.total_out ?? 0}
+                  money={money}
+                  className="text-lg font-semibold tabular-nums text-foreground"
+                />
               </p>
               {data?.budget_total > 0 ? (
                 <p className="text-xs tabular-nums text-muted-foreground">Orçamento {money(data.budget_total)}</p>
               ) : null}
+            </div>
+            <div className="space-y-1 border-b border-white/[0.06] py-3">
+              <CoverageNote view={coverage} />
+              <ManualSubtotal manual={manual} money={money} className="pl-3.5" />
             </div>
             {allRows.length ? (
               <ul className="divide-y divide-white/[0.05]">
@@ -282,6 +312,7 @@ const EMPTY_FIXED = { name: "", amount: "", due_day: "", category: "Outros", lan
 
 function FixedDialog({ open, fixed, onClose }) {
   const invalidate = useInvalidateFinance();
+  const { hidden } = useHideMoney();
   const [form, setForm] = useState(EMPTY_FIXED);
 
   useEffect(() => {
@@ -356,6 +387,8 @@ function FixedDialog({ open, fixed, onClose }) {
             <label className="block space-y-1.5 text-sm">
               <span className="font-medium">Valor</span>
               <Input
+                type={hidden ? "password" : "text"}
+                autoComplete="off"
                 inputMode="decimal"
                 value={form.amount}
                 onChange={(e) => set("amount")(e.target.value.replace(/[^\d.,]/g, ""))}
@@ -602,11 +635,11 @@ function GoalsSection({ money }) {
 }
 
 /** Organização: gasto por categoria com orçamento, despesas fixas e metas. */
-export default function OrganizationTab({ overview, money }) {
+export default function OrganizationTab({ overview, money, month, onMonthChange }) {
   const currentMonth = overview.month?.month || overview.today.slice(0, 7);
   return (
     <div className="space-y-10">
-      <MonthSection currentMonth={currentMonth} money={money} />
+      <MonthSection currentMonth={currentMonth} month={month} onMonthChange={onMonthChange} money={money} />
       <FixedSection money={money} />
       <GoalsSection money={money} />
     </div>

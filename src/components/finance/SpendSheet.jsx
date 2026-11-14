@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { addDaysYmd, parseMoneyInput } from "@/lib/finance";
 import { SPEND_CATEGORIES, categoryIcon } from "@/lib/financeCategories";
+import { UNCONFIRMED_MESSAGE, intentKeyFor, markUnconfirmed, outcomeUnknown, settleIntent } from "@/lib/financeIntent";
+import { failureMessage } from "@/lib/apiFailure";
 import { cn } from "@/lib/utils";
 
 const OVERVIEW_KEY = ["finance", "overview"];
+const SPEND_SCOPE = "spend";
 
 function localToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Fortaleza" }).format(new Date());
@@ -96,13 +99,21 @@ export default function SpendSheet({ open, onOpenChange, accounts = [], today })
       );
       return { previous };
     },
-    onSuccess: () => {
-      toast.success("Gasto lançado");
+    onSuccess: (row) => {
+      settleIntent(SPEND_SCOPE);
+      toast.success(row?.replayed ? "Esse gasto já estava lançado. Nada entrou duas vezes." : "Gasto lançado");
       onOpenChange(false);
     },
     onError: (err, _data, context) => {
       queryClient.setQueryData(OVERVIEW_KEY, context?.previous);
-      toast.error(err?.message || "Não deu para lançar o gasto");
+      if (outcomeUnknown(err)) {
+        // pode ter gravado: guarda a chave para o reenvio igual devolver o primeiro resultado
+        markUnconfirmed(SPEND_SCOPE);
+        setError(UNCONFIRMED_MESSAGE);
+        return;
+      }
+      settleIntent(SPEND_SCOPE);
+      setError(failureMessage(err, err?.message || "Não deu para lançar o gasto"));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["finance"] });
@@ -117,7 +128,7 @@ export default function SpendSheet({ open, onOpenChange, accounts = [], today })
       amountRef.current?.focus();
       return;
     }
-    mutation.mutate({
+    const data = {
       amount: -value,
       direction: "outflow",
       merchant: merchant.trim() || category || "Gasto",
@@ -125,7 +136,9 @@ export default function SpendSheet({ open, onOpenChange, accounts = [], today })
       account_id: accountId || undefined,
       posted_on: postedOn,
       source: "joao",
-    });
+    };
+    setError("");
+    mutation.mutate({ ...data, intent_key: intentKeyFor(SPEND_SCOPE, data) });
   }
 
   return (

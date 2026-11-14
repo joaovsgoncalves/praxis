@@ -138,7 +138,6 @@ export function WalletHero({ overview, hide }) {
               </p>
             ) : null}
           </div>
-          <HideMoneyButton hide={hide} className="-mr-2 -mt-2" />
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-white/[0.06] pt-4">
           {stats.map((stat) => (
@@ -160,7 +159,7 @@ const pillClass =
 
 /** Ações rápidas abaixo da pilha de cartões; "Lançar gasto" é a primária. */
 export function WalletActions({ hide, midasSync, onUpdateBalance, onDues, onSpend }) {
-  const EyeIcon = hide.hidden ? Eye : EyeOff;
+  const EyeIcon = hide?.hidden ? Eye : EyeOff;
   return (
     <div className="flex flex-wrap gap-2">
       {onSpend ? (
@@ -181,10 +180,12 @@ export function WalletActions({ hide, midasSync, onUpdateBalance, onDues, onSpen
         <CalendarClock className="mr-1.5 h-4 w-4" aria-hidden />
         Vencimentos
       </Button>
-      <Button type="button" variant="outline" className={pillClass} aria-pressed={hide.hidden} onClick={hide.toggle}>
-        <EyeIcon className="mr-1.5 h-4 w-4" aria-hidden />
-        {hide.hidden ? "Mostrar valores" : "Ocultar valores"}
-      </Button>
+      {hide ? (
+        <Button type="button" variant="outline" className={pillClass} aria-pressed={hide.hidden} onClick={hide.toggle}>
+          <EyeIcon className="mr-1.5 h-4 w-4" aria-hidden />
+          {hide.hidden ? "Mostrar valores" : "Ocultar valores"}
+        </Button>
+      ) : null}
       <MidasChip sync={midasSync} />
     </div>
   );

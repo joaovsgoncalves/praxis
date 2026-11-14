@@ -27,13 +27,33 @@ export const LANE_LABELS = {
 };
 
 export const FINANCE_TABS = [
-  { id: 'agora', label: 'Agora' },
+  { id: 'resumo', label: 'Resumo' },
   { id: 'movimentacoes', label: 'Movimentações' },
   { id: 'organizacao', label: 'Organização' },
+];
+
+/** O que mora dentro de Organização, na ordem da tela. */
+export const FINANCE_SECTIONS = [
+  { id: 'contas', label: 'Contas' },
   { id: 'dividas', label: 'Dívidas' },
   { id: 'parcelas', label: 'Parcelas' },
   { id: 'assinaturas', label: 'Assinaturas' },
+  { id: 'orcamento', label: 'Orçamento' },
 ];
+
+/** Aba (e seção) a partir de ?aba=. Os nomes das abas antigas continuam abrindo o lugar certo. */
+export function resolveFinanceTab(value) {
+  const v = String(value || '').toLowerCase();
+  if (v === 'movimentacoes' || v === 'organizacao') return { tab: v, section: null };
+  if (FINANCE_SECTIONS.some((s) => s.id === v)) return { tab: 'organizacao', section: v };
+  return { tab: 'resumo', section: null };
+}
+
+/** Mês de ?mes= (AAAA-MM), nunca depois do mês corrente. */
+export function resolveFinanceMonth(value, currentMonth) {
+  const v = String(value || '');
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(v) && v <= currentMonth ? v : currentMonth;
+}
 
 /** Selo do cartão a partir de cards_status[].card_situation. */
 export const CARD_SITUATION_LABELS = {

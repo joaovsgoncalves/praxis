@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PraxisEmptyState, PraxisListSkeleton, SectionHeader } from "@/components/layout/PraxisPage";
 import { ChoiceChip } from "@/components/finance/SpendSheet";
 import { addDaysYmd, formatDay } from "@/lib/finance";
+import { coverageView, emptyMovementsText } from "@/lib/financeCoverage";
+import { CoverageNote } from "@/components/finance/CoverageNote";
 import {
   ALL_CATEGORIES,
   OFF_BUDGET_CATEGORIES,
@@ -46,7 +48,7 @@ function TxRow({ tx, accountName, money, onOpen }) {
               {accountName ? ` · ${accountName}` : ""}
             </span>
             {isManualTx(tx) ? (
-              <span className="shrink-0 rounded-full bg-primary/15px-1.5 py-px text-[11px] font-medium text-primary">
+              <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-px text-[11px] font-medium text-primary">
                 lançado por ti
               </span>
             ) : null}
@@ -129,11 +131,18 @@ export default function MovementsTab({ overview, money }) {
   const [editing, setEditing] = useState(null);
 
   const from = addDaysYmd(today, -days);
-  const { data: transactions = [], isLoading, isFetching } = useQuery({
+  const { data: transactions = [], isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["finance", "transactions", { from, to: today }],
     queryFn: () => praxisApi.finance.transactions.list({ from, to: today, limit: 1000 }),
     placeholderData: keepPreviousData,
   });
+  const coverageQuery = useQuery({
+    queryKey: ["finance", "coverage", { from, to: today }],
+    queryFn: () => praxisApi.finance.coverage({ from, to: today }),
+    placeholderData: keepPreviousData,
+  });
+  const coverage = coverageView(coverageQuery.data, { loading: coverageQuery.isLoading, failed: coverageQuery.isError });
+  const emptyText = emptyMovementsText(coverage, { from, to: today });
 
   const accountNames = useMemo(
     () => new Map((overview.accounts || []).map((a) => [a.id, a.name])),
@@ -234,17 +243,26 @@ export default function MovementsTab({ overview, money }) {
         ) : null}
       </div>
 
+      <CoverageNote view={coverage} />
+
       {isLoading ? (
         <PraxisListSkeleton rows={5} />
+      ) : isError ? (
+        <PraxisEmptyState
+          icon={ArrowLeftRight}
+          title="Não deu para ler as movimentações"
+          description="Os lançamentos continuam salvos; a lista só não chegou agora."
+          action={
+            <Button type="button" variant="outline" className="h-10 rounded-full" onClick={() => refetch()}>
+              Tentar de novo
+            </Button>
+          }
+        />
       ) : !groups.length ? (
         <PraxisEmptyState
           icon={ArrowLeftRight}
-          title={hasFilter ? "Nada com esse filtro" : "Sem movimentação ainda"}
-          description={
-            hasFilter
-              ? "Tira um filtro ou busca outro nome."
-              : "Quando o Midas mandar o extrato do banco ou você lançar um gasto, aparece aqui."
-          }
+          title={hasFilter ? "Nada com esse filtro" : emptyText.title}
+          description={hasFilter ? "Tira um filtro ou busca outro nome." : emptyText.description}
         />
       ) : (
         <div className="space-y-5">

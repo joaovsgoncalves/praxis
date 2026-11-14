@@ -59,6 +59,7 @@ export const financeApiModule = (request) => ({
     },
     insights: (params = {}) => request(`/api/finance/insights${qs(params)}`),
     month: (params = {}) => request(`/api/finance/month${qs(params)}`),
+    coverage: (params = {}) => request(`/api/finance/coverage${qs(params)}`),
     budgets: {
       list: () => request('/api/finance/budgets'),
       save: (data) => request('/api/finance/budgets', { method: 'PUT', body: JSON.stringify(data) }),

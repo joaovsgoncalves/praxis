@@ -15,7 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:mobile": "playwright test --project=mobile-390",
     "test:e2e:mobile:prod": "PRAXIS_E2E_BASE=https://dopraxis.vercel.app playwright test --project=mobile-390",
-    "test:e2e:local": "node scripts/e2e-local-stack.mjs -- playwright test e2e/check-do-dia.spec.js && node scripts/e2e-local-stack.mjs -- playwright test e2e/hoje-habitos-tarefas.spec.js",
+    "test:e2e:local": "node scripts/e2e-local-stack.mjs -- playwright test e2e/check-do-dia.spec.js && node scripts/e2e-local-stack.mjs -- playwright test e2e/hoje-habitos-tarefas.spec.js && node scripts/e2e-local-stack.mjs -- playwright test e2e/financas.spec.js",
     "smoke:e2e": "bash scripts/smoke-praxis-e2e.sh",
     "checklist:10": "bash scripts/checklist-praxis-10.sh",
     "backup:local": "bash scripts/praxis-backup.sh",

@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  PageHero,
   SectionHeading,
   PraxisEmptyState,
   PraxisColumnsSkeleton,
@@ -17,20 +17,36 @@ import {
 import {
   APR_LABELS,
   DEBT_STATUS_LABELS,
-  FINANCE_TABS,
+  FINANCE_SECTIONS,
   LANE_LABELS,
   SUB_STATUS_LABELS,
   debtTone,
   financeSummaryPhrase,
   formatBrl,
   formatDay,
+  parseMoneyInput,
+  resolveFinanceMonth,
+  resolveFinanceTab,
 } from "@/lib/finance";
+import { coverageView, manualSubtotal } from "@/lib/financeCoverage";
+import {
+  UNCONFIRMED_MESSAGE,
+  intentKeyFor,
+  markUnconfirmed,
+  outcomeUnknown,
+  pendingIntent,
+  settleIntent,
+} from "@/lib/financeIntent";
+import { failureMessage } from "@/lib/apiFailure";
 import { buildWalletCards } from "@/lib/financeWallet";
 import { useHideMoney } from "@/hooks/useHideMoney";
 import SourceChip from "@/components/finance/SourceChip";
 import WalletCards from "@/components/finance/WalletCards";
 import AccountsGrid from "@/components/finance/AccountsGrid";
-import { HideMoneyButton, MidasChip, WalletActions, WalletHero } from "@/components/finance/WalletHero";
+import { HideMoneyButton, WalletActions, WalletHero } from "@/components/finance/WalletHero";
+import FinanceTabs, { FINANCE_PANEL_ID, financeTabId } from "@/components/finance/FinanceTabs";
+import BankShown from "@/components/finance/BankShown";
+import { CoverageNote, CoveredMoney, ManualSubtotal } from "@/components/finance/CoverageNote";
 import SpendSheet from "@/components/finance/SpendSheet";
 import MovementsTab from "@/components/finance/MovementsTab";
 import OrganizationTab from "@/components/finance/OrganizationTab";
@@ -40,26 +56,31 @@ function invalidateFinance(queryClient) {
   queryClient.invalidateQueries({ queryKey: ["finance"] });
 }
 
-function TabChips({ tab, onChange }) {
+const sectionDomId = (id) => `financas-${id}`;
+
+/** Atalhos para as partes de Organização: contas, dívidas, parcelas, assinaturas e orçamento. */
+function SectionShortcuts({ onGo }) {
   return (
-    <div className="praxis-scroll-x flex w-full max-w-full flex-nowrap items-center gap-2 overflow-x-auto py-1">
-      {FINANCE_TABS.map((item) => (
+    <nav aria-label="Partes de Organização" className="praxis-scroll-x -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      {FINANCE_SECTIONS.map((section) => (
         <button
-          key={item.id}
+          key={section.id}
           type="button"
-          onClick={() => onChange(item.id)}
-          className={cn(
-            "praxis-touch-target flex h-11 shrink-0 items-center justify-center rounded-full border px-4 text-sm font-medium transition-colors",
-            tab === item.id
-              ? "border-primary/40 bg-primary/15 text-primary"
-              : "border-white/10 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
-          )}
+          onClick={() => onGo(section.id)}
+          className="praxis-touch-target flex h-10 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.03] px-4 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
         >
-          {item.label}
+          {section.label}
         </button>
       ))}
-    </div>
+    </nav>
   );
+}
+
+function scrollToSection(id) {
+  const node = document.getElementById(sectionDomId(id));
+  if (!node) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  node.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
 }
 
 function ProgressBar({ value, max, className }) {
@@ -73,13 +94,14 @@ function ProgressBar({ value, max, className }) {
 
 export default function Financas() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState("agora");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { tab, section } = resolveFinanceTab(searchParams.get("aba"));
   const [payDebt, setPayDebt] = useState(null);
   const [payAmount, setPayAmount] = useState("");
+  const [payError, setPayError] = useState("");
   const [caixaOpen, setCaixaOpen] = useState(false);
   const [caixaAmount, setCaixaAmount] = useState("");
   const [spendOpen, setSpendOpen] = useState(false);
-  const tabsRef = useRef(null);
   const hide = useHideMoney();
   const { money, text } = hide;
 
@@ -98,10 +120,34 @@ export default function Financas() {
     queryFn: () => praxisApi.finance.installments.list({ status: "open" }),
   });
 
-  const { data: insights } = useQuery({
+  const { data: insights, isLoading: insightsLoading, isError: insightsFailed } = useQuery({
     queryKey: ["finance", "insights"],
     queryFn: () => praxisApi.finance.insights(),
   });
+
+  const currentMonth = overview?.month?.month || overview?.today?.slice(0, 7) || "";
+  const month = currentMonth ? resolveFinanceMonth(searchParams.get("mes"), currentMonth) : "";
+
+  /** Troca aba e/ou mês mantendo o resto da URL. Aba nova entra no histórico; mês só substitui. */
+  function goTo({ aba, mes }, { replace = false } = {}) {
+    const next = new URLSearchParams(searchParams);
+    if (aba !== undefined) {
+      if (!aba || aba === "resumo") next.delete("aba");
+      else next.set("aba", aba);
+    }
+    if (mes !== undefined) {
+      if (!mes || mes === currentMonth) next.delete("mes");
+      else next.set("mes", mes);
+    }
+    setSearchParams(next, { replace });
+  }
+
+  // link antigo (?aba=dividas) ou atalho: abre Organização e leva até a parte pedida
+  useEffect(() => {
+    if (tab !== "organizacao" || !section || !overview) return undefined;
+    const frame = requestAnimationFrame(() => scrollToSection(section));
+    return () => cancelAnimationFrame(frame);
+  }, [tab, section, overview]);
 
   const fixedPaidMutation = useMutation({
     mutationFn: (id) => praxisApi.finance.fixed.markPaid(id),
@@ -114,12 +160,28 @@ export default function Financas() {
 
   const payMutation = useMutation({
     mutationFn: ({ id, data }) => praxisApi.finance.debts.pay(id, data),
-    onSuccess: () => {
-      toast.success("Pagamento registrado");
+    onSuccess: (row, { id }) => {
+      settleIntent(`pay:${id}`);
+      toast.success(row?.replayed ? "Esse pagamento já estava registrado. Nada foi baixado duas vezes." : "Pagamento registrado");
       setPayDebt(null);
+      setPayError("");
       invalidateFinance(queryClient);
     },
-    onError: (err) => toast.error(err.message || "Não deu para registrar"),
+    onError: (err, { id }) => {
+      if (outcomeUnknown(err)) {
+        // a resposta não voltou: pode ter gravado. A chave fica guardada e o reenvio igual é seguro.
+        markUnconfirmed(`pay:${id}`);
+        setPayError(UNCONFIRMED_MESSAGE);
+        invalidateFinance(queryClient);
+        return;
+      }
+      settleIntent(`pay:${id}`);
+      setPayError(
+        err?.status === 409
+          ? "Essa tentativa já foi usada com outro valor. Confere o saldo da dívida e registra de novo."
+          : failureMessage(err, err?.message || "Não deu para registrar"),
+      );
+    },
   });
 
   const caixaMutation = useMutation({
@@ -172,49 +234,26 @@ export default function Financas() {
     [topCategories],
   );
 
-  const syncedAccounts = useMemo(() => {
-    const accounts = overview?.accounts || [];
-    const fromPierre = accounts.filter(
-      (a) => a.available_source === "pierre" || a.invested_source === "pierre" || a.pierre_account_id,
-    );
-    if (fromPierre.length > 0) return fromPierre;
-    return accounts.filter((a) => (a.available || 0) > 0 || (a.invested || 0) > 0);
-  }, [overview]);
-
-  const bankEntries = useMemo(() => {
-    const list = [];
-    for (const acc of syncedAccounts) {
-      if (acc.available !== undefined && acc.available !== null) {
-        list.push({
-          id: `${acc.id}-available`,
-          name: acc.name,
-          kind: "available",
-          kindLabel: "livre",
-          amount: acc.available,
-          source: acc.available_source || "pierre",
-          asOf: acc.available_as_of,
-        });
-      }
-      if (Number(acc.invested || 0) > 0) {
-        list.push({
-          id: `${acc.id}-invested`,
-          name: acc.name,
-          kind: "invested",
-          kindLabel: "auto-invest",
-          amount: acc.invested,
-          source: acc.invested_source || "pierre",
-          asOf: acc.invested_as_of,
-        });
-      }
-    }
-    return list;
-  }, [syncedAccounts]);
-
   const walletCards = useMemo(() => buildWalletCards(overview), [overview]);
 
+  const coverage = coverageView(insights?.coverage, { loading: insightsLoading, failed: insightsFailed });
+  const manual = manualSubtotal(coverage, {
+    out: insights?.manual_outflow,
+    inn: insights?.manual_inflow,
+    count: insights?.manual_tx_count,
+  });
+
   function openPay(debt) {
+    // se a última tentativa desta dívida ficou sem confirmação, volta com o mesmo valor
+    const waiting = pendingIntent(`pay:${debt.id}`);
     setPayDebt(debt);
-    setPayAmount(String(debt.balance ?? ""));
+    setPayAmount(String(waiting?.payload?.amount ?? debt.balance ?? "").replace(".", ","));
+    setPayError(waiting ? UNCONFIRMED_MESSAGE : "");
+  }
+
+  function closePay() {
+    setPayDebt(null);
+    setPayError("");
   }
 
   function openCaixaDialog() {
@@ -223,23 +262,25 @@ export default function Financas() {
   }
 
   function showDues() {
-    setTab("dividas");
-    requestAnimationFrame(() => {
-      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      tabsRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-    });
+    if (tab === "organizacao" && section === "dividas") scrollToSection("dividas");
+    else goTo({ aba: "dividas" });
+  }
+
+  function goSection(id) {
+    if (section === id) scrollToSection(id);
+    else goTo({ aba: id }, { replace: true });
   }
 
   function submitPay() {
     if (!payDebt) return;
-    payMutation.mutate({
-      id: payDebt.id,
-      data: {
-        amount: Number(String(payAmount).replace(",", ".")),
-        account_id: operationalId,
-        method: "pix",
-      },
-    });
+    const amount = parseMoneyInput(payAmount);
+    if (!(amount > 0)) {
+      setPayError("Informe quanto foi pago.");
+      return;
+    }
+    const data = { amount, account_id: operationalId, method: "pix" };
+    setPayError("");
+    payMutation.mutate({ id: payDebt.id, data: { ...data, intent_key: intentKeyFor(`pay:${payDebt.id}`, data) } });
   }
 
   if (isLoading) {
@@ -263,27 +304,44 @@ export default function Financas() {
 
   return (
     <div className="praxis-page space-y-8">
-      <PageHero
-        kicker="Dinheiro"
-        kickerIcon={Wallet}
-        title="Finanças"
-        description={text(financeSummaryPhrase(overview.caixa, overview.invested))}
-        action={
-          tab === "agora" ? null : (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" className="h-10 rounded-full px-4 font-semibold" onClick={() => setSpendOpen(true)}>
-                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                Lançar gasto
-              </Button>
-              <MidasChip sync={overview.last_midas_sync} />
-              <Button type="button" variant="outline" className="rounded-full" onClick={openCaixaDialog}>
-                Atualizar saldo
-              </Button>
-              <HideMoneyButton hide={hide} />
-            </div>
-          )
-        }
-      />
+      <section className="praxis-page-hero !p-4 sm:!p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <p className="praxis-kicker-row">
+              <Wallet className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+              <span>Dinheiro</span>
+            </p>
+            <h1 className="praxis-title text-2xl font-bold leading-[1.15] sm:text-4xl">Finanças</h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
+              type="button"
+              aria-label="Lançar gasto"
+              className="h-10 rounded-full px-4 font-semibold"
+              onClick={() => setSpendOpen(true)}
+            >
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              Lançar<span className="hidden sm:inline">&nbsp;gasto</span>
+            </Button>
+            <HideMoneyButton hide={hide} />
+          </div>
+        </div>
+      </section>
+
+      <FinanceTabs tab={tab} onChange={(id) => goTo({ aba: id })} />
+
+      <div
+        id={FINANCE_PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={financeTabId(tab)}
+        tabIndex={0}
+        className="space-y-8 focus-visible:outline-none"
+      >
+      {tab === "resumo" ? (
+      <>
+      <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+        {text(financeSummaryPhrase(overview.caixa, overview.invested))}
+      </p>
 
       <Card className="border-primary/25 bg-primary/[0.07]">
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -305,7 +363,6 @@ export default function Financas() {
         </CardContent>
       </Card>
 
-      {tab === "agora" ? (
         <section aria-label="Carteira" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-6">
           <WalletHero overview={overview} hide={hide} />
           <div className="flex min-w-0 flex-col justify-between gap-4">
@@ -319,22 +376,10 @@ export default function Financas() {
                 description="Marque uma conta como do dia ou sincronize os bancos."
               />
             )}
-            <WalletActions
-              hide={hide}
-              midasSync={overview.last_midas_sync}
-              onUpdateBalance={openCaixaDialog}
-              onDues={showDues}
-              onSpend={() => setSpendOpen(true)}
-            />
+            <WalletActions midasSync={overview.last_midas_sync} onUpdateBalance={openCaixaDialog} onDues={showDues} />
           </div>
         </section>
-      ) : null}
 
-      <div ref={tabsRef} className="scroll-mt-4">
-        <TabChips tab={tab} onChange={setTab} />
-      </div>
-
-      {tab === "agora" ? (
         <div className="space-y-8">
           <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:gap-6">
             <Card className="flex h-full flex-col justify-between border-white/10 bg-white/[0.03]">
@@ -350,19 +395,23 @@ export default function Financas() {
                   ) : null}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Entradas (30d)</p>
-                    <p className="text-lg font-semibold tabular-nums text-foreground">
-                      {insights ? money(insights.inflow) : "—"}
-                    </p>
+                <div className="space-y-3 border-t border-white/[0.06] pt-3" data-testid="totals-30d">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Entradas (30d)</p>
+                      <p className="text-lg font-semibold tabular-nums text-foreground">
+                        <CoveredMoney view={coverage} value={insights?.inflow ?? 0} money={money} />
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Saídas (30d)</p>
+                      <p className="text-lg font-semibold tabular-nums text-foreground">
+                        <CoveredMoney view={coverage} value={insights?.outflow ?? 0} money={money} />
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Saídas (30d)</p>
-                    <p className="text-lg font-semibold tabular-nums text-foreground">
-                      {insights ? money(insights.outflow) : "—"}
-                    </p>
-                  </div>
+                  <CoverageNote view={coverage} />
+                  <ManualSubtotal manual={manual} money={money} className="pl-3.5" />
                 </div>
               </CardContent>
             </Card>
@@ -375,14 +424,20 @@ export default function Financas() {
                   </p>
                   {insights && insights.outflow > 0 ? (
                     <span className="text-xs font-medium tabular-nums text-muted-foreground">
-                      Total: {money(insights.outflow)}
+                      Total: <CoveredMoney view={coverage} value={insights.outflow} money={money} />
                     </span>
                   ) : null}
                 </div>
 
                 {!topCategories.length ? (
                   <div className="flex min-h-[140px] flex-1 items-center justify-center p-4 text-center">
-                    <p className="text-sm text-muted-foreground">Sem movimento neste recorte</p>
+                    <p className="text-sm text-muted-foreground">
+                      {coverage.zeroIsReal
+                        ? "Nenhuma saída nos últimos 30 dias, com o extrato completo."
+                        : coverage.status === "loading"
+                          ? "Lendo o extrato."
+                          : "Sem extrato para montar as categorias deste recorte."}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2.5 pt-1">
@@ -418,80 +473,26 @@ export default function Financas() {
             </div>
           </section>
 
-          <AccountsGrid accounts={overview.accounts} money={money} />
-
-          {overview.last_sync && Boolean(overview.last_sync.ok) ? (
-            <section className="space-y-3">
-              <SectionHeading
-                title="O banco mostrou"
-                kicker={
-                  overview.last_sync.finished_at || overview.last_sync.started_at
-                    ? `Sync ${formatDay((overview.last_sync.finished_at || overview.last_sync.started_at).slice(0, 10))}`
-                    : "Sincronizado"
-                }
-              />
-              <div className="space-y-2">
-                {bankEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{entry.name}</p>
-                        <Badge variant="outline" className="border-white/10 text-[10px] uppercase text-muted-foreground">
-                          {entry.kindLabel}
-                        </Badge>
-                        <SourceChip source={entry.source} />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.kind === "invested" ? "Investimento / auto-invest" : "Saldo em conta"}
-                        {entry.asOf ? ` · ${formatDay(entry.asOf)}` : ""}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-base font-semibold tabular-nums">
-                      {money(entry.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {(overview.installments_n || 0) > 0 ? (
-            <section className="space-y-3">
-              <SectionHeading title="Compras parceladas" kicker="Já está no cartão — não soma de novo" />
-              <Card className="border-white/10 bg-white/[0.03]">
-                <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Ainda resta</p>
-                    <p className="text-xl font-semibold tabular-nums">{money(overview.installments_remaining)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Pesa por mês</p>
-                    <p className="text-xl font-semibold tabular-nums">{money(overview.installments_month)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Última</p>
-                    <p className="text-xl font-semibold tabular-nums">
-                      {overview.installments_last ? formatDay(overview.installments_last) : "—"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-          ) : null}
+          <BankShown entries={overview.bank_shown} money={money} />
         </div>
+      </>
       ) : null}
 
-      {tab === "dividas" ? (
-        <div className="space-y-4">
+      {tab === "organizacao" ? (
+        <>
+        <SectionShortcuts onGo={goSection} />
+
+        <div id={sectionDomId("contas")} className="scroll-mt-20">
+          <AccountsGrid accounts={overview.accounts} money={money} />
+        </div>
+
+        <div id={sectionDomId("dividas")} className="scroll-mt-20 space-y-4">
           <SectionHeading
-            title="Fila"
+            title="Dívidas"
             kicker={`${money(overview.debts_total)} em aberto`}
           />
           {openDebts.map((debt) => (
-            <Card key={debt.id} className="border-white/10 bg-white/[0.03]">
+            <Card key={debt.id} data-testid="debt-row" className="border-white/10 bg-white/[0.03]">
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -510,7 +511,7 @@ export default function Financas() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {debt.due_date ? `Vence ${formatDay(debt.due_date)}` : "Sem data"}
-                    {debt.note ? ` · ${debt.note}` : ""}
+                    {debt.note ? ` · ${text(debt.note)}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -522,18 +523,19 @@ export default function Financas() {
               </CardContent>
             </Card>
           ))}
+          {!openDebts.length ? (
+            <PraxisEmptyState compact title="Nenhuma dívida em aberto" description="Quando entrar uma, ela aparece aqui com vencimento e botão de baixa." />
+          ) : null}
           {cleanDebts.length ? (
             <p className="text-xs text-muted-foreground">
               Já limpo: {cleanDebts.map((d) => d.title).join(", ")}.
             </p>
           ) : null}
         </div>
-      ) : null}
 
-      {tab === "parcelas" ? (
-        <div className="space-y-4">
+        <div id={sectionDomId("parcelas")} className="scroll-mt-20 space-y-4">
           <SectionHeading
-            title="Já comprado, ainda cai"
+            title="Parcelas"
             kicker={`${overview.installments_n || 0} em andamento`}
           />
           <p className="text-sm text-muted-foreground">
@@ -594,9 +596,9 @@ export default function Financas() {
             </div>
           )}
         </div>
-      ) : null}
 
-      {tab === "assinaturas" ? (
+        <div id={sectionDomId("assinaturas")} className="scroll-mt-20 space-y-4">
+        <SectionHeading title="Assinaturas" kicker={`${liveSubs.length} ativas`} />
         <div className="grid gap-6 lg:grid-cols-2">
           {[
             { title: "Trabalho", items: workSubs, total: overview.work_month },
@@ -633,11 +635,21 @@ export default function Financas() {
             </section>
           ))}
         </div>
+        </div>
+
+        <div id={sectionDomId("orcamento")} className="scroll-mt-20">
+          <OrganizationTab
+            overview={overview}
+            money={money}
+            month={month}
+            onMonthChange={(next) => goTo({ mes: next }, { replace: true })}
+          />
+        </div>
+        </>
       ) : null}
 
       {tab === "movimentacoes" ? <MovementsTab overview={overview} money={money} /> : null}
-
-      {tab === "organizacao" ? <OrganizationTab overview={overview} money={money} /> : null}
+      </div>
 
       <SpendSheet
         open={spendOpen}
@@ -646,31 +658,51 @@ export default function Financas() {
         today={overview.today}
       />
 
-      <Dialog open={Boolean(payDebt)} onOpenChange={(open) => !open && setPayDebt(null)}>
+      <Dialog open={Boolean(payDebt)} onOpenChange={(open) => !open && closePay()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Registrar pagamento</DialogTitle>
+            <DialogTitle>Registrar pagamento{payDebt ? ` · ${payDebt.title}` : ""}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Isso não paga no banco. Só baixa a fila aqui quando o Pix já saiu.
           </p>
-          <label className="space-y-1.5 text-sm">
-            <span className="text-muted-foreground">Valor</span>
-            <Input
-              inputMode="decimal"
-              value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
-              className="tabular-nums"
-            />
-          </label>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" className="rounded-full" onClick={() => setPayDebt(null)}>
-              Cancelar
-            </Button>
-            <Button type="button" className="rounded-full" disabled={payMutation.isPending} onClick={submitPay}>
-              Confirmar
-            </Button>
-          </div>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitPay();
+            }}
+          >
+            <label className="block space-y-1.5 text-sm">
+              <span className="text-muted-foreground">Valor</span>
+              <Input
+                type={hide.hidden ? "password" : "text"}
+                autoComplete="off"
+                inputMode="decimal"
+                value={payAmount}
+                onChange={(e) => {
+                  setPayAmount(e.target.value.replace(/[^\d.,]/g, ""));
+                  setPayError("");
+                }}
+                aria-invalid={Boolean(payError)}
+                aria-describedby={payError ? "pay-error" : undefined}
+                className="tabular-nums"
+              />
+            </label>
+            {payError ? (
+              <p id="pay-error" role="alert" className="text-sm text-amber-200">
+                {payError}
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" className="rounded-full" onClick={closePay}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="rounded-full" disabled={payMutation.isPending}>
+                {payMutation.isPending ? "Registrando…" : payError === UNCONFIRMED_MESSAGE ? "Tentar de novo" : "Confirmar"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -681,6 +713,9 @@ export default function Financas() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">O que o app mostra hoje. Esse número trava por cima da foto antiga.</p>
           <Input
+            type={hide.hidden ? "password" : "text"}
+            autoComplete="off"
+            aria-label="Saldo do Inter"
             inputMode="decimal"
             value={caixaAmount}
             onChange={(e) => setCaixaAmount(e.target.value)}
