@@ -24,6 +24,10 @@ import {
 import { cn } from "@/lib/utils";
 
 const PAGE_DAYS = 60;
+// dias com movimento mostrados de cada vez: com extrato do banco a lista passa de centenas de linhas
+const DAY_GROUPS = 10;
+/** Tira sujeira do começo da descrição do banco ("|joao…"). */
+const txTitle = (tx) => String(tx?.merchant || tx?.raw_description || "").replace(/^[\s|·:;,.-]+/, "") || "Lançamento";
 
 function TxRow({ tx, accountName, money, onOpen }) {
   const Icon = categoryIcon(tx.category);
@@ -41,7 +45,7 @@ function TxRow({ tx, accountName, money, onOpen }) {
           <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{tx.merchant || tx.raw_description || "Lançamento"}</span>
+          <span className="block truncate text-sm font-medium">{txTitle(tx)}</span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">
               {tx.category}
@@ -94,7 +98,7 @@ function CategoryDialog({ tx, onClose }) {
     <Dialog open={Boolean(tx)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="truncate pr-6">{tx?.merchant || tx?.raw_description || "Lançamento"}</DialogTitle>
+          <DialogTitle className="truncate pr-6">{txTitle(tx)}</DialogTitle>
           <DialogDescription>
             {tx ? `${formatDay(tx.posted_on)} · escolha a categoria` : ""}
           </DialogDescription>
@@ -129,6 +133,7 @@ export default function MovementsTab({ overview, money }) {
   const [account, setAccount] = useState("all");
   const [kind, setKind] = useState("all");
   const [editing, setEditing] = useState(null);
+  const [shownGroups, setShownGroups] = useState(DAY_GROUPS);
 
   const from = addDaysYmd(today, -days);
   const { data: transactions = [], isLoading, isFetching, isError, refetch } = useQuery({
@@ -266,7 +271,7 @@ export default function MovementsTab({ overview, money }) {
         />
       ) : (
         <div className="space-y-5">
-          {groups.map((group) => (
+          {groups.slice(0, shownGroups).map((group) => (
             <section key={group.date} aria-label={dayHeading(group.date, today)} className="praxis-panel rounded-2xl p-2 sm:p-3">
               <header className="flex items-baseline justify-between gap-3 px-2 pb-1 pt-1">
                 <h3 className="text-sm font-semibold">{dayHeading(group.date, today)}</h3>
@@ -293,15 +298,29 @@ export default function MovementsTab({ overview, money }) {
       )}
 
       <div className="flex justify-center">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 rounded-full border-white/10 bg-white/[0.03] px-5"
-          disabled={isFetching}
-          onClick={() => setDays((d) => d + PAGE_DAYS)}
-        >
-          {isFetching && !isLoading ? "Carregando…" : `Carregar mais ${PAGE_DAYS} dias`}
-        </Button>
+        {groups.length > shownGroups ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-full border-white/10 bg-white/[0.03] px-5"
+            onClick={() => setShownGroups((n) => n + DAY_GROUPS)}
+          >
+            Mostrar dias anteriores ({groups.length - shownGroups})
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-full border-white/10 bg-white/[0.03] px-5"
+            disabled={isFetching}
+            onClick={() => {
+              setDays((d) => d + PAGE_DAYS);
+              setShownGroups((n) => n + DAY_GROUPS);
+            }}
+          >
+            {isFetching && !isLoading ? "Carregando…" : `Carregar mais ${PAGE_DAYS} dias`}
+          </Button>
+        )}
       </div>
 
       <CategoryDialog tx={editing} onClose={() => setEditing(null)} />

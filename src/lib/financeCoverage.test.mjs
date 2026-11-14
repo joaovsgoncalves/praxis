@@ -59,3 +59,12 @@ test('lista vazia de movimentações diz o que se sabe do período', () => {
   assert.match(none.description, /não quer dizer que não houve gasto/);
   assert.equal(emptyMovementsText(coverageView(null, { failed: true }), range).title, 'Não deu para ler o período');
 });
+
+test('parcial com todas as contas cobrindo um pedaço: diz de quando a quando, não "0 de N contas"', () => {
+  const piece = (name) => ({ name, status: 'partial', covered_from: '2026-10-01', covered_to: '2026-11-14' });
+  const view = coverageView({ status: 'partial', zero_is_real: false, accounts: [piece('Inter'), piece('C6'), { name: 'Carteira', status: 'manual' }] });
+  assert.equal(view.status, 'partial');
+  assert.match(view.detail, /extrato de 01\/10 a 14\/11/);
+  assert.doesNotMatch(view.detail, /0 de/);
+  assert.equal(view.zeroIsReal, false);
+});

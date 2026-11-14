@@ -57,17 +57,19 @@ function invalidateFinance(queryClient) {
 }
 
 const sectionDomId = (id) => `financas-${id}`;
+// a lista de parcelas passa de dezenas de linhas: mostra as primeiras e abre o resto sob pedido
+const INSTALLMENTS_SHORT = 5;
 
 /** Atalhos para as partes de Organização: contas, dívidas, parcelas, assinaturas e orçamento. */
 function SectionShortcuts({ onGo }) {
   return (
-    <nav aria-label="Partes de Organização" className="praxis-scroll-x -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+    <nav aria-label="Partes de Organização" className="flex flex-wrap gap-2">
       {FINANCE_SECTIONS.map((section) => (
         <button
           key={section.id}
           type="button"
           onClick={() => onGo(section.id)}
-          className="praxis-touch-target flex h-10 shrink-0 items-center rounded-full border border-white/10 bg-white/[0.03] px-4 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+          className="praxis-touch-target flex h-10 items-center rounded-full border border-white/10 bg-white/[0.03] px-3.5 text-sm text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
         >
           {section.label}
         </button>
@@ -102,6 +104,7 @@ export default function Financas() {
   const [caixaOpen, setCaixaOpen] = useState(false);
   const [caixaAmount, setCaixaAmount] = useState("");
   const [spendOpen, setSpendOpen] = useState(false);
+  const [allInstallments, setAllInstallments] = useState(false);
   const hide = useHideMoney();
   const { money, text } = hide;
 
@@ -572,7 +575,7 @@ export default function Financas() {
             />
           ) : (
             <div className="space-y-2">
-              {installments.map((inst) => {
+              {(allInstallments ? installments : installments.slice(0, INSTALLMENTS_SHORT)).map((inst) => {
                 const acc = overview.accounts.find((a) => a.id === inst.account_id);
                 return (
                   <div
@@ -593,6 +596,19 @@ export default function Financas() {
                   </div>
                 );
               })}
+              {installments.length > INSTALLMENTS_SHORT ? (
+                <div className="flex justify-center pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-full border-white/10 bg-white/[0.03] px-5"
+                    aria-expanded={allInstallments}
+                    onClick={() => setAllInstallments((v) => !v)}
+                  >
+                    {allInstallments ? "Mostrar só as primeiras" : `Ver as ${installments.length} parcelas`}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
@@ -623,7 +639,7 @@ export default function Financas() {
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="h-9 rounded-full text-xs text-muted-foreground"
+                      className="h-10 rounded-full px-3 text-xs text-muted-foreground"
                       disabled={deleteSubMutation.isPending}
                       onClick={() => deleteSubMutation.mutate(sub.id)}
                     >

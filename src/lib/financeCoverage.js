@@ -66,6 +66,22 @@ export function coverageView(coverage, { loading = false, failed = false } = {})
   }
   if (status === 'partial') {
     const got = linked.length - missing.length;
+    // todas as contas têm um pedaço do período: dizer de quando a quando, em vez de "0 de N contas"
+    const pieces = linked.filter((a) => a.covered_from && a.covered_to);
+    if (got === 0 && pieces.length === linked.length && linked.length) {
+      const start = pieces.map((a) => a.covered_from).sort().at(-1);
+      const end = pieces.map((a) => a.covered_to).sort()[0];
+      if (start <= end) {
+        return {
+          status,
+          tone: 'warn',
+          label: 'Extrato parcial',
+          detail: `O banco mandou extrato de ${ddmm(start)} a ${ddmm(end)}. Fora desses dias só aparece o que foi lançado à mão, então os totais podem ser maiores.`,
+          zeroIsReal: false,
+          missing,
+        };
+      }
+    }
     return {
       status,
       tone: 'warn',
