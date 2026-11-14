@@ -65,14 +65,18 @@ export function DashboardSkeleton() {
       <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.6fr)] xl:gap-6">
         <div className="min-w-0 space-y-4 sm:space-y-5">
           <Bone className="h-[70px]" />
-          <Bone className="h-[403px] sm:h-[308px]" />
-          <Bone className="h-[620px] sm:h-[584px]" />
-          <div className="space-y-3">
+          <Bone className="h-[250px] sm:h-[308px]" />
+          <div className="space-y-3 xl:hidden">
             <Bone className="h-8 w-40 rounded-lg" />
-            <Bone className="h-[224px]" />
+            <Bone className="h-[150px]" />
           </div>
+          <Bone className="h-[620px] sm:h-[584px]" />
         </div>
         <div className="min-w-0 space-y-3">
+          <div className="hidden space-y-3 pb-2 xl:block">
+            <Bone className="h-8 w-40 rounded-lg" />
+            <Bone className="h-[150px]" />
+          </div>
           <Bone className="h-8 w-44 rounded-lg" />
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (

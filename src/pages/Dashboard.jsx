@@ -35,6 +35,7 @@ import { fortalezaDateKey, buildSnooze15Update, buildSnoozeTomorrowUpdate } from
 import { planNowTasks } from "@/lib/nowTask";
 import { computeDayLeft } from "@/lib/dayLeft";
 import { useTimeOfDay } from "@/hooks/useTimeOfDay";
+import { useMinWidth } from "@/hooks/useMinWidth";
 import { isHabitDueOnDate } from "@/lib/habits";
 import { isTaskCompletedForToday, isTaskOpen, cleanPriorityPrefix } from "@/lib/tasks";
 import { addDaysToDateKey, sortTasksForList } from "@/lib/taskListFilters";
@@ -53,6 +54,8 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const today = fortalezaDateKey();
   const { greeting, clock } = useTimeOfDay();
+  // Duas colunas a partir de 1280: tarefas à esquerda, hábitos e ferramentas à direita.
+  const twoColumns = useMinWidth(1280);
 
   useEffect(() => {
     if (searchParams.get("from") === "capture") {
@@ -347,6 +350,25 @@ export default function Dashboard() {
     return <DashboardSkeleton />;
   }
 
+  const habitsGlance = (
+    <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "60ms" }}>
+      <HabitsGlance
+        today={today}
+        clock={clock}
+        compounds={compoundHabits}
+        habits={standaloneHabitsDueToday}
+        sinceHabits={sinceHabits}
+        habitLogs={habitLogs}
+        onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
+        onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
+        onSkipHabit={(habitId, skipReason, skipNote) =>
+          skipHabitMutation.mutate({ habitId, skipReason, skipNote })
+        }
+        onEditHabit={setEditingHabit}
+      />
+    </div>
+  );
+
   return (
     <div
       className="praxis-page praxis-dashboard flex flex-col gap-4 space-y-0 sm:gap-5"
@@ -380,7 +402,10 @@ export default function Dashboard() {
             />
           </div>
 
-          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "60ms" }}>
+          {/* Celular: o primeiro hábito fica marcável sem rolar, logo abaixo do Agora. */}
+          {twoColumns ? null : habitsGlance}
+
+          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "90ms" }}>
             <DayTrack
               tasks={tasks}
               today={today}
@@ -394,28 +419,13 @@ export default function Dashboard() {
               onSnooze15={handleSnooze15}
             />
           </div>
-
-          <div className="praxis-dashboard-reveal" style={{ "--praxis-reveal-delay": "90ms" }}>
-            <HabitsGlance
-              today={today}
-              clock={clock}
-              compounds={compoundHabits}
-              habits={standaloneHabitsDueToday}
-              sinceHabits={sinceHabits}
-              habitLogs={habitLogs}
-              onToggleHabit={(habitId, isDone, value) => toggleHabitMutation.mutate({ habitId, isDone, value })}
-              onQuickIncrement={(habit, inc) => quickIncrementMutation.mutateAsync({ habit, increment: inc })}
-              onSkipHabit={(habitId, skipReason, skipNote) =>
-                skipHabitMutation.mutate({ habitId, skipReason, skipNote })
-              }
-              onEditHabit={setEditingHabit}
-            />
-          </div>
         </div>
 
-        {/* Ferramentas: fixa no xl; se passar da tela, rola por dentro. */}
+        {/* Segunda coluna: hábitos e ferramentas. Rola com a página: com os hábitos aqui ela já não cabe fixa numa tela. */}
+        <div className="min-w-0 space-y-4 sm:space-y-5">
+          {twoColumns ? habitsGlance : null}
         <aside
-          className="praxis-dashboard-reveal praxis-hide-scrollbar min-w-0 space-y-3 xl:sticky xl:top-6 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto"
+          className="praxis-dashboard-reveal min-w-0 space-y-3"
           style={{ "--praxis-reveal-delay": "120ms" }}
           aria-labelledby="tools-title"
           data-testid="day-tools"
@@ -434,6 +444,7 @@ export default function Dashboard() {
           />
           <WeekPanel today={today} />
         </aside>
+        </div>
       </div>
 
       <Collapsible

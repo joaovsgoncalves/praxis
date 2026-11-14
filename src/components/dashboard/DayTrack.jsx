@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronDown,
   Clock,
+  ChevronRight,
   ExternalLink,
   Hourglass,
   MapPin,
@@ -286,6 +287,16 @@ export default function DayTrack({
         icon={Route}
         iconClassName="text-domain-gold"
         count={trailCount + behind.length || undefined}
+        action={(
+          <Link
+            to="/tarefas"
+            className="inline-flex min-h-11 items-center gap-0.5 rounded-full px-2 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Ver todas
+            <span className="sr-only"> as tarefas</span>
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        )}
       />
       <Card className="praxis-dashboard-card">
         <CardContent className="space-y-1 px-2 py-2 sm:px-3 sm:py-3">
