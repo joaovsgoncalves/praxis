@@ -169,6 +169,9 @@ export async function syncPierre(db, { actor = 'system', getLocalDateString } = 
         if (!match.pierre_account_id) {
           db.prepare('UPDATE finance_accounts SET pierre_account_id = ?, updated_at = ? WHERE id = ?')
             .run(pId, new Date().toISOString(), match.id);
+          // marca também em memória: sem isso, duas contas do mesmo banco no Pierre caíam na mesma
+          // conta local, o vínculo trocava a cada carga e a seguinte criava uma conta repetida
+          match.pierre_account_id = pId;
         }
         if (mask && !match.mask) {
           updateAccount(db, match.id, { mask });
