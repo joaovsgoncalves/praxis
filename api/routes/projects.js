@@ -9,13 +9,19 @@ import {
   listProjects,
   todayFortaleza,
 } from '../projects.js';
-import { getContinuityGuidance } from '../continuityGuidance.js';
+import { getContinuityGuidance, writeContinuityGuidance } from '../continuityGuidance.js';
 
 function sendError(res, err) {
   const status = err.status || 500;
   const code = err.code || err.message;
   if (status === 409 && (code === 'FOCUS_LIMIT' || err.message === 'FOCUS_LIMIT')) {
     return res.status(409).json({ error: 'FOCUS_LIMIT' });
+  }
+  if (status === 409 && code === 'REVISION_CHANGED') {
+    return res.status(409).json({ error: 'REVISION_CHANGED', current_revision: err.current_revision });
+  }
+  if (status === 409 && code === 'GUIDANCE_CHANGED') {
+    return res.status(409).json({ error: 'GUIDANCE_CHANGED', current_generated_at: err.current_generated_at });
   }
   res.status(status).json({ error: err.message || 'error' });
 }
@@ -61,6 +67,14 @@ export function createProjectsRouter({ db, getLocalDateString = todayFortaleza }
         : todayFortaleza();
       const guidance = getContinuityGuidance(db, today);
       res.json(guidance);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.put('/guidance/:date', (req, res) => {
+    try {
+      res.json(writeContinuityGuidance(db, req.params.date, req.body || {}));
     } catch (err) {
       sendError(res, err);
     }

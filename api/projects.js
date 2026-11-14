@@ -241,6 +241,18 @@ export function initProjectsSchema(db) {
   db.exec("UPDATE projects SET live = 1 WHERE column = 'no_ar'");
   db.exec("UPDATE projects SET column = 'andando' WHERE column = 'no_ar'");
   db.exec("UPDATE projects SET column = 'pausado' WHERE column = 'parado'");
+
+  // Trava contra sobrescrita: toda escrita na frente sobe a revisão, inclusive quem grava direto no banco
+  // (script do Sêneca). Quem leu a revisão N manda `expected_revision: N`; se mudou, a escrita é recusada (409).
+  ensureColumn(db, 'projects', 'revision', 'INTEGER NOT NULL DEFAULT 0');
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS projects_revision_bump
+    AFTER UPDATE ON projects
+    WHEN NEW.revision = OLD.revision
+    BEGIN
+      UPDATE projects SET revision = OLD.revision + 1 WHERE id = NEW.id;
+    END;
+  `);
 }
 
 function mapRow(row) {
@@ -689,6 +701,16 @@ export function applyProjectPatch(db, idOrSlug, body = {}) {
   if (!existing) return null;
 
   const run = db.transaction(() => {
+    if (body.expected_revision !== undefined && body.expected_revision !== null) {
+      const expected = Number(body.expected_revision);
+      if (!Number.isInteger(expected) || expected < 0) throw badRequest('expected_revision inválido');
+      const current = db.prepare('SELECT revision FROM projects WHERE id = ?').get(existing.id).revision;
+      if (current !== expected) {
+        const err = conflict('REVISION_CHANGED');
+        err.current_revision = current;
+        throw err;
+      }
+    }
     if (body.column !== undefined) {
       const moved = moveProjectColumn(db, existing.id, body.column, { note: body.last_move_note });
       if (!moved) throw notFoundError();
@@ -702,6 +724,8 @@ export function applyProjectPatch(db, idOrSlug, body = {}) {
     delete rest.focus;
     delete rest.slug;
     delete rest.id;
+    delete rest.expected_revision;
+    delete rest.revision;
     const hasFields = Object.keys(rest).some((key) => rest[key] !== undefined);
     if (hasFields) updateProject(db, existing.id, rest);
     return getProject(db, existing.id);
