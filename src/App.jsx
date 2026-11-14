@@ -129,6 +129,9 @@ const AuthenticatedApp = () => {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/habitos-tarefas" element={<HabitsTasks />} />
+          {/* Destinos curtos do celular; /habitos-tarefas segue igual para os links antigos. */}
+          <Route path="/habitos" element={<HabitsTasks key="habitos" destination="habits" />} />
+          <Route path="/tarefas" element={<HabitsTasks key="tarefas" destination="tasks" />} />
           <Route path="/ideias" element={<Ideas />} />
           <Route path="/compras" element={<Compras />} />
           <Route path="/financas" element={<Financas />} />

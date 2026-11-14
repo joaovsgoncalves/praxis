@@ -12,6 +12,7 @@ import {
   Dumbbell,
   Wallet,
   Layers,
+  Flame,
 } from "lucide-react";
 
 export const JOTA_FIT_URL = "https://jota-fit.web.app";
@@ -22,6 +23,14 @@ export const primaryNavItems = [
   { path: "/", label: "Hoje", icon: LayoutDashboard, end: true },
   { path: "/habitos-tarefas", label: "Hábitos e tarefas", shortLabel: "Hábitos", icon: ListTodo },
   { path: "/revisao-semanal", label: "Revisar", icon: BookOpen },
+];
+
+/** Barra de baixo do celular: o que se abre todo dia. O resto fica no menu do cabeçalho. */
+export const mobileNavItems = [
+  { path: "/", label: "Hoje", icon: LayoutDashboard, end: true },
+  { path: "/habitos", label: "Hábitos", icon: Flame },
+  { path: "/tarefas", label: "Tarefas", icon: ListTodo },
+  { path: "/financas", label: "Finanças", icon: Wallet },
 ];
 
 /** Ferramentas na aba lateral (sidebar / menu hambúrguer) — sem página hub */

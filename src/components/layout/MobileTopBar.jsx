@@ -5,6 +5,8 @@ import PraxisBrand from '@/components/brand/PraxisBrand';
 
 const ROUTE_TITLES = [
   { prefix: '/habitos-tarefas', title: 'Hábitos e tarefas' },
+  { prefix: '/habitos', title: 'Hábitos' },
+  { prefix: '/tarefas', title: 'Tarefas' },
   { prefix: '/capturas', title: 'Revisar capturas' },
   { prefix: '/captura', title: 'Captura por voz' },
   { prefix: '/ideias', title: 'Ideias' },

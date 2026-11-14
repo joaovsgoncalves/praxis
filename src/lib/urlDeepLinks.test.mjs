@@ -27,9 +27,10 @@ test('day: grava e apaga sem mexer nos outros parâmetros', () => {
 
 test('weekDayHref abre Tarefas na semana com o dia', () => {
   const href = weekDayHref('2026-10-14');
-  assert.equal(href, '/habitos-tarefas?tab=tasks&scope=week&day=2026-10-14');
+  assert.equal(href, '/tarefas?scope=week&day=2026-10-14');
   const query = params(href.split('?')[1]);
-  assert.equal(habitTasksTabFromSearchParams(query), 'tasks');
+  // O destino é a rota; a tela conjunta antiga é que usa ?tab=.
+  assert.equal(href.split('?')[0], '/tarefas');
   assert.equal(taskScopeFromSearchParams(query), 'week');
   assert.equal(taskLensFromSearchParams(query), 'list');
   assert.equal(taskDayFromSearchParams(query), '2026-10-14');

@@ -74,7 +74,9 @@ function SidebarGamificationBar() {
 
 function isNavActive(location, item) {
   if (item.end) return location.pathname === '/';
-  if (item.path === '/habitos-tarefas') return location.pathname === '/habitos-tarefas';
+  if (item.path === '/habitos-tarefas') {
+    return ['/habitos-tarefas', '/habitos', '/tarefas'].includes(location.pathname);
+  }
   if (item.path === '/captura') return location.pathname === '/captura';
   if (item.path === '/capturas') return location.pathname === '/capturas';
   return location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);

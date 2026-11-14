@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, ListTodo, BookOpen, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { mobileNavItems } from "@/lib/praxisNav";
 import { prefetchHandlers } from "@/lib/routePrefetch";
 
 const linkClass = ({ isActive }) =>
@@ -14,8 +14,16 @@ const linkClass = ({ isActive }) =>
       : "text-muted-foreground",
   );
 
-export default function MobileBottomNav({ onOpenMenu }) {
+/** A tela conjunta antiga acende o destino que ela está mostrando. */
+function legacyDestination(location) {
+  if (location.pathname !== "/habitos-tarefas") return null;
+  return new URLSearchParams(location.search).get("tab") === "habits" ? "/habitos" : "/tarefas";
+}
+
+// O menu (Revisar, Frentes, Foco e o resto) abre pelo botão do cabeçalho.
+export default function MobileBottomNav() {
   const location = useLocation();
+  const legacy = legacyDestination(location);
 
   return (
     <nav
@@ -23,40 +31,21 @@ export default function MobileBottomNav({ onOpenMenu }) {
       aria-label="Navegação principal"
     >
       <div className="praxis-nav-island pointer-events-auto mx-auto flex h-16 max-w-md items-stretch gap-1 rounded-[22px] p-1.5">
-        <NavLink to="/" end className={linkClass} {...prefetchHandlers("/")}>
-          <LayoutDashboard className="h-5 w-5 shrink-0" aria-hidden />
-          <span>Hoje</span>
-        </NavLink>
-
-        <NavLink
-          to="/habitos-tarefas"
-          {...prefetchHandlers("/habitos-tarefas")}
-          className={({ isActive }) =>
-            linkClass({ isActive: isActive || location.pathname === "/habitos-tarefas" })
-          }
-        >
-          <ListTodo className="h-5 w-5 shrink-0" aria-hidden />
-          <span>Hábitos</span>
-        </NavLink>
-
-        <NavLink
-          to="/revisao-semanal"
-          {...prefetchHandlers("/revisao-semanal")}
-          className={({ isActive }) => linkClass({ isActive })}
-        >
-          <BookOpen className="h-5 w-5 shrink-0" aria-hidden />
-          <span>Revisar</span>
-        </NavLink>
-
-        <button
-          type="button"
-          onClick={onOpenMenu}
-          className={linkClass({ isActive: false })}
-          aria-label="Abrir menu — ferramentas na lateral"
-        >
-          <Menu className="h-5 w-5 shrink-0" aria-hidden />
-          <span>Menu</span>
-        </button>
+        {mobileNavItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.end}
+              {...prefetchHandlers(item.path)}
+              className={({ isActive }) => linkClass({ isActive: isActive || legacy === item.path })}
+            >
+              <Icon className="h-5 w-5 shrink-0" aria-hidden />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </div>
     </nav>
   );

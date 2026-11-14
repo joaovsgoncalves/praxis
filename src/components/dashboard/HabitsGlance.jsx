@@ -346,7 +346,7 @@ export default function HabitsGlance({
         count={total > 0 ? `${done}/${total}` : undefined}
         action={(
           <Link
-            to="/habitos-tarefas?tab=habits"
+            to="/habitos"
             className="inline-flex min-h-11 items-center gap-0.5 rounded-full px-2 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Ver todos os hábitos

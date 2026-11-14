@@ -179,6 +179,8 @@ export function RouteSkeleton({ pathname }) {
     case '/':
       return <DashboardSkeleton />;
     case '/habitos-tarefas':
+    case '/habitos':
+    case '/tarefas':
       return <HabitsTasksSkeleton />;
     case '/financas':
       return <FinancasSkeleton />;

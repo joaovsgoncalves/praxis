@@ -70,7 +70,7 @@ export default function AvoidanceWidget() {
                 <Link
                   to={
                     item.entity_id && item.type === 'task'
-                      ? `/habitos-tarefas?tab=tasks&scope=overdue`
+                      ? `/tarefas?scope=overdue`
                       : item.action?.href || '/'
                   }
                   className="flex items-start gap-3 rounded-xl border border-border/70 bg-card/30 p-3 transition-colors hover:bg-card/50"

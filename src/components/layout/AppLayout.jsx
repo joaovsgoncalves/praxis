@@ -11,11 +11,11 @@ import OfflineBanner from '@/components/shared/OfflineBanner';
 import WhatsNewDialog from '@/components/shared/WhatsNewDialog';
 import PendingIntentPrompt from '@/components/shared/PendingIntentPrompt';
 import { tweenFast } from '@/lib/motion';
-import { primaryNavItems } from '@/lib/praxisNav';
+import { mobileNavItems, primaryNavItems } from '@/lib/praxisNav';
 import { prefetchWhenIdle } from '@/lib/routePrefetch';
 
 // Abas do dia a dia: depois que a primeira tela assenta, já ficam baixadas.
-const IDLE_PREFETCH = primaryNavItems.map((item) => item.path);
+const IDLE_PREFETCH = [...new Set([...mobileNavItems, ...primaryNavItems].map((item) => item.path))];
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -60,7 +60,7 @@ export default function AppLayout() {
           </main>
         </div>
 
-        {!isLogin ? <MobileBottomNav onOpenMenu={() => setSidebarOpen(true)} /> : null}
+        {!isLogin ? <MobileBottomNav /> : null}
         <WhatsNewDialog />
         <PendingIntentPrompt />
       </div>

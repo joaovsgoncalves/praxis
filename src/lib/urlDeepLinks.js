@@ -78,10 +78,9 @@ export function setTaskDayInSearchParams(searchParams, day) {
   return next;
 }
 
-/** Link para Hábitos e Tarefas › Tarefas › Semana com o dia escolhido. */
+/** Link para Tarefas › Semana com o dia escolhido. */
 export function weekDayHref(day) {
-  let params = setHabitTasksTabInSearchParams(new URLSearchParams(), 'tasks');
-  params = setTaskScopeInSearchParams(params, 'week');
+  let params = setTaskScopeInSearchParams(new URLSearchParams(), 'week');
   params = setTaskDayInSearchParams(params, day);
-  return `/habitos-tarefas?${params.toString()}`;
+  return `/tarefas?${params.toString()}`;
 }

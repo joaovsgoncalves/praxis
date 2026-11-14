@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { praxisApi } from '@/api/praxisClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
-import { Plus, CheckCircle2, Circle, Flame, Eraser, Archive, ListTodo, GripVertical } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Flame, Eraser, Archive, ListTodo, GripVertical, SlidersHorizontal, BarChart3 } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState, SectionHeader } from '@/components/layout/PraxisPage';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
@@ -100,9 +100,35 @@ import {
 } from '@/components/habits-tasks/TaskCardParts';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
-export default function HabitsTasks() {
+/** Título de um destino curto: uma linha só, com as ações secundárias à direita. */
+function DestinationHeader({ title, icon: Icon, count, children }) {
+  return (
+    <div className="flex min-h-11 items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.04] shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.07)]">
+          <Icon className="h-4 w-4 text-primary" aria-hidden />
+        </span>
+        {/* No celular o nome já está no topo da tela; aqui ele só existe para leitor de tela. */}
+        <h2 className="praxis-title min-w-0 truncate text-xl font-semibold leading-tight max-lg:sr-only">{title}</h2>
+        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] px-2 font-mono text-xs font-medium tabular-nums text-secondary-foreground shadow-[inset_0_0_0_1px_hsl(0_0%_100%/0.06)]">
+          {count}
+        </span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * destination: null = tela conjunta (/habitos-tarefas, links antigos);
+ * 'habits' | 'tasks' = destino curto, a lista começa logo abaixo do topo.
+ */
+export default function HabitsTasks({ destination = null }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [view, setView] = useState(() => habitTasksTabFromSearchParams(searchParams));
+  const [viewState, setView] = useState(() => habitTasksTabFromSearchParams(searchParams));
+  const view = destination || viewState;
+  // Filtro por área, modos de planejamento e ações em lote: fechados até pedir.
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [createTaskInitial, setCreateTaskInitial] = useState(null);
@@ -114,7 +140,8 @@ export default function HabitsTasks() {
   const [taskSelectionMode, setTaskSelectionMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState(() => new Set());
   const [taskScope, setTaskScope] = useState(() => taskScopeFromSearchParams(searchParams));
-  const [lens, setLens] = useState(() => taskLensFromSearchParams(searchParams));
+  const [lensState, setLens] = useState(() => taskLensFromSearchParams(searchParams));
+  const lens = destination === 'habits' ? 'list' : lensState;
   const [skipSheetHabit, setSkipSheetHabit] = useState(null);
   const [quantSheetHabit, setQuantSheetHabit] = useState(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState(null);
@@ -715,9 +742,86 @@ export default function HabitsTasks() {
     />
   );
 
+  const areaChips = (
+    <div className="praxis-scroll-x flex w-full max-w-full items-center gap-2 py-1">
+      <button
+        onClick={() => setCategoryFilter('all')}
+        className={cn(
+          'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+          categoryFilter === 'all'
+            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+            : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
+        )}
+      >
+        Todos
+      </button>
+      {Object.entries(CATEGORIES).map(([key, cat]) => (
+        <button
+          key={key}
+          onClick={() => setCategoryFilter(key)}
+          className={cn(
+            'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+            categoryFilter === key
+              ? `${cat.color} ring-1 ring-current`
+              : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
+          )}
+        >
+          {cat.emoji} {cat.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const taskListActions = (
+    <>
+      <Button
+        type="button"
+        variant={taskSelectionMode ? 'secondary' : 'outline'}
+        size="sm"
+        className="h-10 rounded-full px-3.5 transition-transform active:scale-[0.96] motion-reduce:transition-none"
+        onClick={() => {
+          setTaskSelectionMode((v) => !v);
+          setSelectedTaskIds(new Set());
+        }}
+      >
+        {taskSelectionMode ? 'Pronto' : 'Selecionar'}
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-10 gap-1 rounded-full px-3 transition-transform active:scale-[0.96] motion-reduce:transition-none sm:px-3.5"
+        disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
+        onClick={openBulkArchive}
+        aria-label="Arquivar"
+      >
+        <Archive className="h-4 w-4" aria-hidden />
+        <span className="hidden sm:inline">Arquivar</span>
+      </Button>
+    </>
+  );
+
+  // No destino curto, planejamento e filtros abrem sozinhos quando já estão em uso.
+  const areaFiltered = categoryFilter !== 'all';
+  const taskOptionsVisible = optionsOpen || lens !== 'list' || Boolean(selectedDay) || taskSelectionMode || areaFiltered;
+  const habitOptionsVisible = optionsOpen || areaFiltered;
+  const optionsToggle = (label, visible) => (
+    <Button
+      type="button"
+      variant={visible ? 'secondary' : 'outline'}
+      size="sm"
+      className="h-10 gap-1.5 rounded-full px-3.5"
+      aria-expanded={visible}
+      onClick={() => setOptionsOpen((v) => !v)}
+    >
+      <SlidersHorizontal className="h-4 w-4" aria-hidden />
+      {label}
+    </Button>
+  );
+
   return (
-    <div className="praxis-page overflow-x-hidden">
-      {lens !== 'board' && lens !== 'week' && (
+    <div className={cn('praxis-page overflow-x-hidden', destination && 'praxis-page--tight')}>
+      {!destination && lens !== 'board' && lens !== 'week' && (
         <PageHero
         kicker="Hábitos e tarefas"
         kickerIcon={ListTodo}
@@ -749,7 +853,7 @@ export default function HabitsTasks() {
       </PageHero>
       )}
 
-      {lens !== 'board' && lens !== 'week' && (
+      {!destination && lens !== 'board' && lens !== 'week' && (
         <section className="praxis-panel rounded-3xl p-3 sm:p-4 space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Tabs value={view} onValueChange={handleViewChange}>
@@ -762,33 +866,7 @@ export default function HabitsTasks() {
 
           </div>
 
-          <div className="praxis-scroll-x flex w-full max-w-full items-center gap-2 py-1">
-            <button
-              onClick={() => setCategoryFilter('all')}
-              className={cn(
-                'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                categoryFilter === 'all'
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                  : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
-              )}
-            >
-              Todos
-            </button>
-            {Object.entries(CATEGORIES).map(([key, cat]) => (
-              <button
-                key={key}
-                onClick={() => setCategoryFilter(key)}
-                className={cn(
-                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                  categoryFilter === key
-                    ? `${cat.color} ring-1 ring-current`
-                    : 'bg-secondary/55 text-muted-foreground hover:bg-secondary hover:text-foreground'
-                )}
-              >
-                {cat.emoji} {cat.label}
-              </button>
-            ))}
-          </div>
+          {areaChips}
         </section>
       )}
 
@@ -845,43 +923,38 @@ export default function HabitsTasks() {
         <div className={cn('grid gap-6', view === 'all' && lens === 'list' && 'xl:grid-cols-2 xl:items-start xl:gap-8')}>
         {(view === 'all' || view === 'tasks') && (
           <section className="min-w-0 space-y-3">
-            {/* Mesma linha de título que Hábitos: ícone, nome, contagem e ações compactas */}
-            <SectionHeader
-              title="Tarefas"
-              icon={ListTodo}
-              count={lens === 'board' ? boardTasksCount : lens === 'week' ? weekTasksCount : filteredTasks.length}
-              action={lens === 'list' ? (
-                <>
-                  <Button
-                    type="button"
-                    variant={taskSelectionMode ? 'secondary' : 'outline'}
-                    size="sm"
-                    className="h-10 rounded-full px-3.5 transition-transform active:scale-[0.96] motion-reduce:transition-none"
-                    onClick={() => {
-                      setTaskSelectionMode((v) => !v);
-                      setSelectedTaskIds(new Set());
-                    }}
-                  >
-                    {taskSelectionMode ? 'Pronto' : 'Selecionar'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10 gap-1 rounded-full px-3 transition-transform active:scale-[0.96] motion-reduce:transition-none sm:px-3.5"
-                    disabled={archivableTasks.length === 0 || bulkArchiveTasks.isPending}
-                    onClick={openBulkArchive}
-                    aria-label="Arquivar"
-                  >
-                    <Archive className="h-4 w-4" aria-hidden />
-                    <span className="hidden sm:inline">Arquivar</span>
-                  </Button>
-                </>
-              ) : null}
-            />
+            {destination ? (
+              <DestinationHeader
+                title="Tarefas"
+                icon={ListTodo}
+                count={lens === 'week' ? weekTasksCount : filteredTasks.length}
+              >
+                {optionsToggle('Planejar', taskOptionsVisible)}
+              </DestinationHeader>
+            ) : (
+              <SectionHeader
+                title="Tarefas"
+                icon={ListTodo}
+                count={lens === 'board' ? boardTasksCount : lens === 'week' ? weekTasksCount : filteredTasks.length}
+                action={lens === 'list' ? taskListActions : null}
+              />
+            )}
 
+            {destination && !taskOptionsVisible ? null : (
             <div className="flex flex-wrap items-center gap-2">
               <TaskLensSwitch value={lens} onChange={handleLensChange} />
+              {destination && lens === 'list' ? taskListActions : null}
+              {destination ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-full px-3.5"
+                  onClick={() => handleOpenCreateTask(null)}
+                >
+                  <Plus className="mr-1 h-4 w-4" aria-hidden /> Com detalhes
+                </Button>
+              ) : null}
               {lens === 'list' && taskScope === 'overdue' && noiseTasks.length > 0 && (
                 <Button
                   type="button"
@@ -895,13 +968,17 @@ export default function HabitsTasks() {
                 </Button>
               )}
             </div>
+            )}
+
+            {destination && taskOptionsVisible ? areaChips : null}
+            {destination && taskOptionsVisible ? weekStrip : null}
 
             <QuickTaskInput
               onAdd={handleQuickAddTask}
               isPending={createTask.isPending}
             />
 
-            {weekStripOnTop ? null : weekStrip}
+            {destination || weekStripOnTop ? null : weekStrip}
 
             {lens === 'list' && (
               <div className="praxis-scroll-x flex gap-2 pb-1">
@@ -1118,27 +1195,54 @@ export default function HabitsTasks() {
 
         {(view === 'all' || view === 'habits') && lens === 'list' && (
           <section className="min-w-0 space-y-3">
-            <SectionHeader
-              title="Hábitos"
-              icon={Flame}
-              count={(
-                <>
-                  <span className="sr-only">Feitos hoje: </span>
-                  {completedHabits}/{activeHabitsDueToday.length}
-                </>
-              )}
-              action={filteredHabits.length > 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
-                  className="h-10 rounded-full px-3.5 transition-transform active:scale-[0.96] motion-reduce:transition-none"
+            {destination ? (
+              <>
+                <DestinationHeader
+                  title="Hábitos"
+                  icon={Flame}
+                  count={(
+                    <>
+                      <span className="sr-only">Feitos hoje: </span>
+                      {completedHabits}/{activeHabitsDueToday.length}
+                    </>
+                  )}
                 >
-                  <Plus className="mr-1 h-4 w-4" aria-hidden /> Novo hábito
-                </Button>
-              ) : null}
-            />
+                  {optionsToggle('Área', habitOptionsVisible)}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
+                    className="h-10 rounded-full px-3.5"
+                  >
+                    <Plus className="mr-1 h-4 w-4" aria-hidden /> Novo
+                    <span className="sr-only"> hábito</span>
+                  </Button>
+                </DestinationHeader>
+                {habitOptionsVisible ? areaChips : null}
+              </>
+            ) : (
+              <SectionHeader
+                title="Hábitos"
+                icon={Flame}
+                count={(
+                  <>
+                    <span className="sr-only">Feitos hoje: </span>
+                    {completedHabits}/{activeHabitsDueToday.length}
+                  </>
+                )}
+                action={filteredHabits.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setEditingHabit(null); setShowHabitForm(true); }}
+                    className="h-10 rounded-full px-3.5 transition-transform active:scale-[0.96] motion-reduce:transition-none"
+                  >
+                    <Plus className="mr-1 h-4 w-4" aria-hidden /> Novo hábito
+                  </Button>
+                ) : null}
+              />
+            )}
 
             {activeHabitsDueToday.length > 0 && (
               <div className="praxis-panel space-y-1.5 rounded-xl px-4 py-3">
@@ -1271,6 +1375,14 @@ export default function HabitsTasks() {
                 />
               </div>
             )}
+            {destination === 'habits' ? (
+              <Link
+                to="/historico"
+                className="praxis-touch-target inline-flex h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+              >
+                <BarChart3 className="h-4 w-4" aria-hidden /> Ver histórico de hábitos
+              </Link>
+            ) : null}
           </section>
         )}
       </div>
