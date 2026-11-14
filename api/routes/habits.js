@@ -12,6 +12,8 @@ import {
   normalizeSinceDate,
   normalizeTrackingMode,
 } from '../lib/habitSinceCounter.js';
+import { GOAL_NOT_FOUND, goalLinkForCreate, goalLinkForUpdate } from '../lib/goalLinks.js';
+import { readHabitQuantity } from '../lib/habitQuantity.js';
 
 const HABIT_KINDS = new Set(['simple', 'compound']);
 
@@ -370,6 +372,8 @@ export function createHabitsRouter(ctx) {
       : null;
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
+    const goalLink = goalLinkForCreate(db, goal_id);
+    if (!goalLink.ok) return res.status(400).json(GOAL_NOT_FOUND);
     if (!HABIT_KINDS.has(kind)) return res.status(400).json({ error: 'Invalid habit kind' });
     const parentError = validateParent(parent_id, kind);
     if (parentError) return res.status(400).json({ error: parentError });
@@ -399,7 +403,7 @@ export function createHabitsRouter(ctx) {
       `).run(
         id, habitTitle, description, kind === 'compound' ? String(emoji || '') : '', freq,
         category, Number(streak_target) || 30,
-        goal_id || null, source || 'manual', habitSortOrder, recDays, tgt, unit || '',
+        goalLink.value, source || 'manual', habitSortOrder, recDays, tgt, unit || '',
         prefTime || '', kind, parent_id || null, childPosition,
         habitTrackingMode, habitSinceDate, habitQuickIncrement
       );
@@ -443,8 +447,11 @@ export function createHabitsRouter(ctx) {
     const existing = db.prepare('SELECT * FROM habits WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Habit not found' });
 
+    const goalLink = goalLinkForUpdate(db, req.body, existing.goal_id);
+    if (!goalLink.ok) return res.status(400).json(GOAL_NOT_FOUND);
+
     const {
-      title, description, frequency, category, streak_target, goal_id, source, status,
+      title, description, frequency, category, streak_target, source, status,
       sort_order, recurrence_days, target_value, unit, preferred_time, kind,
       parent_id, position_in_parent, children_ids, children, emoji,
       tracking_mode, since_date, quick_increment,
@@ -515,7 +522,7 @@ export function createHabitsRouter(ctx) {
           frequency = COALESCE(?, frequency),
           category = COALESCE(?, category),
           streak_target = COALESCE(?, streak_target),
-          goal_id = COALESCE(?, goal_id),
+          goal_id = CASE WHEN ? = 1 THEN ? ELSE goal_id END,
           source = COALESCE(?, source),
           status = COALESCE(?, status),
           sort_order = COALESCE(?, sort_order),
@@ -538,7 +545,8 @@ export function createHabitsRouter(ctx) {
         frequency,
         category,
         streak_target !== undefined ? Number(streak_target) : null,
-        goal_id,
+        goalLink.change ? 1 : 0,
+        goalLink.value,
         source,
         status,
         sort_order !== undefined ? Number(sort_order) : null,
@@ -722,18 +730,14 @@ export function registerHabitLogRoutes(app, ctx) {
     if (normalized.error) return res.status(400).json({ error: normalized.error });
 
     let completedFlag = normalized.completed;
-    let logValue = normalized.value === undefined || normalized.value === null || normalized.value === ''
-      ? null
-      : Number(normalized.value);
-
-    const inc = req.body?.increment ?? req.body?.delta;
-    if (inc !== undefined && inc !== null && inc !== '') {
-      const existingRow = db.prepare('SELECT value FROM habit_logs WHERE habit_id = ? AND date = ?').get(habit_id, date);
-      const baseVal = (existingRow && existingRow.value != null && Number.isFinite(Number(existingRow.value)))
-        ? Number(existingRow.value)
-        : 0;
-      logValue = Math.round((baseVal + Number(inc)) * 1000) / 1000;
-    }
+    const existingRow = db.prepare('SELECT value FROM habit_logs WHERE habit_id = ? AND date = ?').get(habit_id, date);
+    const quantity = readHabitQuantity({
+      value: normalized.outcome === 'skipped' ? undefined : normalized.value,
+      increment: normalized.outcome === 'skipped' ? undefined : (req.body?.increment ?? req.body?.delta),
+      currentValue: existingRow?.value,
+    });
+    if (quantity.error) return res.status(400).json({ error: quantity.error, code: 'habit_log_invalid_value' });
+    let logValue = quantity.value;
 
     let outcome = normalized.outcome;
     let skipReason = normalized.skip_reason;

@@ -15,6 +15,7 @@ import { CATEGORIES, enrichCategory } from './lib/categories.js';
 import { getLevel } from './lib/gamification.js';
 import { createCalendarServices } from './lib/calendarSync.js';
 import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
+import { createDayRollover } from './lib/dayRollover.js';
 import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
 import { createTasksRouter, registerIdeaToTaskRoute } from './routes/tasks.js';
 import { createHabitsRouter, registerHabitLogRoutes } from './routes/habits.js';
@@ -226,6 +227,10 @@ app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ db }));
 
 const HOST = process.env.HOST || '127.0.0.1';
 
+// Virada do dia: fecha as vencidas antes de atender e segue conferindo a cada minuto.
+const dayRollover = createDayRollover({ db, getLocalDateString, nextSortOrder });
+dayRollover.run('subida');
+
 app.listen(PORT, HOST, () => {
   console.log(`🔥 Praxis API running on ${HOST}:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
@@ -235,4 +240,5 @@ app.listen(PORT, HOST, () => {
   });
   // Retentativa das intenções de agenda que falharam (a espera entre tentativas fica na fila).
   setInterval(() => calendarQueue.drain(), 60 * 1000).unref();
+  dayRollover.start();
 });

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
+import { createDayRollover } from './lib/dayRollover.js';
 import { buildRouteCtx, createTestDb, fixedDate, requestJson, startTestServer } from './test-support/helpers.mjs';
 
 const TODAY = '2026-10-15';
@@ -12,13 +13,21 @@ async function setup(t) {
   const calendarCalls = [];
   const app = express();
   app.use(express.json());
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db, {
+  const ctx = buildRouteCtx(db, {
     getLocalDateString: fixedDate(TODAY),
     syncTaskToCalendar: (task) => {
       calendarCalls.push(task.id);
       return { skipped: true };
     },
-  })));
+  });
+  app.use('/api/tasks', createTasksRouter(ctx));
+  // O fechamento é da virada do dia; a lista só lê.
+  const rollover = createDayRollover({
+    db,
+    getLocalDateString: fixedDate(TODAY),
+    nextSortOrder: ctx.nextSortOrder,
+    log: { log() {}, error() {} },
+  });
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -29,10 +38,14 @@ async function setup(t) {
     INSERT INTO tasks (id, title, date, time, status, priority, category, sort_order, recurrence, recurrence_parent_id, calendar_event_id)
     VALUES (?, ?, ?, ?, 'pending', 'medium', 'pessoal', ?, ?, ?, ?)
   `);
-  const list = () => requestJson(server.base, `/api/tasks?limit=50&include_overdue=1&today=${TODAY}`);
+  const readList = () => requestJson(server.base, `/api/tasks?limit=50&include_overdue=1&today=${TODAY}`);
+  const list = () => {
+    rollover.run('teste');
+    return readList();
+  };
   const xp = () => db.prepare("SELECT xp_total FROM gamification WHERE id = 'main'").get().xp_total;
   const snapshot = () => db.prepare('SELECT * FROM tasks ORDER BY id, date').all();
-  return { db, insert, list, xp, snapshot, calendarCalls };
+  return { db, insert, list, readList, xp, snapshot, calendarCalls };
 }
 
 test('recorrente de ontem aberta vira não rolou e garante a de hoje, sem XP nem agenda', async (t) => {
@@ -102,17 +115,19 @@ test('instância antiga de vários dias não cria filhos no passado', async (t) 
   assert.equal(db.prepare('SELECT day_outcome_date FROM tasks WHERE id = ?').get('agua').day_outcome_date, '2026-10-10');
 });
 
-test('lista sem include_overdue não fecha nada', async (t) => {
-  const { db, insert } = await setup(t);
+test('abrir a lista não fecha nem cria nada, com ou sem include_overdue', async (t) => {
+  const { insert, readList, snapshot, xp, calendarCalls } = await setup(t);
   insert.run('faculdade', 'Sair para a faculdade', YESTERDAY, '18:40', 1, 'daily', null, null);
-  const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db, { getLocalDateString: fixedDate(TODAY) })));
-  const server = await startTestServer(app);
-  t.after(() => server.close());
+  const before = snapshot();
+  const xpBefore = xp();
 
-  await requestJson(server.base, '/api/tasks?limit=50');
+  const tasks = await readList();
+  await readList();
 
-  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get('faculdade').status, 'pending');
+  assert.deepEqual(snapshot(), before, 'a leitura não grava nada');
+  assert.equal(xp(), xpBefore);
+  assert.deepEqual(calendarCalls, []);
+  assert.equal(tasks.find((task) => task.id === 'faculdade').status, 'pending', 'até a virada rodar, aparece como atrasada');
 });
 
 test('bloco com hora do Sêneca de ontem vira não rolou, sem gerar filho; avulsa manual continua atrasada', async (t) => {

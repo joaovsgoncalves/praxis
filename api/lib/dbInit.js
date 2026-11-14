@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { initXpEventsSchema } from './xpEvents.js';
+import { repairOrphanGoalLinks } from './goalLinks.js';
 
 /**
  * Resolve o arquivo do banco preferindo praxis.db. Se ele não existir mas o
@@ -562,4 +563,9 @@ db.prepare(`
 `).run();
 
 initXpEventsSchema(db);
+
+const repairedGoalLinks = repairOrphanGoalLinks(db);
+if (repairedGoalLinks > 0) {
+  console.log(`[metas] ${repairedGoalLinks} vínculo(s) com meta excluída reparado(s); itens preservados (goal_link_repairs)`);
+}
 }

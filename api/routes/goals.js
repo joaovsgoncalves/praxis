@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
+import { unlinkGoal } from '../lib/goalLinks.js';
 
 /** Normalize optional deadline: empty string → null; omit → undefined (keep existing on update). */
 function normalizeDeadline(value) {
@@ -128,8 +129,19 @@ export function createGoalsRouter({ db, getLocalDateString, nextSortOrder }) {
     const existing = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Goal not found' });
 
-    db.prepare('DELETE FROM goals WHERE id = ?').run(req.params.id);
-    res.json({ success: true });
+    // Excluir a meta solta as tarefas e os hábitos dela na mesma transação: nada fica apontando para o vazio.
+    let unlinked;
+    try {
+      unlinked = db.transaction(() => {
+        const result = unlinkGoal(db, req.params.id);
+        db.prepare('DELETE FROM goals WHERE id = ?').run(req.params.id);
+        return result;
+      })();
+    } catch (error) {
+      console.error('[metas] exclusão desfeita:', error?.message || error);
+      return res.status(500).json({ error: 'Não foi possível excluir a meta. Nada foi alterado.', code: 'goal_delete_failed' });
+    }
+    res.json({ success: true, unlinked });
   });
 
   return router;

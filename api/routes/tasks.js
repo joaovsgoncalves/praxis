@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
-import { nextRecurrenceDate } from '../taskRecurrence.js';
+import { spawnNextRecurringTask as spawnInSeries } from '../lib/taskSeries.js';
+import { GOAL_NOT_FOUND, goalLinkForCreate, goalLinkForUpdate } from '../lib/goalLinks.js';
 import { awardXp, reverseXp } from '../lib/xpEvents.js';
 import { createTaskCalendarQueue } from '../lib/taskCalendarQueue.js';
 
@@ -79,8 +80,7 @@ export function createTasksRouter(ctx) {
     const today = String(todayParam || getLocalDateString()).slice(0, 10);
     const mergeOverdue = include_overdue === '1' || include_overdue === 'true';
 
-    // Recorrente que passou do dia não é dívida: fecha como "não rolou" antes de montar a lista.
-    if (mergeOverdue) closeMissedRecurringTasks(getLocalDateString());
+    // Leitura não altera nada: o fechamento das vencidas é da virada do dia (lib/dayRollover.js).
 
     let query = 'SELECT * FROM tasks WHERE 1=1';
     const params = [];
@@ -246,50 +246,8 @@ export function createTasksRouter(ctx) {
     res.json({ success: true });
   });
 
-  /**
-   * Garante a próxima ocorrência da série. Uma ocorrência por série e data, em qualquer
-   * estado: concluir, reabrir e concluir de novo nunca cria a segunda na mesma data.
-   * Só grava no banco; quem chama decide a agenda.
-   */
-  function spawnNextRecurringTask(db, task, { completedDate, today }) {
-    if (!task?.recurrence || task.recurrence === 'none') return null;
-    const baseForNext = task.date || completedDate || today;
-    const nextDate = nextRecurrenceDate(baseForNext, task.recurrence, task.recurrence_days);
-    if (!nextDate) return null;
-
-    const parentRef = task.recurrence_parent_id || task.id;
-    const existingOccurrence = db
-      .prepare(
-        `SELECT id FROM tasks
-         WHERE (recurrence_parent_id = ? OR id = ?) AND date = ? AND id != ?
-         ORDER BY created_date ASC
-         LIMIT 1`,
-      )
-      .get(parentRef, parentRef, nextDate, task.id);
-    if (existingOccurrence) return { id: existingOccurrence.id, date: nextDate, created: false };
-
-    const childId = randomUUID();
-    db.prepare(`
-      INSERT INTO tasks (id, title, description, date, time, status, priority, category, goal_id, source, duration_minutes, sort_order, recurrence, recurrence_days, recurrence_parent_id)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      childId,
-      task.title,
-      task.description,
-      nextDate,
-      task.time,
-      task.priority,
-      task.category,
-      task.goal_id || null,
-      task.source || 'recurrence',
-      task.duration_minutes || null,
-      nextSortOrder('tasks'),
-      task.recurrence,
-      task.recurrence_days || '[]',
-      parentRef,
-    );
-    return { id: childId, date: nextDate, created: true };
-  }
+  const spawnNextRecurringTask = (database, task, options) =>
+    spawnInSeries(database, task, { ...options, nextSortOrder });
 
   /**
    * Efeitos de entrar ou sair de concluída: XP (+10 uma vez, estorno ao reabrir) e próxima
@@ -334,63 +292,6 @@ export function createTasksRouter(ctx) {
     });
   }
 
-  /**
-   * Instância recorrente (ou bloco com hora criado pelo Sêneca) aberta de um dia anterior vira "não rolou": cancelada,
-   * day_outcome = 'missed' na data dela, sem XP e sem mexer no Google Agenda.
-   * A próxima ocorrência (hoje ou depois) fica garantida. Idempotente.
-   */
-  const staleRecurringStmt = db.prepare(`
-    SELECT * FROM tasks
-    WHERE (
-        (recurrence IS NOT NULL AND recurrence != 'none')
-        OR (source = 'seneca' AND time IS NOT NULL AND time != '')
-      )
-      AND date IS NOT NULL AND date != '' AND date < ?
-      AND status IN ('pending', 'in_progress')
-      AND category != 'ideias'
-    ORDER BY date ASC
-  `);
-  const markMissedStmt = db.prepare(`
-    UPDATE tasks SET
-      status = 'cancelled',
-      day_outcome = 'missed',
-      day_outcome_date = date,
-      updated_date = datetime('now')
-    WHERE id = ? AND status IN ('pending', 'in_progress')
-  `);
-  const openUpcomingInChainStmt = db.prepare(`
-    SELECT id FROM tasks
-    WHERE (recurrence_parent_id = ? OR id = ?) AND date >= ?
-      AND status IN ('pending', 'in_progress')
-    LIMIT 1
-  `);
-
-  const closeMissedRecurringTasks = db.transaction((today) => {
-    const stale = staleRecurringStmt.all(today);
-    if (stale.length === 0) return 0;
-
-    const latestByChain = new Map();
-    for (const task of stale) {
-      markMissedStmt.run(task.id);
-      // Bloco com hora do Sêneca é avulso: ele cria o do dia seguinte, então não gera filho.
-      if (!task.recurrence || task.recurrence === 'none') continue;
-      latestByChain.set(task.recurrence_parent_id || task.id, task);
-    }
-
-    for (const [parentRef, task] of latestByChain) {
-      if (openUpcomingInChainStmt.get(parentRef, parentRef, today)) continue;
-      // Avança a base até a próxima ocorrência cair em hoje ou depois (sem criar filhos no passado).
-      let base = task.date;
-      for (let guard = 0; guard < 400; guard += 1) {
-        const next = nextRecurrenceDate(base, task.recurrence, task.recurrence_days);
-        if (!next || next >= today) break;
-        base = next;
-      }
-      spawnNextRecurringTask(db, { ...task, date: base }, { today });
-    }
-    return stale.length;
-  });
-
   router.post('/', (req, res) => {
     const id = randomUUID();
     const {
@@ -401,6 +302,8 @@ export function createTasksRouter(ctx) {
     } = req.body;
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
+    const goalLink = goalLinkForCreate(db, goal_id);
+    if (!goalLink.ok) return res.status(400).json(GOAL_NOT_FOUND);
 
     const isIdea = category === 'ideias';
     const taskPriority = isIdea ? (priority || 'low') : priority;
@@ -422,7 +325,7 @@ export function createTasksRouter(ctx) {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           id, taskTitle, description, taskDate || null, taskTime || null, status, taskPriority, category,
-          goal_id || null, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
+          goalLink.value, source || 'manual', duration_minutes ? Number(duration_minutes) : null,
           calendar_event_id || null, taskSortOrder, recurrence,
           JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []),
           recurrence_parent_id || null,
@@ -454,7 +357,10 @@ export function createTasksRouter(ctx) {
     const existing = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Task not found' });
 
-    const { title, description, date, time, status, priority, category, goal_id, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, idea_status, source_idea_id } = req.body;
+    const goalLink = goalLinkForUpdate(db, req.body, existing.goal_id);
+    if (!goalLink.ok) return res.status(400).json(GOAL_NOT_FOUND);
+
+    const { title, description, date, time, status, priority, category, source, duration_minutes, calendar_event_id, sort_order, recurrence, recurrence_days, idea_status, source_idea_id } = req.body;
 
     const wasDone = existing.status === 'completed' || existing.status === 'done';
     const willBeDone = status === 'completed' || status === 'done';
@@ -485,7 +391,7 @@ export function createTasksRouter(ctx) {
             status = COALESCE(?, status),
             priority = COALESCE(?, priority),
             category = COALESCE(?, category),
-            goal_id = COALESCE(?, goal_id),
+            goal_id = CASE WHEN ? = 1 THEN ? ELSE goal_id END,
             source = COALESCE(?, source),
             duration_minutes = COALESCE(?, duration_minutes),
             calendar_event_id = COALESCE(?, calendar_event_id),
@@ -500,7 +406,8 @@ export function createTasksRouter(ctx) {
           WHERE id = ?
         `).run(
           title !== undefined ? stripPriorityPrefix(title) : null, description, date, time, status, priority, category,
-          goal_id, source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
+          goalLink.change ? 1 : 0, goalLink.value,
+          source, duration_minutes !== undefined ? Number(duration_minutes) : null, calendar_event_id,
           sort_order !== undefined ? Number(sort_order) : null,
           recurrence,
           recurrence_days !== undefined ? JSON.stringify(Array.isArray(recurrence_days) ? recurrence_days : []) : null,
