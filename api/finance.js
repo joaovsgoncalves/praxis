@@ -310,6 +310,11 @@ export function initFinanceSchema(db) {
   if (!accountCols.includes('card_last4')) {
     db.exec('ALTER TABLE finance_accounts ADD COLUMN card_last4 TEXT');
   }
+  // PF x PJ (separação leve): a conta diz de quem é; dívida, parcela, assinatura e lançamento herdam
+  // pela conta (sem conta = PF). Visão geral, mês e insights são PF por padrão; `entity=pj` mostra a empresa.
+  if (!accountCols.includes('entity')) {
+    db.exec("ALTER TABLE finance_accounts ADD COLUMN entity TEXT NOT NULL DEFAULT 'pf'");
+  }
   const settingsCols = db.prepare('PRAGMA table_info(finance_settings)').all().map((c) => c.name);
   if (!settingsCols.includes('hide_values')) {
     db.exec('ALTER TABLE finance_settings ADD COLUMN hide_values INTEGER DEFAULT 0');
@@ -730,12 +735,38 @@ export function latestBalance(db, accountId, amountKind = 'available') {
   `).get(accountId, amountKind);
 }
 
-export function listAccounts(db, { status = 'active' } = {}) {
+export const ENTITIES = ['pf', 'pj'];
+
+/** `entity` de consulta: 'pf' | 'pj' | 'all'. Valor ausente vira o padrão; inválido é recusado. */
+export function parseEntity(value, fallback = 'pf') {
+  if (value === undefined || value === null || value === '') return fallback;
+  const v = String(value).toLowerCase();
+  if (v === 'all' || ENTITIES.includes(v)) return v;
+  throw badRequest('entity inválido: use pf, pj ou all');
+}
+
+/** ids das contas da empresa */
+export function pjAccountIds(db) {
+  return new Set(db.prepare("SELECT id FROM finance_accounts WHERE entity = 'pj'").all().map((r) => r.id));
+}
+
+function belongs(pj, accountId, entity) {
+  if (entity === 'all') return true;
+  const isPj = accountId != null && pj.has(accountId);
+  return entity === 'pj' ? isPj : !isPj;
+}
+
+export function listAccounts(db, { status = 'active', entity = 'all' } = {}) {
   let q = 'SELECT * FROM finance_accounts WHERE 1=1';
   const params = [];
   if (status && status !== 'all') {
     q += ' AND status = ?';
     params.push(status);
+  }
+  const ent = parseEntity(entity, 'all');
+  if (ent !== 'all') {
+    q += ' AND entity = ?';
+    params.push(ent);
   }
   q += ' ORDER BY sort_order ASC, name ASC';
   const rows = db.prepare(q).all(...params);
@@ -746,6 +777,7 @@ export function listAccounts(db, { status = 'active' } = {}) {
     const projected = latestBalance(db, acc.id, 'projected_bill');
     return {
       ...acc,
+      entity: acc.entity || 'pf',
       brand_color: acc.brand_color || null,
       card_last4: acc.card_last4 || null,
       is_operational: Number(acc.is_operational) === 1,
@@ -770,11 +802,13 @@ export function createAccount(db, body) {
   }
   const id = body.id || randomUUID();
   const now = nowIso();
+  const entity = parseEntity(body.entity, 'pf');
+  if (entity === 'all') throw badRequest('entity da conta: pf ou pj');
   const sort = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM finance_accounts').get();
   db.prepare(`
     INSERT INTO finance_accounts
-      (id, name, kind, institution, mask, pierre_account_id, is_operational, status, sort_order, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, name, kind, institution, mask, pierre_account_id, is_operational, status, sort_order, created_at, updated_at, entity)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     name,
@@ -787,6 +821,7 @@ export function createAccount(db, body) {
     Number.isFinite(Number(body.sort_order)) ? Number(body.sort_order) : (sort.m || 0) + 1,
     now,
     now,
+    entity,
   );
   if (body.amount !== undefined) {
     createBalance(db, {
@@ -807,6 +842,11 @@ export function updateAccount(db, id, body = {}) {
   // valida antes de gravar qualquer coisa
   const brandColor = body.brand_color !== undefined ? normalizeBrandColor(body.brand_color) : existing.brand_color;
   const cardLast4 = body.card_last4 !== undefined ? normalizeCardLast4(body.card_last4) : existing.card_last4;
+  const entity = body.entity !== undefined ? parseEntity(body.entity) : (existing.entity || 'pf');
+  if (entity === 'all') throw badRequest('entity da conta: pf ou pj');
+  if (body.entity !== undefined) {
+    db.prepare('UPDATE finance_accounts SET entity = ? WHERE id = ?').run(entity, id);
+  }
   db.prepare(`
     UPDATE finance_accounts SET
       name = COALESCE(?, name),
@@ -1044,7 +1084,8 @@ export function updateTransaction(db, id, body = {}) {
 }
 
 /** Extrato: lançamento manual já confirmado pelo banco não aparece de novo. */
-export function listTransactions(db, { from, to, account_id, category, q, limit } = {}) {
+export function listTransactions(db, { from, to, account_id, category, q, limit, entity } = {}) {
+  const ent = parseEntity(entity, 'all');
   const today = todayFortaleza();
   const start = isValidDateString(from) ? from : addDays(today, -30);
   const end = isValidDateString(to) ? to : today;
@@ -1062,6 +1103,11 @@ export function listTransactions(db, { from, to, account_id, category, q, limit 
     sql += ' AND (merchant LIKE ? OR raw_description LIKE ?)';
     const like = `%${q}%`;
     params.push(like, like);
+  }
+  if (ent !== 'all') {
+    sql += ent === 'pj'
+      ? " AND account_id IN (SELECT id FROM finance_accounts WHERE entity = 'pj')"
+      : " AND (account_id IS NULL OR account_id NOT IN (SELECT id FROM finance_accounts WHERE entity = 'pj'))";
   }
   sql += ' ORDER BY posted_on DESC, created_at DESC LIMIT ?';
   params.push(Math.min(Number(limit) || 200, 1000));
@@ -1406,14 +1452,16 @@ export function updateGoal(db, id, body = {}) {
   return listGoals(db).find((g) => g.id === id);
 }
 
-export function getInsights(db, { from, to } = {}) {
+export function getInsights(db, { from, to, entity } = {}) {
+  const ent = parseEntity(entity, 'pf');
+  const pj = pjAccountIds(db);
   const today = todayFortaleza();
   const start = isValidDateString(from) ? from : addDays(today, -30);
   const end = isValidDateString(to) ? to : today;
   const rows = db.prepare(`
     SELECT * FROM finance_transactions
     WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL
-  `).all(start, end).filter((tx) => !OFF_BUDGET_CATEGORIES.includes(tx.category));
+  `).all(start, end).filter((tx) => !OFF_BUDGET_CATEGORIES.includes(tx.category) && belongs(pj, tx.account_id, ent));
 
   let outflow = 0;
   let inflow = 0;
@@ -1651,7 +1699,7 @@ function cardLabel(card) {
  * fixas ativas não pagas no mês do vencimento, assinaturas active/keep e mínimo em aberto dos cartões.
  * Dívida com status waiting (pai) não entra.
  */
-export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus }) {
+export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus, pj = pjAccountIds(db) }) {
   const until = addDays(salaryDate, -1);
   const items = [];
   const unknown = [];
@@ -1670,6 +1718,7 @@ export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus }) {
 
   for (const sub of listSubscriptions(db)) {
     if (!['active', 'keep'].includes(sub.status) || !(sub.amount > 0)) continue;
+    if (!belongs(pj, sub.account_id, 'pf')) continue;
     if (sub.cadence === 'yearly') {
       if (sub.next_charge && sub.next_charge >= today && sub.next_charge <= until) {
         items.push({ kind: 'subscription', id: sub.id, name: sub.name, amount: sub.amount, due_date: sub.next_charge });
@@ -1841,16 +1890,18 @@ export function saveBudgets(db, body) {
 }
 
 /** Gasto do mês por categoria (só saídas; fatura e transferência à parte), com limite e % do orçamento. */
-export function getMonthSummary(db, { month, today } = {}) {
+export function getMonthSummary(db, { month, today, entity } = {}) {
+  const ent = parseEntity(entity, 'pf');
+  const pj = pjAccountIds(db);
   const day = isValidDateString(today) ? today : todayFortaleza();
   const ym = month === undefined || month === null || month === '' ? monthOf(day) : parseMonth(month);
   const [y, m] = ym.split('-').map(Number);
   const from = `${ym}-01`;
   const to = ymdOf(y, m, daysInMonth(y, m));
   const rows = db.prepare(`
-    SELECT category, direction, amount FROM finance_transactions
+    SELECT category, direction, amount, account_id FROM finance_transactions
     WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL AND direction != 'internal'
-  `).all(from, to);
+  `).all(from, to).filter((tx) => belongs(pj, tx.account_id, ent));
 
   const spent = new Map();
   const count = new Map();
@@ -1897,18 +1948,19 @@ export function getMonthSummary(db, { month, today } = {}) {
     off_budget_out: money(offBudget),
     budget_total: money([...budgets.values()].reduce((s, v) => s + v, 0)),
     categories,
-    pending_card: pendingCardSummary(db, from, to),
+    pending_card: pendingCardSummary(db, from, to, pj, ent),
+    entity: ent,
   };
 }
 
 /** Compras de cartão ainda pendentes no banco, à parte: não entram em total_out nem no orçamento. */
-function pendingCardSummary(db, from, to) {
-  const row = db.prepare(`
-    SELECT COUNT(*) AS n, COALESCE(SUM(-amount), 0) AS total, MAX(seen_at) AS seen_at
-    FROM finance_pending_transactions
+function pendingCardSummary(db, from, to, pj = pjAccountIds(db), entity = 'pf') {
+  const rows = db.prepare(`
+    SELECT amount, seen_at, account_id FROM finance_pending_transactions
     WHERE amount < 0 AND posted_on >= ? AND posted_on <= ?
-  `).get(from, to);
-  return { count: row.n, total: money(row.total), seen_at: row.seen_at || null };
+  `).all(from, to).filter((r) => belongs(pj, r.account_id, entity));
+  const seen = rows.map((r) => r.seen_at).filter(Boolean).sort().at(-1) || null;
+  return { count: rows.length, total: money(rows.reduce((s, r) => s - r.amount, 0)), seen_at: seen };
 }
 
 /** GET /api/finance/pending — lista das compras pendentes (mais novas primeiro). */
@@ -2029,9 +2081,11 @@ export function lastMidasSync(db) {
 export function getOverview(db, { today } = {}) {
   const day = isValidDateString(today) ? today : todayFortaleza();
   const settings = getSettings(db);
-  const accounts = listAccounts(db);
-  const debts = listDebts(db);
-  const subscriptions = listSubscriptions(db);
+  // visão geral é sempre PF; a empresa tem a própria visão (month/insights/accounts com entity=pj)
+  const pj = pjAccountIds(db);
+  const accounts = listAccounts(db).filter((a) => a.entity !== 'pj');
+  const debts = listDebts(db).filter((d) => belongs(pj, d.account_id, 'pf'));
+  const subscriptions = listSubscriptions(db).filter((s) => belongs(pj, s.account_id, 'pf'));
   const lastSync = db.prepare(
     'SELECT * FROM finance_sync_log ORDER BY started_at DESC LIMIT 1',
   ).get();
@@ -2067,9 +2121,9 @@ export function getOverview(db, { today } = {}) {
       .reduce((s, d) => s + d.balance, 0),
   );
 
-  const cardsStatus = listCardStatus(db, { today: day });
+  const cardsStatus = listCardStatus(db, { today: day }).filter((c) => belongs(pj, c.account_id, 'pf'));
   const salaryDate = nextSalaryDate(day, settings.salary_day);
-  const commitments = commitmentsUntilSalary(db, { today: day, salaryDate, cardsStatus });
+  const commitments = commitmentsUntilSalary(db, { today: day, salaryDate, cardsStatus, pj });
   const committedUntilSalary = money(commitments.items.reduce((s, c) => s + c.amount, 0));
   const safeToSpend = money(Math.max(0, livre - committedUntilSalary));
   const creditAvailableTotal = money(
@@ -2082,7 +2136,7 @@ export function getOverview(db, { today } = {}) {
   const workMonth = money(liveSubs.filter((s) => s.lane === 'work').reduce((s, x) => s + x.amount, 0));
   const personalMonth = money(liveSubs.filter((s) => s.lane === 'personal').reduce((s, x) => s + x.amount, 0));
 
-  const openInst = listInstallments(db, { status: 'open' });
+  const openInst = listInstallments(db, { status: 'open' }).filter((x) => belongs(pj, x.account_id, 'pf'));
   const installmentsRemaining = money(openInst.reduce((s, x) => s + Number(x.remaining || 0), 0));
   const installmentsMonth = money(openInst.reduce((s, x) => s + Number(x.monthly || 0), 0));
   const lastInstDue = openInst
@@ -2124,7 +2178,9 @@ export function getOverview(db, { today } = {}) {
     safe_to_spend: safeToSpend,
     // compatibilidade: faturas de cartão de hoje-3 a hoje+7 (o front usa os compromissos até o salário)
     bills_due_7d: billsDue7d,
-    month: getMonthSummary(db, { today: day }),
+    month: getMonthSummary(db, { today: day, entity: 'pf' }),
+    entity: 'pf',
+    pj_accounts_n: pj.size,
     debts_total: debtsTotal,
     cards_total: cardsTotal,
     cards_status: cardsStatus,

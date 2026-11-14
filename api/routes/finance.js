@@ -62,7 +62,7 @@ export function createFinanceRouter({ db, getLocalDateString }) {
 
   router.get('/month', (req, res) => {
     try {
-      res.json(getMonthSummary(db, { month: req.query.month, today: localToday() }));
+      res.json(getMonthSummary(db, { month: req.query.month, today: localToday(), entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
@@ -138,7 +138,11 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/accounts', (req, res) => {
-    res.json(listAccounts(db, { status: req.query.status }));
+    try {
+      res.json(listAccounts(db, { status: req.query.status, entity: req.query.entity }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.post('/accounts', (req, res) => {
@@ -248,14 +252,19 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/transactions', (req, res) => {
-    res.json(listTransactions(db, {
-      from: req.query.from,
-      to: req.query.to,
-      account_id: req.query.account_id,
-      category: req.query.category,
-      q: req.query.q,
-      limit: req.query.limit,
-    }));
+    try {
+      res.json(listTransactions(db, {
+        from: req.query.from,
+        to: req.query.to,
+        account_id: req.query.account_id,
+        category: req.query.category,
+        q: req.query.q,
+        limit: req.query.limit,
+        entity: req.query.entity,
+      }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.post('/transactions', (req, res) => {
@@ -274,7 +283,11 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/insights', (req, res) => {
-    res.json(getInsights(db, { from: req.query.from, to: req.query.to }));
+    try {
+      res.json(getInsights(db, { from: req.query.from, to: req.query.to, entity: req.query.entity }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.get('/goals', (_req, res) => {

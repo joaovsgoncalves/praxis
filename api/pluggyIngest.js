@@ -197,7 +197,7 @@ function parseTransactions(list, label = 'transactions') {
 function operationalAccount(db, institution) {
   return db.prepare(`
     SELECT * FROM finance_accounts
-    WHERE institution = ? AND kind != 'credit' AND status = 'active'
+    WHERE institution = ? AND kind != 'credit' AND status = 'active' AND entity = 'pf'
     ORDER BY is_operational DESC, sort_order ASC, id ASC
     LIMIT 1
   `).get(institution) || null;
@@ -208,7 +208,7 @@ function cardAccount(db, institution, last4, fallback) {
   if (last4) {
     const credit = db.prepare(`
       SELECT * FROM finance_accounts
-      WHERE kind = 'credit' AND status = 'active' AND (mask = ? OR card_last4 = ?)
+      WHERE kind = 'credit' AND status = 'active' AND entity = 'pf' AND (mask = ? OR card_last4 = ?)
       ORDER BY (institution = ?) DESC, sort_order ASC, id ASC
       LIMIT 1
     `).get(last4, last4, institution);
@@ -419,14 +419,14 @@ function transactionAccount(db, tx) {
   const byCard = db.prepare(`
     SELECT a.* FROM finance_card_status cs
     JOIN finance_accounts a ON a.id = cs.account_id
-    WHERE cs.institution = ? AND a.status = 'active'
+    WHERE cs.institution = ? AND a.status = 'active' AND a.entity = 'pf'
     ORDER BY a.sort_order ASC, a.id ASC
     LIMIT 1
   `).get(tx.institution);
   if (byCard) return byCard;
   return db.prepare(`
     SELECT * FROM finance_accounts
-    WHERE kind = 'credit' AND status = 'active' AND institution = ?
+    WHERE kind = 'credit' AND status = 'active' AND institution = ? AND entity = 'pf'
     ORDER BY sort_order ASC, id ASC
     LIMIT 1
   `).get(tx.institution) || op;
