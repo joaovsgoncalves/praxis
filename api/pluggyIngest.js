@@ -397,10 +397,22 @@ function applyInstitution(db, item, now, today) {
   return { applied };
 }
 
-/** Conta do lançamento: crédito da instituição (se houver) para CREDIT; senão a conta do dia dela. */
+/**
+ * Conta do lançamento: para CREDIT, a conta do cartão daquela instituição; senão a conta do dia dela.
+ * A conta do cartão é achada pelo estado do cartão (`finance_card_status`), porque o nome e a
+ * `institution` dela costumam ser do produto (GOLD, platinum, BANDEIRADO), não do banco.
+ */
 function transactionAccount(db, tx) {
   const op = operationalAccount(db, tx.institution);
   if (tx.account_type !== 'CREDIT') return op;
+  const byCard = db.prepare(`
+    SELECT a.* FROM finance_card_status cs
+    JOIN finance_accounts a ON a.id = cs.account_id
+    WHERE cs.institution = ? AND a.status = 'active'
+    ORDER BY a.sort_order ASC, a.id ASC
+    LIMIT 1
+  `).get(tx.institution);
+  if (byCard) return byCard;
   return db.prepare(`
     SELECT * FROM finance_accounts
     WHERE kind = 'credit' AND status = 'active' AND institution = ?
@@ -413,7 +425,7 @@ function transactionAccount(db, tx) {
  * Gasto que o João lançou e o banco agora confirmou: mesmo valor, até 3 dias de diferença,
  * mesma conta (ou lançado sem conta). O manual sai das somas; a categoria e o nome dele ficam na linha do banco.
  */
-function matchManual(db, bankTx) {
+function matchManual(db, bankTx, altAccountId = null) {
   if (bankTx.amount >= 0) return null;
   const placeholders = MANUAL_SOURCES.map(() => '?').join(', ');
   return db.prepare(`
@@ -422,15 +434,16 @@ function matchManual(db, bankTx) {
       AND (external_id IS NULL OR external_id = '')
       AND ABS(ABS(amount) - ?) < 0.005
       AND posted_on >= date(?, '-3 day') AND posted_on <= date(?, '+3 day')
-      AND (account_id IS NULL OR account_id = ?)
+      AND (account_id IS NULL OR account_id = ? OR account_id = ?)
     ORDER BY ABS(julianday(posted_on) - julianday(?)) ASC, created_at ASC
     LIMIT 1
-  `).get(...MANUAL_SOURCES, Math.abs(bankTx.amount), bankTx.posted_on, bankTx.posted_on, bankTx.account_id, bankTx.posted_on) || null;
+  `).get(...MANUAL_SOURCES, Math.abs(bankTx.amount), bankTx.posted_on, bankTx.posted_on, bankTx.account_id, altAccountId ?? bankTx.account_id, bankTx.posted_on) || null;
 }
 
 function applyTransactions(db, list) {
-  const summary = { received: list.length, inserted: 0, duplicates: 0, matched: 0, skipped: [] };
-  const exists = db.prepare('SELECT id FROM finance_transactions WHERE external_id = ?');
+  const summary = { received: list.length, inserted: 0, duplicates: 0, matched: 0, relinked: 0, skipped: [] };
+  const exists = db.prepare('SELECT id, account_id, source FROM finance_transactions WHERE external_id = ?');
+  const relink = db.prepare('UPDATE finance_transactions SET account_id = ? WHERE id = ?');
   const insert = db.prepare(`
     INSERT INTO finance_transactions
       (id, external_id, account_id, posted_on, amount, direction, raw_description,
@@ -438,8 +451,15 @@ function applyTransactions(db, list) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pluggy', ?, ?)
   `);
   for (const tx of list) {
-    if (exists.get(tx.external_id)) {
+    const found = exists.get(tx.external_id);
+    if (found) {
       summary.duplicates += 1;
+      // lançamento do banco gravado na conta errada (ex.: compra de cartão na corrente): só troca a conta
+      const right = transactionAccount(db, tx);
+      if (found.source === 'pluggy' && right && found.account_id !== right.id) {
+        relink.run(right.id, found.id);
+        summary.relinked += 1;
+      }
       continue;
     }
     const account = transactionAccount(db, tx);
@@ -456,7 +476,9 @@ function applyTransactions(db, list) {
       merchant: cleanMerchant(tx.description),
       note: '',
     };
-    const manual = matchManual(db, row);
+    // compra de cartão: o João pode ter lançado o gasto na corrente do mesmo banco
+    const alt = tx.account_type === 'CREDIT' ? operationalAccount(db, tx.institution)?.id ?? null : null;
+    const manual = matchManual(db, row, alt);
     if (manual) {
       if (manual.category && manual.category !== 'Outros') row.category = manual.category;
       if (manual.merchant) row.merchant = manual.merchant;
