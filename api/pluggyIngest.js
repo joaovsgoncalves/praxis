@@ -17,6 +17,8 @@ import {
 export const PLUGGY_INSTITUTIONS = ['inter', 'c6', 'mp', 'nubank', 'santander'];
 export const PLUGGY_ACCOUNT_TYPES = ['BANK', 'CREDIT'];
 const MAX_TRANSACTIONS = 2000;
+// Pagamento de fatura confirmado pelo João vale até o banco mostrar, no máximo 3 dias úteis (João, 14/11/2026).
+export const MANUAL_PAYMENT_GRACE_BUSINESS_DAYS = 3;
 const ISO_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LAST4_RE = /^\d{4}$/;
@@ -240,15 +242,54 @@ function upsertBalance(db, accountId, bank, bankUpdatedAt) {
   return amount;
 }
 
-function upsertCardStatus(db, accountId, institution, card, bankUpdatedAt, now) {
+function ymdToUtc(ymd) {
+  const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+/** Dias úteis (seg a sex) depois de `from` até `to`, inclusive `to`. Feriado não é descontado. */
+export function businessDaysBetween(from, to) {
+  let n = 0;
+  for (let t = ymdToUtc(from) + 86400000; t <= ymdToUtc(to); t += 86400000) {
+    const wd = new Date(t).getUTCDay();
+    if (wd !== 0 && wd !== 6) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Quanto do que o João confirmou ter pago (finance_payments, via /debts/:id/pay) o banco ainda não mostra.
+ * Conta pagamentos desde o fechamento da fatura, feitos há no máximo 3 dias úteis.
+ * Se o banco já mostra pelo menos esse valor como pago, o banco vence e o ajuste some.
+ */
+export function pendingManualCardPayment(db, accountIds, bill, today) {
+  if (!bill || !accountIds.length || !today) return 0;
+  const marks = accountIds.map(() => '?').join(', ');
+  const debts = db.prepare(`SELECT id FROM finance_debts WHERE kind = 'card' AND account_id IN (${marks})`).all(...accountIds);
+  if (!debts.length) return 0;
+  const since = bill.closing_date || (bill.due_date ? new Date(ymdToUtc(bill.due_date) - 40 * 86400000).toISOString().slice(0, 10) : null);
+  if (!since) return 0;
+  const rows = db.prepare(`
+    SELECT amount, paid_on FROM finance_payments
+    WHERE debt_id IN (${debts.map(() => '?').join(', ')}) AND paid_on >= ? AND paid_on <= ?
+  `).all(...debts.map((d) => d.id), since, today);
+  const manual = money(rows
+    .filter((r) => businessDaysBetween(r.paid_on, today) <= MANUAL_PAYMENT_GRACE_BUSINESS_DAYS)
+    .reduce((s, r) => s + Number(r.amount || 0), 0));
+  if (manual <= 0.009) return 0;
+  if (Number(bill.paid || 0) + 0.01 >= manual) return 0;
+  return money(Math.min(manual, Math.max(0, Number(bill.total || 0) - Number(bill.paid || 0))));
+}
+
+function upsertCardStatus(db, accountId, institution, card, bankUpdatedAt, now, manualPaid = 0) {
   const bill = card.bill;
   const remaining = bill ? money(Math.max(0, bill.total - bill.paid)) : null;
   db.prepare(`
     INSERT INTO finance_card_status
       (account_id, institution, last4, brand, used, limit_total, limit_available,
        bill_total, bill_minimum, bill_paid, bill_remaining, bill_due, bill_closing,
-       bank_updated_at, updated_at, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pluggy')
+       bank_updated_at, updated_at, source, bill_paid_manual)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pluggy', ?)
     ON CONFLICT(account_id) DO UPDATE SET
       institution = excluded.institution,
       last4 = excluded.last4,
@@ -264,7 +305,8 @@ function upsertCardStatus(db, accountId, institution, card, bankUpdatedAt, now) 
       bill_closing = excluded.bill_closing,
       bank_updated_at = excluded.bank_updated_at,
       updated_at = excluded.updated_at,
-      source = excluded.source
+      source = excluded.source,
+      bill_paid_manual = excluded.bill_paid_manual
   `).run(
     accountId,
     institution,
@@ -281,11 +323,15 @@ function upsertCardStatus(db, accountId, institution, card, bankUpdatedAt, now) 
     bill?.closing_date || null,
     bankUpdatedAt,
     now,
+    money(manualPaid || 0),
   );
   return remaining;
 }
 
-/** Só os campos da fatura; ignora locked porque o Pluggy é a fonte oficial dela. */
+/**
+ * Só os campos da fatura; ignora locked porque o Pluggy é a fonte oficial do valor.
+ * O `bill.paid` que chega aqui já inclui o pagamento confirmado pelo João que o banco ainda não mostra.
+ */
 function updateCardDebt(db, accountIds, bill, now) {
   let debt = null;
   for (const id of accountIds) {
@@ -314,7 +360,7 @@ function updateCardDebt(db, accountIds, bill, now) {
   return debt.id;
 }
 
-function applyInstitution(db, item, now) {
+function applyInstitution(db, item, now, today) {
   const op = operationalAccount(db, item.institution);
   const cardAcc = item.card ? cardAccount(db, item.institution, item.card.last4, op) : null;
   if (!op && !cardAcc) return { skipped: { institution: item.institution, status: item.status, reason: 'sem conta na Praxis' } };
@@ -331,15 +377,21 @@ function applyInstitution(db, item, now) {
     balance: null,
     bill_remaining: null,
     debt_id: null,
+    manual_paid_pending: 0,
   };
   if (item.bank && op) {
     applied.balance = upsertBalance(db, op.id, item.bank, item.updated_at);
   }
   if (item.card && cardAcc) {
-    applied.bill_remaining = upsertCardStatus(db, cardAcc.id, item.institution, item.card, item.updated_at, now);
-    if (item.card.bill) {
-      const ids = [...new Set([cardAcc.id, op?.id].filter(Boolean))];
-      applied.debt_id = updateCardDebt(db, ids, item.card.bill, now);
+    const ids = [...new Set([cardAcc.id, op?.id].filter(Boolean))];
+    const manual = item.card.bill ? pendingManualCardPayment(db, ids, item.card.bill, today) : 0;
+    const card = manual > 0
+      ? { ...item.card, bill: { ...item.card.bill, paid: money(item.card.bill.paid + manual) } }
+      : item.card;
+    applied.manual_paid_pending = manual;
+    applied.bill_remaining = upsertCardStatus(db, cardAcc.id, item.institution, card, item.updated_at, now, manual);
+    if (card.bill) {
+      applied.debt_id = updateCardDebt(db, ids, card.bill, now);
     }
   }
   return { applied };
@@ -436,6 +488,7 @@ function applyTransactions(db, list) {
 export function ingestPluggy(db, body, { today } = {}) {
   const payload = parsePluggyPayload(body);
   const now = new Date().toISOString();
+  const day = today || todayFortaleza();
   const applied = [];
   const skipped = [];
   let transactions = null;
@@ -446,7 +499,7 @@ export function ingestPluggy(db, body, { today } = {}) {
         skipped.push({ institution: item.institution, status: item.status, reason: 'status do banco' });
         continue;
       }
-      const result = applyInstitution(db, item, now);
+      const result = applyInstitution(db, item, now, day);
       if (result.applied) applied.push(result.applied);
       else skipped.push(result.skipped);
     }

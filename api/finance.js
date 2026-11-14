@@ -315,6 +315,11 @@ export function initFinanceSchema(db) {
   if (!txCols.includes('note')) {
     db.exec("ALTER TABLE finance_transactions ADD COLUMN note TEXT DEFAULT ''");
   }
+  // pagamento de fatura confirmado pelo João que o banco ainda não mostra (Argos, 14/11/2026) — só aditivo
+  const cardCols = db.prepare('PRAGMA table_info(finance_card_status)').all().map((c) => c.name);
+  if (cardCols.length && !cardCols.includes('bill_paid_manual')) {
+    db.exec('ALTER TABLE finance_card_status ADD COLUMN bill_paid_manual REAL DEFAULT 0');
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS finance_fixed_expenses (
       id TEXT PRIMARY KEY,
@@ -1930,14 +1935,28 @@ export function cleanMerchant(description) {
   return s.slice(0, 80);
 }
 
+/** Fatura cujo vencimento já passou e cujo fechamento tem mais de 35 dias: o banco ainda não mandou o ciclo novo. */
+export function billCycleStale(card, today) {
+  if (!card || !card.bill_due || !card.bill_closing || !isValidDateString(today)) return false;
+  if (card.bill_due >= today) return false;
+  const [y1, m1, d1] = card.bill_closing.slice(0, 10).split('-').map(Number);
+  const [y2, m2, d2] = today.split('-').map(Number);
+  return (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000 > 35;
+}
+
 /** Estado dos cartões que o banco mandou, com o nome da conta e a situação da fatura. */
-export function listCardStatus(db) {
+export function listCardStatus(db, { today } = {}) {
+  const day = isValidDateString(today) ? today : todayFortaleza();
   return db.prepare(`
     SELECT cs.*, a.name AS account_name, a.status AS account_status
     FROM finance_card_status cs
     LEFT JOIN finance_accounts a ON a.id = cs.account_id
     ORDER BY cs.bill_due IS NULL, cs.bill_due ASC, cs.institution ASC
-  `).all().map((card) => ({ ...card, card_situation: cardSituation(card) }));
+  `).all().map((card) => ({
+    ...card,
+    card_situation: cardSituation(card),
+    bill_cycle_stale: billCycleStale(card, day),
+  }));
 }
 
 /** Última atualização de cada banco ativo (cartão ou saldo do Pluggy); devolve a mais antiga. */
@@ -2011,7 +2030,7 @@ export function getOverview(db, { today } = {}) {
       .reduce((s, d) => s + d.balance, 0),
   );
 
-  const cardsStatus = listCardStatus(db);
+  const cardsStatus = listCardStatus(db, { today: day });
   const salaryDate = nextSalaryDate(day, settings.salary_day);
   const commitments = commitmentsUntilSalary(db, { today: day, salaryDate, cardsStatus });
   const committedUntilSalary = money(commitments.items.reduce((s, c) => s + c.amount, 0));
