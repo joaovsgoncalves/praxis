@@ -2040,12 +2040,13 @@ const CATEGORY_RULES = [
   ['Impostos', /\btax(es)?\b|impost|darf|\bdas\b|iptu|ipva|simples nacional/i],
   ['Assinaturas', /subscription|streaming|digital service|assinatura|netflix|spotify|youtube|icloud|apple\.com|google one|prime video|disney|hbo|deezer|chatgpt|openai/i],
   ['Alimentação', /food|eating|restaurant|delivery|groceries|supermarket|bakery|ifood|rappi|aliment|restaurante|lanchonete|padaria|mercado(?! ?(pago|livre))|supermercado|atacad|a[cç]ougue|hortifruti|caf[eé]\b/i],
-  ['Transporte', /transport|taxi|ride|uber|99app|99 ?pop|gas station|fuel|parking|toll|combust|posto|estacionamento|ped[aá]gio|[oô]nibus|metr[oô]|passagem/i],
+  ['Fitness', /fitness|\bgym\b|academia|smart ?fit|suplement/i],
+  ['Transporte', /transport|taxi|ride|uber|vehicle|automotive|oficina|auto ?pe[cç]as|mec[aâ]nic|99app|99 ?pop|gas station|fuel|parking|toll|combust|posto|estacionamento|ped[aá]gio|[oô]nibus|metr[oô]|passagem/i],
   ['Moradia', /housing|rent\b|electricity|water|utilities|telecom|internet|aluguel|condom[ií]nio|energia|enel|[aá]gua|cagece|g[aá]s de cozinha/i],
-  ['Saúde', /health|pharmac|drugstore|hospital|clinic|dentist|doctor|sa[uú]de|farm[aá]cia|drogaria|drogasil|pague menos|cl[ií]nica|laborat[oó]rio|m[eé]dic/i],
+  ['Saúde', /health|pharmac|optometr|[oó]tica|drugstore|hospital|clinic|dentist|doctor|sa[uú]de|farm[aá]cia|drogaria|drogasil|pague menos|cl[ií]nica|laborat[oó]rio|m[eé]dic/i],
   ['Educação', /educat|school|university|college|course|book|faculdade|escola|curso|livraria|udemy|alura/i],
   ['Compras', /shopping|clothing|electronics|department store|marketplace|compras|loja|vestu[aá]rio|mercado ?livre|amazon|shopee|magalu|magazine|aliexpress|shein/i],
-  ['Lazer', /leisure|entertainment|travel|hotel|airline|cinema|theater|game|sport|lazer|viagem|show|ingresso|bar\b/i],
+  ['Lazer', /leisure|entertainment|travel|hotel|airline|cinema|theater|\bgames?\b|sport|ticket|accomm?odation|lazer|viagem|show|ingresso|bar\b/i],
 ];
 
 /** Categoria do Pluggy/Midas (ou descrição) → categoria da Praxis. */

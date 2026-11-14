@@ -209,3 +209,19 @@ test('"O banco mostrou": uma linha por conta, a origem mais recente vence e cont
   ]);
   assert.equal(new Set(shown.map((e) => e.id)).size, shown.length, 'nenhuma conta contada duas vezes');
 });
+
+test('categoria do banco: "pagamento" não vira Lazer e os nomes em inglês do Pluggy têm destino', async () => {
+  const { mapBankCategory } = await import('./finance.js');
+  const map = (category, description, amount = -10, type = 'BANK') => mapBankCategory(category, description, amount, type);
+  // "game" casava dentro de "paGAMEnto": o boleto do carro aparecia como Lazer
+  assert.equal(map('Transfers', 'Pagamento efetuado - BANCO ITAU UNIBANCO S.A.', -1270.9), 'Outros');
+  assert.equal(map('Transfers', 'Pagamento de Título - BANCO ITAU UNIBANCO S.A.', -1270.9), 'Outros');
+  assert.equal(map('Entertainment', 'STEAM GAMES', -50, 'CREDIT'), 'Lazer');
+  assert.equal(map('Tickets', 'SYMPLA', -90, 'CREDIT'), 'Lazer');
+  assert.equal(map('Vehicle maintenance', 'AUTO CENTER', -200, 'CREDIT'), 'Transporte');
+  assert.equal(map('Automotive', 'LOJA X', -100, 'CREDIT'), 'Transporte');
+  assert.equal(map('Optometry', 'OTICAS Y', -120, 'CREDIT'), 'Saúde');
+  assert.equal(map('Wellness and fitness', 'ACADEMIA Z', -59, 'CREDIT'), 'Fitness');
+  assert.equal(map('Same person transfer', 'PIX ENVIADO', -500), 'Transferência');
+  assert.equal(map('Credit card payment', 'Pagamento de fatura', -900), 'Pagamento de fatura');
+});
