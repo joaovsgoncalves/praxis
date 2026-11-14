@@ -302,6 +302,49 @@ test('servidor fora com cópia no aparelho: a tela diz que é cópia e de que ho
   await context.close();
 });
 
+test('Hábitos e Tarefas: enquanto lê ou se a leitura falha, a tela não diz que está vazia', async ({ browser }) => {
+  // Hábitos: a leitura demora. Nada de "Nenhum hábito ainda" antes da resposta.
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const slow = await openSession(browser, PHONE, {
+    path: '/habitos',
+    before: (p) => p.route(/\/api\/habits(\?|$)/, async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      await held;
+      return route.fallback();
+    }),
+  });
+  await expect(slow.page.getByRole('status', { name: 'Carregando os hábitos' })).toBeVisible();
+  await expect(slow.page.getByText('Nenhum hábito ainda')).toHaveCount(0);
+  release();
+  await expect(habitAction(slow.page.getByRole('main'))).toBeVisible();
+  await expect(slow.page.getByRole('status', { name: 'Carregando os hábitos' })).toHaveCount(0);
+  await slow.context.close();
+
+  // Hábitos: o servidor falha e não há cópia no aparelho. Erro com saída, nunca vazio.
+  let failing = true;
+  const broken = await openSession(browser, PHONE, {
+    path: '/habitos',
+    before: (p) => p.route(/\/api\/(habits|tasks)(\?|$)/, (route) =>
+      (failing && route.request().method() === 'GET' ? failWith500(route) : route.fallback())),
+  });
+  const habitsError = broken.page.getByTestId('habits-page-error');
+  await expect(habitsError).toBeVisible();
+  await expect(habitsError).toContainText('O servidor falhou ao carregar os hábitos.');
+  await expect(broken.page.getByText('Nenhum hábito ainda')).toHaveCount(0);
+
+  // Tarefas: mesma regra.
+  await broken.page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Tarefas' }).tap();
+  const tasksError = broken.page.getByTestId('tasks-page-error');
+  await expect(tasksError).toBeVisible();
+  await expect(broken.page.getByText('Nenhuma tarefa neste filtro')).toHaveCount(0);
+  failing = false;
+  await tasksError.getByRole('button', { name: 'Tentar novamente' }).tap();
+  await expect(broken.page.getByTestId('tasks-page-error')).toHaveCount(0);
+  await expect(broken.page.getByRole('main').getByRole('button', { name: /^Concluir / }).first()).toBeVisible();
+  await broken.context.close();
+});
+
 test('lista vazia de verdade mostra o vazio, sem erro', async ({ browser }) => {
   const { context, page } = await openSession(browser, PHONE, {
     before: (p) =>

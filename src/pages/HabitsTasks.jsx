@@ -18,6 +18,8 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import { Plus, CheckCircle2, Circle, Flame, Eraser, Archive, ListTodo, GripVertical, SlidersHorizontal, BarChart3 } from 'lucide-react';
 import { PageHero, StatGrid, StatTile, PraxisEmptyState, SectionHeader } from '@/components/layout/PraxisPage';
+import { SectionLoadError, SectionLoading } from '@/components/shared/SectionRead';
+import { buildSectionRead } from '@/lib/readState';
 import { cn } from '@/lib/utils';
 import TaskForm from '@/components/habits-tasks/TaskForm';
 import QuickTaskInput from '@/components/habits-tasks/QuickTaskInput';
@@ -218,15 +220,21 @@ export default function HabitsTasks({ destination = null }) {
     setSearchParams(setHabitTasksTabInSearchParams(searchParams, next), { replace: true });
   };
 
-  const { data: tasks = [] } = useQuery({
+  const tasksQuery = useQuery({
     queryKey: ['tasks', today],
     queryFn: () => praxisApi.tasks.list({ limit: 50, include_overdue: '1', today }),
   });
-  const { data: habits = [] } = useQuery({
+  const { data: tasks = [] } = tasksQuery;
+  const habitsQuery = useQuery({
     queryKey: ['allHabits', 'active', today],
     queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
   });
-  const { data: habitLogs = [] } = useQuery({ queryKey: ['habitLogs', today], queryFn: () => praxisApi.habitLogs.list({ date: today }) });
+  const { data: habits = [] } = habitsQuery;
+  const habitLogsQuery = useQuery({ queryKey: ['habitLogs', today], queryFn: () => praxisApi.habitLogs.list({ date: today }) });
+  const { data: habitLogs = [] } = habitLogsQuery;
+  // Lista vazia só vale depois de ler: antes disso é "carregando" ou "não consegui ler", nunca "nenhum hábito".
+  const tasksRead = buildSectionRead([tasksQuery]);
+  const habitsRead = buildSectionRead([habitsQuery, habitLogsQuery]);
   const { data: activeHabitsList = [] } = useQuery({
     queryKey: ['habits', 'active', today],
     queryFn: () => praxisApi.habits.list({ status: 'active', date: today }),
@@ -1023,6 +1031,10 @@ export default function HabitsTasks({ destination = null }) {
                 onEditTask={openTask}
                 onCreateTaskAt={(initialData) => handleOpenCreateTask(initialData)}
               />
+            ) : tasksRead.status === 'error' ? (
+              <SectionLoadError what="as tarefas" read={tasksRead} testId="tasks-page-error" />
+            ) : tasksRead.status === 'loading' ? (
+              <SectionLoading className="h-[180px]" label="Carregando as tarefas" />
             ) : filteredTasks.length === 0 && listDay ? (
               <PraxisEmptyState
                 icon={ListTodo}
@@ -1267,7 +1279,11 @@ export default function HabitsTasks({ destination = null }) {
               </div>
             )}
 
-            {filteredHabits.length === 0 ? (
+            {habitsRead.status === 'error' ? (
+              <SectionLoadError what="os hábitos" read={habitsRead} testId="habits-page-error" />
+            ) : habitsRead.status === 'loading' ? (
+              <SectionLoading className="h-[180px]" label="Carregando os hábitos" />
+            ) : filteredHabits.length === 0 ? (
               <PraxisEmptyState
                 icon={Flame}
                 title="Nenhum hábito ainda"
