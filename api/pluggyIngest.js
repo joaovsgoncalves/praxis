@@ -399,7 +399,9 @@ function applyStatementCoverage(db, item, now) {
     SELECT id FROM finance_accounts
     WHERE kind = 'credit' AND status = 'active' AND institution = ?
   `).all(item.institution);
-  const ids = [...new Set([op?.id, ...credit.map((c) => c.id)].filter(Boolean))];
+  // o cartão pode ter vindo de outra origem com outro nome de instituição: vale o final do cartão
+  const byLast4 = item.card ? cardAccount(db, item.institution, item.card.last4, null) : null;
+  const ids = [...new Set([op?.id, byLast4?.id, ...credit.map((c) => c.id)].filter(Boolean))];
   for (const accountId of ids) {
     recordStatementCoverage(db, {
       accountId, source: 'pluggy', from: item.statement.from, to: item.statement.to, at: now,

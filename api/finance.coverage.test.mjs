@@ -284,3 +284,18 @@ test('Pluggy: statement inválido recusa a carga inteira', async (t) => {
   assert.equal(balances(), before);
   assert.deepEqual(windows(db), []);
 });
+
+test('Pluggy: o extrato cobre também o cartão achado pelo final, mesmo com outro nome de instituição', async (t) => {
+  const { db, server } = await mountFinance(t);
+  // cartão criado por outra origem: a instituição gravada é o nome do produto, não o banco
+  createAccount(db, { id: 'acc-gold', name: 'GOLD', institution: 'gold', kind: 'credit', mask: '7788' });
+  const body = pluggyBody({
+    statement: { from: '2026-10-15', to: TODAY },
+    card: { last4: '7788', brand: 'MASTERCARD', used: 100, limit: 1000, available: 900, bill: null },
+  });
+  const result = await requestJson(server.base, '/api/finance/ingest/pluggy', { method: 'POST', body });
+  assert.ok(result.applied[0].statement_accounts.includes('acc-inter'));
+  assert.ok(result.applied[0].statement_accounts.includes('acc-gold'));
+  const cov = await requestJson(server.base, `/api/finance/coverage?from=2026-10-15&to=${TODAY}`);
+  assert.equal(cov.accounts.find((a) => a.account_id === 'acc-gold').status, 'complete');
+});
