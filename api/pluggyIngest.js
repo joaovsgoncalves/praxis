@@ -146,20 +146,31 @@ export function parsePluggyPayload(body) {
       card: parseCard(raw.card, `${path}.card`),
     };
   });
-  return { fetched_at: fetchedAt, institutions, transactions: parseTransactions(body.transactions) };
+  const pendingInstitutions = body.pending_institutions == null ? [] : body.pending_institutions;
+  if (!Array.isArray(pendingInstitutions)) throw invalid('pending_institutions', 'lista');
+  pendingInstitutions.forEach((inst, i) => {
+    if (!PLUGGY_INSTITUTIONS.includes(inst)) throw invalid(`pending_institutions[${i}]`, `use ${PLUGGY_INSTITUTIONS.join(', ')}`);
+  });
+  return {
+    fetched_at: fetchedAt,
+    institutions,
+    transactions: parseTransactions(body.transactions),
+    pending_transactions: parseTransactions(body.pending_transactions, 'pending_transactions'),
+    pending_institutions: [...new Set(pendingInstitutions)],
+  };
 }
 
 /**
  * transactions (opcional): [{ external_id, institution, account_type: BANK|CREDIT, date: YYYY-MM-DD,
  *   amount (negativo = saída), description, category }]
  */
-function parseTransactions(list) {
+function parseTransactions(list, label = 'transactions') {
   if (list === null || list === undefined) return [];
-  if (!Array.isArray(list)) throw invalid('transactions', 'lista');
-  if (list.length > MAX_TRANSACTIONS) throw invalid('transactions', `no máximo ${MAX_TRANSACTIONS}`);
+  if (!Array.isArray(list)) throw invalid(label, 'lista');
+  if (list.length > MAX_TRANSACTIONS) throw invalid(label, `no máximo ${MAX_TRANSACTIONS}`);
   const seen = new Set();
   return list.map((raw, i) => {
-    const path = `transactions[${i}]`;
+    const path = `${label}[${i}]`;
     if (!isPlainObject(raw)) throw invalid(path, 'objeto');
     const externalId = shortText(raw.external_id, `${path}.external_id`, { max: 120, nullable: false }).trim();
     if (seen.has(externalId)) throw invalid(`${path}.external_id`, 'repetido');
@@ -506,6 +517,65 @@ function applyTransactions(db, list) {
   return summary;
 }
 
+/**
+ * Compras pendentes do cartão. Para cada banco lido por completo (`pending_institutions`) e atualizado,
+ * a lista daquele banco é trocada inteira. Uma pendente não entra se a versão confirmada já existe:
+ * mesmo id, ou mesma conta e mesmo valor com data de -3 a +10 dias (o banco pode trocar o id ao confirmar).
+ * Banco que não veio completo fica com a lista anterior (com o `seen_at` antigo).
+ */
+function applyPending(db, payload, refreshed, now) {
+  const summary = { stored: 0, already_posted: 0, institutions: [] };
+  const targets = payload.pending_institutions.filter((inst) => refreshed.has(inst));
+  if (!targets.length) return summary;
+  const clear = db.prepare('DELETE FROM finance_pending_transactions WHERE institution = ?');
+  const byId = db.prepare('SELECT id FROM finance_transactions WHERE external_id = ?');
+  const posted = db.prepare(`
+    SELECT id FROM finance_transactions
+    WHERE source = 'pluggy' AND account_id = ? AND ABS(amount - ?) < 0.005
+      AND posted_on >= date(?, '-3 day') AND posted_on <= date(?, '+10 day')
+    ORDER BY ABS(julianday(posted_on) - julianday(?)) ASC
+  `);
+  const insert = db.prepare(`
+    INSERT OR REPLACE INTO finance_pending_transactions
+      (external_id, institution, account_id, posted_on, amount, raw_description, merchant, category, seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const used = new Set();
+  for (const inst of targets) {
+    clear.run(inst);
+    summary.institutions.push(inst);
+    for (const tx of payload.pending_transactions.filter((t) => t.institution === inst)) {
+      if (byId.get(tx.external_id)) {
+        summary.already_posted += 1;
+        continue;
+      }
+      const account = transactionAccount(db, tx);
+      const amount = money(tx.amount);
+      const twin = account
+        ? posted.all(account.id, amount, tx.date, tx.date, tx.date).find((r) => !used.has(r.id))
+        : null;
+      if (twin) {
+        used.add(twin.id);
+        summary.already_posted += 1;
+        continue;
+      }
+      insert.run(
+        tx.external_id,
+        inst,
+        account?.id ?? null,
+        tx.date,
+        amount,
+        tx.description,
+        cleanMerchant(tx.description),
+        mapBankCategory(tx.category, tx.description, tx.amount, tx.account_type),
+        now,
+      );
+      summary.stored += 1;
+    }
+  }
+  return summary;
+}
+
 /** POST /api/finance/ingest/pluggy — idempotente; status != UPDATED só entra no log. */
 export function ingestPluggy(db, body, { today } = {}) {
   const payload = parsePluggyPayload(body);
@@ -514,6 +584,7 @@ export function ingestPluggy(db, body, { today } = {}) {
   const applied = [];
   const skipped = [];
   let transactions = null;
+  let pending = null;
 
   db.transaction(() => {
     for (const item of payload.institutions) {
@@ -530,6 +601,8 @@ export function ingestPluggy(db, body, { today } = {}) {
       updateSettings(db, { snapshot_label: '' });
     }
     transactions = applyTransactions(db, payload.transactions);
+    const refreshed = new Set(payload.institutions.filter((i) => i.status === 'UPDATED').map((i) => i.institution));
+    pending = applyPending(db, payload, refreshed, now);
     db.prepare(`
       INSERT INTO finance_sync_log (id, started_at, finished_at, ok, accounts_n, tx_n, error, actor)
       VALUES (?, ?, ?, 1, ?, ?, ?, 'midas')
@@ -549,6 +622,7 @@ export function ingestPluggy(db, body, { today } = {}) {
     applied,
     skipped,
     transactions,
+    pending,
     overview_snapshot: {
       caixa: overview.caixa,
       livre: overview.livre,

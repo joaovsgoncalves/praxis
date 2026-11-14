@@ -37,6 +37,7 @@ import {
   updateSettings,
   updateSubscription,
   updateTransaction,
+  listPendingTransactions,
 } from '../finance.js';
 import { ingestPluggy } from '../pluggyIngest.js';
 import { syncPierre } from '../pierreSync.js';
@@ -303,6 +304,14 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   router.post('/ingest/pluggy', (req, res) => {
     try {
       res.json(ingestPluggy(db, req.body, { today: localToday() }));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.get('/pending', (_req, res) => {
+    try {
+      res.json({ pending: listPendingTransactions(db) });
     } catch (err) {
       sendError(res, err);
     }

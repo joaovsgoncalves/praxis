@@ -282,6 +282,21 @@ export function initFinanceSchema(db) {
       source TEXT DEFAULT 'pluggy'
     );
 
+    -- compras do cartão que o banco ainda não confirmou (PENDING no Pluggy). Ficam fora de todas as
+    -- somas; a lista de cada banco é trocada inteira a cada leitura completa e a compra sai daqui
+    -- quando a versão confirmada aparece em finance_transactions.
+    CREATE TABLE IF NOT EXISTS finance_pending_transactions (
+      external_id TEXT PRIMARY KEY,
+      institution TEXT NOT NULL,
+      account_id TEXT,
+      posted_on TEXT NOT NULL,
+      amount REAL NOT NULL,
+      raw_description TEXT DEFAULT '',
+      merchant TEXT DEFAULT '',
+      category TEXT,
+      seen_at TEXT
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_tx_pierre
       ON finance_transactions(pierre_tx_id)
       WHERE pierre_tx_id IS NOT NULL AND pierre_tx_id != '';
@@ -1882,7 +1897,29 @@ export function getMonthSummary(db, { month, today } = {}) {
     off_budget_out: money(offBudget),
     budget_total: money([...budgets.values()].reduce((s, v) => s + v, 0)),
     categories,
+    pending_card: pendingCardSummary(db, from, to),
   };
+}
+
+/** Compras de cartão ainda pendentes no banco, à parte: não entram em total_out nem no orçamento. */
+function pendingCardSummary(db, from, to) {
+  const row = db.prepare(`
+    SELECT COUNT(*) AS n, COALESCE(SUM(-amount), 0) AS total, MAX(seen_at) AS seen_at
+    FROM finance_pending_transactions
+    WHERE amount < 0 AND posted_on >= ? AND posted_on <= ?
+  `).get(from, to);
+  return { count: row.n, total: money(row.total), seen_at: row.seen_at || null };
+}
+
+/** GET /api/finance/pending — lista das compras pendentes (mais novas primeiro). */
+export function listPendingTransactions(db) {
+  return db.prepare(`
+    SELECT p.external_id, p.institution, p.account_id, a.name AS account_name, p.posted_on, p.amount,
+           p.merchant, p.category, p.seen_at
+    FROM finance_pending_transactions p
+    LEFT JOIN finance_accounts a ON a.id = p.account_id
+    ORDER BY p.posted_on DESC, p.external_id ASC
+  `).all();
 }
 
 // ── Categoria e descrição do banco ────────────────────────────────────────────
