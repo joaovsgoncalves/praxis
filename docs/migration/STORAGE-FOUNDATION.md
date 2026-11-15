@@ -46,6 +46,8 @@ Esta é a **fundação da fase 2**, não a fase inteira concluída:
 7. Identidade, conversão de todos os chamadores para async, demais repositórios e homologação do Alfred continuam pendentes.
 8. `npm audit` apontou alertas PREEXISTENTES em `body-parser@1.20.5` (high), `proxy-addr@2.0.7` (critical) e `qs@6.15.2` (moderate). As três versões são idênticas no commit-base e nesta worktree. Não foram introduzidas pelo SDK; avaliar/corrigir separadamente antes de publicar, sem atualizar produção implicitamente.
 
+Atualização: a segunda fatia (revisões semanais pela camada nova, ciclo de vida das conexões e erro assíncrono do Express) está em `PHASE2-WEEKLY-REVIEWS.md`. Os itens 1, 6 e parte do 7 acima avançaram ali; o resto continua aberto.
+
 ## Alfred
 
 Nenhuma mudança de acesso nesta fatia. Uso normal pelo conector atual continua; a mensagem de convivência anterior segue válida. Nenhuma mensagem foi enviada automaticamente e nenhuma pausa de escritas foi ativada.

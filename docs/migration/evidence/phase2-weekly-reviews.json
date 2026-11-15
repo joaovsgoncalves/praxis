@@ -1,0 +1,37 @@
+{
+  "scope": "phase 2 second slice: weekly reviews served through async storage; first route only, not API cutover",
+  "base": "70e2b16",
+  "commits": ["07c76dd", "8d226bf", "f838a3b", "00fa392"],
+  "parity_http": {
+    "steps": 93,
+    "engines": ["frozen legacy route bcbadad (oracle)", "new route + SQLite", "new route + Firestore emulator"],
+    "result": "identical status, content-type and body; random ids and timestamps normalized",
+    "counterproof": "removing the 52 cap breaks step 81 (GET ?limit=100)"
+  },
+  "sqlite_semantics_oracle": {
+    "values_compared": 60097,
+    "values_refused_explicitly": 23,
+    "binding_cases": 17296,
+    "sqlite_version": "3.53.2"
+  },
+  "real_server": { "tests": 6, "pass": 6, "fail": 0 },
+  "emulator_matrix": { "tests": 71, "pass": 71, "fail": 0, "skipped": 0 },
+  "full_api_suite": { "tests": 455, "pass": 451, "fail": 0, "skipped": 4, "skipped_reason": "Firestore-only tests without emulator; covered by emulator_matrix" },
+  "intentional_divergence": "array of length != 1 or object among fields: legacy wrote shifted values with 201, new returns 500 sqlite_coercion_unsupported and writes nothing",
+  "fixed_findings": [
+    "double create of the same document in one Firestore commit returned INVALID_ARGUMENT; now already_exists like SQLite (tasks and weekly reviews)",
+    "parity script did not exercise the 52 limit cap; extended with 55 weeks"
+  ],
+  "real_databases_used": ["SQLite :memory: and isolated file copies with synthetic data", "Firestore Emulator demo-praxis-storage on loopback"],
+  "production_schema_read_only": "weekly_reviews column order checked with sqlite3 -readonly (schema only)",
+  "cloud_resources_created": false,
+  "production_changed": false,
+  "pushed": false,
+  "alfred_action_required": false,
+  "remaining": [
+    "port remaining routes and internal consumers (timers, day rollover, calendar queue) to async storage",
+    "identity/session repository",
+    "routine domain with checklist, recurrence, XP and calendar (phase 3), finance (phase 5)",
+    "npm audit alerts body-parser/proxy-addr/qs before any publication"
+  ]
+}
