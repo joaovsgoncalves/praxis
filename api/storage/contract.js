@@ -66,11 +66,12 @@ export function taskQuery(input = {}) {
 export const REVIEW_FIELDS = Object.freeze(['id', 'week_start', 'highlights', 'blockers', 'learnings', 'next_week_focus', 'overall_score', 'created_date', 'updated_date']);
 const REVIEW_TEXT = new Set(['highlights', 'blockers', 'learnings', 'next_week_focus']);
 const REVIEW_IMMUTABLE = new Set(['id', 'week_start', 'created_date']);
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const SQL_STAMP = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
+// `mondayOf` usa toISOString: anos fora de 0000-9999 saem como ±YYYYYY-MM-DD e a rota antiga aceitava.
+const WEEK_START = /^(?:\d{4}|[+-]\d{6})-\d{2}-\d{2}$/;
 export function weekStart(value) {
-  if (typeof value !== 'string' || !DATE_ONLY.test(value)) throw new StorageError('invalid_review_week');
+  if (typeof value !== 'string' || !WEEK_START.test(value)) throw new StorageError('invalid_review_week');
   return value;
 }
 function reviewValues(input) {

@@ -1,58 +1,31 @@
 import { Router } from 'express';
-import { randomUUID } from 'crypto';
-import { mondayOf } from '../lib/week.js';
+import { asyncRoute } from '../lib/asyncRoute.js';
 
-/** Weekly reviews — mounted at /api/weekly-reviews */
-export function createWeeklyReviewsRouter({ db }) {
+/**
+ * Weekly reviews — mounted at /api/weekly-reviews.
+ * Regras no serviço (`services/weeklyReviews.js`); envelope igual ao da rota antiga, congelada em
+ * `test-support/oracles/weeklyReviews.bcbadad.js` para a prova de paridade.
+ */
+export function createWeeklyReviewsRouter({ weeklyReviews }) {
+  if (!weeklyReviews) throw new TypeError('createWeeklyReviewsRouter: informe o serviço weeklyReviews');
   const router = Router();
 
-  router.get('/', (req, res) => {
-    const limit = Math.min(Number(req.query.limit) || 12, 52);
-    const reviews = db.prepare(
-      'SELECT * FROM weekly_reviews ORDER BY week_start DESC LIMIT ?',
-    ).all(limit);
-    res.json(reviews);
-  });
+  router.get('/', asyncRoute(async (req, res) => {
+    res.json(await weeklyReviews.list(req.query.limit));
+  }));
 
-  router.get('/current', (req, res) => {
-    const weekStart = mondayOf(req.query.date);
-    const review = db.prepare('SELECT * FROM weekly_reviews WHERE week_start = ?').get(weekStart);
-    res.json({ week_start: weekStart, review: review || null });
-  });
+  router.get('/current', asyncRoute(async (req, res) => {
+    res.json(await weeklyReviews.current(req.query.date));
+  }));
 
-  router.post('/', (req, res) => {
-    const {
-      week_start, highlights = '', blockers = '', learnings = '',
-      next_week_focus = '', overall_score = 3,
-    } = req.body;
-    const ws = mondayOf(week_start);
+  router.post('/', asyncRoute(async (req, res) => {
+    const { status, review } = await weeklyReviews.save(req.body);
+    res.status(status).json(review);
+  }));
 
-    const existing = db.prepare('SELECT id FROM weekly_reviews WHERE week_start = ?').get(ws);
-    if (existing) {
-      db.prepare(`
-        UPDATE weekly_reviews SET
-          highlights = ?, blockers = ?, learnings = ?,
-          next_week_focus = ?, overall_score = ?,
-          updated_date = datetime('now')
-        WHERE id = ?
-      `).run(highlights, blockers, learnings, next_week_focus, overall_score, existing.id);
-      const updated = db.prepare('SELECT * FROM weekly_reviews WHERE id = ?').get(existing.id);
-      return res.json(updated);
-    }
-
-    const id = randomUUID();
-    db.prepare(`
-      INSERT INTO weekly_reviews (id, week_start, highlights, blockers, learnings, next_week_focus, overall_score)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, ws, highlights, blockers, learnings, next_week_focus, overall_score);
-    const created = db.prepare('SELECT * FROM weekly_reviews WHERE id = ?').get(id);
-    res.status(201).json(created);
-  });
-
-  router.delete('/:id', (req, res) => {
-    db.prepare('DELETE FROM weekly_reviews WHERE id = ?').run(req.params.id);
-    res.json({ success: true });
-  });
+  router.delete('/:id', asyncRoute(async (req, res) => {
+    res.json(await weeklyReviews.remove(req.params.id));
+  }));
 
   return router;
 }

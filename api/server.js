@@ -41,6 +41,9 @@ import { createFinanceRouter } from './routes/finance.js';
 import { initProjectsSchema, seedProjectsIfEmpty } from './projects.js';
 import { initContinuityGuidanceSchema } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
+import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
+import { createWeeklyReviewsService } from './services/weeklyReviews.js';
+import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
   try {
@@ -98,6 +101,9 @@ loadEnvFile(path.join(__dirname, '..', '.env'));
 if (!OPENAI_API_KEY && process.env.OPENAI_API_KEY) OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!FORJA_API_KEY && process.env.FORJA_API_KEY) FORJA_API_KEY = process.env.FORJA_API_KEY;
 
+// Motor da camada nova escolhido antes de abrir qualquer banco: valor desconhecido não sobe o servidor.
+const STORAGE_ENGINE = storageEngineFromEnv();
+
 const app = express();
 const PORT = process.env.PORT || 18556;
 const APP_TIME_ZONE = process.env.FORJA_TIME_ZONE || 'America/Fortaleza';
@@ -134,7 +140,8 @@ const COOKIE_SECURE = !['0', 'false', 'no'].includes(
 );
 
 // O banco de sempre: dados do dono legado e controle de usuários e sessões.
-const controlDb = new Database(resolveDbPath(__dirname));
+const controlDbPath = resolveDbPath(__dirname);
+const controlDb = new Database(controlDbPath);
 controlDb.pragma('journal_mode = WAL');
 
 /** Esquema e linhas padrão. As sementes pessoais (finanças e frentes do João) só no banco dele. */
@@ -163,6 +170,18 @@ const userDbs = createUserDbs({
 const tenant = createTenantDb({ bootDb: controlDb, open: userDbs.open });
 const db = tenant.db;
 const isLegacyScope = () => tenant.currentUserId() === LEGACY_OWNER;
+
+// Camada de persistência assíncrona (migração): conexão dedicada por dono, mesmo arquivo do banco
+// dele. O preparo (criar/alinhar o banco) continua com a fachada legada; o dono vem do mesmo escopo.
+const storageRuntime = createStorageRuntime({
+  engine: STORAGE_ENGINE,
+  currentOwner: tenant.currentUserId,
+  sqlite: {
+    pathFor: (owner) => (owner === LEGACY_OWNER ? controlDbPath : userDbs.fileFor(owner)),
+    prepare: (owner) => { tenant.dbFor(owner); },
+  },
+});
+const weeklyReviews = createWeeklyReviewsService({ storage: storageRuntime.storage });
 
 /** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
 function forEachOwner(label, fn) {
@@ -274,7 +293,7 @@ app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOr
 app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
 registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
 app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString }));
-app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ db }));
+app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ weeklyReviews }));
 
 const HOST = process.env.HOST || '127.0.0.1';
 
@@ -285,7 +304,8 @@ forEachOwner('virada do dia', () => dayRollover.run('subida'));
 // Daqui em diante, banco sem dono no escopo não responde: nenhuma rota cai nos dados de outra pessoa.
 tenant.seal();
 
-app.listen(PORT, HOST, () => {
+const clocks = [];
+const server = app.listen(PORT, HOST, () => {
   console.log(`🔥 Praxis API running on ${HOST}:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
   setImmediate(() => {
@@ -293,6 +313,16 @@ app.listen(PORT, HOST, () => {
     tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain());
   });
   // Retentativa das intenções de agenda que falharam (a espera entre tentativas fica na fila).
-  setInterval(() => tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain()), 60 * 1000).unref();
-  setInterval(() => forEachOwner('virada do dia', () => dayRollover.run('tick')), 60 * 1000).unref();
+  clocks.push(setInterval(() => tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain()), 60 * 1000).unref());
+  clocks.push(setInterval(() => forEachOwner('virada do dia', () => dayRollover.run('tick')), 60 * 1000).unref());
+});
+
+installGracefulShutdown({
+  server,
+  steps: [
+    ['relógios', () => { for (const clock of clocks) clearInterval(clock); }],
+    ['camada de persistência', () => storageRuntime.close()],
+    ['bancos das contas', () => tenant.closeAll()],
+    ['banco de controle', () => { if (controlDb.open) controlDb.close(); }],
+  ],
 });
