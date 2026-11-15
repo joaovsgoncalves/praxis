@@ -62,6 +62,16 @@ export function taskQuery(input = {}) {
       || !Number.isInteger(query.offset) || query.offset < 0 || query.offset > 1000000) throw new StorageError('invalid_task_query');
   return query;
 }
+/** `goal_id = ?` das tarefas (e hábitos): texto exato, coluna TEXT. */
+export function taskGoalKey(value) {
+  if (typeof value !== 'string') throw new StorageError('invalid_query');
+  return value;
+}
+/** Lista de ids lida antes na mesma transação (ex.: itens de uma meta a soltar). */
+export function taskIdList(value) {
+  if (!Array.isArray(value)) throw new StorageError('invalid_query');
+  return value.map((id) => recordId(id));
+}
 // Revisão semanal: colunas na ordem da tabela SQLite (`weekly_reviews` em lib/dbInit.js).
 export const REVIEW_FIELDS = Object.freeze(['id', 'week_start', 'highlights', 'blockers', 'learnings', 'next_week_focus', 'overall_score', 'created_date', 'updated_date']);
 const REVIEW_TEXT = new Set(['highlights', 'blockers', 'learnings', 'next_week_focus']);

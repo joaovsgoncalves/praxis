@@ -23,5 +23,11 @@ export function sqliteTasks(db) {
       if (!result.changes) throw new StorageError('not_found');
     },
     async remove(id) { db.prepare('DELETE FROM tasks WHERE id=?').run(id); },
+    async maxSort() { return db.prepare('SELECT MAX(sort_order) AS m FROM tasks').get().m; },
+    async idsByGoal(goalId) { return db.prepare('SELECT id FROM tasks WHERE goal_id = ?').pluck().all(goalId); },
+    async clearGoal(ids) {
+      const update = db.prepare('UPDATE tasks SET goal_id = NULL WHERE id = ?');
+      for (const id of ids) update.run(id);
+    },
   };
 }

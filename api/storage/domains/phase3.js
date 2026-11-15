@@ -5,11 +5,15 @@
  * Contrato (normalização dos argumentos) de cada domínio de rotina. As linhas trafegam como o SQLite
  * as guarda: colunas na ordem da tabela, valores já com a afinidade da coluna aplicada pelo serviço.
  */
-import { StorageError, recordId } from '../contract.js';
+import { StorageError, recordId, taskGoalKey, taskIdList } from '../contract.js';
 import { sqliteFocusSessions } from '../sqlite/focusSessions.js';
 import { sqliteWellnessChecks } from '../sqlite/wellnessChecks.js';
 import { firestoreFocusSessions } from '../firestore/focusSessions.js';
 import { firestoreWellnessChecks } from '../firestore/wellnessChecks.js';
+import { sqliteGoals } from '../sqlite/goals.js';
+import { sqliteHabits } from '../sqlite/habits.js';
+import { firestoreGoals } from '../firestore/goals.js';
+import { firestoreHabits } from '../firestore/habits.js';
 
 function plain(value, code = 'invalid_record') {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -89,6 +93,40 @@ export const WELLNESS_COLUMNS = Object.freeze([['id', 'TEXT', true], ['date', 'T
 const wellnessRows = rowContract(WELLNESS_COLUMNS, new Set(['id', 'date', 'created_date']));
 export const WELLNESS_FIELDS = wellnessRows.fields;
 
+/**
+ * Ficha de ordem de inserção (`_row` no Firestore) reservada por `nextRow()` antes das escritas, para
+ * criar linhas de duas tabelas na mesma transação (o Firestore exige ler tudo antes de gravar).
+ * SQLite: `null` (o rowid é implícito). Firestore: inteiro positivo.
+ */
+function rowToken(value) {
+  if (value !== null && !(Number.isSafeInteger(value) && value > 0)) throw new StorageError('invalid_row_token');
+  return value;
+}
+/** `goal_id = ?` e lista de ids a soltar: mesma regra das tarefas (storage/contract.js). */
+const goalKey = taskGoalKey, idList = taskIdList;
+const sqlStamp = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
+
+// ---- Metas: tabela `goals`, coleção users/{uid}/goals ----
+export const GOAL_COLUMNS = Object.freeze([['id', 'TEXT', true], ['title', 'TEXT', true], ['description', 'TEXT'], ['deadline', 'TEXT'], ['timeframe', 'TEXT'], ['category', 'TEXT'], ['status', 'TEXT'], ['manual_progress', 'INTEGER'], ['created_date', 'TEXT']]);
+const goalRows = rowContract(GOAL_COLUMNS, new Set(['id', 'created_date']));
+export const GOAL_FIELDS = goalRows.fields;
+
+// ---- Hábitos: tabela `habits`, coleção users/{uid}/habits (fase 3, domínio 4 completa o resto) ----
+export const HABIT_COLUMNS = Object.freeze([['id', 'TEXT', true], ['title', 'TEXT', true], ['description', 'TEXT'], ['frequency', 'TEXT'], ['category', 'TEXT'], ['streak_target', 'INTEGER'], ['goal_id', 'TEXT'], ['source', 'TEXT'], ['status', 'TEXT'], ['sort_order', 'INTEGER'], ['kind', 'TEXT'], ['parent_id', 'TEXT'], ['position_in_parent', 'INTEGER'], ['emoji', 'TEXT'], ['tracking_mode', 'TEXT'], ['since_date', 'TEXT'], ['quick_increment', 'REAL'], ['created_date', 'TEXT'], ['recurrence_days', 'TEXT'], ['target_value', 'REAL'], ['unit', 'TEXT'], ['preferred_time', 'TEXT']]);
+const habitRows = rowContract(HABIT_COLUMNS, new Set(['id', 'created_date']));
+export const HABIT_FIELDS = habitRows.fields;
+/** DEFAULT de cada coluna da tabela `habits` (lib/dbInit.js); `created_date` = `datetime('now')`. */
+export const HABIT_DEFAULTS = Object.freeze({
+  description: '', frequency: 'daily', category: 'pessoal', streak_target: 30, goal_id: null, source: 'manual', status: 'active',
+  sort_order: null, kind: 'simple', parent_id: null, position_in_parent: null, emoji: '', tracking_mode: 'check', since_date: '',
+  quick_increment: null, recurrence_days: '[]', target_value: null, unit: '', preferred_time: '',
+});
+/** Linha completa de hábito como o INSERT com colunas omitidas gravaria. */
+export function habitRow(values, now = new Date()) {
+  const row = { ...HABIT_DEFAULTS, created_date: sqlStamp(now), ...values };
+  return Object.fromEntries(HABIT_FIELDS.map((field) => [field, row[field] ?? null]));
+}
+
 export const DOMAINS = [
   {
     name: 'focusSessions',
@@ -113,5 +151,33 @@ export const DOMAINS = [
     }),
     sqlite: sqliteWellnessChecks,
     firestore: (userDoc, transaction, client) => firestoreWellnessChecks(userDoc, transaction, client),
+  },
+  {
+    name: 'goals',
+    spec: () => ({
+      get: ['read', (id) => [recordId(id)]],
+      list: ['read', () => []],
+      nextRow: ['read', () => []],
+      create: ['readwrite', (row) => [goalRows.row(row)]],
+      createAt: ['write', (row, token) => [goalRows.row(row), rowToken(token)]],
+      patch: ['write', (id, fields) => [recordId(id), goalRows.patch(fields)]],
+      remove: ['write', (id) => [recordId(id)]],
+    }),
+    sqlite: sqliteGoals,
+    firestore: (userDoc, transaction, client) => firestoreGoals(userDoc, transaction, client),
+  },
+  {
+    name: 'habits',
+    spec: () => ({
+      get: ['read', (id) => [recordId(id)]],
+      maxSort: ['read', () => []],
+      idsByGoal: ['read', (goalId) => [goalKey(goalId)]],
+      nextRow: ['read', () => []],
+      create: ['readwrite', (row) => [habitRows.row(row)]],
+      createAt: ['write', (row, token) => [habitRows.row(row), rowToken(token)]],
+      clearGoal: ['write', (ids) => [idList(ids)]],
+    }),
+    sqlite: sqliteHabits,
+    firestore: (userDoc, transaction, client) => firestoreHabits(userDoc, transaction, client),
   },
 ];

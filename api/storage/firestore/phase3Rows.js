@@ -45,6 +45,26 @@ export function phase3Rows(userDoc, transaction, client, collection, fields) {
       if (transaction) return createWith(transaction, row, created);
       return client.runTransaction((tx) => createWith(tx, row, new Set()), { maxAttempts: 5 });
     },
+    /** Reserva a próxima ordem (leitura); `createAt` grava a linha e a sequência no mesmo commit. */
+    async nextRow() {
+      if (!transaction) throw new StorageError('transaction_required');
+      const seq = await transaction.get(seqRef);
+      return (seq.exists ? seq.data().next : 0) + 1;
+    },
+    async createAt(row, token) {
+      if (!transaction) throw new StorageError('transaction_required');
+      if (token === null) throw new StorageError('invalid_row_token');
+      const ref = col.doc(documentId(row.id));
+      if (created.has(ref.path)) throw new StorageError('already_exists');
+      created.add(ref.path);
+      transaction.set(seqRef, { next: token });
+      transaction.create(ref, { ...row, _row: token });
+      return structuredClone(row);
+    },
+    async remove(id) {
+      const ref = col.doc(documentId(id));
+      if (transaction) transaction.delete(ref); else await ref.delete();
+    },
     async patch(id, values) {
       const ref = col.doc(documentId(id));
       if (transaction) transaction.update(ref, values); else await ref.update(values);

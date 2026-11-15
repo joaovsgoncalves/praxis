@@ -111,3 +111,14 @@ export async function assertParity(t, setup, script, { runParityScript, parityEn
   }
   return expected;
 }
+
+/**
+ * Para os testes existentes das rotas portadas: storage assíncrono sobre o MESMO banco em memória do
+ * teste (as rotas ainda legadas, como tarefas e hábitos, seguem no `db`) e o router embrulhado no
+ * escopo de um dono. Só o arnês muda; as asserções dos testes ficam como estão.
+ */
+export function sqliteStorageFor(db, owner = OWNER) {
+  const scope = new AsyncLocalStorage();
+  const storage = createStorage({ driver: createSqliteDriver({ open: () => db }), currentOwner: () => scope.getStore() });
+  return { storage, scoped: (router) => (req, res, next) => scope.run(owner, () => router(req, res, next)) };
+}

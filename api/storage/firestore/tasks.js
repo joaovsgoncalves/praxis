@@ -1,5 +1,6 @@
 import { StorageError } from '../contract.js';
 import { documentId, originalId } from '../schema.mjs';
+import { maxSqlite } from '../sqliteOrder.js';
 
 /** `users/{uid}/tasks/{locator}`; `transaction` ausente = operação direta. */
 export function firestoreTasks(col, transaction) {
@@ -36,6 +37,21 @@ export function firestoreTasks(col, transaction) {
     async remove(id) {
       const ref=col.doc(documentId(id));
       if(transaction) transaction.delete(ref); else await ref.delete();
+    },
+    // MAX(sort_order) do SQLite (NULL ignorado, texto acima de número). ceiling: lê a coleção inteira.
+    async maxSort() {
+      const snap=transaction?await transaction.get(col):await col.get();
+      return maxSqlite(snap.docs.map(doc=>doc.data().sort_order));
+    },
+    async idsByGoal(goalId) {
+      const q=col.where('goal_id','==',goalId), snap=transaction?await transaction.get(q):await q.get();
+      return snap.docs.map(doc=>{ const row=doc.data(); originalId(doc.id,row.id); return row.id; });
+    },
+    async clearGoal(ids) {
+      for(const id of ids) {
+        const ref=col.doc(documentId(id));
+        if(transaction) transaction.update(ref,{goal_id:null}); else await ref.update({goal_id:null});
+      }
     },
   };
 }

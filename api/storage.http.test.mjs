@@ -1,5 +1,5 @@
 /**
- * Rotas já servidas pela camada nova (revisões semanais, compras, foco e bem-estar), no servidor de verdade: cópia isolada da API (banco novo,
+ * Rotas já servidas pela camada nova (revisões semanais, compras, foco, bem-estar e metas), no servidor de verdade: cópia isolada da API (banco novo,
  * sem agenda, sem segredo de produção), duas contas, chave do agente no fluxo do Alfred, conferência
  * no arquivo de cada conta e desligamento gracioso.
  */
@@ -173,6 +173,24 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal(bad.status, 500); assert.match(await bad.text(), /sqlite_coercion_unsupported/);
   });
 
+  await t.test('metas pela camada nova: contas separadas, vínculo inicial, exclusão solta a tarefa e goals.list do Alfred', async () => {
+    const ga = await call(proc, 'POST', '/api/goals', { cookie: A, body: { title: 'Meta do Jota', initial_link: { type: 'task', title: 'Primeiro passo', date: '2026-11-20' } } });
+    const gb = await call(proc, 'POST', '/api/goals', { cookie: B, body: { title: 'Meta da Bia', initial_link: { type: 'habit' } } });
+    assert.equal(ga.status, 201, ga.text); assert.equal(gb.status, 201, gb.text);
+    assert.equal(ga.json.linked.type, 'task'); assert.equal(gb.json.linked.type, 'habit');
+    assert.deepEqual((await call(proc, 'GET', '/api/goals', { key: API_KEY })).json.map((g) => g.title), ['Meta do Jota'], 'goals.list do Alfred: só as do dono legado');
+    assert.equal((await call(proc, 'GET', `/api/goals/${ga.json.goal.id}`, { cookie: B })).status, 404);
+    assert.equal((await call(proc, 'DELETE', `/api/goals/${ga.json.goal.id}`, { cookie: B })).status, 404, 'a outra conta não apaga');
+    const task = (await call(proc, 'GET', '/api/tasks?date=2026-11-20', { cookie: A })).json.find((r) => r.id === ga.json.linked.id);
+    assert.equal(task?.goal_id, ga.json.goal.id, 'a rota legada de tarefas vê a tarefa criada pela camada nova');
+    const upd = await call(proc, 'PUT', `/api/goals/${ga.json.goal.id}`, { cookie: A, body: { deadline: '2026-12-31', manual_progress: 30 } });
+    assert.equal(upd.status, 200, upd.text); assert.equal(upd.json.deadline, '2026-12-31');
+    const del = await call(proc, 'DELETE', `/api/goals/${ga.json.goal.id}`, { cookie: A });
+    assert.deepEqual(del.json, { success: true, unlinked: { tasks: 1, habits: 0 } });
+    const after = (await call(proc, 'GET', '/api/tasks?date=2026-11-20', { cookie: A })).json.find((r) => r.id === ga.json.linked.id);
+    assert.equal(after?.goal_id, null, 'tarefa preservada, sem vínculo');
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -190,6 +208,10 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual(other.prepare('SELECT mood FROM wellness_checks').pluck().all(), [2]);
     assert.deepEqual(control.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [1500]);
     assert.deepEqual(other.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [600]);
+    assert.equal(control.prepare('SELECT COUNT(*) FROM goals').pluck().get(), 0);
+    assert.deepEqual(other.prepare('SELECT title FROM goals').pluck().all(), ['Meta da Bia']);
+    assert.deepEqual(other.prepare("SELECT title, goal_id IS NOT NULL FROM habits WHERE source = 'goal_wizard'").raw().all(), [['Meta da Bia', 1]]);
+    assert.deepEqual(control.prepare("SELECT title, goal_id FROM tasks WHERE source = 'goal_wizard'").raw().all(), [['Primeiro passo', null]]);
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
 });

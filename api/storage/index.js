@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { assertUserId } from '../lib/tenantDb.js';
 import {
   StorageError, mapStorageError, recordId,
-  newTask, taskPatch, taskQuery,
+  newTask, taskPatch, taskQuery, taskGoalKey, taskIdList,
   newReview, reviewPatch, reviewQuery, weekStart,
   newPurchase, purchasePatch, purchaseQuery,
 } from './contract.js';
@@ -22,6 +22,10 @@ function domainSpecs(now, extra) {
       create: ['write', (input) => [newTask(input, now)]],
       patch: ['write', (id, fields) => [recordId(id), taskPatch(fields)]],
       remove: ['write', (id) => [recordId(id)]],
+      // Usados pelas metas (fase 3): posição MAX + 1 e soltar os itens de uma meta excluída.
+      maxSort: ['read', () => []],
+      idsByGoal: ['read', (goalId) => [taskGoalKey(goalId)]],
+      clearGoal: ['write', (ids) => [taskIdList(ids)]],
     },
     weeklyReviews: {
       get: ['read', (id) => [recordId(id)]],
