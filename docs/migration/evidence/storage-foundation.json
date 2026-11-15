@@ -1,0 +1,32 @@
+{
+  "scope": "phase 2 foundation, task repository only; not API cutover",
+  "storage": {
+    "tests": 36,
+    "pass": 36,
+    "fail": 0,
+    "skipped": 0
+  },
+  "legacy_regression": {
+    "tests": 23,
+    "pass": 23,
+    "fail": 0,
+    "skipped": 0
+  },
+  "real_databases_used": [
+    "SQLite :memory:",
+    "Firestore Emulator demo-praxis-storage on loopback"
+  ],
+  "cloud_resources_created": false,
+  "production_changed": false,
+  "known_preexisting_dependency_alerts": [
+    "body-parser@1.20.5 high",
+    "proxy-addr@2.0.7 critical",
+    "qs@6.15.2 moderate"
+  ],
+  "remaining": [
+    "wire async service callers preserving API envelopes",
+    "other repositories, identity and managed runtime",
+    "cloud index validation and financial/domain parity",
+    "Alfred connector transition and separate cutover approval"
+  ]
+}
