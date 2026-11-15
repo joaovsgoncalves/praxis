@@ -25,8 +25,7 @@ for (const kind of parityEngines()) {
   });
 }
 
-// Orientação do dia ainda no banco legado nesta etapa (o domínio 3 da fase 4 leva para os dois motores).
-for (const kind of ['sqlite']) {
+for (const kind of parityEngines()) {
   test(`${kind}: concurrent guidance CAS requests preserve exactly one winner`,async t=>{
    const {server}=await mount(t, kind);
    const base={source:'alfred',expected_generated_at:null,priorities:[{rank:1,action:'a',reason_code:'manual',reason:'b'}]};

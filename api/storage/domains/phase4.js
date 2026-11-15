@@ -8,6 +8,8 @@ import { sqliteUserSettings } from '../sqlite/userSettings.js';
 import { firestoreUserSettings } from '../firestore/userSettings.js';
 import { sqliteProjects, sqliteProjectUpdates } from '../sqlite/projects.js';
 import { firestoreProjects, firestoreProjectUpdates } from '../firestore/projects.js';
+import { sqliteContinuityGuidance } from '../sqlite/continuityGuidance.js';
+import { firestoreContinuityGuidance } from '../firestore/continuityGuidance.js';
 
 // --- Configurações: tabela `user_settings`, linha única. ---
 /**
@@ -82,12 +84,12 @@ function scalarColumn(value, affinity, required, code) {
   if (stored === null && required) throw new StorageError(code);
   return stored;
 }
-function fullRow(input, fieldList, integer, notNull, prefix) {
+function fullRow(input, fieldList, integer, notNull, prefix, keyField = 'id') {
   plainObject(input, `invalid_${prefix}`);
   for (const key of Object.keys(input)) if (!fieldList.includes(key)) throw new StorageError(`unknown_${prefix}_field`);
   for (const key of fieldList) if (!Object.prototype.hasOwnProperty.call(input, key)) throw new StorageError(`incomplete_${prefix}`);
   const row = Object.fromEntries(fieldList.map((key) => [key, scalarColumn(input[key], integer.has(key) ? 'INTEGER' : 'TEXT', notNull.has(key), `invalid_${prefix}_value`)]));
-  recordId(row.id);
+  recordId(row[keyField]);
   return row;
 }
 function projectRow(input) {
@@ -138,4 +140,20 @@ const projectUpdates = {
   firestore: (userDoc, transaction, client) => firestoreProjectUpdates(userDoc, transaction, client, PROJECT_UPDATE_FIELDS),
 };
 
-export const DOMAINS = [userSettings, projects, projectUpdates];
+// --- Orientação do dia: tabela `continuity_guidance`, uma linha por data (chave = `date`). ---
+export const GUIDANCE_FIELDS = Object.freeze(['date', 'summary', 'priorities_json', 'source', 'generated_at', 'created_at', 'updated_at']);
+const GUIDANCE_NOT_NULL = new Set(['date', 'summary', 'priorities_json', 'source', 'generated_at']);
+const guidanceRow = (input) => fullRow(input, GUIDANCE_FIELDS, new Set(), GUIDANCE_NOT_NULL, 'guidance', 'date');
+
+const continuityGuidance = {
+  name: 'continuityGuidance',
+  spec: () => ({
+    get: ['read', (date) => [recordId(date)]],
+    /** Linha inteira (a troca de 0 a 3 ações é o documento todo, numa gravação). */
+    put: ['write', (row) => [guidanceRow(row)]],
+  }),
+  sqlite: (db) => sqliteContinuityGuidance(db, GUIDANCE_FIELDS),
+  firestore: (userDoc, transaction) => firestoreContinuityGuidance(userDoc, transaction, GUIDANCE_FIELDS),
+};
+
+export const DOMAINS = [userSettings, projects, projectUpdates, continuityGuidance];

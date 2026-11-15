@@ -2,6 +2,7 @@
 import { createProjectsRouter as createOracleRouter } from './oracles/projectsRoute.bcbadad.js';
 import { createProjectsRouter } from '../routes/projects.js';
 import { createProjectsService } from '../services/personal/projects.js';
+import { createGuidanceService } from '../services/personal/guidance.js';
 import { seedProjectsIfEmpty } from '../projects.js';
 import { createTestDb } from './helpers.mjs';
 import { makeClockedParityApp, rowsInInsertOrder } from './httpParity.fase4.mjs';
@@ -16,6 +17,7 @@ async function copySeed(storage, seed) {
     seed(scratch);
     for (const row of rowsInInsertOrder(scratch, 'projects')) await storage.projects.create(row);
     for (const row of rowsInInsertOrder(scratch, 'project_updates')) await storage.projectUpdates.create(row);
+    for (const row of rowsInInsertOrder(scratch, 'continuity_guidance')) await storage.continuityGuidance.put(row);
   } finally { scratch.close(); }
 }
 
@@ -25,8 +27,12 @@ export const projectsSetup = (every = 2, { seed = seedProjectsIfEmpty, getLocalD
   every,
   seedSqlite: (db) => seed(db),
   seedStorage: (storage) => copySeed(storage, seed),
-  oracle: (db) => createOracleRouter({ db }),
-  build: (storage, { clock, db }) => createProjectsRouter({ projects: createProjectsService({ storage, now: clock.now }), db, getLocalDateString }),
+  oracle: (db) => createOracleRouter({ db, getLocalDateString }),
+  build: (storage, { clock }) => createProjectsRouter({
+    projects: createProjectsService({ storage, now: clock.now }),
+    guidance: createGuidanceService({ storage, now: clock.now }),
+    getLocalDateString,
+  }),
 });
 
 /**

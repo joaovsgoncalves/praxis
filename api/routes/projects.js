@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { asyncRoute } from '../lib/asyncRoute.js';
 import { todayFortaleza } from '../projects.js';
-import { getContinuityGuidance, writeContinuityGuidance } from '../continuityGuidance.js';
 
 function sendError(res, err) {
   const status = err.status || 500;
@@ -21,11 +20,11 @@ function sendError(res, err) {
 /**
  * Projects — mounted at /api/projects.
  * Frentes e timeline pelo serviço (`services/personal/projects.js`) sobre a camada assíncrona;
- * envelope igual ao da rota antiga, congelada em `test-support/oracles/projectsRoute.bcbadad.js`.
- * Orientação do dia ainda no banco legado (`db`).
+ * orientação do dia pelo serviço `services/personal/guidance.js`. Envelope igual ao da rota antiga,
+ * congelada em `test-support/oracles/projectsRoute.bcbadad.js`.
  */
-export function createProjectsRouter({ projects, db, getLocalDateString = todayFortaleza }) {
-  if (!projects) throw new TypeError('createProjectsRouter: informe o serviço projects');
+export function createProjectsRouter({ projects, guidance, getLocalDateString = todayFortaleza }) {
+  if (!projects || !guidance) throw new TypeError('createProjectsRouter: informe os serviços projects e guidance');
   const router = Router();
 
   router.get('/', asyncRoute(async (_req, res) => {
@@ -58,25 +57,24 @@ export function createProjectsRouter({ projects, db, getLocalDateString = todayF
     }
   }));
 
-  router.get('/guidance/today', (_req, res) => {
+  router.get('/guidance/today', asyncRoute(async (_req, res) => {
     try {
       const today = typeof getLocalDateString === 'function'
         ? getLocalDateString()
         : todayFortaleza();
-      const guidance = getContinuityGuidance(db, today);
-      res.json(guidance);
+      res.json(await guidance.read(today));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.put('/guidance/:date', (req, res) => {
+  router.put('/guidance/:date', asyncRoute(async (req, res) => {
     try {
-      res.json(writeContinuityGuidance(db, req.params.date, req.body || {}));
+      res.json(await guidance.write(req.params.date, req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   router.get('/:id', asyncRoute(async (req, res) => {
     const row = await projects.get(req.params.id);

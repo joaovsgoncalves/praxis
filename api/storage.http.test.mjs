@@ -200,6 +200,24 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     } finally { control.close(); other.close(); }
   });
 
+  await t.test('orientação do dia pela camada nova (fase 4): trava do Alfred e contas separadas', async () => {
+    const today = (await call(proc, 'GET', '/api/projects/guidance/today', { key: API_KEY })).json;
+    const body = { source: 'alfred', generated_at: `${today.date}T07:50:00-03:00`, summary: 'Do Jota', priorities: [{ rank: 1, action: 'Revisar', reason_code: 'manual', reason: 'hoje', project_slug: 'praxis' }] };
+    const first = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { key: API_KEY, body: { ...body, expected_generated_at: today.generated_at } });
+    assert.equal(first.status, 200, first.text);
+    assert.equal(first.json.priorities[0].project.name, 'Praxis');
+    const blind = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { key: API_KEY, body: { ...body, expected_generated_at: null } });
+    assert.deepEqual([blind.status, blind.json.error], [409, 'GUIDANCE_CHANGED']);
+    assert.deepEqual((await call(proc, 'GET', '/api/projects/guidance/today', { cookie: A })).json, first.json);
+    assert.equal((await call(proc, 'GET', '/api/projects/guidance/today', { cookie: B })).json.fresh, false, 'a da Bia continua vazia');
+    const bia = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { cookie: B, body: { ...body, summary: 'Da Bia', expected_generated_at: null, priorities: [{ rank: 1, action: 'a', reason_code: 'manual', reason: 'b', project_slug: 'frente-da-bia' }] } });
+    assert.equal(bia.status, 200, bia.text);
+    const notMine = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { cookie: B, body: { ...body, expected_generated_at: body.generated_at } });
+    assert.deepEqual([notMine.status, notMine.json.error], [400, 'project_slug not found: praxis'], 'frente de outra conta não existe aqui');
+    const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
+    try { assert.deepEqual(control.prepare('SELECT summary FROM continuity_guidance').pluck().all(), ['Do Jota']); } finally { control.close(); }
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;

@@ -63,8 +63,7 @@ for (const kind of parityEngines()) {
 
 }
 
-// Orientação do dia ainda no banco legado nesta etapa (o domínio 3 da fase 4 leva para os dois motores).
-for (const kind of ['sqlite']) {
+for (const kind of parityEngines()) {
   test(`${kind}: orientação do dia: grava com expected null, depois exige o generated_at lido`, async (t) => {
     const { server } = await mount(t, kind);
     const first = await send(server.base, '/api/projects/guidance/2026-11-15', 'PUT', guidance({ expected_generated_at: null }));

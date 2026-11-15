@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import Database from 'better-sqlite3';
-import express from 'express';
 import { initProjectsSchema, seedProjectsIfEmpty } from './projects.js';
 import {
   initContinuityGuidanceSchema,
@@ -9,16 +8,15 @@ import {
   upsertContinuityGuidance,
   getContinuityGuidance,
 } from './continuityGuidance.js';
-import { createProjectsRouter } from './routes/projects.js';
-import { createProjectsService } from './services/personal/projects.js';
-import { createStorage } from './storage/index.js';
-import { createSqliteDriver } from './storage/sqlite/driver.js';
-import { startTestServer, requestJson } from './test-support/helpers.mjs';
+import { requestJson } from './test-support/helpers.mjs';
+import { parityEngines } from './test-support/httpParity.mjs';
+import { mountProjectsEngine } from './test-support/projectsFixture.fase4.mjs';
 
-// Arnês: frentes pela camada nova sobre o mesmo banco do teste (orientação ainda lê `db`).
-function projectsRouterFor(db, getLocalDateString) {
-  const storage = createStorage({ driver: createSqliteDriver({ open: () => db }), currentOwner: () => 'alice' });
-  return createProjectsRouter({ projects: createProjectsService({ storage }), db, getLocalDateString });
+// Arnês das rotas: a rota nova sobre a camada assíncrona em cada motor. A semente é a mesma do
+// setupDb (frentes + Animália na GoFluxo) mais o que cada teste grava antes, no banco legado.
+function seedLikeSetupDb(db) {
+  seedProjectsIfEmpty(db);
+  db.exec("UPDATE projects SET parent_slug = 'gofluxo' WHERE slug = 'animalia'");
 }
 
 function setupDb() {
@@ -524,114 +522,80 @@ test('QA-4: priorities_json corrompido ou não-array retorna fallback honesto co
 // Testes de rotas Express HTTP
 // ===================================================================
 
-test('GET /api/projects/guidance/today retorna 200 com fallback quando vazia', async (t) => {
-  const db = setupDb();
-  const app = express();
-  app.use(express.json());
-  const fixedToday = () => '2026-09-09';
-  app.use('/api/projects', projectsRouterFor(db, fixedToday));
+for (const kind of parityEngines()) {
+  test(`${kind}: GET /api/projects/guidance/today retorna 200 com fallback quando vazia`, async (t) => {
+    const fixedToday = () => '2026-09-09';
+    const { server } = await mountProjectsEngine(t, kind, { seed: seedLikeSetupDb, getLocalDateString: fixedToday });
 
-  const server = await startTestServer(app);
-  t.after(() => {
-    db.close();
-    return server.close();
+    const res = await requestJson(server.base, '/api/projects/guidance/today');
+    assert.equal(res.date, '2026-09-09');
+    assert.equal(res.summary, '');
+    assert.equal(res.generated_at, null);
+    assert.deepEqual(res.priorities, []);
+    assert.equal(res.fresh, false);
   });
 
-  const res = await requestJson(server.base, '/api/projects/guidance/today');
-  assert.equal(res.date, '2026-09-09');
-  assert.equal(res.summary, '');
-  assert.equal(res.generated_at, null);
-  assert.deepEqual(res.priorities, []);
-  assert.equal(res.fresh, false);
-});
+  test(`${kind}: GET /api/projects/guidance/today retorna 200 com fallback quando priorities_json corrompido`, async (t) => {
+    const fixedToday = () => '2026-09-09';
+    const { server } = await mountProjectsEngine(t, kind, { getLocalDateString: fixedToday, seed: (db) => {
+      seedLikeSetupDb(db);
+    db.prepare(`
+      INSERT INTO continuity_guidance (date, summary, priorities_json, source, generated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('2026-09-09', 'Sumário corrupto', '{bad-json', 'seneca', '2026-09-09T07:50:00-03:00');
+    } });
 
-test('GET /api/projects/guidance/today retorna 200 com fallback quando priorities_json corrompido', async (t) => {
-  const db = setupDb();
-  const fixedToday = () => '2026-09-09';
-
-  db.prepare(`
-    INSERT INTO continuity_guidance (date, summary, priorities_json, source, generated_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).run('2026-09-09', 'Sumário corrupto', '{bad-json', 'seneca', '2026-09-09T07:50:00-03:00');
-
-  const app = express();
-  app.use(express.json());
-  app.use('/api/projects', projectsRouterFor(db, fixedToday));
-
-  const server = await startTestServer(app);
-  t.after(() => {
-    db.close();
-    return server.close();
+    const res = await requestJson(server.base, '/api/projects/guidance/today');
+    assert.equal(res.date, '2026-09-09');
+    assert.equal(res.summary, '');
+    assert.equal(res.generated_at, null);
+    assert.deepEqual(res.priorities, []);
+    assert.equal(res.fresh, false);
   });
 
-  const res = await requestJson(server.base, '/api/projects/guidance/today');
-  assert.equal(res.date, '2026-09-09');
-  assert.equal(res.summary, '');
-  assert.equal(res.generated_at, null);
-  assert.deepEqual(res.priorities, []);
-  assert.equal(res.fresh, false);
-});
+  test(`${kind}: GET /api/projects/guidance/today retorna 200 com orientação fresca e hidratada`, async (t) => {
+    const fixedToday = () => '2026-09-09';
+    const { server } = await mountProjectsEngine(t, kind, { getLocalDateString: fixedToday, seed: (db) => {
+      seedLikeSetupDb(db);
+    upsertContinuityGuidance(db, {
+      date: '2026-09-09',
+      summary: 'RCA vem primeiro porque há ação comercial com impacto imediato.',
+      generated_at: '2026-09-09T07:50:00-03:00',
+      priorities: [
+        {
+          rank: 1,
+          action: 'Disparar o follow-up da campanha para clientes com investimento adicional.',
+          reason_code: 'income',
+          reason: 'Protege renda e fechamento',
+          project_slug: 'rca',
+          task_id: 'task-123',
+        },
+      ],
+    });
+    } });
 
-test('GET /api/projects/guidance/today retorna 200 com orientação fresca e hidratada', async (t) => {
-  const db = setupDb();
-  const fixedToday = () => '2026-09-09';
-
-  upsertContinuityGuidance(db, {
-    date: '2026-09-09',
-    summary: 'RCA vem primeiro porque há ação comercial com impacto imediato.',
-    generated_at: '2026-09-09T07:50:00-03:00',
-    priorities: [
-      {
-        rank: 1,
-        action: 'Disparar o follow-up da campanha para clientes com investimento adicional.',
-        reason_code: 'income',
-        reason: 'Protege renda e fechamento',
-        project_slug: 'rca',
-        task_id: 'task-123',
-      },
-    ],
+    const res = await requestJson(server.base, '/api/projects/guidance/today');
+    assert.equal(res.date, '2026-09-09');
+    assert.equal(res.fresh, true);
+    assert.equal(res.summary, 'RCA vem primeiro porque há ação comercial com impacto imediato.');
+    assert.equal(res.priorities.length, 1);
+    assert.equal(res.priorities[0].rank, 1);
+    assert.equal(res.priorities[0].reason, 'Protege renda e fechamento');
+    assert.equal(res.priorities[0].project.slug, 'rca');
+    assert.equal(res.priorities[0].project.name, 'RCA');
   });
 
-  const app = express();
-  app.use(express.json());
-  app.use('/api/projects', projectsRouterFor(db, fixedToday));
+  test(`${kind}: precedência da rota /guidance/today sobre /:id`, async (t) => {
+    const fixedToday = () => '2026-09-09';
+    const { server } = await mountProjectsEngine(t, kind, { seed: seedLikeSetupDb, getLocalDateString: fixedToday });
 
-  const server = await startTestServer(app);
-  t.after(() => {
-    db.close();
-    return server.close();
+    const response = await fetch(`${server.base}/api/projects/guidance/today`);
+    assert.equal(response.status, 200);
+
+    // Se houvesse colisão com /:id, tentaria buscar um projeto com id/slug='guidance',
+    // o que retornaria 404 Not Found porque esse projeto não existe.
+    const payload = await response.json();
+    assert.ok('fresh' in payload);
+    assert.ok('priorities' in payload);
   });
-
-  const res = await requestJson(server.base, '/api/projects/guidance/today');
-  assert.equal(res.date, '2026-09-09');
-  assert.equal(res.fresh, true);
-  assert.equal(res.summary, 'RCA vem primeiro porque há ação comercial com impacto imediato.');
-  assert.equal(res.priorities.length, 1);
-  assert.equal(res.priorities[0].rank, 1);
-  assert.equal(res.priorities[0].reason, 'Protege renda e fechamento');
-  assert.equal(res.priorities[0].project.slug, 'rca');
-  assert.equal(res.priorities[0].project.name, 'RCA');
-});
-
-test('precedência da rota /guidance/today sobre /:id', async (t) => {
-  const db = setupDb();
-  const fixedToday = () => '2026-09-09';
-  const app = express();
-  app.use(express.json());
-  app.use('/api/projects', projectsRouterFor(db, fixedToday));
-
-  const server = await startTestServer(app);
-  t.after(() => {
-    db.close();
-    return server.close();
-  });
-
-  const response = await fetch(`${server.base}/api/projects/guidance/today`);
-  assert.equal(response.status, 200);
-
-  // Se houvesse colisão com /:id, tentaria buscar um projeto com id/slug='guidance',
-  // o que retornaria 404 Not Found porque esse projeto não existe.
-  const payload = await response.json();
-  assert.ok('fresh' in payload);
-  assert.ok('priorities' in payload);
-});
+}
