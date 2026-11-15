@@ -282,14 +282,26 @@ export function pendingManualCardPayment(db, accountIds, bill, today) {
   if (!since) return 0;
   const rows = db.prepare(`
     SELECT amount, paid_on FROM finance_payments
-    WHERE debt_id IN (${debts.map(() => '?').join(', ')}) AND paid_on >= ? AND paid_on <= ?
+    WHERE debt_id IN (${debts.map(() => '?').join(', ')}) AND confirmed=1 AND paid_on >= ? AND paid_on <= ?
   `).all(...debts.map((d) => d.id), since, today);
   const manual = money(rows
     .filter((r) => businessDaysBetween(r.paid_on, today) <= MANUAL_PAYMENT_GRACE_BUSINESS_DAYS)
     .reduce((s, r) => s + Number(r.amount || 0), 0));
   if (manual <= 0.009) return 0;
-  if (Number(bill.paid || 0) + 0.01 >= manual) return 0;
-  return money(Math.min(manual, Math.max(0, Number(bill.total || 0) - Number(bill.paid || 0))));
+  let missing = Math.max(0, manual - Number(bill.paid || 0));
+  // New confirmations retain the pre-payment bank baseline: cumulative bank
+  // payments can include older payments absent from the recent manual window.
+  if (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='alfred_payment_receipts'").get()) {
+    const tracked = db.prepare(`
+      SELECT r.expected_paid_floor,p.paid_on FROM alfred_payment_receipts r
+      JOIN finance_payments p ON p.id=r.payment_id
+      WHERE p.debt_id IN (${debts.map(() => '?').join(', ')})
+        AND r.cycle_closing=? AND r.cycle_due=? AND p.confirmed=1 AND p.paid_on<=?
+    `).all(...debts.map(d=>d.id), since, bill.due_date, today)
+      .filter(r=>businessDaysBetween(r.paid_on,today)<=MANUAL_PAYMENT_GRACE_BUSINESS_DAYS);
+    if(tracked.length) missing=Math.max(missing,Math.max(...tracked.map(r=>r.expected_paid_floor))-Number(bill.paid||0));
+  }
+  return money(Math.min(manual,Math.max(0,missing),Math.max(0, Number(bill.total || 0) - Number(bill.paid || 0))));
 }
 
 function upsertCardStatus(db, accountId, institution, card, bankUpdatedAt, now, manualPaid = 0) {
@@ -443,12 +455,15 @@ function matchManual(db, bankTx, altAccountId = null) {
     SELECT * FROM finance_transactions
     WHERE source IN (${placeholders}) AND direction = 'outflow' AND matched_tx_id IS NULL
       AND (external_id IS NULL OR external_id = '')
+      -- Debt payments without an identified funding account cannot be safely reconciled.
+      -- Never let a debt payment relabel an unrelated ordinary purchase.
+      AND (debt_id IS NULL OR (account_id IS NOT NULL AND account_id = ? AND category = ?))
       AND ABS(ABS(amount) - ?) < 0.005
       AND posted_on >= date(?, '-3 day') AND posted_on <= date(?, '+3 day')
       AND (account_id IS NULL OR account_id = ? OR account_id = ?)
     ORDER BY ABS(julianday(posted_on) - julianday(?)) ASC, created_at ASC
     LIMIT 1
-  `).get(...MANUAL_SOURCES, Math.abs(bankTx.amount), bankTx.posted_on, bankTx.posted_on, bankTx.account_id, altAccountId ?? bankTx.account_id, bankTx.posted_on) || null;
+  `).get(...MANUAL_SOURCES, bankTx.account_id, bankTx.category, Math.abs(bankTx.amount), bankTx.posted_on, bankTx.posted_on, bankTx.account_id, altAccountId ?? bankTx.account_id, bankTx.posted_on) || null;
 }
 
 function applyTransactions(db, list) {
