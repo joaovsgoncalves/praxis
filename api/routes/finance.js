@@ -1,8 +1,8 @@
 import { Router } from 'express';
+import { asyncRoute } from '../lib/asyncRoute.js';
+import { createFinanceCoreService } from '../services/finance/core.js';
 import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
 import {
-  createAccount,
-  createBalance,
   createDebt,
   createGoal,
   createInstallment,
@@ -15,10 +15,7 @@ import {
   getInsights,
   getMonthSummary,
   getOverview,
-  getSettings,
   lastSync,
-  listAccounts,
-  listBalances,
   listBudgets,
   listDebts,
   listFixedExpenses,
@@ -31,11 +28,9 @@ import {
   saveBudgets,
   updateFixedExpense,
   seedFinanceIfEmpty,
-  updateAccount,
   updateDebt,
   updateGoal,
   updateInstallment,
-  updateSettings,
   updateSubscription,
   updateTransaction,
   listPendingTransactions,
@@ -56,8 +51,15 @@ function withIntentKey(req) {
   return header ? { ...body, intent_key: header } : body;
 }
 
-/** Finanças — mounted at /api/finance */
-export function createFinanceRouter({ db, getLocalDateString }) {
+/**
+ * Finanças — mounted at /api/finance.
+ * Migração (fase 5): configuração, contas e saldos saem da camada assíncrona (`storage`, serviço em
+ * services/finance/core.js); o resto ainda usa `db`. Envelope igual ao da rota antiga, congelada em
+ * test-support/oracles/financeRoutes.bcbadad.js para a prova de paridade.
+ */
+export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
+  if (!storage) throw new TypeError('createFinanceRouter: informe storage (camada assíncrona)');
+  const core = createFinanceCoreService({ storage, now });
   const router = Router();
   installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
@@ -135,55 +137,55 @@ export function createFinanceRouter({ db, getLocalDateString }) {
     res.json(row);
   });
 
-  router.get('/settings', (_req, res) => {
-    res.json(getSettings(db));
-  });
+  router.get('/settings', asyncRoute(async (_req, res) => {
+    res.json(await core.getSettings());
+  }));
 
-  router.patch('/settings', (req, res) => {
+  router.patch('/settings', asyncRoute(async (req, res) => {
     try {
-      res.json(updateSettings(db, req.body || {}));
+      res.json(await core.updateSettings(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/accounts', (req, res) => {
+  router.get('/accounts', asyncRoute(async (req, res) => {
     try {
-      res.json(listAccounts(db, { status: req.query.status, entity: req.query.entity }));
+      res.json(await core.listAccounts({ status: req.query.status, entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.post('/accounts', (req, res) => {
+  router.post('/accounts', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createAccount(db, req.body || {}));
+      res.status(201).json(await core.createAccount(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/accounts/:id', (req, res) => {
+  router.patch('/accounts/:id', asyncRoute(async (req, res) => {
     try {
-      const row = updateAccount(db, req.params.id, req.body || {});
+      const row = await core.updateAccount(req.params.id, req.body || {});
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/balances', (req, res) => {
-    res.json(listBalances(db, { account_id: req.query.account_id }));
-  });
+  router.get('/balances', asyncRoute(async (req, res) => {
+    res.json(await core.listBalances({ account_id: req.query.account_id }));
+  }));
 
-  router.post('/balances', (req, res) => {
+  router.post('/balances', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createBalance(db, req.body || {}));
+      res.status(201).json(await core.createBalance(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   router.get('/debts', (req, res) => {
     res.json(listDebts(db, { status: req.query.status }));

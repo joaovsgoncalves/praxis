@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
+import { sqliteTestStorage } from './test-support/httpParity.fase5.mjs';
 import { getOverview, initFinanceSchema, listAccounts, seedFinanceIfEmpty, updateSettings } from './finance.js';
 import { createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
 import { fortalezaClock, fortalezaStamp, midasLabel } from '../src/lib/financeClock.js';
@@ -14,7 +15,7 @@ async function mountFinance(t) {
   seedFinanceIfEmpty(db);
   const app = express();
   app.use(express.json());
-  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => TODAY }));
+  app.use('/api/finance', createFinanceRouter({ db, storage: sqliteTestStorage(db), getLocalDateString: () => TODAY }));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

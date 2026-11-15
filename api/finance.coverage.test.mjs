@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
+import { sqliteTestStorage } from './test-support/httpParity.fase5.mjs';
 import { createAccount, createBalance, createTransaction, getInsights, getMonthSummary, seedFinanceIfEmpty } from './finance.js';
 import { daysBetween, getStatementCoverage, recordStatementCoverage } from './lib/financeCoverage.js';
 import { syncPierre } from './pierreSync.js';
@@ -221,7 +222,7 @@ async function mountFinance(t) {
   seedFinanceIfEmpty(db);
   const app = express();
   app.use(express.json());
-  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => TODAY }));
+  app.use('/api/finance', createFinanceRouter({ db, storage: sqliteTestStorage(db), getLocalDateString: () => TODAY }));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -324,7 +325,7 @@ test('PF e PJ: conta da empresa sem extrato não rebaixa a cobertura pessoal nem
 
   const app = express();
   app.use(express.json());
-  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => TODAY }));
+  app.use('/api/finance', createFinanceRouter({ db, storage: sqliteTestStorage(db), getLocalDateString: () => TODAY }));
   const server = await startTestServer(app);
   t.after(() => server.close());
   const overview = await requestJson(server.base, '/api/finance/overview');

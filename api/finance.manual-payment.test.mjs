@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
+import { sqliteTestStorage } from './test-support/httpParity.fase5.mjs';
 import { billCycleStale, getOverview, seedFinanceIfEmpty } from './finance.js';
 import { businessDaysBetween } from './pluggyIngest.js';
 import { createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
@@ -14,7 +15,7 @@ async function mount(t, clock) {
   seedFinanceIfEmpty(db);
   const app = express();
   app.use(express.json());
-  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => clock.today }));
+  app.use('/api/finance', createFinanceRouter({ db, storage: sqliteTestStorage(db), getLocalDateString: () => clock.today }));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
