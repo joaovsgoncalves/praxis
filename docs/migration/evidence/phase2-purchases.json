@@ -1,0 +1,30 @@
+{
+  "scope": "phase 2 third slice: purchases served through async storage; not API cutover",
+  "base": "80fff72",
+  "commits": ["9f0010e"],
+  "parity_http": {
+    "steps": 55,
+    "engines": ["frozen legacy route + purchaseList bcbadad (oracle)", "new route + SQLite", "new route + Firestore emulator"],
+    "result": "identical status, content-type and body; only server-generated UUIDs and timestamps normalized",
+    "counterproofs": {
+      "remove_exclude_paused": "breaks at step 24",
+      "read_max_sort_outside_transaction": "concurrency test repeats positions",
+      "remove_firestore_sequence_token": "did NOT break in emulator; in-transaction collection read already serializes; token kept for insertion order, to confirm on real Firestore before cutover"
+    }
+  },
+  "repository_contract": { "tests": 13, "pass": 13, "fail": 0, "covers": "legacy ordering NULL<number<text, insertion-order tie break, MAX with text, isolation, immutables" },
+  "real_server": { "tests": 7, "pass": 7, "fail": 0 },
+  "emulator_matrix": { "tests": 87, "pass": 87, "fail": 0, "skipped": 0 },
+  "full_api_suite": { "tests": 467, "pass": 461, "fail": 0, "skipped": 6, "skipped_reason": "Firestore-only tests without emulator; covered by emulator_matrix" },
+  "intentional_divergences": [
+    "query filter with list/object that shifted SQL parameters: now 500 sqlite_coercion_unsupported",
+    "client-chosen id above 1500 bytes: now 500 invalid_record_id"
+  ],
+  "routes_on_new_layer": 8,
+  "routes_total_estimate": 123,
+  "sync_sqlite_calls_remaining_non_test": 537,
+  "cloud_resources_created": false,
+  "production_changed": false,
+  "pushed": false,
+  "alfred_action_required": false
+}
