@@ -3,16 +3,18 @@ import { StorageError } from '../contract.js';
 import { sqliteTasks } from './tasks.js';
 import { sqliteWeeklyReviews } from './weeklyReviews.js';
 import { sqlitePurchases } from './purchases.js';
+import { EXTRA_DOMAINS, checkDomains } from '../domains/index.js';
 
-const DOMAINS = Object.freeze({ tasks: sqliteTasks, weeklyReviews: sqliteWeeklyReviews, purchases: sqlitePurchases });
+const BUILT_IN = Object.freeze({ tasks: sqliteTasks, weeklyReviews: sqliteWeeklyReviews, purchases: sqlitePurchases });
 
 /**
  * Opera as tabelas existentes, sem esquema, semente ou conexão implícitos.
  * open(owner) devolve a conexão DEDICADA da camada nova para um dono autorizado. Tudo nessa conexão
  * passa por esta fila, inclusive leitura, para ninguém enxergar escrita ainda não confirmada.
  */
-export function createSqliteDriver({ open }) {
+export function createSqliteDriver({ open, domains = EXTRA_DOMAINS }) {
   if (typeof open !== 'function') throw new TypeError('open(owner) required');
+  const DOMAINS = { ...BUILT_IN, ...Object.fromEntries(checkDomains(domains).map((domain) => [domain.name, domain.sqlite])) };
   const ownership = new WeakMap(), queues = new WeakMap();
   function dbFor(owner) {
     assertUserId(owner);

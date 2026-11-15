@@ -2,12 +2,13 @@ import { assertUserId } from '../../lib/tenantDb.js';
 import { firestoreTasks } from './tasks.js';
 import { firestoreWeeklyReviews } from './weeklyReviews.js';
 import { firestorePurchases } from './purchases.js';
+import { EXTRA_DOMAINS, checkDomains } from '../domains/index.js';
 
 /**
  * SDK injetado: importar este módulo não lê credencial nem abre rede.
  * `root` é escolhido pelo servidor (banco/namespace), nunca vem do corpo da requisição.
  */
-export function createFirestoreDriver({ client, root = client }) {
+export function createFirestoreDriver({ client, root = client, domains: extra = EXTRA_DOMAINS }) {
   if (!client || typeof client.runTransaction !== 'function' || typeof client.batch !== 'function' || !root || typeof root.collection !== 'function') {
     throw new TypeError('Firestore client and root required');
   }
@@ -16,6 +17,7 @@ export function createFirestoreDriver({ client, root = client }) {
     tasks: (owner, tx) => firestoreTasks(userDoc(owner).collection('tasks'), tx),
     weeklyReviews: (owner, tx) => firestoreWeeklyReviews(userDoc(owner), tx, client),
     purchases: (owner, tx) => firestorePurchases(userDoc(owner), tx, client),
+    ...Object.fromEntries(checkDomains(extra).map((domain) => [domain.name, (owner, tx) => domain.firestore(userDoc(owner), tx, client)])),
   };
   const driver = {
     kind: 'firestore',

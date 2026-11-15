@@ -6,14 +6,16 @@ import {
   newReview, reviewPatch, reviewQuery, weekStart,
   newPurchase, purchasePatch, purchaseQuery,
 } from './contract.js';
+import { EXTRA_DOMAINS, checkDomains } from './domains/index.js';
 
 /**
  * Métodos de cada domínio: tipo de acesso (read/write/readwrite) e normalização dos argumentos.
  * `readwrite` = o motor precisa ler antes de escrever (Firestore exige leituras antes das escritas),
  * então segue a regra das duas coisas nos dois motores.
  */
-function domainSpecs(now) {
+function domainSpecs(now, extra) {
   return {
+    ...Object.fromEntries(extra.map((domain) => [domain.name, domain.spec(now)])),
     tasks: {
       get: ['read', (id) => [recordId(id)]],
       list: ['read', (query) => [taskQuery(query)]],
@@ -45,9 +47,9 @@ function domainSpecs(now) {
  * Fronteira de persistência assíncrona. `currentOwner` vem do escopo verificado pelo servidor;
  * nenhum método ou payload escolhe o dono.
  */
-export function createStorage({ driver, currentOwner, now = () => new Date() }) {
+export function createStorage({ driver, currentOwner, now = () => new Date(), domains = EXTRA_DOMAINS }) {
   if (!driver || typeof driver.transaction !== 'function' || typeof currentOwner !== 'function') throw new TypeError('storage requires driver and verified currentOwner');
-  const specs = domainSpecs(now);
+  const specs = domainSpecs(now, checkDomains(domains));
   for (const name of Object.keys(specs)) if (typeof driver[name] !== 'function') throw new TypeError(`driver sem domínio ${name}`);
   const transactionScope = new AsyncLocalStorage();
   const owner = () => assertUserId(currentOwner());
