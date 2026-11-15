@@ -1,0 +1,3257 @@
+{
+  "format_version": 1,
+  "scope": "Local adapter describe + static primary route declarations, not public MCP execution",
+  "adapter": "/root/.hermes/workspaces/labs/hermes-gpt/extensions/apps_access/praxis_adapter.py",
+  "catalog": {
+    "app": "praxis",
+    "operations": {
+      "tasks.list": {
+        "method": "GET",
+        "path": "/api/tasks",
+        "write": false,
+        "description": "Read-only list. limit defaults to 100; offset to 0. include_overdue forbidden.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "in_progress",
+                "completed",
+                "done",
+                "cancelled"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "idea_status": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "tasks.get": {
+        "method": "GET",
+        "path": "/api/tasks/{id}",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "tasks.create": {
+        "method": "POST",
+        "path": "/api/tasks",
+        "write": true,
+        "description": "May create/update/cancel a Google Calendar event according to Praxis policy. Completing an existing recurring task may create the next occurrence and its calendar event; completion/reopening can award/reverse XP. Primary-record readback does not certify external Calendar delivery. No delete operation.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 20000
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "time": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 5,
+              "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "in_progress",
+                "completed",
+                "done",
+                "cancelled"
+              ]
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "goal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "duration_minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
+            },
+            "recurrence": {
+              "type": "string",
+              "enum": [
+                "none",
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            },
+            "recurrence_days": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "maxItems": 7,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "tasks.update": {
+        "method": "PUT",
+        "path": "/api/tasks/{id}",
+        "write": true,
+        "description": "May create/update/cancel a Google Calendar event according to Praxis policy. Completing an existing recurring task may create the next occurrence and its calendar event; completion/reopening can award/reverse XP. Primary-record readback does not certify external Calendar delivery. No delete operation.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 20000
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "time": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 5,
+              "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "in_progress",
+                "completed",
+                "done",
+                "cancelled"
+              ]
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "goal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "duration_minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
+            },
+            "recurrence": {
+              "type": "string",
+              "enum": [
+                "none",
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            },
+            "recurrence_days": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "maxItems": 7,
+              "uniqueItems": true
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "checklist.list": {
+        "method": "GET",
+        "path": "/api/tasks/{task_id}/checklist",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "task_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "checklist.create": {
+        "method": "POST",
+        "path": "/api/tasks/{task_id}/checklist",
+        "write": true,
+        "description": "Creates an unchecked checklist item.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "task_id",
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "checklist.update": {
+        "method": "PATCH",
+        "path": "/api/tasks/{task_id}/checklist/{item_id}",
+        "write": true,
+        "description": "Changes title and/or done; does not complete parent task.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "item_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "done": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "task_id",
+            "item_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.list": {
+        "method": "GET",
+        "path": "/api/habits",
+        "write": false,
+        "description": "Habit tree. status defaults to active; date selects computed daily state.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "paused",
+                "archived",
+                "all"
+              ]
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "habit_logs.list": {
+        "method": "GET",
+        "path": "/api/habit-logs",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "habit_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "from": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "to": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "habit_logs.set": {
+        "method": "POST",
+        "path": "/api/habit-logs",
+        "write": true,
+        "description": "Upsert replaces daily log, not increments. done below numeric target becomes partial; omitted value for done uses habit target. skipped clears value. Compound/since habits reject daily logs.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "habit_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "done",
+                "skipped"
+              ]
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000
+            },
+            "skip_reason": {
+              "type": "string",
+              "enum": [
+                "time",
+                "energy",
+                "context",
+                "other"
+              ]
+            },
+            "note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 280
+            }
+          },
+          "required": [
+            "habit_id",
+            "date",
+            "outcome"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "wellness.get": {
+        "method": "GET",
+        "path": "/api/wellness",
+        "write": false,
+        "description": "Array, latest 30 records; optional exact date.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "wellness.set": {
+        "method": "POST",
+        "path": "/api/wellness",
+        "write": true,
+        "description": "Full daily upsert (not patch). All fields required to avoid implicit default overwrites.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "sleep_hours": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "sleep_quality": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "mood": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "productivity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "date",
+            "sleep_hours",
+            "sleep_quality",
+            "mood",
+            "productivity",
+            "note"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "focus.list": {
+        "method": "GET",
+        "path": "/api/focus",
+        "write": false,
+        "description": "Latest 50 sessions, optionally for an exact date.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "focus.create": {
+        "method": "POST",
+        "path": "/api/focus",
+        "write": true,
+        "description": "Records completed focus duration; does not start a timer.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "task_title": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 500
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "duration_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            }
+          },
+          "required": [
+            "date",
+            "duration_seconds"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "categories.list": {
+        "method": "GET",
+        "path": "/api/categories",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "goals.list": {
+        "method": "GET",
+        "path": "/api/goals",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "projects.list": {
+        "method": "GET",
+        "path": "/api/projects",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "tasks.delete": {
+        "method": "DELETE",
+        "path": "/api/tasks/{id}",
+        "write": true,
+        "description": "Deletes checklist, reverses XP and cancels calendar event. Explicit user request only.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "tasks.not_today": {
+        "method": "POST",
+        "path": "/api/tasks/{id}/not-today",
+        "write": true,
+        "description": "Moves open task to tomorrow and syncs calendar.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "time",
+                "energy",
+                "context",
+                "other"
+              ]
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "tasks.reorder": {
+        "method": "PATCH",
+        "path": "/api/tasks/reorder",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "ordered_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              "maxItems": 500,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "ordered_ids"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "checklist.delete": {
+        "method": "DELETE",
+        "path": "/api/tasks/{task_id}/checklist/{item_id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "item_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "task_id",
+            "item_id",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "checklist.reorder": {
+        "method": "PATCH",
+        "path": "/api/tasks/{task_id}/checklist/reorder",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "ordered_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              "maxItems": 500,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "task_id",
+            "ordered_ids"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.create": {
+        "method": "POST",
+        "path": "/api/habits",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekdays",
+                "weekends",
+                "weekly"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "streak_target": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650
+            },
+            "goal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "recurrence_days": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "maxItems": 7
+            },
+            "target_value": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 40
+            },
+            "preferred_time": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 5,
+              "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "simple",
+                "compound"
+              ]
+            },
+            "parent_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "position_in_parent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "children_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              "maxItems": 500,
+              "uniqueItems": true
+            },
+            "emoji": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 20
+            },
+            "tracking_mode": {
+              "type": "string",
+              "enum": [
+                "check",
+                "since"
+              ]
+            },
+            "since_date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "quick_increment": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "paused",
+                "archived"
+              ]
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.update": {
+        "method": "PUT",
+        "path": "/api/habits/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekdays",
+                "weekends",
+                "weekly"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "streak_target": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650
+            },
+            "goal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "recurrence_days": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "maxItems": 7
+            },
+            "target_value": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 40
+            },
+            "preferred_time": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 5,
+              "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "simple",
+                "compound"
+              ]
+            },
+            "parent_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "position_in_parent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "children_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              "maxItems": 500,
+              "uniqueItems": true
+            },
+            "emoji": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 20
+            },
+            "tracking_mode": {
+              "type": "string",
+              "enum": [
+                "check",
+                "since"
+              ]
+            },
+            "since_date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "quick_increment": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "paused",
+                "archived"
+              ]
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.children": {
+        "method": "PATCH",
+        "path": "/api/habits/{id}/children",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "ordered_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              "maxItems": 500,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "id",
+            "ordered_ids"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.reorder": {
+        "method": "PATCH",
+        "path": "/api/habits/reorder",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "ordered_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              "maxItems": 500,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "ordered_ids"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.delete": {
+        "method": "DELETE",
+        "path": "/api/habits/{id}",
+        "write": true,
+        "description": "Deletes habit logs and ritual links; compound children archived. Prefer habits.update status=archived when history should remain.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habit_logs.delete": {
+        "method": "DELETE",
+        "path": "/api/habit-logs/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "habit_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "habit_id",
+            "date",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "ideas.to_task": {
+        "method": "POST",
+        "path": "/api/ideas/{id}/to-task",
+        "write": true,
+        "description": "Creates task, marks idea promoted and syncs calendar.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "priority": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "category",
+            "date",
+            "priority"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "habits.streak": {
+        "method": "GET",
+        "path": "/api/habits/{id}/streak",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "goals.get": {
+        "method": "GET",
+        "path": "/api/goals/{id}",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "goals.create": {
+        "method": "POST",
+        "path": "/api/goals",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "deadline": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "timeframe": {
+              "type": "string",
+              "enum": [
+                "short",
+                "medium",
+                "long"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "completed",
+                "paused",
+                "cancelled"
+              ]
+            },
+            "manual_progress": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "goals.update": {
+        "method": "PUT",
+        "path": "/api/goals/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "deadline": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "timeframe": {
+              "type": "string",
+              "enum": [
+                "short",
+                "medium",
+                "long"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "completed",
+                "paused",
+                "cancelled"
+              ]
+            },
+            "manual_progress": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "goals.delete": {
+        "method": "DELETE",
+        "path": "/api/goals/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "projects.get": {
+        "method": "GET",
+        "path": "/api/projects/{id}",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "projects.create": {
+        "method": "POST",
+        "path": "/api/projects",
+        "write": true,
+        "description": "Focus/column changes only when the user requests them; do not choose priorities silently.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "tagline": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "objective": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "status_summary": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "current_slice": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "next_step": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "last_move_note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "notes": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "shipped_note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "blocked_note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "slug": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "produto",
+                "cliente",
+                "trabalho",
+                "estudo",
+                "pessoal"
+              ]
+            },
+            "column": {
+              "type": "string",
+              "enum": [
+                "andando",
+                "radar",
+                "aguardando",
+                "pausado"
+              ]
+            },
+            "focus": {
+              "type": "boolean"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "parent_slug": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "last_reviewed_at": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [
+            "slug",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "projects.update": {
+        "method": "PATCH",
+        "path": "/api/projects/{id}",
+        "write": true,
+        "description": "Focus/column/live/objective edits require a user request. expected_revision from latest projects.get is mandatory; conflict requires reread and user review, never blind retry.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "tagline": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "objective": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "status_summary": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "current_slice": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "next_step": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "last_move_note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "notes": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "shipped_note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "blocked_note": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "produto",
+                "cliente",
+                "trabalho",
+                "estudo",
+                "pessoal"
+              ]
+            },
+            "column": {
+              "type": "string",
+              "enum": [
+                "andando",
+                "radar",
+                "aguardando",
+                "pausado"
+              ]
+            },
+            "focus": {
+              "type": "boolean"
+            },
+            "live": {
+              "type": "boolean"
+            },
+            "parent_slug": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "last_reviewed_at": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "expected_revision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "id",
+            "expected_revision"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "projects.updates": {
+        "method": "GET",
+        "path": "/api/projects/{id}/updates",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "projects.add_update": {
+        "method": "POST",
+        "path": "/api/projects/{id}/updates",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [
+            "id",
+            "summary",
+            "date"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "projects.complete_step": {
+        "method": "POST",
+        "path": "/api/projects/{id}/complete-next-step",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "expected_step": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          },
+          "required": [
+            "id",
+            "expected_step",
+            "summary"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "guidance.get": {
+        "method": "GET",
+        "path": "/api/projects/guidance/today",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "purchases.list": {
+        "method": "GET",
+        "path": "/api/purchases",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "all",
+                "want",
+                "bought",
+                "paused"
+              ]
+            },
+            "horizon": {
+              "type": "string",
+              "enum": [
+                "short",
+                "medium",
+                "long"
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "purchases.create": {
+        "method": "POST",
+        "path": "/api/purchases",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "notes": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "horizon": {
+              "type": "string",
+              "enum": [
+                "short",
+                "medium",
+                "long"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "want",
+                "bought",
+                "paused"
+              ]
+            },
+            "price_estimate": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 100
+            },
+            "url": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "purchases.update": {
+        "method": "PATCH",
+        "path": "/api/purchases/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "notes": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "horizon": {
+              "type": "string",
+              "enum": [
+                "short",
+                "medium",
+                "long"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "want",
+                "bought",
+                "paused"
+              ]
+            },
+            "price_estimate": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 100
+            },
+            "url": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 2000
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "purchases.delete": {
+        "method": "DELETE",
+        "path": "/api/purchases/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "reviews.list": {
+        "method": "GET",
+        "path": "/api/weekly-reviews",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 52
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "reviews.current": {
+        "method": "GET",
+        "path": "/api/weekly-reviews/current",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "reviews.set": {
+        "method": "POST",
+        "path": "/api/weekly-reviews",
+        "write": true,
+        "description": "Full weekly replacement: all fields required, not a partial patch.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "week_start": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "highlights": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 10000
+            },
+            "blockers": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 10000
+            },
+            "learnings": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 10000
+            },
+            "next_week_focus": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 10000
+            },
+            "overall_score": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "week_start",
+            "highlights",
+            "blockers",
+            "learnings",
+            "next_week_focus",
+            "overall_score"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "reviews.delete": {
+        "method": "DELETE",
+        "path": "/api/weekly-reviews/{id}",
+        "write": true,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "confirm_delete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "date",
+            "confirm_delete"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "insights.best_hours": {
+        "method": "GET",
+        "path": "/api/insights/best-hours",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "insights.correlation": {
+        "method": "GET",
+        "path": "/api/insights/correlation",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "insights.weekly": {
+        "method": "GET",
+        "path": "/api/insights/weekly",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "insights.avoidance": {
+        "method": "GET",
+        "path": "/api/insights/avoidance",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "focus.stats": {
+        "method": "GET",
+        "path": "/api/focus/stats",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "rituals.list": {
+        "method": "GET",
+        "path": "/api/rituals",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "rituals.get": {
+        "method": "GET",
+        "path": "/api/rituals/{id}",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "rituals.progress": {
+        "method": "GET",
+        "path": "/api/rituals/{id}/progress",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "finance.status": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "Coverage, timestamps and limitations; no sync triggered.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.overview": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "PF-only Praxis overview with separate unconfirmed pending_card_items (all dates/signs) and coverage. Salary date is a model assumption, not confirmed income.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.bills": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "Card status, original stale-cycle and manual-payment fields preserved.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.debts.list": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "all",
+                "open",
+                "min_paid",
+                "clean",
+                "waiting",
+                "blocked"
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.installments.list": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "all",
+                "open",
+                "done"
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.subscriptions.list": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "keep",
+                "cancel",
+                "cancelled",
+                "installment"
+              ]
+            },
+            "lane": {
+              "type": "string",
+              "enum": [
+                "work",
+                "personal"
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.month": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "month": {
+              "type": "string",
+              "minLength": 7,
+              "maxLength": 7,
+              "pattern": "^\\d{4}-(?:0[1-9]|1[0-2])$"
+            }
+          },
+          "required": [
+            "month"
+          ],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "finance.transactions.list": {
+        "method": "GET",
+        "path": "local-readonly",
+        "write": false,
+        "description": "Deterministic offset pagination, default limit100; separate calls can change as sync runs. matched rows excluded like Praxis API.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "to": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "account_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "q": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        "transport": "fixed SQLite read-only snapshot, Praxis calculation functions"
+      },
+      "guidance.set": {
+        "method": "PUT",
+        "path": "/api/projects/guidance/{date}",
+        "write": true,
+        "description": "Writes today only. Read guidance.get first; expected_generated_at is its timestamp or null. At most 3 priorities; source must be alfred. Never activate until old writer is stopped. Preview validates structure only. Conflict requires reread and user review, never blind retry.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4000
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "alfred"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$"
+            },
+            "expected_generated_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "priorities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rank": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3
+                  },
+                  "action": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "reason_code": {
+                    "type": "string",
+                    "enum": [
+                      "deadline",
+                      "income",
+                      "academic",
+                      "client_commitment",
+                      "continuity",
+                      "basic_need",
+                      "manual"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "project_slug": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+                  },
+                  "task_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+                  }
+                },
+                "required": [
+                  "rank",
+                  "action",
+                  "reason_code",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 3
+            }
+          },
+          "required": [
+            "date",
+            "summary",
+            "source",
+            "generated_at",
+            "expected_generated_at",
+            "priorities"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "finance.bill.confirm_payment": {
+        "method": "POST",
+        "path": "local-confirm-payment",
+        "write": true,
+        "description": "Records a user-reported card payment, never sends money. Preview required; then apply identical payload with returned preview_hash, confirmed_by_user=true and stable request_id. Refuses blocked debts, stale cycles and multiple/ambiguous card debts. Preserves locked/source/note: locked protects against synchronization overwrites, not explicit payment reporting. Payment must be provably after bank_updated_at: paid_on alone works only if the bank snapshot predates that local day; otherwise paid_at with explicit timezone is required and must come from user/payment evidence, never guessed. If snapshot is newer than payment, refuse to avoid double counting. Funding account remains unknown; ledger entry cannot auto-match bank debit. Baseline receipt preserves manual overlay up to 3 business days.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "debt_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "amount": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 1000000
+            },
+            "paid_on": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "format": "date"
+            },
+            "confirmed_by_user": {
+              "type": "boolean"
+            },
+            "paid_at": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 40
+            },
+            "preview_hash": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "debt_id",
+            "amount",
+            "paid_on"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "finance.fixed.confirmation": {
+        "method": "GET",
+        "path": "/api/finance/fixed-confirmations",
+        "write": false,
+        "description": "Read current-month native fixed-expense user confirmation. No bank reconciliation.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "fixed_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "period": {
+              "type": "string",
+              "minLength": 7,
+              "maxLength": 7,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])$"
+            }
+          },
+          "required": [
+            "fixed_id",
+            "period"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "finance.fixed.confirm_period": {
+        "method": "POST",
+        "path": "/api/finance/fixed-confirmations",
+        "write": true,
+        "description": "Preview first. Confirm only current Fortaleza month, using preview_hash, confirmed_by_user=true and stable request_id. Marks the native fixed-expense flag, visible in Praxis and excluded from that month commitments. No cash/debt/payment transaction; paid date and amount unknown. Never sets another month.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "fixed_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "period": {
+              "type": "string",
+              "minLength": 7,
+              "maxLength": 7,
+              "pattern": "^20\\d{2}-(0[1-9]|1[0-2])$"
+            },
+            "confirmed_by_user": {
+              "type": "boolean"
+            },
+            "preview_hash": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "fixed_id",
+            "period"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "finance.balance.confirm_zero": {
+        "method": "POST",
+        "path": "/api/finance/balances",
+        "write": true,
+        "description": "Preview then apply confirmed zero balance for Mercado Pago only. Preserves bank history; creates source joao balance, no transaction. Newer bank data can supersede. Stable request_id required; uncertain writes never resend.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "account_id": {
+              "type": "string",
+              "enum": [
+                "acc-mp"
+              ]
+            },
+            "confirmed_by_user": {
+              "type": "boolean"
+            },
+            "preview_hash": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "account_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "finance.subscriptions.update": {
+        "method": "PATCH",
+        "path": "/api/finance/subscriptions/{id}",
+        "write": true,
+        "description": "Edits existing PF subscription catalogue only. Preview required; stable request_id; rereads after edit. No charge, payment, or vendor cancellation. Account, lane, charge_day and next_charge cannot be changed. Null-account records follow native PF convention. Preflight detects stale previews but native API is not atomic CAS; conflicts/uncertainty require manual reconciliation.",
+        "payload_schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "amount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "cadence": {
+                  "type": "string",
+                  "enum": [
+                    "monthly",
+                    "yearly",
+                    "installment",
+                    "service"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "keep",
+                    "cancel",
+                    "cancelled",
+                    "installment"
+                  ]
+                },
+                "note": {
+                  "type": "string",
+                  "minLength": 0,
+                  "maxLength": 4000
+                }
+              },
+              "additionalProperties": false,
+              "required": [],
+              "minProperties": 1
+            },
+            "preview_hash": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "id",
+            "patch"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "dry_run_default": true,
+    "request_id_required_for_writes": true,
+    "request_id_format": "[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}",
+    "safety": "No arbitrary URL/path/header or unknown fields. Deletes require explicit user request and confirm_delete=true. dry_run writes do not apply changes; fixed-expense previews perform read-only HTTP requests. Reads execute even with dry_run=true. Updates require at least one changed field. Same request_id and canonical operation/payload replays saved result; conflict refuses. Pending never resends; reconcile manually. Audit stores only hashes, operation, status and timestamp. Private idempotency result storage contains user data. Nulls unsupported except guidance.set expected_generated_at when absent. Dates are YYYY-MM-DD."
+  },
+  "mappings": {
+    "categories.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/categories",
+      "files": [
+        "api/routes/ops.js"
+      ]
+    },
+    "checklist.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/tasks/{task_id}/checklist",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "checklist.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/tasks/{task_id}/checklist/{item_id}",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "checklist.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/tasks/{task_id}/checklist",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "checklist.reorder": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/tasks/{task_id}/checklist/reorder",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "checklist.update": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/tasks/{task_id}/checklist/{item_id}",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "finance.balance.confirm_zero": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/finance/balances",
+      "files": [
+        "api/routes/finance.js"
+      ]
+    },
+    "finance.bill.confirm_payment": {
+      "kind": "direct_sqlite_write",
+      "wrapper": "finance_confirm.py",
+      "implementation": "finance_confirm_candidate.mjs",
+      "table_scope": "finance_* and lazy alfred_payment_receipts"
+    },
+    "finance.bills": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.debts.list": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.fixed.confirm_period": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/finance/fixed-confirmations",
+      "files": [
+        "api/finance.fixed-confirmation.candidate.mjs"
+      ]
+    },
+    "finance.fixed.confirmation": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/finance/fixed-confirmations",
+      "files": [
+        "api/finance.fixed-confirmation.candidate.mjs"
+      ]
+    },
+    "finance.installments.list": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.month": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.overview": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.status": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.subscriptions.list": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "finance.subscriptions.update": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/finance/subscriptions/{id}",
+      "files": [
+        "api/routes/finance.js"
+      ]
+    },
+    "finance.transactions.list": {
+      "kind": "direct_sqlite_read",
+      "wrapper": "finance_read.py",
+      "implementation": "finance_read.mjs",
+      "table_scope": "finance_*"
+    },
+    "focus.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/focus",
+      "files": [
+        "api/routes/focus.js"
+      ]
+    },
+    "focus.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/focus",
+      "files": [
+        "api/routes/focus.js"
+      ]
+    },
+    "focus.stats": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/focus/stats",
+      "files": [
+        "api/routes/focus.js"
+      ]
+    },
+    "goals.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/goals",
+      "files": [
+        "api/routes/goals.js"
+      ]
+    },
+    "goals.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/goals/{id}",
+      "files": [
+        "api/routes/goals.js"
+      ]
+    },
+    "goals.get": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/goals/{id}",
+      "files": [
+        "api/routes/goals.js"
+      ]
+    },
+    "goals.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/goals",
+      "files": [
+        "api/routes/goals.js"
+      ]
+    },
+    "goals.update": {
+      "kind": "http",
+      "method": "PUT",
+      "path": "/api/goals/{id}",
+      "files": [
+        "api/routes/goals.js"
+      ]
+    },
+    "guidance.get": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/projects/guidance/today",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "guidance.set": {
+      "kind": "http",
+      "method": "PUT",
+      "path": "/api/projects/guidance/{date}",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "habit_logs.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/habit-logs/{id}",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habit_logs.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/habit-logs",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habit_logs.set": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/habit-logs",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.children": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/habits/{id}/children",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/habits",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/habits/{id}",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/habits",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.reorder": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/habits/reorder",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.streak": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/habits/{id}/streak",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "habits.update": {
+      "kind": "http",
+      "method": "PUT",
+      "path": "/api/habits/{id}",
+      "files": [
+        "api/routes/habits.js"
+      ]
+    },
+    "ideas.to_task": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/ideas/{id}/to-task",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "insights.avoidance": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/insights/avoidance",
+      "files": [
+        "api/routes/insights.js"
+      ]
+    },
+    "insights.best_hours": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/insights/best-hours",
+      "files": [
+        "api/routes/insights.js"
+      ]
+    },
+    "insights.correlation": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/insights/correlation",
+      "files": [
+        "api/routes/insights.js"
+      ]
+    },
+    "insights.weekly": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/insights/weekly",
+      "files": [
+        "api/routes/insights.js"
+      ]
+    },
+    "projects.add_update": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/projects/{id}/updates",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "projects.complete_step": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/projects/{id}/complete-next-step",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "projects.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/projects",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "projects.get": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/projects/{id}",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "projects.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/projects",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "projects.update": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/projects/{id}",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "projects.updates": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/projects/{id}/updates",
+      "files": [
+        "api/routes/projects.js"
+      ]
+    },
+    "purchases.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/purchases",
+      "files": [
+        "api/routes/purchases.js"
+      ]
+    },
+    "purchases.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/purchases/{id}",
+      "files": [
+        "api/routes/purchases.js"
+      ]
+    },
+    "purchases.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/purchases",
+      "files": [
+        "api/routes/purchases.js"
+      ]
+    },
+    "purchases.update": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/purchases/{id}",
+      "files": [
+        "api/routes/purchases.js"
+      ]
+    },
+    "reviews.current": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/weekly-reviews/current",
+      "files": [
+        "api/routes/weeklyReviews.js"
+      ]
+    },
+    "reviews.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/weekly-reviews/{id}",
+      "files": [
+        "api/routes/weeklyReviews.js"
+      ]
+    },
+    "reviews.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/weekly-reviews",
+      "files": [
+        "api/routes/weeklyReviews.js"
+      ]
+    },
+    "reviews.set": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/weekly-reviews",
+      "files": [
+        "api/routes/weeklyReviews.js"
+      ]
+    },
+    "rituals.get": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/rituals/{id}",
+      "files": [
+        "api/routes/rituals.js"
+      ]
+    },
+    "rituals.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/rituals",
+      "files": [
+        "api/routes/rituals.js"
+      ]
+    },
+    "rituals.progress": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/rituals/{id}/progress",
+      "files": [
+        "api/routes/rituals.js"
+      ]
+    },
+    "tasks.create": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/tasks",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "tasks.delete": {
+      "kind": "http",
+      "method": "DELETE",
+      "path": "/api/tasks/{id}",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "tasks.get": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/tasks/{id}",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "tasks.list": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/tasks",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "tasks.not_today": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/tasks/{id}/not-today",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "tasks.reorder": {
+      "kind": "http",
+      "method": "PATCH",
+      "path": "/api/tasks/reorder",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "tasks.update": {
+      "kind": "http",
+      "method": "PUT",
+      "path": "/api/tasks/{id}",
+      "files": [
+        "api/routes/tasks.js"
+      ]
+    },
+    "wellness.get": {
+      "kind": "http",
+      "method": "GET",
+      "path": "/api/wellness",
+      "files": [
+        "api/routes/wellness.js"
+      ]
+    },
+    "wellness.set": {
+      "kind": "http",
+      "method": "POST",
+      "path": "/api/wellness",
+      "files": [
+        "api/routes/wellness.js"
+      ]
+    }
+  },
+  "required_semantics": [
+    "preview_before_sensitive_write",
+    "stable_request_id",
+    "pending_not_auto_retried",
+    "PF_only_finance",
+    "bank_freshness_not_read_time",
+    "CAS_project_and_guidance",
+    "task_XP_recurrence_atomic",
+    "fixed_confirmation_not_cash_payment"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "scope": "Confirmed consumers of current Praxis; proposed target requires implementation and approvals",
+  "target": {"frontend":"Vercel","api":"Cloud Run","database":"Firestore","objects":"Cloud Storage","regionPreference":"southamerica-east1"},
+  "consumers": [
+    {"id":"web","source":"src/api/praxisClient.js","current":"HTTP through Vercel rewrite","target":"same public paths, rewrite to Cloud Run","preserve":["cookie","X-Praxis-Account","offline owner","errors","idempotency"]},
+    {"id":"alfred-http","source":"labs/hermes-gpt/extensions/apps_access/praxis_adapter.py","current":"fixed loopback HTTP","target":"fixed authenticated HTTPS endpoint","preserve":["71 operation schemas","preview","request_id","CAS","readback"]},
+    {"id":"alfred-finance-read","source":"labs/hermes-gpt/extensions/apps_access/finance_read.mjs","current":"direct SQLite read snapshot","target":"assistant finance API","preserve":["finance-read-v1.1.0","PF scope","coverage","source timestamps","pagination"]},
+    {"id":"alfred-payment","source":"labs/hermes-gpt/extensions/apps_access/finance_confirm_candidate.mjs","current":"direct SQLite transaction and lazy alfred_payment_receipts","target":"atomic service command","preserve":["same request receipt","stale preview refusal","actual payment timestamp","card-cycle checks","manual overlay"]},
+    {"id":"alfred-ledger","source":"labs/hermes-gpt/extensions/apps_access/state/praxis-ledger.sqlite3","current":"private pending/done operation receipts","target":"service-owned durable receipts","preserve":["pending remains pending","never replay uncertain outcome automatically","request hashes"]},
+    {"id":"bank-sync","source":"/root/.hermes/profiles/argos/scripts/casa_financas_pf_sync.py","scheduler":"argos:financas-pf-sync","current":"active HTTP writer","target":"authenticated managed job and same ingest contract","approval":"Argos coordination and cloud cost gate"},
+    {"id":"backup-hermes","source":"/root/.hermes/scripts/forja-db-backup-daily.py","scheduler":"ana:praxis:backup","current":"active SQLite backup","target":"consistent Firestore/object snapshot with watermark and restore proof"},
+    {"id":"consistency","source":"/root/.hermes/scripts/forja-consistency-watchdog.py","scheduler":"ana:praxis:consistencia","current":"active API plus SQLite comparison","target":"API versus destination invariants"},
+    {"id":"backup-system","source":"scripts/praxis-backup.sh","scheduler":"system crontab","current":"active SQLite backup","target":"replace or consolidate only with approval"},
+    {"id":"health-system","source":"scripts/praxis-health-watchdog.sh","scheduler":"system crontab","current":"public HTTP health","target":"same public health and target revision/readiness"},
+    {"id":"internal-workers","source":"api/server.js; api/lib/dayRollover.js; api/lib/taskCalendarQueue.js","current":"in-process timers","target":"Scheduler/Tasks/Jobs with shared leases and idempotency","preserve":["tenant scope","calendar event IDs","no duplicate XP/recurrence"]},
+    {"id":"capture-worker","source":"api/routes/captures.js; api/captureQueue.js","current":"local audio and subprocess","target":"private object storage plus bounded worker/job","preserve":["ownership","audio checksum","retry identity","capture states"]}
+  ],
+  "excluded_retired": ["personal crons of Midas", "personal crons of Seneca"],
+  "limits": ["Map combines code and scheduler inspection, not execution of every consumer", "Alfred live GPT/MCP acceptance remains separate", "No credentials, real payloads or ledger rows captured"]
+}
