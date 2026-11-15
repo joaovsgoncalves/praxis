@@ -176,6 +176,9 @@ test('duas contas: cada uma só vê e só mexe no que é seu', async (t) => {
     const res = await call('GET', '/api/calendar/events', { cookie: B });
     assert.equal(res.status, 404);
     assert.equal(res.json.code, 'calendar_not_linked');
+    const today = await call('GET', '/api/calendar/today', { cookie: B });
+    assert.equal(today.status, 200);
+    assert.deepEqual(today.json, [], 'o dia da conta sem agenda não tem eventos, e nunca os do dono');
     const seed = await call('POST', '/api/finance/seed', { cookie: B, body: { force: true } });
     assert.equal(seed.status, 404);
     assert.equal(seed.json.code, 'personal_seed');

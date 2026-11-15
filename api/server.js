@@ -267,6 +267,8 @@ registerParseVoiceRoutes(app, {
   openaiApiKey: OPENAI_API_KEY,
   appTimeZone: APP_TIME_ZONE,
 });
+// Conta sem agenda ligada: o dia dela simplesmente não tem eventos (a tela não precisa tratar erro).
+app.get('/api/calendar/today', (req, res, next) => (isLegacyScope() ? next() : res.json([])));
 app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a esta conta'), createCalendarRouter());
 app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOrder }));
 app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));

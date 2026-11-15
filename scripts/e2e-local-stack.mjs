@@ -10,7 +10,7 @@
  * - Serve o dist/ e repassa /api na mesma origem, como a Vercel faz em produção.
  * Requer `npm run build` antes. Sem comando depois de `--`, fica no ar até Ctrl+C.
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -22,6 +22,9 @@ const dist = path.join(root, 'dist');
 const apiPort = Number(process.env.PRAXIS_E2E_API_PORT || 18599);
 const webPort = Number(process.env.PRAXIS_E2E_WEB_PORT || 4179);
 const password = process.env.PRAXIS_E2E_PASSWORD || `e2e-${Math.random().toString(36).slice(2, 12)}`;
+// Segunda conta, sintética, para as provas de separação entre pessoas (fase 4).
+const secondUser = 'visita.e2e';
+const secondPassword = `e2e-b-${Math.random().toString(36).slice(2, 14)}`;
 const separator = process.argv.indexOf('--');
 const command = separator >= 0 ? process.argv.slice(separator + 1) : [];
 
@@ -36,7 +39,8 @@ fs.cpSync(path.join(root, 'api'), apiDir, {
   recursive: true,
   filter: (src) => {
     const name = path.basename(src);
-    return name !== 'node_modules' && name !== '.env' && name !== 'uploads' && !/\.db(-shm|-wal)?$/.test(name);
+    // `data` guarda os bancos das outras contas: como o praxis.db, nunca entra na cópia de teste.
+    return name !== 'node_modules' && name !== '.env' && name !== 'uploads' && name !== 'data' && !/\.db(-shm|-wal)?$/.test(name);
   },
 });
 fs.symlinkSync(fs.realpathSync(path.join(root, 'api', 'node_modules')), path.join(apiDir, 'node_modules'));
@@ -54,6 +58,8 @@ const api = spawn(process.env.PRAXIS_API_NODE || process.execPath, ['server.js']
     PRAXIS_COOKIE_SECURE: '0',
     FORJA_CALENDAR_SYNC_ENABLED: '0',
     PRAXIS_API_VERSION: 'e2e',
+    PRAXIS_DATA_DIR: path.join(apiDir, 'data'),
+    FORJA_TRANSCRIBE_PYTHON: process.env.PRAXIS_E2E_TRANSCRIBE_PYTHON || '/bin/false',
   },
 });
 const apiLogPath = path.join(sandbox, 'api.log');
@@ -148,6 +154,16 @@ web.listen(webPort, '127.0.0.1', async () => {
     stopStack(1);
     return;
   }
+  const made = spawnSync(process.env.PRAXIS_API_NODE || process.execPath, ['scripts/create-user.mjs', secondUser, 'Visita'], {
+    cwd: apiDir,
+    env: { ...process.env, PRAXIS_NEW_USER_PASSWORD: secondPassword },
+    encoding: 'utf8',
+  });
+  if (made.status !== 0) {
+    console.error(`Não criou a segunda conta de teste: ${made.stderr || made.stdout}`);
+    stopStack(1);
+    return;
+  }
   const base = `http://127.0.0.1:${webPort}`;
   if (command.length === 0) {
     console.log(`Pilha de teste em ${base} (API em ${apiPort}). Ctrl+C encerra e apaga o banco.`);
@@ -156,7 +172,14 @@ web.listen(webPort, '127.0.0.1', async () => {
   const child = spawn(command[0], command.slice(1), {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, PRAXIS_E2E_BASE: base, PRAXIS_E2E_PASSWORD: password, PRAXIS_E2E_LOCAL_STACK: '1' },
+    env: {
+      ...process.env,
+      PRAXIS_E2E_BASE: base,
+      PRAXIS_E2E_PASSWORD: password,
+      PRAXIS_E2E_USER2: secondUser,
+      PRAXIS_E2E_PASSWORD2: secondPassword,
+      PRAXIS_E2E_LOCAL_STACK: '1',
+    },
   });
   child.on('exit', (code) => stopStack(code ?? 1));
 });
