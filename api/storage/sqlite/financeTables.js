@@ -33,6 +33,62 @@ export const FINANCE_TABLES = Object.freeze({
   }),
 });
 
+/**
+ * Domínio 2 em diante: tabela genérica. `key` = coluna da chave primária (padrão `id`); `order` =
+ * ORDER BY da consulta antiga, termo a termo (`isNull` = `col IS NULL`); `filters` = colunas que a
+ * lista aceita filtrar por igualdade. Empate final: ordem de inserção (rowid / `_row`).
+ */
+const text = (name) => [name, 'TEXT'], int = (name) => [name, 'INTEGER'], real = (name) => [name, 'REAL'];
+export const FINANCE_GENERIC_TABLES = Object.freeze({
+  financeSubscriptions: Object.freeze({
+    table: 'finance_subscriptions',
+    columns: [text('id'), text('name'), text('lane'), real('amount'), text('cadence'), int('charge_day'), text('account_id'), text('status'), text('next_charge'), text('vendor_hint'), text('source'), int('locked'), text('note'), text('created_at'), text('updated_at')],
+    money: ['amount'], notNull: ['id', 'name'],
+    order: [{ col: 'lane' }, { col: 'amount', desc: true }],
+    filters: ['lane', 'status'],
+  }),
+  financeInstallments: Object.freeze({
+    table: 'finance_installments',
+    columns: [text('id'), text('title'), text('account_id'), real('monthly'), real('remaining'), int('paid_n'), int('total_n'), text('last_due'), text('status'), text('source'), int('locked'), text('note'), text('created_at'), text('updated_at')],
+    money: ['monthly', 'remaining'], notNull: ['id', 'title'],
+    order: [{ col: 'remaining', desc: true }, { col: 'monthly', desc: true }],
+    filters: ['status'],
+  }),
+  financeGoals: Object.freeze({
+    table: 'finance_goals',
+    columns: [text('id'), text('title'), real('target_amount'), real('current_amount'), text('due_date'), text('debt_id'), text('status'), text('created_at'), text('updated_at')],
+    money: ['target_amount', 'current_amount'], notNull: ['id', 'title'],
+    order: [{ col: 'due_date', isNull: true }, { col: 'due_date' }, { col: 'title' }],
+    filters: [],
+  }),
+  financeFixedExpenses: Object.freeze({
+    table: 'finance_fixed_expenses',
+    columns: [text('id'), text('name'), real('amount'), int('due_day'), text('category'), text('lane'), int('active'), text('last_paid_month'), text('note'), text('created_at'), text('updated_at')],
+    money: ['amount'], notNull: ['id', 'name', 'amount'],
+    order: [{ col: 'active', desc: true }, { col: 'due_day', isNull: true }, { col: 'due_day' }, { col: 'name' }],
+    filters: [],
+  }),
+  financeBudgets: Object.freeze({
+    table: 'finance_budgets',
+    key: 'category',
+    columns: [text('category'), real('monthly_limit'), text('updated_at')],
+    money: ['monthly_limit'], notNull: ['category', 'monthly_limit'],
+    order: [{ col: 'category' }],
+    filters: [],
+  }),
+  // Só o necessário no domínio 2 (apagar assinatura solta o vínculo); criação e unicidade no domínio 3.
+  financeTransactions: Object.freeze({
+    table: 'finance_transactions',
+    columns: [text('id'), text('pierre_tx_id'), text('account_id'), text('posted_on'), real('amount'), text('direction'), text('raw_description'), text('merchant'), text('category'), text('subscription_id'), text('debt_id'), text('source'), text('created_at'), text('external_id'), text('matched_tx_id'), text('note'), text('payment_id'), text('intent_key')],
+    money: ['amount'], notNull: ['id', 'posted_on', 'amount'],
+    order: [],
+    filters: ['subscription_id'],
+  }),
+});
+
+export const keyOf = (def) => def.key ?? 'id';
+export const orderSql = (def) => def.order.map(({ col, desc, isNull }) => (isNull ? `${col} IS NULL` : `${col} ${desc ? 'DESC' : 'ASC'}`)).join(', ');
+
 export const columnNames = (def) => def.columns.map(([name]) => name);
 
 /** Centavos exatos: o número tem de voltar igual depois de virar centavos (sem fração de centavo). */
@@ -69,7 +125,7 @@ export function financeRow(def, input) {
     if (!Object.hasOwn(input, name)) throw new StorageError('incomplete_finance_row', `incomplete_finance_row: ${def.table}.${name}`);
     checkValue(def, name, input[name]);
   }
-  recordId(input.id);
+  recordId(input[def.key ?? 'id']);
   if (def.singleton && input.id !== def.singleton) throw new StorageError('invalid_record_id');
   return Object.fromEntries(names.map((name) => [name, input[name]]));
 }
@@ -81,7 +137,7 @@ export function financePatch(def, input) {
   const keys = Object.keys(input);
   if (!keys.length) throw new StorageError('empty_patch');
   for (const key of keys) {
-    if (key === 'id') throw new StorageError('immutable_record_id');
+    if (key === (def.key ?? 'id')) throw new StorageError('immutable_record_id');
     if (!names.includes(key)) throw new StorageError('unknown_finance_field', `unknown_finance_field: ${def.table}.${key}`);
     checkValue(def, key, input[key]);
   }

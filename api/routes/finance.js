@@ -1,37 +1,20 @@
 import { Router } from 'express';
 import { asyncRoute } from '../lib/asyncRoute.js';
 import { createFinanceCoreService } from '../services/finance/core.js';
+import { createFinanceRecordsService } from '../services/finance/records.js';
 import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
 import {
   createDebt,
-  createGoal,
-  createInstallment,
-  createSubscription,
-  deleteInstallment,
-  deleteSubscription,
   createTransactionOnce,
-  createFixedExpense,
-  deleteFixedExpense,
   getInsights,
   getMonthSummary,
   getOverview,
   lastSync,
-  listBudgets,
   listDebts,
-  listFixedExpenses,
-  listGoals,
-  listInstallments,
-  listSubscriptions,
   listTransactions,
-  markFixedPaid,
   payDebt,
-  saveBudgets,
-  updateFixedExpense,
   seedFinanceIfEmpty,
   updateDebt,
-  updateGoal,
-  updateInstallment,
-  updateSubscription,
   updateTransaction,
   listPendingTransactions,
   getCoverageFor,
@@ -53,13 +36,15 @@ function withIntentKey(req) {
 
 /**
  * Finanças — mounted at /api/finance.
- * Migração (fase 5): configuração, contas e saldos saem da camada assíncrona (`storage`, serviço em
- * services/finance/core.js); o resto ainda usa `db`. Envelope igual ao da rota antiga, congelada em
+ * Migração (fase 5): configuração, contas e saldos (services/finance/core.js) e cadastros — fixas,
+ * orçamento, assinaturas, parcelas, metas (services/finance/records.js) — saem da camada assíncrona
+ * (`storage`); o resto ainda usa `db`. Envelope igual ao da rota antiga, congelada em
  * test-support/oracles/financeRoutes.bcbadad.js para a prova de paridade.
  */
 export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
   if (!storage) throw new TypeError('createFinanceRouter: informe storage (camada assíncrona)');
   const core = createFinanceCoreService({ storage, now });
+  const records = createFinanceRecordsService({ storage, now });
   const router = Router();
   installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
@@ -80,62 +65,62 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     }
   });
 
-  router.get('/budgets', (_req, res) => {
-    res.json(listBudgets(db));
-  });
+  router.get('/budgets', asyncRoute(async (_req, res) => {
+    res.json(await records.listBudgets());
+  }));
 
-  router.put('/budgets', (req, res) => {
+  router.put('/budgets', asyncRoute(async (req, res) => {
     try {
-      res.json(saveBudgets(db, req.body));
+      res.json(await records.saveBudgets(req.body));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   // despesas fixas mensais (faculdade, carro, contador…) — entram no "pode gastar até o salário"
-  router.get('/fixed', (_req, res) => {
-    res.json(listFixedExpenses(db, { today: localToday() }));
-  });
+  router.get('/fixed', asyncRoute(async (_req, res) => {
+    res.json(await records.listFixedExpenses({ today: localToday() }));
+  }));
 
-  router.post('/fixed', (req, res) => {
+  router.post('/fixed', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createFixedExpense(db, req.body || {}, { today: localToday() }));
+      res.status(201).json(await records.createFixedExpense(req.body || {}, { today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/fixed/:id', (req, res) => {
+  router.patch('/fixed/:id', asyncRoute(async (req, res) => {
     try {
-      const row = updateFixedExpense(db, req.params.id, req.body || {}, { today: localToday() });
+      const row = await records.updateFixedExpense(req.params.id, req.body || {}, { today: localToday() });
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.delete('/fixed/:id', (req, res) => {
-    const row = deleteFixedExpense(db, req.params.id);
+  router.delete('/fixed/:id', asyncRoute(async (req, res) => {
+    const row = await records.deleteFixedExpense(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, id: row.id });
-  });
+  }));
 
-  router.post('/fixed/:id/paid', (req, res) => {
+  router.post('/fixed/:id/paid', asyncRoute(async (req, res) => {
     try {
-      const row = markFixedPaid(db, req.params.id, { month: req.body?.month, today: localToday() });
+      const row = await records.markFixedPaid(req.params.id, { month: req.body?.month, today: localToday() });
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.delete('/fixed/:id/paid', (req, res) => {
-    const row = markFixedPaid(db, req.params.id, { month: null, today: localToday() });
+  router.delete('/fixed/:id/paid', asyncRoute(async (req, res) => {
+    const row = await records.markFixedPaid(req.params.id, { month: null, today: localToday() });
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
   router.get('/settings', asyncRoute(async (_req, res) => {
     res.json(await core.getSettings());
@@ -215,53 +200,53 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     }
   });
 
-  router.get('/subscriptions', (req, res) => {
-    res.json(listSubscriptions(db, { lane: req.query.lane, status: req.query.status }));
-  });
+  router.get('/subscriptions', asyncRoute(async (req, res) => {
+    res.json(await records.listSubscriptions({ lane: req.query.lane, status: req.query.status }));
+  }));
 
-  router.post('/subscriptions', (req, res) => {
+  router.post('/subscriptions', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createSubscription(db, req.body || {}));
+      res.status(201).json(await records.createSubscription(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/subscriptions/:id', (req, res) => {
-    const row = updateSubscription(db, req.params.id, req.body || {});
+  router.patch('/subscriptions/:id', asyncRoute(async (req, res) => {
+    const row = await records.updateSubscription(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.delete('/subscriptions/:id', (req, res) => {
-    const row = deleteSubscription(db, req.params.id);
+  router.delete('/subscriptions/:id', asyncRoute(async (req, res) => {
+    const row = await records.deleteSubscription(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, id: row.id });
-  });
+  }));
 
-  router.get('/installments', (req, res) => {
-    res.json(listInstallments(db, { status: req.query.status }));
-  });
+  router.get('/installments', asyncRoute(async (req, res) => {
+    res.json(await records.listInstallments({ status: req.query.status }));
+  }));
 
-  router.post('/installments', (req, res) => {
+  router.post('/installments', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createInstallment(db, req.body || {}));
+      res.status(201).json(await records.createInstallment(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/installments/:id', (req, res) => {
-    const row = updateInstallment(db, req.params.id, req.body || {});
+  router.patch('/installments/:id', asyncRoute(async (req, res) => {
+    const row = await records.updateInstallment(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.delete('/installments/:id', (req, res) => {
-    const row = deleteInstallment(db, req.params.id);
+  router.delete('/installments/:id', asyncRoute(async (req, res) => {
+    const row = await records.deleteInstallment(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, id: row.id });
-  });
+  }));
 
   router.get('/transactions', (req, res) => {
     try {
@@ -304,23 +289,23 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     }
   });
 
-  router.get('/goals', (_req, res) => {
-    res.json(listGoals(db));
-  });
+  router.get('/goals', asyncRoute(async (_req, res) => {
+    res.json(await records.listGoals());
+  }));
 
-  router.post('/goals', (req, res) => {
+  router.post('/goals', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createGoal(db, req.body || {}));
+      res.status(201).json(await records.createGoal(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/goals/:id', (req, res) => {
-    const row = updateGoal(db, req.params.id, req.body || {});
+  router.patch('/goals/:id', asyncRoute(async (req, res) => {
+    const row = await records.updateGoal(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
   router.post('/seed', (req, res) => {
     const result = seedFinanceIfEmpty(db, { force: Boolean(req.body?.force) });

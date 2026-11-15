@@ -153,3 +153,13 @@ export function sqliteRowWithReal(columns, args) {
   return Object.fromEntries(columns.map(([name, affinity], index) => [name,
     affinity === 'REAL' ? applyRealAffinity(bound[index]) : applyAffinity(bound[index], affinity)]));
 }
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+/**
+ * Texto como volta numa leitura do SQLite (better-sqlite3): substituto UTF-16 solto é gravado como
+ * 3 bytes inválidos (ED xx xx) e lido como 3 U+FFFD. Outro motor grava já o texto lido, para a
+ * resposta sair igual (oráculo em `sqliteSemantics.real.test.mjs`).
+ */
+export function sqliteStoredText(value) {
+  return typeof value === 'string' ? value.replace(LONE_SURROGATE, '���') : value;
+}

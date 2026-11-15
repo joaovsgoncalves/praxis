@@ -19,7 +19,7 @@ import {
   money, isValidDateString, todayFortaleza, parseEntity, normalizeBrandColor, normalizeCardLast4,
 } from '../../finance.js';
 import { bindPositional, sqliteRowWithReal } from '../../storage/sqliteSemantics.js';
-import { recordId } from '../../storage/contract.js';
+import { pick, badRequest, parseMonthDay, uniqueAs, orMissing, findIn } from './shared.js';
 
 const SETTINGS_INSERT = [['id', 'TEXT'], ['reserved_car', 'REAL'], ['reserved_live', 'REAL'], ['snapshot_label', 'TEXT'], ['updated_at', 'TEXT']];
 const SETTINGS_UPDATE = [['reserved_car', 'REAL'], ['reserved_live', 'REAL'], ['snapshot_label', 'TEXT'], ['hide_values', 'INTEGER'], ['salary_day', 'INTEGER'], ['updated_at', 'TEXT']];
@@ -28,19 +28,6 @@ const ACCOUNT_UPDATE = [['name', 'TEXT'], ['kind', 'TEXT'], ['institution', 'TEX
 const BALANCE_INSERT = [['id', 'TEXT'], ['account_id', 'TEXT'], ['as_of', 'TEXT'], ['amount', 'REAL'], ['amount_kind', 'TEXT'], ['source', 'TEXT'], ['locked', 'INTEGER'], ['note', 'TEXT'], ['created_at', 'TEXT']];
 const BALANCE_KINDS = ['available', 'invested', 'official_bill', 'projected_bill'];
 
-function pick(value, allowed, fallback) {
-  return allowed.includes(value) ? value : fallback;
-}
-function badRequest(message) {
-  const err = new Error(message);
-  err.status = 400;
-  return err;
-}
-function parseMonthDay(value, field) {
-  if (typeof value === 'string' && value.trim() !== '') value = Number(value);
-  if (!Number.isInteger(value) || value < 1 || value > 31) throw badRequest(`${field} precisa ser um dia de 1 a 31`);
-  return value;
-}
 function settingsView(row) {
   const salaryDay = Number(row.salary_day);
   return {
@@ -48,29 +35,6 @@ function settingsView(row) {
     hide_values: Number(row.hide_values) === 1,
     salary_day: Number.isInteger(salaryDay) && salaryDay >= 1 && salaryDay <= 31 ? salaryDay : DEFAULT_SALARY_DAY,
   };
-}
-function sqliteUniqueError(table) {
-  const error = new Error(`UNIQUE constraint failed: ${table}.id`);
-  error.name = 'SqliteError';
-  error.code = 'SQLITE_CONSTRAINT_PRIMARYKEY';
-  return error;
-}
-async function uniqueAs(table, promise) {
-  try { return await promise; } catch (error) { if (error?.code === 'already_exists') throw sqliteUniqueError(table); throw error; }
-}
-/** Id que nenhum registro pode ter (inválido para guardar) = registro inexistente. */
-async function orMissing(promise, missing = null) {
-  try { return await promise; } catch (error) { if (error?.code === 'invalid_record_id') return missing; throw error; }
-}
-function storableId(value) {
-  try { recordId(value); return true; } catch { return false; }
-}
-/**
- * Dentro da transação: erro de operação marca a transação como falha mesmo capturado, então o id
- * que não pode existir é decidido antes de consultar.
- */
-async function findIn(repo, id) {
-  return storableId(id) ? repo.get(id) : null;
 }
 function accountView(acc, latest) {
   const { available, invested, official_bill: official, projected_bill: projected } = latest;

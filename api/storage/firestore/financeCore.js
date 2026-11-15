@@ -1,12 +1,14 @@
 import { StorageError } from '../contract.js';
 import { documentId, originalId, centsToMoney } from '../schema.mjs';
 import { compareSqlite, maxSqlite } from '../sqliteOrder.js';
+import { sqliteStoredText } from '../sqliteSemantics.js';
 import { FINANCE_TABLES, columnNames, exactCents } from '../sqlite/financeTables.js';
 
 /**
  * Configuração, contas e saldos no Firestore (`users/{uid}/financeSettings|financeAccounts|financeBalances`).
  *
- * - Dinheiro em centavos inteiros no mesmo campo; a leitura devolve o número do SQLite.
+ * - Dinheiro em centavos inteiros no mesmo campo; a leitura devolve o número do SQLite. Texto com
+ *   substituto UTF-16 solto é gravado como o SQLite o devolve (`sqliteStoredText`).
  * - `_row` = ordem de inserção (o rowid), tirada de `users/{uid}/sequences/<coleção>`. Numa transação a
  *   sequência é lida por `reserve(n)` ANTES das escritas (o Firestore exige leituras antes das
  *   escritas) e gravada no primeiro `create`; criação sem reserva na transação é recusada.
@@ -23,8 +25,9 @@ function financeTable(userDoc, transaction, client, name) {
   const created = new Set();
   let reservation = null;
 
+  // Texto gravado como o SQLite o devolve (substituto UTF-16 solto = 3 U+FFFD).
   const toDoc = (row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key,
-    def.money.includes(key) && value !== null ? exactCents(value) : value]));
+    def.money.includes(key) && value !== null ? exactCents(value) : sqliteStoredText(value)]));
   const fromDoc = (key, value) => {
     if (value === undefined || value === null) return null;
     if (def.money.includes(key)) return centsToMoney(value);
@@ -88,7 +91,7 @@ export function firestoreFinanceSettings(userDoc, transaction, client) {
     get: () => t.get(FINANCE_TABLES.financeSettings.singleton),
     async create(row) {
       const doc = Object.fromEntries(Object.entries(row).map(([key, value]) => [key,
-        FINANCE_TABLES.financeSettings.money.includes(key) && value !== null ? exactCents(value) : value]));
+        FINANCE_TABLES.financeSettings.money.includes(key) && value !== null ? exactCents(value) : sqliteStoredText(value)]));
       if (!transaction) { await ref.create(doc); return structuredClone(row); }
       if (created.has(ref.path)) throw new StorageError('already_exists');
       created.add(ref.path);

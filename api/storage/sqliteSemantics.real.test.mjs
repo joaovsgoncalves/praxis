@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
-import { bindPositional, applyRealAffinity, sqliteRowWithReal } from './sqliteSemantics.js';
+import { bindPositional, applyRealAffinity, sqliteRowWithReal, sqliteStoredText } from './sqliteSemantics.js';
 
 function real(fn) {
   try { return { ok: fn() }; } catch (error) { return { error: `${error.name}: ${error.message}` }; }
@@ -65,5 +65,21 @@ test('linha com coluna REAL: mesma ligação e mesmos valores do SQLite real', (
     const truth = real(() => { db.exec('DELETE FROM r'); db.prepare('INSERT INTO r VALUES (?, ?, ?)').run(...args); return db.prepare('SELECT h, s, m FROM r').get(); });
     assert.deepEqual(emulated(() => sqliteRowWithReal(columns, args)), 'ok' in truth ? { ok: { ...truth.ok } } : truth, JSON.stringify(args));
   }
+  db.close();
+});
+
+test('texto com substituto UTF-16 solto: igual ao que o SQLite real devolve', () => {
+  const db = new Database(':memory:');
+  db.exec('CREATE TABLE s (t TEXT)');
+  const insert = db.prepare('INSERT INTO s (t) VALUES (?)'), read = db.prepare('SELECT t FROM s WHERE rowid = ?');
+  const emoji = '😀', high = emoji[0], low = emoji[1];
+  const corpus = ['', 'abc', emoji, `${emoji}abc`.slice(1), `x${emoji}`.slice(0, 2), high, low, `${low}${high}`, `${high}${high}${low}`, `a${low}b${high}`, `${'a'.repeat(119)}${emoji}`.slice(0, 120),
+    'ação', '�', `${high}�`, `${emoji}${emoji}`.slice(1, 3)];
+  for (let code = 0xd800; code <= 0xdfff; code += 97) corpus.push(`a${String.fromCharCode(code)}z`);
+  for (const value of corpus) {
+    const stored = read.get(insert.run(value).lastInsertRowid).t;
+    assert.equal(sqliteStoredText(value), stored, JSON.stringify(value));
+  }
+  assert.equal(sqliteStoredText(5), 5);
   db.close();
 });
