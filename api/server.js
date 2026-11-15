@@ -44,6 +44,7 @@ import { createProjectsRouter } from './routes/projects.js';
 import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
 import { createWeeklyReviewsService } from './services/weeklyReviews.js';
 import { createPurchasesService } from './services/purchases.js';
+import { createFocusService, createWellnessService } from './services/routine/focusWellness.js';
 import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -184,6 +185,8 @@ const storageRuntime = createStorageRuntime({
 });
 const weeklyReviews = createWeeklyReviewsService({ storage: storageRuntime.storage });
 const purchases = createPurchasesService({ storage: storageRuntime.storage });
+const focus = createFocusService({ storage: storageRuntime.storage });
+const wellness = createWellnessService({ storage: storageRuntime.storage });
 
 /** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
 function forEachOwner(label, fn) {
@@ -278,8 +281,8 @@ app.use('/api/tasks', createTasksRouter(routeCtx));
 registerIdeaToTaskRoute(app, routeCtx);
 app.use('/api/habits', createHabitsRouter(routeCtx));
 registerHabitLogRoutes(app, routeCtx);
-app.use('/api/wellness', createWellnessRouter(routeCtx));
-app.use('/api/focus', createFocusRouter({ db }));
+app.use('/api/wellness', createWellnessRouter({ wellness }));
+app.use('/api/focus', createFocusRouter({ focus }));
 app.use('/api/goals', createGoalsRouter({ db, getLocalDateString, nextSortOrder }));
 app.use('/api/user', createSettingsRouter({ db }));
 registerParseVoiceRoutes(app, {

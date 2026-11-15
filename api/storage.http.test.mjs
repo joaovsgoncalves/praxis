@@ -1,5 +1,5 @@
 /**
- * Rotas já servidas pela camada nova (revisões semanais e compras), no servidor de verdade: cópia isolada da API (banco novo,
+ * Rotas já servidas pela camada nova (revisões semanais, compras, foco e bem-estar), no servidor de verdade: cópia isolada da API (banco novo,
  * sem agenda, sem segredo de produção), duas contas, chave do agente no fluxo do Alfred, conferência
  * no arquivo de cada conta e desligamento gracioso.
  */
@@ -154,6 +154,25 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal((await call(proc, 'GET', '/api/purchases', { cookie: A })).json.length, 1);
   });
 
+  await t.test('foco e bem-estar pela camada nova: contas separadas e fluxos wellness.set/focus.create do Alfred', async () => {
+    const wa = await call(proc, 'POST', '/api/wellness', { cookie: A, body: { date: '2026-11-15', sleep_hours: 6.5, mood: 4 } });
+    const wb = await call(proc, 'POST', '/api/wellness', { cookie: B, body: { date: '2026-11-15', mood: 2 } });
+    assert.equal(wa.status, 201, wa.text); assert.equal(wb.status, 201, wb.text);
+    // wellness.set do Alfred: todos os campos, upsert do dia do dono legado, releitura por ?date=.
+    const set = await call(proc, 'POST', '/api/wellness', { key: API_KEY, body: { date: '2026-11-15', sleep_hours: 8, sleep_quality: 5, mood: 5, productivity: 4, note: 'Pelo Alfred' } });
+    assert.equal(set.status, 200, set.text); assert.equal(set.json.id, wa.json.id, 'atualiza o dia do dono, não cria outro');
+    assert.deepEqual((await call(proc, 'GET', '/api/wellness?date=2026-11-15', { key: API_KEY })).json, [set.json]);
+    assert.deepEqual((await call(proc, 'GET', '/api/wellness?date=2026-11-15', { cookie: B })).json.map((r) => r.mood), [2]);
+    // focus.create do Alfred e releitura por ?date=; a outra conta não vê.
+    const fa = await call(proc, 'POST', '/api/focus', { key: API_KEY, body: { date: '2026-11-15', duration_seconds: 1500, task_title: 'Pelo Alfred' } });
+    const fb = await call(proc, 'POST', '/api/focus', { cookie: B, body: { date: '2026-11-15', duration_seconds: 600 } });
+    assert.equal(fa.status, 201, fa.text); assert.equal(fb.status, 201, fb.text);
+    assert.deepEqual((await call(proc, 'GET', '/api/focus?date=2026-11-15', { cookie: A })).json, [fa.json]);
+    assert.deepEqual((await call(proc, 'GET', '/api/focus/stats?days=7', { cookie: B })).json.map((r) => r.total_seconds), [600]);
+    const bad = await fetch(`${proc.base}/api/focus`, { method: 'POST', headers: { cookie: A, 'content-type': 'application/json' }, body: JSON.stringify({ duration_seconds: 1.5 }), signal: AbortSignal.timeout(3000) });
+    assert.equal(bad.status, 500); assert.match(await bad.text(), /sqlite_coercion_unsupported/);
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -167,6 +186,10 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual(other.prepare('SELECT highlights FROM weekly_reviews').pluck().all(), ['Da Bia']);
     assert.deepEqual(control.prepare('SELECT title FROM purchase_items').pluck().all(), ['Fone do Jota']);
     assert.deepEqual(other.prepare('SELECT title FROM purchase_items').pluck().all(), ['Livro da Bia']);
+    assert.deepEqual(control.prepare('SELECT note FROM wellness_checks').pluck().all(), ['Pelo Alfred']);
+    assert.deepEqual(other.prepare('SELECT mood FROM wellness_checks').pluck().all(), [2]);
+    assert.deepEqual(control.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [1500]);
+    assert.deepEqual(other.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [600]);
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
 });
