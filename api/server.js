@@ -125,7 +125,7 @@ function addDaysLocal(dateString, days) {
 const HABIT_OUTCOMES = new Set(['done', 'skipped']);
 const SKIP_REASONS = new Set(['time', 'energy', 'context', 'other']);
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: true, credentials: true, exposedHeaders: ['X-Praxis-Account', 'X-Request-Id', 'X-Praxis-Api-Version'] }));
 app.use(createRequestLog({ version: resolveApiVersion(__dirname) }));
 app.use(express.json());
 

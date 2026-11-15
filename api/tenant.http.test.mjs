@@ -69,6 +69,7 @@ test.before(async () => {
       FORJA_API_KEY: API_KEY,
       PRAXIS_CAPTURE_WEBHOOK_SECRET: WEBHOOK,
       PRAXIS_API_VERSION: 'teste-contas',
+      FORJA_TRANSCRIBE_PYTHON: '/bin/false', // transcrição falha na hora: o teste não chama nenhum serviço de fala
       PRAXIS_DATA_DIR: path.join(apiDir, 'data'),
     },
   });
@@ -201,11 +202,48 @@ test('duas contas: cada uma só vê e só mexe no que é seu', async (t) => {
     assert.equal(other.prepare('SELECT count(*) FROM finance_debts').pluck().get(), 0);
   });
 
+  await t.test('cada resposta diz de que conta é, para a tela perceber troca feita em outra aba', async () => {
+    const tag = async (cookie) => (await fetch(`${base}/api/tasks`, { headers: { cookie } })).headers.get('x-praxis-account');
+    assert.equal(await tag(A), inA.json.user.id);
+    assert.equal(await tag(B), inB.json.user.id);
+  });
+
+  await t.test('áudio: o arquivo de cada conta fica em pasta própria, e a captura não cruza', async () => {
+    const send = async (cookie, name) => {
+      const form = new FormData();
+      form.append('audio', new Blob([Buffer.from(`audio-falso-${name}`)], { type: 'audio/webm' }), `${name}.webm`);
+      return fetch(`${base}/api/captures`, { method: 'POST', headers: { cookie }, body: form });
+    };
+    const sentB = await send(B, 'bia');
+    const sentA = await send(A, 'jota');
+    // A transcrição falha de propósito (422 ou 503): o que se confere é onde o áudio e a captura foram parar.
+    assert.ok([200, 422, 503].includes(sentB.status) && [200, 422, 503].includes(sentA.status), `${sentB.status} ${sentA.status}`);
+    const root = path.join(apiDir, 'uploads', 'captures');
+    const dirB = path.join(root, 'users', inB.json.user.id);
+    assert.equal(fs.readdirSync(dirB).length, 1, 'o áudio da Bia está na pasta dela');
+    assert.equal((fs.statSync(dirB).mode & 0o077), 0);
+    assert.equal(fs.readdirSync(root).filter((name) => name !== 'users').length, 1, 'o do dono legado segue onde sempre ficou');
+    const listB = (await call('GET', '/api/captures?status=failed,transcribed,parsed,pending,queued', { cookie: B })).json;
+    const listA = (await call('GET', '/api/captures?status=failed,transcribed,parsed,pending,queued', { cookie: A })).json;
+    const rows = (value) => (Array.isArray(value) ? value : (value?.captures || value?.items || []));
+    assert.equal(rows(listB).length, 1, JSON.stringify(listB).slice(0, 200));
+    assert.ok(rows(listA).every((row) => !rows(listB).some((other) => other.id === row.id)));
+  });
+
   await t.test('sair de uma conta não derruba a outra, e sem sessão nada responde', async () => {
     assert.equal((await call('POST', '/api/auth/logout', { cookie: B })).status, 200);
     assert.equal((await call('GET', '/api/tasks', { cookie: B })).status, 401);
     assert.equal((await call('GET', '/api/tasks', { cookie: A })).status, 200);
     assert.equal((await call('GET', '/api/tasks')).status, 401);
+  });
+
+  await t.test('forçar a senha de uma conta trava só ela; o dono segue entrando', async () => {
+    let last;
+    for (let i = 0; i < 31; i += 1) last = await login(`errada-${i}-xxxxxxxx`, 'bia.teste');
+    assert.equal(last.status, 429);
+    assert.equal((await login(PASS_B, 'bia.teste')).status, 429, 'a conta atacada espera a janela passar');
+    assert.equal((await login(PASS_A)).status, 200, 'a conta do dono não foi afetada');
+    assert.equal(log.includes('ERR_ERL_'), false, `o limitador reclamou da configuração:\n${log.slice(-600)}`);
   });
 
   assert.equal(/tenant_scope_missing|fora do escopo/.test(log), false, `banco usado sem dono:\n${log.slice(-800)}`);

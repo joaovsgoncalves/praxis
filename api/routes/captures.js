@@ -3,7 +3,8 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
-import { keepScope } from '../lib/tenantDb.js';
+import { assertUserId, keepScope } from '../lib/tenantDb.js';
+import { LEGACY_OWNER } from '../praxisAuth.js';
 import {
   listCaptures,
   getCapture,
@@ -150,9 +151,17 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
     return 'webm';
   }
 
-  function persistCaptureAudio(tempPath, captureId, mime) {
+  /** Áudio do dono legado fica onde sempre ficou; o das outras contas, em pasta própria. */
+  function captureDirFor(owner) {
+    if (!owner || owner === LEGACY_OWNER) return CAPTURE_DIR;
+    const dir = path.join(CAPTURE_DIR, 'users', assertUserId(owner));
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    return dir;
+  }
+
+  function persistCaptureAudio(tempPath, captureId, mime, owner) {
     const ext = audioExtensionForMime(mime);
-    const destPath = path.join(CAPTURE_DIR, `${captureId}.${ext}`);
+    const destPath = path.join(captureDirFor(owner), `${captureId}.${ext}`);
     fs.copyFileSync(tempPath, destPath);
     return destPath;
   }
@@ -193,7 +202,7 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
       tempPath = req.file.path;
 
       const captureId = randomUUID();
-      const destPath = persistCaptureAudio(tempPath, captureId, req.file.mimetype);
+      const destPath = persistCaptureAudio(tempPath, captureId, req.file.mimetype, req.praxisOwner);
       safeUnlink(tempPath);
       tempPath = null;
 

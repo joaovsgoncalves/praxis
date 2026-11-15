@@ -255,6 +255,8 @@ export function createApiAuthMiddleware({ db, apiKey, runAs = null }) {
         type: 'session',
         user: { id: session.user_id, username: session.username, display_name: session.display_name },
       };
+      // A tela confere se a resposta é da conta que ela acha que está aberta (troca em outra aba).
+      res.setHeader('X-Praxis-Account', session.user_id);
       return scoped(req, ownerKeyOf(session), next);
     }
 
@@ -264,11 +266,23 @@ export function createApiAuthMiddleware({ db, apiKey, runAs = null }) {
 
 const UNKNOWN_USER_HASH = bcrypt.hashSync(randomBytes(18).toString('hex'), 12);
 
+/**
+ * Limite de tentativas erradas por conta, não por endereço: a API fica atrás de mais de um
+ * intermediário, o endereço que chega aqui é o deles, e cabeçalho de origem pode ser forjado.
+ * Assim, forçar a senha de uma conta não trava a entrada das outras, e entrar certo não gasta tentativa.
+ */
 export const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => {
+    const typed = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+    if (!typed) return `conta:${LEGACY_OWNER}`;
+    return `conta:${normalizeUsername(typed) || 'invalida'}`;
+  },
+  validate: { xForwardedForHeader: false },
   message: { error: 'Too many login attempts. Try again later.' },
 });
 

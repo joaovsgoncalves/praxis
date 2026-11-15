@@ -4,6 +4,7 @@ import { setSessionHint } from '@/lib/sessionHint';
 import { clearSessionLost, subscribeSessionLost } from '@/lib/sessionGate';
 import { clearPendingIntent, userKeyOf } from '@/lib/pendingIntent';
 import { queryClientInstance } from '@/lib/query-client';
+import { adoptAccount, purgeTabData, releaseAccount, subscribeAccountChanged, watchOtherTabs } from '@/lib/accountScope';
 
 const AuthContext = createContext();
 
@@ -34,6 +35,29 @@ export const AuthProvider = ({ children }) => {
     [],
   );
 
+  // A conta deste navegador mudou por fora desta aba (outra aba saiu ou entrou com outra conta,
+  // ou o servidor respondeu por outra conta). Nada do que está na tela vale: recomeça do zero.
+  useEffect(() => {
+    const restart = () => {
+      purgeTabData();
+      queryClientInstance.clear();
+      window.location.reload();
+    };
+    const offChanged = subscribeAccountChanged(restart);
+    const offTabs = watchOtherTabs();
+    return () => {
+      offChanged();
+      offTabs();
+    };
+  }, []);
+
+  /** O servidor confirmou a conta: o que estiver guardado de outra conta sai antes de a tela pintar. */
+  const enterAccount = useCallback((nextUser) => {
+    const { switched } = adoptAccount(userKeyOf(nextUser));
+    if (switched) queryClientInstance.clear();
+    return switched;
+  }, []);
+
   const checkUserAuth = useCallback(async () => {
     const seq = ++checkSeq.current;
     const stale = () => seq !== checkSeq.current;
@@ -44,6 +68,7 @@ export const AuthProvider = ({ children }) => {
       if (stale()) return;
       setWebAuthEnabled(Boolean(config.webAuthEnabled));
       if (!config.webAuthEnabled) {
+        enterAccount({ username: 'local' });
         setUser({ username: 'local', display_name: 'Local dev' });
         setIsAuthenticated(true);
         setAuthChecked(true);
@@ -58,6 +83,7 @@ export const AuthProvider = ({ children }) => {
       const me = await praxisApi.auth.me();
       if (stale()) return;
       clearSessionLost();
+      enterAccount(me.user);
       setUser(me.user);
       setIsAuthenticated(true);
       setAuthChecked(true);
@@ -77,7 +103,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       if (!stale()) setIsLoadingAuth(false);
     }
-  }, []);
+  }, [enterAccount]);
 
   useEffect(() => {
     checkUserAuth();
@@ -92,14 +118,9 @@ export const AuthProvider = ({ children }) => {
     setAuthError({ type: 'auth_required' });
     setSessionHint(false);
     clearPendingIntent();
-    try {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k?.startsWith('praxis:offline:') || k?.startsWith('forja:offline:')) keys.push(k);
-      }
-      keys.forEach((k) => localStorage.removeItem(k));
-    } catch {}
+    // Saiu: nada desta conta fica no navegador nem na memória da aba.
+    releaseAccount();
+    queryClientInstance.clear();
   };
 
   const navigateToLogin = () => {
@@ -110,13 +131,12 @@ export const AuthProvider = ({ children }) => {
   const onLoginSuccess = (session) => {
     setAuthError(null);
     clearSessionLost();
-    // Entrou outra pessoa: nada do que estava em memória ou pendente vale para ela.
-    const sameUser = !user || !session?.user || userKeyOf(user) === userKeyOf(session.user);
-    if (sameUser) {
-      queryClientInstance.invalidateQueries();
-    } else {
-      clearPendingIntent();
-      queryClientInstance.clear();
+    // Entrou outra pessoa: nada do que estava guardado, em memória ou pendente vale para ela.
+    // Quem diz se é a mesma conta é o que o navegador guardava, não o que esta aba lembra.
+    if (session?.user) {
+      const switched = enterAccount(session.user);
+      if (switched) clearPendingIntent();
+      else queryClientInstance.invalidateQueries();
     }
     if (session?.user) {
       checkSeq.current += 1;

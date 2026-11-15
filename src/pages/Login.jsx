@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Hammer, Lock } from 'lucide-react';
+import { Hammer, Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { PraxisCenteredShell } from '@/components/layout/PraxisPage';
 import { readPendingIntent } from '@/lib/pendingIntent';
 
 export default function Login({ onSuccess, sessionLost = false }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ export default function Login({ onSuccess, sessionLost = false }) {
     if (!pwd) return;
     setLoading(true);
     try {
-      const session = await praxisApi.auth.login(pwd);
+      const session = await praxisApi.auth.login(pwd, username);
       onSuccess?.(session);
     } catch (err) {
       const msg = err?.message || '';
@@ -39,7 +40,9 @@ export default function Login({ onSuccess, sessionLost = false }) {
       if (msg.includes('503') || status === 503) {
         setError('Login ainda não configurado no servidor. Defina PRAXIS_APP_PASSWORD na VPS.');
       } else if (msg.includes('401') || status === 401) {
-        setError('Senha incorreta. Confere maiúsculas, símbolos e tenta de novo.');
+        setError(username.trim()
+          ? 'Usuário ou senha incorretos. Confere os dois e tenta de novo.'
+          : 'Senha incorreta. Confere maiúsculas, símbolos e tenta de novo.');
       } else if (msg.includes('429') || status === 429) {
         setError('Muitas tentativas — espera uns 15 min e tenta de novo.');
       } else {
@@ -75,6 +78,32 @@ export default function Login({ onSuccess, sessionLost = false }) {
           ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-muted-foreground">
+                Usuário
+              </Label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Input
+                  id="username"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="só para quem recebeu convite"
+                  aria-describedby="username-hint"
+                  disabled={loading}
+                  className="pl-10 praxis-touch-target"
+                />
+              </div>
+              <p id="username-hint" className="text-xs text-muted-foreground">
+                Sem convite, deixa em branco e entra só com a senha.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="password" className="text-muted-foreground">
                 Senha

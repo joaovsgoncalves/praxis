@@ -4,6 +4,7 @@ import { financeApiModule } from './financeApi';
 import { projectsApiModule } from './projectsApi';
 import { kindFromStatus } from '@/lib/apiFailure';
 import { isSessionLost, markSessionLost } from '@/lib/sessionGate';
+import { activeAccount, isForeignResponse, readOfflineEntry, reportAccountChanged, writeOfflineEntry } from '@/lib/accountScope';
 
 // Em produção, usa API relativa para passar pelo proxy /api do Vercel.
 // Em dev local, .env define VITE_PRAXIS_API/VITE_FORJA_API para o backend da Praxis.
@@ -37,29 +38,10 @@ function isCacheable(path) {
   return OFFLINE_CACHEABLE.some(p => path === p || path.startsWith(p + '?') || path.startsWith(p + '/'));
 }
 
-function readOfflineCache(path) {
-  try {
-    // Tenta ler o novo prefixo 'praxis:offline:' primeiro
-    let raw = localStorage.getItem('praxis:offline:' + path);
-    if (!raw) {
-      // Tenta ler o antigo 'forja:offline:' como fallback
-      raw = localStorage.getItem('forja:offline:' + path);
-    }
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function writeOfflineCache(path, data) {
-  try {
-    localStorage.setItem(
-      OFFLINE_KEY_PREFIX + path,
-      JSON.stringify({ data, timestamp: Date.now() })
-    );
-  } catch {}
-}
+// A cópia offline tem dono: só é lida e gravada para a conta que o servidor confirmou
+// (src/lib/accountScope.js). Cópia sem dono, ou de outra conta, não existe para a tela.
+const readOfflineCache = (path) => readOfflineEntry(path);
+const writeOfflineCache = (path, data, account) => writeOfflineEntry(path, data, account);
 
 export function getOfflineStatus() {
   // Heuristic: most-recently-cached entry; UI uses this to show a stale banner.
@@ -157,6 +139,8 @@ async function request(path, options = {}) {
 
   const isGet = !fetchOptions.method || fetchOptions.method === 'GET';
   const sessionFree = SESSION_FREE.some((prefix) => path.startsWith(prefix));
+  // De quem é este pedido: a conta ativa quando ele sai. A resposta só vale para ela.
+  const account = activeAccount();
 
   // A sessão já caiu: mandar mais chamadas só renderia uma fila de 401.
   if (!sessionFree && isSessionLost()) {
@@ -179,6 +163,12 @@ async function request(path, options = {}) {
       // Saiu do aparelho e a resposta não voltou: o resultado é desconhecido.
       throw apiError(cause?.message || 'Falha de rede', { kind: 'network', sent: true, requestId, cause });
     }
+    // O servidor diz por qual conta respondeu. Se não é a desta aba (outra aba trocou de conta),
+    // a resposta não é mostrada nem guardada: a tela recomeça com a conta certa.
+    if (!sessionFree && isForeignResponse(res.headers.get('X-Praxis-Account'), account)) {
+      reportAccountChanged({ source: 'resposta' });
+      throw apiError('A conta deste navegador mudou', { kind: 'session', accountChanged: true, requestId });
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw failedResponse(res, body, path, requestId);
@@ -186,13 +176,13 @@ async function request(path, options = {}) {
     if (res.status === 204) return null;
     const data = await res.json();
     if (isGet && isCacheable(path)) {
-      writeOfflineCache(path, data);
+      writeOfflineCache(path, data, account);
       emitOfflineState(false);
     }
     return data;
   } catch (err) {
     // Resposta do servidor não é falta de rede: sessão, permissão e "não existe" sobem como são.
-    if (err?.status === 401 || err?.status === 403 || err?.status === 404) throw err;
+    if (err?.status === 401 || err?.status === 403 || err?.status === 404 || err?.accountChanged) throw err;
     // Fall back to cached payload only on cacheable GETs — never silently swallow writes.
     if (isGet && !fresh && isCacheable(path)) {
       const cached = readOfflineCache(path);
@@ -215,11 +205,13 @@ export const praxisApi = {
   auth: {
     config: () => request('/api/auth/config'),
     me: () => request('/api/auth/me'),
-    login: (password) =>
-      request('/api/auth/login', {
+    login: (password, username = '') => {
+      const name = String(username ?? '').trim();
+      return request('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ password: String(password ?? '').trim() }),
-      }),
+        body: JSON.stringify({ password: String(password ?? '').trim(), ...(name ? { username: name } : {}) }),
+      });
+    },
     logout: () => request('/api/auth/logout', { method: 'POST', body: '{}' }),
   },
 
