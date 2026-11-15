@@ -4,22 +4,22 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { createTestDb } from './test-support/helpers.mjs';
 import { createStorage } from './storage/index.js';
-import { createSqliteTasksDriver } from './storage/sqlite/tasks.js';
-import { createFirestoreTasksDriver } from './storage/firestore/tasks.js';
+import { createSqliteDriver } from './storage/sqlite/driver.js';
+import { createFirestoreDriver } from './storage/firestore/driver.js';
 import { Firestore } from '@google-cloud/firestore';
 
 const now = () => new Date('2026-11-15T12:00:00Z');
 async function fixture(kind) {
   const scope = new AsyncLocalStorage(), databases = new Map();
   let client;
-  const driver = kind === 'sqlite' ? createSqliteTasksDriver({
+  const driver = kind === 'sqlite' ? createSqliteDriver({
     open(owner) { if (!databases.has(owner)) databases.set(owner, createTestDb()); return databases.get(owner); },
   }) : (() => {
     const host = process.env.FIRESTORE_EMULATOR_HOST;
     assert.match(host || '', /^(127\.0\.0\.1|localhost):\d+$/);
     client = new Firestore({projectId:'demo-praxis-storage', host, ssl:false});
     const root = client.collection('storageContractRuns').doc(randomUUID());
-    return createFirestoreTasksDriver({root, client});
+    return createFirestoreDriver({root, client});
   })();
   return { driver, storage:createStorage({driver, currentOwner:()=>scope.getStore(), now}),
     as:(owner, fn)=>scope.run(owner, fn), close:async()=>{ for(const db of databases.values()) db.close(); if(client)await client.terminate(); } };
@@ -73,6 +73,10 @@ for (const kind of ['sqlite','firestore']) {
   await t.test('commit-time duplicate aborts all writes',async()=>inAtomic(async()=>{
    await assert.rejects(()=>s.transaction(async tx=>{await tx.tasks.patch('a',{title:'wrong'});await tx.tasks.create(input('b'));}),{code:'already_exists'});
    assert.equal((await s.tasks.get('a')).title,'Tarefa sintética');
+  }));
+  await t.test('same id created twice in one transaction is already_exists in both engines',async()=>as('double_create',async()=>{
+   await assert.rejects(()=>s.transaction(async tx=>{await tx.tasks.create(input('d'));await tx.tasks.create(input('d'));}),{code:'already_exists'});
+   assert.equal(await s.tasks.get('d'),null);
   }));
   await t.test('caught write failure still aborts the complete transaction',async()=>inAtomic(async()=>{
    await assert.rejects(()=>s.transaction(async tx=>{

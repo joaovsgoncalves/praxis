@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { documentId, originalId, moneyToCents, centsToMoney } from './schema.mjs';
-import { createSqliteTasksDriver } from './sqlite/tasks.js';
+import { createSqliteDriver } from './sqlite/driver.js';
 import { createTestDb } from '../test-support/helpers.mjs';
 
 test('record locator is injective across ordinary, reserved, encoded-looking and oversized keys',()=>{
@@ -19,7 +19,7 @@ test('money conversion preserves cents and tolerates only representation noise',
 });
 test('SQLite provider cannot reuse one connection for two owners',async()=>{
  const db=createTestDb();try{
-  const driver=createSqliteTasksDriver({open:()=>db});await driver.tasks('alice').get('none');
+  const driver=createSqliteDriver({open:()=>db});await driver.tasks('alice').get('none');
   assert.throws(()=>driver.tasks('bob'),{code:'sqlite_owner_connection_reused'});
  }finally{db.close();}
 });
