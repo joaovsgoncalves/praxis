@@ -13,7 +13,7 @@
  * - `db.prepare()` devolve um statement preguiçoso: quem o guarda numa variável continua seguro,
  *   porque o banco é escolhido a cada execução.
  */
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { AsyncLocalStorage, AsyncResource } from 'node:async_hooks';
 
 export class TenantScopeError extends Error {
   constructor(message) {
@@ -25,6 +25,14 @@ export class TenantScopeError extends Error {
 
 const STATEMENT_MODIFIERS = new Set(['pluck', 'raw', 'expand', 'safeIntegers', 'bind']);
 const USER_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/**
+ * Middlewares que leem o corpo por eventos (upload de arquivo) chamam `next` fora do escopo de
+ * quem fez a requisição. Este embrulho devolve o `next` ao escopo em que o middleware começou.
+ */
+export function keepScope(middleware) {
+  return (req, res, next) => middleware(req, res, AsyncResource.bind(next));
+}
 
 export function assertUserId(userId) {
   if (typeof userId !== 'string' || !USER_ID_PATTERN.test(userId)) {
@@ -84,6 +92,7 @@ export function createTenantDb({ open, bootDb = null } = {}) {
     };
     return new Proxy({}, {
       get(_target, prop) {
+        if (typeof prop === 'symbol' || prop === 'then') return undefined;
         if (prop === 'source') return sql;
         if (STATEMENT_MODIFIERS.has(prop)) return (...args) => lazyWith(sql, [...modifiers, [prop, args]]);
         const statement = real();
@@ -107,6 +116,7 @@ export function createTenantDb({ open, bootDb = null } = {}) {
 
   const facade = new Proxy({}, {
     get(_target, prop) {
+      if (typeof prop === 'symbol' || prop === 'then') return undefined;
       if (prop === 'prepare') return (sql) => lazyStatement(sql);
       if (prop === 'transaction') return transaction;
       // fechar o banco de uma pessoa por dentro de uma rota derrubaria as outras requisições dela

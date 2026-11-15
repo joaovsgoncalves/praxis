@@ -6,6 +6,21 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 
 export const SESSION_COOKIE = 'praxis_sid';
+/** Dono dos dados que já existiam antes das contas: o banco de sempre é dele. */
+export const LEGACY_OWNER = 'legacy';
+const DEFAULT_USERNAME = 'jota';
+const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{1,31}$/;
+
+/** Chave que escolhe o banco da pessoa. Sai do usuário que o servidor verificou, nunca do cliente. */
+export function ownerKeyOf(user) {
+  if (!user) return null;
+  return user.legacy_owner ? LEGACY_OWNER : (user.user_id || user.id || null);
+}
+
+export function normalizeUsername(value) {
+  const name = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return USERNAME_PATTERN.test(name) ? name : '';
+}
 const SESSION_DAYS = 30;
 
 export function isWebAuthEnabled() {
@@ -43,6 +58,31 @@ export function initAuthSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_praxis_sessions_token ON praxis_sessions(token);
     CREATE INDEX IF NOT EXISTS idx_praxis_sessions_expires ON praxis_sessions(expires_at);
   `);
+  const columns = db.prepare('PRAGMA table_info(praxis_users)').all().map((column) => column.name);
+  if (!columns.includes('legacy_owner')) {
+    db.exec('ALTER TABLE praxis_users ADD COLUMN legacy_owner INTEGER NOT NULL DEFAULT 0');
+  }
+  // Quem já usava a Praxis antes das contas segue dono do banco de sempre.
+  db.prepare(`
+    UPDATE praxis_users SET legacy_owner = 1
+    WHERE username = ? AND NOT EXISTS (SELECT 1 FROM praxis_users WHERE legacy_owner = 1)
+  `).run(DEFAULT_USERNAME);
+}
+
+/** Cria uma conta do beta. Os dados dela nascem vazios, em banco próprio, no primeiro acesso. */
+export function createUser(db, { username, password, displayName = '' }) {
+  const name = normalizeUsername(username);
+  if (!name) throw new Error('usuário inválido: use de 2 a 32 letras minúsculas, números, ponto, hífen ou sublinhado');
+  const secret = typeof password === 'string' ? password.trim() : '';
+  if (secret.length < 10) throw new Error('senha curta: use pelo menos 10 caracteres');
+  if (db.prepare('SELECT 1 FROM praxis_users WHERE lower(username) = ?').get(name)) {
+    throw new Error('já existe uma conta com esse usuário');
+  }
+  const id = randomBytes(16).toString('hex');
+  db.prepare(
+    'INSERT INTO praxis_users (id, username, password_hash, display_name, legacy_owner) VALUES (?, ?, ?, ?, 0)'
+  ).run(id, name, bcrypt.hashSync(secret, 12), String(displayName || name).slice(0, 80));
+  return { id, username: name };
 }
 
 export function ensureDefaultUser(db) {
@@ -51,12 +91,13 @@ export function ensureDefaultUser(db) {
     console.warn('[praxis-auth] PRAXIS_APP_PASSWORD not set — browser login disabled until configured');
     return;
   }
-  const existing = db.prepare('SELECT id, password_hash FROM praxis_users WHERE username = ?').get('jota');
+  const existing = db.prepare('SELECT id, password_hash FROM praxis_users WHERE username = ?').get(DEFAULT_USERNAME);
   const hash = bcrypt.hashSync(password, 12);
   if (!existing) {
+    const hasLegacyOwner = Boolean(db.prepare('SELECT 1 FROM praxis_users WHERE legacy_owner = 1').get());
     db.prepare(
-      'INSERT INTO praxis_users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)'
-    ).run(randomBytes(16).toString('hex'), 'jota', hash, 'João Victor');
+      'INSERT INTO praxis_users (id, username, password_hash, display_name, legacy_owner) VALUES (?, ?, ?, ?, ?)'
+    ).run(randomBytes(16).toString('hex'), DEFAULT_USERNAME, hash, 'João Victor', hasLegacyOwner ? 0 : 1);
     console.log('[praxis-auth] Default user "jota" created from env password');
     return;
   }
@@ -92,7 +133,7 @@ export function getSessionFromRequest(db, req) {
   const token = cookies[SESSION_COOKIE];
   if (!token) return null;
   const row = db.prepare(`
-    SELECT s.id AS session_id, s.user_id, s.expires_at, u.username, u.display_name
+    SELECT s.id AS session_id, s.user_id, s.expires_at, u.username, u.display_name, u.legacy_owner
     FROM praxis_sessions s
     JOIN praxis_users u ON u.id = s.user_id
     WHERE s.token = ? AND datetime(s.expires_at) > datetime('now')
@@ -170,9 +211,23 @@ export const PUBLIC_API_PATHS = new Set([
   '/api/webhooks/capture-text',
 ]);
 
-export function createApiAuthMiddleware({ db, apiKey }) {
+/** Rotas públicas que gravam dado: entram sempre na conta do dono legado (captura do Telegram do João). */
+const PUBLIC_LEGACY_PATHS = new Set(['/api/webhooks/capture-text']);
+
+/**
+ * @param {object} options
+ * @param {import('better-sqlite3').Database} options.db banco de controle (usuários e sessões)
+ * @param {string} [options.apiKey] chave dos agentes; vale pela conta do dono legado
+ * @param {(owner: string, fn: Function) => any} [options.runAs] abre o escopo de dados da pessoa
+ */
+export function createApiAuthMiddleware({ db, apiKey, runAs = null }) {
+  const scoped = (req, owner, next) => {
+    req.praxisOwner = owner;
+    return runAs ? runAs(owner, next) : next();
+  };
   return (req, res, next) => {
     if (!req.path.startsWith('/api/')) return next();
+    if (PUBLIC_LEGACY_PATHS.has(req.path)) return scoped(req, LEGACY_OWNER, next);
     if (PUBLIC_API_PATHS.has(req.path)) return next();
 
     if (!isWebAuthEnabled()) {
@@ -184,14 +239,14 @@ export function createApiAuthMiddleware({ db, apiKey }) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
       }
-      return next();
+      return scoped(req, LEGACY_OWNER, next);
     }
 
     const header = req.headers.authorization || '';
     const bearer = header.startsWith('Bearer ') ? header.slice(7) : req.headers['x-forja-key'];
     if (apiKey && bearer && safeEqual(bearer, apiKey)) {
       req.praxisAuth = { type: 'api_key', user: { username: 'automation' } };
-      return next();
+      return scoped(req, LEGACY_OWNER, next);
     }
 
     const session = getSessionFromRequest(db, req);
@@ -200,12 +255,14 @@ export function createApiAuthMiddleware({ db, apiKey }) {
         type: 'session',
         user: { id: session.user_id, username: session.username, display_name: session.display_name },
       };
-      return next();
+      return scoped(req, ownerKeyOf(session), next);
     }
 
     return rejectSession(db, req, res);
   };
 }
+
+const UNKNOWN_USER_HASH = bcrypt.hashSync(randomBytes(18).toString('hex'), 12);
 
 export const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -230,7 +287,7 @@ export function registerAuthRoutes(app, db, { secureCookie = true } = {}) {
     const session = getSessionFromRequest(db, req);
     if (!session) return rejectSession(db, req, res);
     res.json({
-      user: { username: session.username, display_name: session.display_name },
+      user: { id: session.user_id, username: session.username, display_name: session.display_name },
       auth: 'session',
     });
   });
@@ -239,22 +296,32 @@ export function registerAuthRoutes(app, db, { secureCookie = true } = {}) {
     if (!isWebAuthEnabled()) {
       return res.status(400).json({ error: 'Web auth is disabled on this server' });
     }
-    const { password } = req.body || {};
+    const { password, username } = req.body || {};
     const normalized = typeof password === 'string' ? password.trim() : '';
     if (!normalized) {
       return res.status(400).json({ error: 'Password is required' });
     }
-    const user = db.prepare('SELECT * FROM praxis_users WHERE username = ?').get('jota');
-    if (!user) {
-      return res.status(503).json({ error: 'Login not configured. Set PRAXIS_APP_PASSWORD on the server.' });
+    // Sem usuário no pedido, vale o dono legado: quem já usava segue entrando só com a senha.
+    const typedName = typeof username === 'string' ? username.trim() : '';
+    let user;
+    if (typedName) {
+      const name = normalizeUsername(typedName);
+      user = name ? db.prepare('SELECT * FROM praxis_users WHERE lower(username) = ?').get(name) : null;
+    } else {
+      user = db.prepare('SELECT * FROM praxis_users WHERE legacy_owner = 1').get();
+      if (!user) {
+        return res.status(503).json({ error: 'Login not configured. Set PRAXIS_APP_PASSWORD on the server.' });
+      }
     }
-    if (!bcrypt.compareSync(normalized, user.password_hash)) {
+    // Mesma resposta e mesmo custo para usuário que não existe e para senha errada.
+    const matches = bcrypt.compareSync(normalized, user ? user.password_hash : UNKNOWN_USER_HASH);
+    if (!user || !matches) {
       res.locals.authFailure = 'senha_incorreta';
       return res.status(401).json({ error: 'Invalid password' });
     }
     createSession(db, user.id, res, { secureCookie });
     res.json({
-      user: { username: user.username, display_name: user.display_name },
+      user: { id: user.id, username: user.username, display_name: user.display_name },
       auth: 'session',
     });
   });

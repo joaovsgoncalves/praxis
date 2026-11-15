@@ -46,6 +46,7 @@ api/*.bak*
 api/*.db.bak*
 api/backups/
 api/uploads/
+api/data/
 
 # Generated architecture diagrams (archify visual-check)
 docs/diagrams/

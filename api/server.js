@@ -9,6 +9,7 @@ import {
   ensureDefaultUser,
   registerAuthRoutes,
   createApiAuthMiddleware,
+  LEGACY_OWNER,
 } from './praxisAuth.js';
 import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
@@ -17,6 +18,8 @@ import { createCalendarServices } from './lib/calendarSync.js';
 import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
 import { createDayRollover } from './lib/dayRollover.js';
 import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
+import { createTenantDb } from './lib/tenantDb.js';
+import { createUserDbs } from './lib/userDbs.js';
 import { createTasksRouter, registerIdeaToTaskRoute } from './routes/tasks.js';
 import { createHabitsRouter, registerHabitLogRoutes } from './routes/habits.js';
 import { createWellnessRouter } from './routes/wellness.js';
@@ -130,22 +133,59 @@ const COOKIE_SECURE = !['0', 'false', 'no'].includes(
   String(process.env.PRAXIS_COOKIE_SECURE ?? '1').toLowerCase(),
 );
 
-const db = new Database(resolveDbPath(__dirname));
-db.pragma('journal_mode = WAL');
+// O banco de sempre: dados do dono legado e controle de usuários e sessões.
+const controlDb = new Database(resolveDbPath(__dirname));
+controlDb.pragma('journal_mode = WAL');
 
-initializeDatabase(db);
-initAuthSchema(db);
-initCaptureQueueSchema(db);
-initPurchaseSchema(db);
-initFinanceSchema(db);
-seedFinanceIfEmpty(db);
-initProjectsSchema(db);
-initContinuityGuidanceSchema(db);
-seedProjectsIfEmpty(db);
-ensureDefaultUser(db);
+/** Esquema e linhas padrão. As sementes pessoais (finanças e frentes do João) só no banco dele. */
+function prepareUserData(target, { personalSeeds }) {
+  initializeDatabase(target);
+  initCaptureQueueSchema(target);
+  initPurchaseSchema(target);
+  initFinanceSchema(target);
+  if (personalSeeds) seedFinanceIfEmpty(target);
+  initProjectsSchema(target);
+  initContinuityGuidanceSchema(target);
+  if (personalSeeds) seedProjectsIfEmpty(target);
+}
 
-registerAuthRoutes(app, db, { secureCookie: COOKIE_SECURE });
-app.use(createApiAuthMiddleware({ db, apiKey: FORJA_API_KEY }));
+prepareUserData(controlDb, { personalSeeds: true });
+initAuthSchema(controlDb);
+ensureDefaultUser(controlDb);
+
+// Um banco por pessoa: as rotas recebem `db`, que sempre aponta para o banco de quem o servidor
+// identificou na requisição. Enquanto o servidor sobe (sem requisição), aponta para o banco legado.
+const userDbs = createUserDbs({
+  controlDb,
+  dataDir: process.env.PRAXIS_DATA_DIR || path.join(__dirname, 'data'),
+  prepare: (target) => prepareUserData(target, { personalSeeds: false }),
+});
+const tenant = createTenantDb({ bootDb: controlDb, open: userDbs.open });
+const db = tenant.db;
+const isLegacyScope = () => tenant.currentUserId() === LEGACY_OWNER;
+
+/** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
+function forEachOwner(label, fn) {
+  for (const owner of userDbs.ownerKeys()) {
+    try {
+      tenant.runAs(owner, fn);
+    } catch (error) {
+      console.error(`[contas] ${label} falhou para ${owner === LEGACY_OWNER ? 'o dono legado' : `a conta ${owner.slice(0, 8)}…`}:`, error?.message || error);
+    }
+  }
+}
+
+/**
+ * O que é pessoal do dono legado e está ligado ao servidor (agenda do Google, banco pelo Pierre,
+ * dados de partida escritos no código) não existe para as outras contas.
+ */
+const legacyOnly = (code, message) => (req, res, next) => {
+  if (isLegacyScope()) return next();
+  return res.status(404).json({ error: message, code });
+};
+
+registerAuthRoutes(app, controlDb, { secureCookie: COOKIE_SECURE });
+app.use(createApiAuthMiddleware({ db: controlDb, runAs: tenant.runAs, apiKey: FORJA_API_KEY }));
 
 function stripPriorityPrefix(title) {
   if (typeof title !== 'string') return title;
@@ -171,15 +211,22 @@ function reorderItems(table, orderedIds) {
   return uniqueIds.length;
 }
 
-const {
-  syncTaskToCalendar,
-  runCalendarMaintenance,
-  createCalendarRouter,
-  taskNeedsCalendarSync,
-} = createCalendarServices({ db, getLocalDateString });
+// A agenda do Google ligada ao servidor é a do dono legado. Para as outras contas, nada sai daqui:
+// nem evento criado, nem fila, nem leitura da agenda dele.
+const calendarServices = createCalendarServices({ db, getLocalDateString });
+const { createCalendarRouter } = calendarServices;
+const CALENDAR_NOT_LINKED = { skipped: true, reason: 'agenda não ligada a esta conta' };
+const syncTaskToCalendar = (...args) => (isLegacyScope() ? calendarServices.syncTaskToCalendar(...args) : CALENDAR_NOT_LINKED);
+const taskNeedsCalendarSync = (...args) => isLegacyScope() && calendarServices.taskNeedsCalendarSync(...args);
+const runCalendarMaintenance = () => tenant.runAs(LEGACY_OWNER, () => calendarServices.runCalendarMaintenance());
 
 // Agenda fora da transação da tarefa: as rotas gravam a intenção, a fila sincroniza depois.
-const calendarQueue = createTaskCalendarQueue({ db, syncTaskToCalendar });
+const legacyCalendarQueue = createTaskCalendarQueue({ db, syncTaskToCalendar });
+const calendarQueue = {
+  enqueue: (...args) => (isLegacyScope() ? legacyCalendarQueue.enqueue(...args) : { queued: false }),
+  drain: (...args) => (isLegacyScope() ? legacyCalendarQueue.drain(...args) : { processed: 0, done: 0, retry: 0, failed: 0 }),
+  stats: (...args) => (isLegacyScope() ? legacyCalendarQueue.stats(...args) : { pending: 0, failed: 0 }),
+};
 
 const routeCtx = {
   db,
@@ -202,6 +249,8 @@ app.use('/api/categories', createCategoriesRouter(CATEGORIES));
 registerOpsRoutes(app, { apiDir: __dirname });
 app.use('/api/purchases', createPurchasesRouter({ db }));
 app.use('/api/projects', createProjectsRouter({ db, getLocalDateString }));
+app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não existem para esta conta'));
+app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));
 app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
 registerCaptureRoutes(app, { db, apiDir: __dirname });
 app.use('/api/tasks', createTasksRouter(routeCtx));
@@ -218,7 +267,7 @@ registerParseVoiceRoutes(app, {
   openaiApiKey: OPENAI_API_KEY,
   appTimeZone: APP_TIME_ZONE,
 });
-app.use('/api/calendar', createCalendarRouter());
+app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a esta conta'), createCalendarRouter());
 app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOrder }));
 app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
 registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
@@ -229,16 +278,19 @@ const HOST = process.env.HOST || '127.0.0.1';
 
 // Virada do dia: fecha as vencidas antes de atender e segue conferindo a cada minuto.
 const dayRollover = createDayRollover({ db, getLocalDateString, nextSortOrder });
-dayRollover.run('subida');
+forEachOwner('virada do dia', () => dayRollover.run('subida'));
+
+// Daqui em diante, banco sem dono no escopo não responde: nenhuma rota cai nos dados de outra pessoa.
+tenant.seal();
 
 app.listen(PORT, HOST, () => {
   console.log(`🔥 Praxis API running on ${HOST}:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
   setImmediate(() => {
     runCalendarMaintenance();
-    calendarQueue.drain();
+    tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain());
   });
   // Retentativa das intenções de agenda que falharam (a espera entre tentativas fica na fila).
-  setInterval(() => calendarQueue.drain(), 60 * 1000).unref();
-  dayRollover.start();
+  setInterval(() => tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain()), 60 * 1000).unref();
+  setInterval(() => forEachOwner('virada do dia', () => dayRollover.run('tick')), 60 * 1000).unref();
 });

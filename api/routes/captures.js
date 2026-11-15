@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
+import { keepScope } from '../lib/tenantDb.js';
 import {
   listCaptures,
   getCapture,
@@ -87,7 +88,7 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
   }
 
   // ==================== TRANSCRIPTION ====================
-  app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  app.post('/api/transcribe', keepScope(upload.single('audio')), async (req, res) => {
     const startedAt = Date.now();
     let audioPath = null;
     let transcriptionSlotAcquired = false;
@@ -178,7 +179,7 @@ export function registerCaptureRoutes(app, { db, apiDir }) {
     res.json(cap);
   });
 
-  app.post('/api/captures', upload.single('audio'), async (req, res) => {
+  app.post('/api/captures', keepScope(upload.single('audio')), async (req, res) => {
     const startedAt = Date.now();
     let tempPath = null;
     let slot = false;
