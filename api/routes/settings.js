@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { asyncRoute } from '../lib/asyncRoute.js';
 
 function settingsPayload(settings) {
   return {
@@ -23,20 +24,20 @@ function isValidFocusGoal(value) {
     || (Number.isInteger(value) && value >= FOCUS_GOAL_MIN && value <= FOCUS_GOAL_MAX);
 }
 
-/** User settings — mounted at /api/user (paths: /settings) */
-export function createSettingsRouter({ db }) {
+/**
+ * User settings — mounted at /api/user (paths: /settings).
+ * Gravação no serviço (`services/personal/settings.js`); envelope igual ao da rota antiga, congelada
+ * em `test-support/oracles/settings.bcbadad.js` para a prova de paridade.
+ */
+export function createSettingsRouter({ settings }) {
+  if (!settings) throw new TypeError('createSettingsRouter: informe o serviço settings');
   const router = Router();
 
-  router.get('/settings', (req, res) => {
-    let settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
-    if (!settings) {
-      db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
-      settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
-    }
-    res.json(settingsPayload(settings));
-  });
+  router.get('/settings', asyncRoute(async (req, res) => {
+    res.json(settingsPayload(await settings.get()));
+  }));
 
-  router.put('/settings', (req, res) => {
+  router.put('/settings', asyncRoute(async (req, res) => {
     const {
       full_name,
       avatar_url,
@@ -55,11 +56,6 @@ export function createSettingsRouter({ db }) {
       });
     }
 
-    const existing = db.prepare('SELECT id FROM user_settings WHERE id = ?').get('default');
-    if (!existing) {
-      db.prepare('INSERT INTO user_settings (id) VALUES (?)').run('default');
-    }
-
     let density = list_density;
     if (density !== undefined && density !== null) {
       const d = String(density);
@@ -69,33 +65,12 @@ export function createSettingsRouter({ db }) {
       density = d;
     }
 
-    db.prepare(`
-      UPDATE user_settings SET
-        full_name = COALESCE(?, full_name),
-        avatar_url = COALESCE(?, avatar_url),
-        pomodoro_focus = COALESCE(?, pomodoro_focus),
-        pomodoro_break = COALESCE(?, pomodoro_break),
-        notif_habits = COALESCE(?, notif_habits),
-        notif_goals = COALESCE(?, notif_goals),
-        list_density = COALESCE(?, list_density)
-      WHERE id = 'default'
-    `).run(
-      full_name,
-      avatar_url,
-      pomodoro_focus,
-      pomodoro_break,
-      notif_habits,
-      notif_goals,
-      density ?? null,
+    const saved = await settings.update(
+      { full_name, avatar_url, pomodoro_focus, pomodoro_break, notif_habits, notif_goals, list_density: density ?? null },
+      hasFocusGoal ? { value: req.body.focus_weekly_goal_minutes } : null,
     );
-    if (hasFocusGoal) {
-      db.prepare("UPDATE user_settings SET focus_weekly_goal_minutes = ? WHERE id = 'default'")
-        .run(req.body.focus_weekly_goal_minutes);
-    }
-
-    const settings = db.prepare('SELECT * FROM user_settings WHERE id = ?').get('default');
-    res.json(settingsPayload(settings));
-  });
+    res.json(settingsPayload(saved));
+  }));
 
   return router;
 }

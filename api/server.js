@@ -28,6 +28,7 @@ import { createGoalsRouter } from './routes/goals.js';
 import { createRitualsRouter } from './routes/rituals.js';
 import { createPurchasesRouter } from './routes/purchases.js';
 import { createSettingsRouter } from './routes/settings.js';
+import { createSettingsService } from './services/personal/settings.js';
 import { createGamificationRouter } from './routes/gamification.js';
 import { createInsightsRouter, registerPraxiaRoutes } from './routes/insights.js';
 import { createWeeklyReviewsRouter } from './routes/weeklyReviews.js';
@@ -281,7 +282,7 @@ registerHabitLogRoutes(app, routeCtx);
 app.use('/api/wellness', createWellnessRouter(routeCtx));
 app.use('/api/focus', createFocusRouter({ db }));
 app.use('/api/goals', createGoalsRouter({ db, getLocalDateString, nextSortOrder }));
-app.use('/api/user', createSettingsRouter({ db }));
+app.use('/api/user', createSettingsRouter({ settings: createSettingsService({ storage: storageRuntime.storage }) }));
 registerParseVoiceRoutes(app, {
   getLocalDateString,
   addDaysLocal,

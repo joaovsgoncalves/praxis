@@ -154,6 +154,25 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal((await call(proc, 'GET', '/api/purchases', { cookie: A })).json.length, 1);
   });
 
+  await t.test('configurações pela camada nova (fase 4): cada conta grava a sua linha, no arquivo dela', async () => {
+    const sa = await call(proc, 'PUT', '/api/user/settings', { cookie: A, body: { full_name: 'Jota', focus_weekly_goal_minutes: 300 } });
+    assert.equal(sa.status, 200, sa.text);
+    assert.equal((await call(proc, 'PUT', '/api/user/settings', { cookie: B, body: { list_density: 'compact' } })).status, 200);
+    const gb = (await call(proc, 'GET', '/api/user/settings', { cookie: B })).json;
+    assert.deepEqual([gb.full_name, gb.list_density, gb.focus_weekly_goal_minutes], ['João Victor', 'compact', null], 'a da Bia não pegou a do Jota');
+    const ga = (await call(proc, 'GET', '/api/user/settings', { key: API_KEY })).json;
+    assert.deepEqual(ga, sa.json, 'chave do agente lê a linha do dono legado');
+    assert.equal((await call(proc, 'PUT', '/api/user/settings', { cookie: A, body: { list_density: 'bad' } })).status, 400);
+    assert.equal((await fetch(`${proc.base}/api/user/settings`, { method: 'PUT', headers: { cookie: A, 'content-type': 'application/json' }, body: '{"full_name":true}', signal: AbortSignal.timeout(3000) })).status, 500, 'erro de ligação responde, não pendura');
+    const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
+    const idB = control.prepare("SELECT id FROM praxis_users WHERE username = 'bia.teste'").pluck().get();
+    const other = new Database(path.join(apiDir, 'data', 'users', `${idB}.db`), { readonly: true });
+    try {
+      assert.deepEqual(control.prepare('SELECT full_name, focus_weekly_goal_minutes FROM user_settings').all(), [{ full_name: 'Jota', focus_weekly_goal_minutes: 300 }]);
+      assert.deepEqual(other.prepare('SELECT full_name, list_density FROM user_settings').all(), [{ full_name: 'João Victor', list_density: 'compact' }]);
+    } finally { control.close(); other.close(); }
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
