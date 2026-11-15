@@ -173,6 +173,33 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     } finally { control.close(); other.close(); }
   });
 
+  await t.test('frentes pela camada nova (fase 4): contas separadas e fluxo do Alfred com revisão', async () => {
+    const la = (await call(proc, 'GET', '/api/projects', { cookie: A })).json;
+    assert.equal(la.length, 9, 'semente só no banco do dono legado');
+    assert.deepEqual((await call(proc, 'GET', '/api/projects', { cookie: B })).json, []);
+    const mine = await call(proc, 'POST', '/api/projects', { cookie: B, body: { slug: 'frente-da-bia', name: 'Da Bia', next_step: 'Começar' } });
+    assert.equal(mine.status, 201, mine.text);
+    assert.equal((await call(proc, 'GET', '/api/projects/frente-da-bia', { cookie: A })).status, 404);
+    assert.equal((await call(proc, 'PATCH', '/api/projects/praxis', { cookie: B, body: { name: 'invadida' } })).status, 404);
+    const read = (await call(proc, 'GET', '/api/projects/praxis', { key: API_KEY })).json;
+    const ok = await call(proc, 'PATCH', '/api/projects/praxis', { key: API_KEY, body: { next_step: 'Pelo Alfred', expected_revision: read.revision } });
+    assert.equal(ok.status, 200, ok.text); assert.equal(ok.json.revision, read.revision + 1);
+    const stale = await call(proc, 'PATCH', '/api/projects/praxis', { key: API_KEY, body: { next_step: 'velho', expected_revision: read.revision } });
+    assert.deepEqual([stale.status, stale.json], [409, { error: 'REVISION_CHANGED', current_revision: read.revision + 1 }]);
+    const done = await call(proc, 'POST', '/api/projects/praxis/complete-next-step', { key: API_KEY, body: { expected_step: 'Pelo Alfred' } });
+    assert.equal(done.status, 200, done.text); assert.equal(done.json.update.summary, 'Concluído: Pelo Alfred');
+    assert.equal((await call(proc, 'GET', '/api/projects/praxis/updates', { cookie: A })).json.length, 1);
+    assert.equal((await call(proc, 'GET', '/api/projects/frente-da-bia/updates', { cookie: B })).json.length, 0);
+    const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
+    const idB = control.prepare("SELECT id FROM praxis_users WHERE username = 'bia.teste'").pluck().get();
+    const other = new Database(path.join(apiDir, 'data', 'users', `${idB}.db`), { readonly: true });
+    try {
+      assert.deepEqual(control.prepare("SELECT next_step, revision FROM projects WHERE slug = 'praxis'").get(), { next_step: '', revision: read.revision + 2 });
+      assert.deepEqual(other.prepare('SELECT slug FROM projects').pluck().all(), ['frente-da-bia']);
+      assert.equal(control.prepare("SELECT COUNT(*) FROM projects WHERE slug = 'frente-da-bia'").pluck().get(), 0);
+    } finally { control.close(); other.close(); }
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;

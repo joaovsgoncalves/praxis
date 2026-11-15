@@ -2,10 +2,12 @@
  * Domínios da fase 4 da migração. SÓ a fase 4 edita este arquivo.
  * Formato de cada item: veja storage/domains/index.js.
  */
-import { StorageError } from '../contract.js';
+import { StorageError, recordId } from '../contract.js';
 import { applyAffinity } from '../sqliteSemantics.js';
 import { sqliteUserSettings } from '../sqlite/userSettings.js';
 import { firestoreUserSettings } from '../firestore/userSettings.js';
+import { sqliteProjects, sqliteProjectUpdates } from '../sqlite/projects.js';
+import { firestoreProjects, firestoreProjectUpdates } from '../firestore/projects.js';
 
 // --- Configurações: tabela `user_settings`, linha única. ---
 /**
@@ -58,4 +60,82 @@ const userSettings = {
   firestore: (userDoc, transaction) => firestoreUserSettings(userDoc, transaction, { fields: USER_SETTINGS_FIELDS, id: USER_SETTINGS_ID }),
 };
 
-export const DOMAINS = [userSettings];
+// --- Frentes: tabelas `projects` e `project_updates`. ---
+/** Colunas de `projects` num banco novo (projects.js `initProjectsSchema`), na ordem do `SELECT *`. */
+export const PROJECT_FIELDS = Object.freeze([
+  'id', 'slug', 'name', 'tagline', 'kind', 'column', 'focus', 'live', 'objective', 'status_summary',
+  'current_slice', 'next_step', 'last_move_at', 'last_move_note', 'last_reviewed_at', 'notes',
+  'shipped_note', 'blocked_note', 'prod_url', 'repo_path', 'sort_order', 'created_date', 'updated_date',
+  'parent_slug', 'revision',
+]);
+const PROJECT_INTEGER = new Set(['focus', 'live', 'sort_order', 'revision']);
+const PROJECT_NOT_NULL = new Set(['id', 'slug', 'name', 'kind', 'column', 'focus', 'live', 'revision']);
+/** `id`, `slug` e criação não mudam depois de gravados; toda alteração manda a revisão nova. */
+const PROJECT_IMMUTABLE = new Set(['id', 'slug', 'created_date']);
+export const PROJECT_UPDATE_FIELDS = Object.freeze(['id', 'project_id', 'date', 'summary', 'source', 'created_by', 'created_at']);
+const UPDATE_NOT_NULL = new Set(['id', 'project_id', 'date', 'summary']);
+
+function scalarColumn(value, affinity, required, code) {
+  // Número não finito segue para a afinidade, que recusa com `sqlite_coercion_unsupported`.
+  if (!(value === null || typeof value === 'string' || (typeof value === 'number' && !Number.isNaN(value)))) throw new StorageError(code);
+  const stored = applyAffinity(value, affinity);
+  if (stored === null && required) throw new StorageError(code);
+  return stored;
+}
+function fullRow(input, fieldList, integer, notNull, prefix) {
+  plainObject(input, `invalid_${prefix}`);
+  for (const key of Object.keys(input)) if (!fieldList.includes(key)) throw new StorageError(`unknown_${prefix}_field`);
+  for (const key of fieldList) if (!Object.prototype.hasOwnProperty.call(input, key)) throw new StorageError(`incomplete_${prefix}`);
+  const row = Object.fromEntries(fieldList.map((key) => [key, scalarColumn(input[key], integer.has(key) ? 'INTEGER' : 'TEXT', notNull.has(key), `invalid_${prefix}_value`)]));
+  recordId(row.id);
+  return row;
+}
+function projectRow(input) {
+  const row = fullRow(input, PROJECT_FIELDS, PROJECT_INTEGER, PROJECT_NOT_NULL, 'project');
+  if (!Number.isSafeInteger(row.revision) || row.revision < 0) throw new StorageError('invalid_project_revision');
+  return row;
+}
+function projectChanges(input) {
+  plainObject(input, 'invalid_project');
+  const out = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!PROJECT_FIELDS.includes(key)) throw new StorageError('unknown_project_field');
+    if (PROJECT_IMMUTABLE.has(key)) throw new StorageError('immutable_project_field');
+    out[key] = scalarColumn(value, PROJECT_INTEGER.has(key) ? 'INTEGER' : 'TEXT', PROJECT_NOT_NULL.has(key), 'invalid_project_value');
+  }
+  if (!Number.isSafeInteger(out.revision) || out.revision < 1) throw new StorageError('project_revision_required');
+  return out;
+}
+const updateRow = (input) => fullRow(input, PROJECT_UPDATE_FIELDS, new Set(), UPDATE_NOT_NULL, 'project_update');
+function timelineLimit(value) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new StorageError('invalid_limit');
+  return value;
+}
+
+const projects = {
+  name: 'projects',
+  spec: () => ({
+    /** Chave = id ou slug; o id vence (mesma escolha do `WHERE id = ? OR slug = ?`). */
+    get: ['read', (key) => [recordId(key)]],
+    /** Ordem `focus DESC, sort_order ASC, name ASC`, empate pela ordem de inserção. */
+    list: ['read', () => []],
+    // Firestore lê a sequência e a sentinela do slug antes de gravar: mesma regra nos dois motores.
+    create: ['readwrite', (row) => [projectRow(row)]],
+    patch: ['write', (id, changes) => [recordId(id), projectChanges(changes)]],
+  }),
+  sqlite: (db) => sqliteProjects(db, PROJECT_FIELDS),
+  firestore: (userDoc, transaction, client) => firestoreProjects(userDoc, transaction, client, PROJECT_FIELDS),
+};
+
+const projectUpdates = {
+  name: 'projectUpdates',
+  spec: () => ({
+    /** Ordem `date DESC, created_at DESC`, empate pela ordem de inserção; `limit` inteiro >= 0. */
+    list: ['read', (projectId, limit) => [recordId(projectId), timelineLimit(limit)]],
+    create: ['readwrite', (row) => [updateRow(row)]],
+  }),
+  sqlite: (db) => sqliteProjectUpdates(db, PROJECT_UPDATE_FIELDS),
+  firestore: (userDoc, transaction, client) => firestoreProjectUpdates(userDoc, transaction, client, PROJECT_UPDATE_FIELDS),
+};
+
+export const DOMAINS = [userSettings, projects, projectUpdates];

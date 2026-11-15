@@ -42,6 +42,7 @@ import { createFinanceRouter } from './routes/finance.js';
 import { initProjectsSchema, seedProjectsIfEmpty } from './projects.js';
 import { initContinuityGuidanceSchema } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
+import { createProjectsService } from './services/personal/projects.js';
 import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
 import { createWeeklyReviewsService } from './services/weeklyReviews.js';
 import { createPurchasesService } from './services/purchases.js';
@@ -270,7 +271,7 @@ const routeCtx = {
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
 registerOpsRoutes(app, { apiDir: __dirname });
 app.use('/api/purchases', createPurchasesRouter({ purchases }));
-app.use('/api/projects', createProjectsRouter({ db, getLocalDateString }));
+app.use('/api/projects', createProjectsRouter({ projects: createProjectsService({ storage: storageRuntime.storage }), db, getLocalDateString }));
 app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não existem para esta conta'));
 app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));
 app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));

@@ -10,7 +10,16 @@ import {
   getContinuityGuidance,
 } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
+import { createProjectsService } from './services/personal/projects.js';
+import { createStorage } from './storage/index.js';
+import { createSqliteDriver } from './storage/sqlite/driver.js';
 import { startTestServer, requestJson } from './test-support/helpers.mjs';
+
+// Arnês: frentes pela camada nova sobre o mesmo banco do teste (orientação ainda lê `db`).
+function projectsRouterFor(db, getLocalDateString) {
+  const storage = createStorage({ driver: createSqliteDriver({ open: () => db }), currentOwner: () => 'alice' });
+  return createProjectsRouter({ projects: createProjectsService({ storage }), db, getLocalDateString });
+}
 
 function setupDb() {
   const db = new Database(':memory:');
@@ -520,7 +529,7 @@ test('GET /api/projects/guidance/today retorna 200 com fallback quando vazia', a
   const app = express();
   app.use(express.json());
   const fixedToday = () => '2026-09-09';
-  app.use('/api/projects', createProjectsRouter({ db, getLocalDateString: fixedToday }));
+  app.use('/api/projects', projectsRouterFor(db, fixedToday));
 
   const server = await startTestServer(app);
   t.after(() => {
@@ -547,7 +556,7 @@ test('GET /api/projects/guidance/today retorna 200 com fallback quando prioritie
 
   const app = express();
   app.use(express.json());
-  app.use('/api/projects', createProjectsRouter({ db, getLocalDateString: fixedToday }));
+  app.use('/api/projects', projectsRouterFor(db, fixedToday));
 
   const server = await startTestServer(app);
   t.after(() => {
@@ -585,7 +594,7 @@ test('GET /api/projects/guidance/today retorna 200 com orientação fresca e hid
 
   const app = express();
   app.use(express.json());
-  app.use('/api/projects', createProjectsRouter({ db, getLocalDateString: fixedToday }));
+  app.use('/api/projects', projectsRouterFor(db, fixedToday));
 
   const server = await startTestServer(app);
   t.after(() => {
@@ -609,7 +618,7 @@ test('precedência da rota /guidance/today sobre /:id', async (t) => {
   const fixedToday = () => '2026-09-09';
   const app = express();
   app.use(express.json());
-  app.use('/api/projects', createProjectsRouter({ db, getLocalDateString: fixedToday }));
+  app.use('/api/projects', projectsRouterFor(db, fixedToday));
 
   const server = await startTestServer(app);
   t.after(() => {
