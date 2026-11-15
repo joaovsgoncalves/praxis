@@ -91,6 +91,29 @@ keep_last "$BACKUP_DIR/daily"   7
 keep_last "$BACKUP_DIR/weekly"  4
 keep_last "$BACKUP_DIR/monthly" 12
 
+# Bancos das outras contas (fase 4: cada pessoa tem o seu arquivo em data/users/<id>.db).
+# Vão para users/, com os 7 mais recentes de cada conta. Sem conta extra, não faz nada.
+USERS_DB_DIR="${PRAXIS_DATA_DIR:-$API_DIR/data}/users"
+USER_COUNT=0
+if [ -d "$USERS_DB_DIR" ]; then
+  shopt -s nullglob
+  for USER_DB in "$USERS_DB_DIR"/*.db; do
+    USER_ID="$(basename "$USER_DB" .db)"
+    mkdir -p "$BACKUP_DIR/users"
+    chmod 700 "$BACKUP_DIR/users"
+    USER_FILE="$BACKUP_DIR/users/praxis-user-$USER_ID-$TS.db"
+    sqlite3 "$USER_DB" ".backup '$USER_FILE'"
+    gzip -f "$USER_FILE"
+    USER_COUNT=$((USER_COUNT + 1))
+    OLD=("$BACKUP_DIR/users/praxis-user-$USER_ID-"*.db.gz)
+    if ((${#OLD[@]} > 7)); then
+      ls -1t "${OLD[@]}" | tail -n +8 | xargs -r rm -f
+    fi
+  done
+  shopt -u nullglob
+fi
+echo "[praxis-backup] outras contas: $USER_COUNT"
+
 BYTES=$(stat -c%s "$DAILY_FILE.gz" 2>/dev/null || echo 0)
 DAILY_NAME="praxis-${TS}.db.gz"
 META_FILE="$BACKUP_DIR/last-backup.json"
