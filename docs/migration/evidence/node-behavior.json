@@ -1,0 +1,15 @@
+{
+  "scope": "Local tests; 8 financial readers and current payment helper use memory/scratch SQLite; no live user calls",
+  "result": {
+    "tests": 49,
+    "pass": 49,
+    "fail": 0
+  },
+  "production_access_guarded": true,
+  "legacy_external_suite": {
+    "tests": 30,
+    "passed": 29,
+    "failed": 1,
+    "reason": "obsolete test expects rejection of new valid PF account; new test verifies current scope semantics; live code unchanged"
+  }
+}

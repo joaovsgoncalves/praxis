@@ -1,0 +1,436 @@
+{
+  "scope": "Current adapter with mocked transport; NOT live production/API parity",
+  "tests": 91,
+  "failures": 0,
+  "errors": 0,
+  "tests_against_active_adapter": true,
+  "coverage": {
+    "tasks.list": {
+      "calls": 19,
+      "successful_calls": 2,
+      "preview": false,
+      "applied": false
+    },
+    "tasks.get": {
+      "calls": 6,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "tasks.create": {
+      "calls": 30,
+      "successful_calls": 6,
+      "preview": true,
+      "applied": true
+    },
+    "tasks.update": {
+      "calls": 4,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": true
+    },
+    "checklist.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "checklist.create": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": true
+    },
+    "checklist.update": {
+      "calls": 4,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": true
+    },
+    "habits.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "habit_logs.list": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "habit_logs.set": {
+      "calls": 3,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": true
+    },
+    "wellness.get": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "wellness.set": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": true
+    },
+    "focus.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "focus.create": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": true
+    },
+    "categories.list": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "goals.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "projects.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "tasks.delete": {
+      "calls": 6,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "tasks.not_today": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "tasks.reorder": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "checklist.delete": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "checklist.reorder": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habits.create": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habits.update": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habits.children": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habits.reorder": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habits.delete": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habit_logs.delete": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "ideas.to_task": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "habits.streak": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "goals.get": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "goals.create": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "goals.update": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "goals.delete": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "projects.get": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "projects.create": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "projects.update": {
+      "calls": 12,
+      "successful_calls": 5,
+      "preview": true,
+      "applied": true
+    },
+    "projects.updates": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "projects.add_update": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "projects.complete_step": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "guidance.get": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "purchases.list": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "purchases.create": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "purchases.update": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "purchases.delete": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "reviews.list": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "reviews.current": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "reviews.set": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "reviews.delete": {
+      "calls": 5,
+      "successful_calls": 3,
+      "preview": true,
+      "applied": true
+    },
+    "insights.best_hours": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "insights.correlation": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "insights.weekly": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "insights.avoidance": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "focus.stats": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "rituals.list": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "rituals.get": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "rituals.progress": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.status": {
+      "calls": 4,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.overview": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.bills": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.debts.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.installments.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.subscriptions.list": {
+      "calls": 1,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "finance.month": {
+      "calls": 4,
+      "successful_calls": 2,
+      "preview": false,
+      "applied": true
+    },
+    "finance.transactions.list": {
+      "calls": 5,
+      "successful_calls": 1,
+      "preview": false,
+      "applied": false
+    },
+    "guidance.set": {
+      "calls": 36,
+      "successful_calls": 5,
+      "preview": true,
+      "applied": true
+    },
+    "finance.bill.confirm_payment": {
+      "calls": 2,
+      "successful_calls": 1,
+      "preview": true,
+      "applied": false
+    },
+    "finance.fixed.confirmation": {
+      "calls": 4,
+      "successful_calls": 3,
+      "preview": false,
+      "applied": false
+    },
+    "finance.fixed.confirm_period": {
+      "calls": 13,
+      "successful_calls": 2,
+      "preview": true,
+      "applied": true
+    },
+    "finance.balance.confirm_zero": {
+      "calls": 14,
+      "successful_calls": 14,
+      "preview": true,
+      "applied": true
+    },
+    "finance.subscriptions.update": {
+      "calls": 12,
+      "successful_calls": 12,
+      "preview": true,
+      "applied": true
+    }
+  },
+  "uncovered": []
+}

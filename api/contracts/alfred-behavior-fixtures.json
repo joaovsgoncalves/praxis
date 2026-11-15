@@ -1,0 +1,4500 @@
+{
+  "source": "91 isolated tests against current adapter and helper modules",
+  "operations": [
+    {
+      "operation": "categories.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "categories.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        },
+        {
+          "kind": "error",
+          "operation": "categories.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "anything": 1
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_forbidden_operations_extras_and_path_injection"
+        }
+      ]
+    },
+    {
+      "operation": "checklist.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "checklist.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "t",
+            "title": "unit"
+          },
+          "dry_run": false,
+          "request_id": "checklist.create",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "i",
+              "task_id": "t",
+              "title": "unit",
+              "done": false
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "apply",
+          "operation": "checklist.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "t",
+            "title": "unit"
+          },
+          "dry_run": false,
+          "request_id": "checklist.create",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "i",
+              "task_id": "t",
+              "title": "unit",
+              "done": false
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        }
+      ]
+    },
+    {
+      "operation": "checklist.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "checklist.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "item_id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "checklist.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "item_id": "fixture",
+            "confirm_delete": true,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "checklist.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "item_id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "checklist.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "item_id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "checklist.delete",
+            "method": "DELETE",
+            "path": "/api/tasks/fixture/checklist/fixture",
+            "fields": [],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "checklist.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "checklist.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "t-1"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        }
+      ]
+    },
+    {
+      "operation": "checklist.reorder",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "checklist.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "checklist.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ],
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "checklist.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "checklist.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "checklist.reorder",
+            "method": "PATCH",
+            "path": "/api/tasks/fixture/checklist/reorder",
+            "fields": [
+              "ordered_ids"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "checklist.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "checklist.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "t",
+            "item_id": "i",
+            "done": true
+          },
+          "dry_run": false,
+          "request_id": "checklist.update",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "i",
+              "task_id": "t",
+              "done": true
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "error",
+          "operation": "checklist.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "t",
+            "item_id": "i",
+            "done": true
+          },
+          "dry_run": false,
+          "request_id": "bad-1",
+          "result": {
+            "ok": false,
+            "error": "pending_manual_reconciliation_required"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_readback_requires_exact_target_and_complete_fields"
+        },
+        {
+          "kind": "apply",
+          "operation": "checklist.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "task_id": "t",
+            "item_id": "i",
+            "done": true
+          },
+          "dry_run": false,
+          "request_id": "checklist.update",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "i",
+              "task_id": "t",
+              "done": true
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        }
+      ]
+    },
+    {
+      "operation": "finance.balance.confirm_zero",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.balance.confirm_zero",
+          "layer": "finance_balance_correction.py",
+          "payload": {
+            "account_id": "acc-mp"
+          },
+          "dry_run": true,
+          "request_id": "test1",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "preview_hash": "b6f370f6dc4da92602835c681172043be40f7348bedb943ad0c45051efbdcfd6",
+            "preview": {
+              "account_id": "acc-mp",
+              "entity": "pf",
+              "institution": "mp",
+              "date": "2026-11-14",
+              "previous": {
+                "id": "bank1",
+                "account_id": "acc-mp",
+                "as_of": "2026-11-14",
+                "amount_kind": "available",
+                "amount": 0.35,
+                "source": "pluggy",
+                "created_at": "2026-11-14T19:33:00Z"
+              },
+              "amount": 0,
+              "source": "joao",
+              "note": "Saldo disponível confirmado zerado por João; correção manual, sem movimentação bancária."
+            },
+            "warning": "Manual correction; newer bank data may supersede. No bank movement or transaction."
+          },
+          "test": "test_finance_balance_correction.Test.test_apply_preserve_and_replay"
+        },
+        {
+          "kind": "apply",
+          "operation": "finance.balance.confirm_zero",
+          "layer": "finance_balance_correction.py",
+          "payload": {
+            "account_id": "acc-mp",
+            "confirmed_by_user": true,
+            "preview_hash": "b6f370f6dc4da92602835c681172043be40f7348bedb943ad0c45051efbdcfd6"
+          },
+          "dry_run": false,
+          "request_id": "test1",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "manual-zero-1b4f0e9851971998e732078544c96b36",
+              "account_id": "acc-mp",
+              "as_of": "2026-11-14",
+              "amount": 0,
+              "amount_kind": "available",
+              "source": "joao",
+              "locked": false,
+              "note": "Saldo disponível confirmado zerado por João; correção manual, sem movimentação bancária.",
+              "created_at": "2026-11-15T01:00:00Z"
+            },
+            "effects": {
+              "bank_movement": false,
+              "transaction_created": false,
+              "history_preserved": true,
+              "newer_bank_data_can_supersede": true
+            }
+          },
+          "test": "test_finance_balance_correction.Test.test_apply_preserve_and_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "finance.balance.confirm_zero",
+          "layer": "finance_balance_correction.py",
+          "payload": {
+            "account_id": "acc-mp"
+          },
+          "dry_run": true,
+          "request_id": "test1",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "preview_hash": "b6f370f6dc4da92602835c681172043be40f7348bedb943ad0c45051efbdcfd6",
+            "preview": {
+              "account_id": "acc-mp",
+              "entity": "pf",
+              "institution": "mp",
+              "date": "2026-11-14",
+              "previous": {
+                "id": "bank1",
+                "account_id": "acc-mp",
+                "as_of": "2026-11-14",
+                "amount_kind": "available",
+                "amount": 0.35,
+                "source": "pluggy",
+                "created_at": "2026-11-14T19:33:00Z"
+              },
+              "amount": 0,
+              "source": "joao",
+              "note": "Saldo disponível confirmado zerado por João; correção manual, sem movimentação bancária."
+            },
+            "warning": "Manual correction; newer bank data may supersede. No bank movement or transaction."
+          },
+          "test": "test_finance_balance_correction.Test.test_apply_preserve_and_replay"
+        }
+      ]
+    },
+    {
+      "operation": "finance.bill.confirm_payment",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.bill.confirm_payment",
+          "layer": "finance_confirm.py",
+          "payload": {
+            "debt_id": "a"
+          },
+          "dry_run": true,
+          "request_id": "req",
+          "result": {
+            "ok": true,
+            "dry_run": true
+          },
+          "test": "test_finance_confirm_wrapper.Tests.test_success_fixed_command"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.bill.confirm_payment",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "missing_required_field"
+          },
+          "test": "test_finance_read.Finance.test_invalid_payload_never_launches_helper"
+        },
+        {
+          "kind": "preview",
+          "operation": "finance.bill.confirm_payment",
+          "layer": "finance_confirm.py",
+          "payload": {
+            "debt_id": "a"
+          },
+          "dry_run": true,
+          "request_id": "req",
+          "result": {
+            "ok": true,
+            "dry_run": true
+          },
+          "test": "test_finance_confirm_wrapper.Tests.test_success_fixed_command"
+        }
+      ]
+    },
+    {
+      "operation": "finance.bills",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.bills",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.bills",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_finance_read.Finance.test_invalid_payload_never_launches_helper"
+        }
+      ]
+    },
+    {
+      "operation": "finance.debts.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.debts.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        }
+      ]
+    },
+    {
+      "operation": "finance.fixed.confirm_period",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.fixed.confirm_period",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "fixed_id": "car-test",
+            "period": "2026-11",
+            "preview_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "confirmed_by_user": true
+          },
+          "dry_run": false,
+          "request_id": "same",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "data": {
+              "fixed_id": "car-test",
+              "period": "2026-11",
+              "status": "paid_reported_by_user",
+              "reported_at": "2026-11-15T00:00:00Z",
+              "source": "joao",
+              "amount": null,
+              "effective_paid_on": null,
+              "affects_cash": false,
+              "affects_balance": false,
+              "fixed": {
+                "id": "car-test",
+                "last_paid_month": "2026-11",
+                "updated_at": "2026-11-15T00:00:00Z"
+              }
+            },
+            "verified": true
+          },
+          "test": "test_finance_fixed_schema.Tests.test_apply_readback"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.fixed.confirm_period",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "fixed_id": "car-test",
+            "period": "2026-11",
+            "preview_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "confirmed_by_user": true
+          },
+          "dry_run": false,
+          "request_id": "same",
+          "result": {
+            "ok": false,
+            "error": "fixed_conflict_reread_no_automatic_retry"
+          },
+          "test": "test_finance_fixed_schema.Tests.test_conflict_no_retry"
+        },
+        {
+          "kind": "apply",
+          "operation": "finance.fixed.confirm_period",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "fixed_id": "car-test",
+            "period": "2026-11",
+            "preview_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "confirmed_by_user": true
+          },
+          "dry_run": false,
+          "request_id": "same",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "data": {
+              "fixed_id": "car-test",
+              "period": "2026-11",
+              "status": "paid_reported_by_user",
+              "reported_at": "2026-11-15T00:00:00Z",
+              "source": "joao",
+              "amount": null,
+              "effective_paid_on": null,
+              "affects_cash": false,
+              "affects_balance": false,
+              "fixed": {
+                "id": "car-test",
+                "last_paid_month": "2026-11",
+                "updated_at": "2026-11-15T00:00:00Z"
+              }
+            },
+            "verified": true
+          },
+          "test": "test_finance_fixed_schema.Tests.test_apply_readback"
+        },
+        {
+          "kind": "preview",
+          "operation": "finance.fixed.confirm_period",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "fixed_id": "car-test",
+            "period": "2026-11"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "preview_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "test": "test_finance_fixed_schema.Tests.test_catalog_preview"
+        }
+      ]
+    },
+    {
+      "operation": "finance.fixed.confirmation",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.fixed.confirmation",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "fixed_id": "car-test",
+            "period": "2026-11"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": null
+          },
+          "test": "test_finance_fixed_schema.Tests.test_read_native_and_unknown_origin"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.fixed.confirmation",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "fixed_id": "car-test",
+            "period": "2026-11"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "invalid_response"
+          },
+          "test": "test_finance_fixed_schema.Tests.test_read_native_and_unknown_origin"
+        }
+      ]
+    },
+    {
+      "operation": "finance.installments.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.installments.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        }
+      ]
+    },
+    {
+      "operation": "finance.month",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.month",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "month": "2026-11"
+          },
+          "dry_run": false,
+          "request_id": "",
+          "result": {
+            "ok": true
+          },
+          "test": "test_finance_read.Finance.test_reads_route_only_to_finance_helper"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.month",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "month": "2026-13"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "invalid_field_value"
+          },
+          "test": "test_finance_read.Finance.test_invalid_payload_never_launches_helper"
+        },
+        {
+          "kind": "apply",
+          "operation": "finance.month",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "month": "2026-11"
+          },
+          "dry_run": false,
+          "request_id": "",
+          "result": {
+            "ok": true
+          },
+          "test": "test_finance_read.Finance.test_reads_route_only_to_finance_helper"
+        }
+      ]
+    },
+    {
+      "operation": "finance.overview",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.overview",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        }
+      ]
+    },
+    {
+      "operation": "finance.status",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.status",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.status",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "finance_read_failed"
+          },
+          "test": "test_finance_read.Finance.test_errors_are_sanitized"
+        }
+      ]
+    },
+    {
+      "operation": "finance.subscriptions.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.subscriptions.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        }
+      ]
+    },
+    {
+      "operation": "finance.subscriptions.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.subscriptions.update",
+          "layer": "finance_subscription_update.py",
+          "payload": {
+            "id": "sub-test",
+            "patch": {
+              "name": "New",
+              "amount": 524.9,
+              "note": "confirmed"
+            }
+          },
+          "dry_run": true,
+          "request_id": "test-1",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "preview_hash": "2bda7914b75bf1029380e6f4c0a894977a713cdb1cba9e783a35855493bee38b",
+            "before": {
+              "id": "sub-test",
+              "name": "Old",
+              "amount": 99,
+              "cadence": "monthly",
+              "status": "keep",
+              "note": "old",
+              "account_id": "acc-pf",
+              "lane": "work",
+              "charge_day": 5,
+              "next_charge": null,
+              "locked": true,
+              "source": "seed",
+              "vendor_hint": "",
+              "created_at": "old",
+              "updated_at": "old"
+            },
+            "after": {
+              "id": "sub-test",
+              "name": "New",
+              "amount": 524.9,
+              "cadence": "monthly",
+              "status": "keep",
+              "note": "confirmed",
+              "account_id": "acc-pf",
+              "lane": "work",
+              "charge_day": 5,
+              "next_charge": null,
+              "locked": true,
+              "source": "seed",
+              "vendor_hint": "",
+              "created_at": "old",
+              "updated_at": "old"
+            },
+            "effects": {
+              "catalogue_only": true,
+              "transaction_created": false,
+              "vendor_changed": false
+            }
+          },
+          "test": "test_finance_subscription_update.Tests.test_apply_and_replay"
+        },
+        {
+          "kind": "apply",
+          "operation": "finance.subscriptions.update",
+          "layer": "finance_subscription_update.py",
+          "payload": {
+            "id": "sub-test",
+            "patch": {
+              "name": "New",
+              "amount": 524.9,
+              "note": "confirmed"
+            },
+            "preview_hash": "2bda7914b75bf1029380e6f4c0a894977a713cdb1cba9e783a35855493bee38b"
+          },
+          "dry_run": false,
+          "request_id": "test-1",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "sub-test",
+              "name": "New",
+              "amount": 524.9,
+              "cadence": "monthly",
+              "status": "keep",
+              "note": "confirmed",
+              "account_id": "acc-pf",
+              "lane": "work",
+              "charge_day": 5,
+              "next_charge": null,
+              "locked": true,
+              "source": "seed",
+              "vendor_hint": "",
+              "created_at": "old",
+              "updated_at": "new"
+            },
+            "effects": {
+              "catalogue_only": true,
+              "transaction_created": false,
+              "vendor_changed": false
+            }
+          },
+          "test": "test_finance_subscription_update.Tests.test_apply_and_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "finance.subscriptions.update",
+          "layer": "finance_subscription_update.py",
+          "payload": {
+            "id": "sub-test",
+            "patch": {
+              "name": "New",
+              "amount": 524.9,
+              "note": "confirmed"
+            }
+          },
+          "dry_run": true,
+          "request_id": "test-1",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "preview_hash": "2bda7914b75bf1029380e6f4c0a894977a713cdb1cba9e783a35855493bee38b",
+            "before": {
+              "id": "sub-test",
+              "name": "Old",
+              "amount": 99,
+              "cadence": "monthly",
+              "status": "keep",
+              "note": "old",
+              "account_id": "acc-pf",
+              "lane": "work",
+              "charge_day": 5,
+              "next_charge": null,
+              "locked": true,
+              "source": "seed",
+              "vendor_hint": "",
+              "created_at": "old",
+              "updated_at": "old"
+            },
+            "after": {
+              "id": "sub-test",
+              "name": "New",
+              "amount": 524.9,
+              "cadence": "monthly",
+              "status": "keep",
+              "note": "confirmed",
+              "account_id": "acc-pf",
+              "lane": "work",
+              "charge_day": 5,
+              "next_charge": null,
+              "locked": true,
+              "source": "seed",
+              "vendor_hint": "",
+              "created_at": "old",
+              "updated_at": "old"
+            },
+            "effects": {
+              "catalogue_only": true,
+              "transaction_created": false,
+              "vendor_changed": false
+            }
+          },
+          "test": "test_finance_subscription_update.Tests.test_apply_and_replay"
+        }
+      ]
+    },
+    {
+      "operation": "finance.transactions.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "finance.transactions.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "from": "2026-11-01",
+            "to": "2026-11-30"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "fixture_layer": "routing_only"
+          },
+          "test": "__main__.ReaderRouting.test_every_financial_reader_routes_without_ledger_or_http"
+        },
+        {
+          "kind": "error",
+          "operation": "finance.transactions.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "from": "2026-02-30",
+            "to": "2026-11-01"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "invalid_date"
+          },
+          "test": "test_finance_read.Finance.test_invalid_payload_never_launches_helper"
+        }
+      ]
+    },
+    {
+      "operation": "focus.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "focus.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11",
+            "duration_seconds": 600
+          },
+          "dry_run": false,
+          "request_id": "focus.create",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "f",
+              "date": "2026-11-11",
+              "duration_seconds": 600
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "error",
+          "operation": "focus.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11",
+            "duration_seconds": 60
+          },
+          "dry_run": false,
+          "request_id": "bad-2",
+          "result": {
+            "ok": false,
+            "error": "pending_manual_reconciliation_required"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_readback_requires_exact_target_and_complete_fields"
+        },
+        {
+          "kind": "apply",
+          "operation": "focus.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11",
+            "duration_seconds": 600
+          },
+          "dry_run": false,
+          "request_id": "focus.create",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "f",
+              "date": "2026-11-11",
+              "duration_seconds": 600
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        }
+      ]
+    },
+    {
+      "operation": "focus.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "focus.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        }
+      ]
+    },
+    {
+      "operation": "focus.stats",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "focus.stats",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "focus.stats",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "goals.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "goals.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "goals.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "goals.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "goals.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "goals.create",
+            "method": "POST",
+            "path": "/api/goals",
+            "fields": [
+              "title"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "goals.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "goals.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "goals.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "goals.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "goals.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "goals.delete",
+            "method": "DELETE",
+            "path": "/api/goals/fixture",
+            "fields": [],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "goals.get",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "goals.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "goals.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "goals.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "goals.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        }
+      ]
+    },
+    {
+      "operation": "goals.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "goals.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "goals.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "goals.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "goals.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "goals.update",
+            "method": "PUT",
+            "path": "/api/goals/fixture",
+            "fields": [
+              "title"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "guidance.get",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "guidance.get",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "guidance.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "guidance.set",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "guidance.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-15",
+            "summary": "Dia",
+            "source": "alfred",
+            "generated_at": "2026-11-15T08:00:01-03:00",
+            "expected_generated_at": null,
+            "priorities": [
+              {
+                "rank": 1,
+                "action": "Estudar",
+                "reason_code": "academic",
+                "reason": "Prova",
+                "project_slug": "faculdade",
+                "task_id": "task-1"
+              }
+            ]
+          },
+          "dry_run": true,
+          "request_id": "guide-test",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "guidance.set",
+            "method": "PUT",
+            "path": "/api/projects/guidance/2026-11-15",
+            "fields": [
+              "expected_generated_at",
+              "generated_at",
+              "priorities",
+              "source",
+              "summary"
+            ],
+            "side_effects": "Writes today only. Read guidance.get first; expected_generated_at is its timestamp or null. At most 3 priorities; source must be alfred. Never activate until old writer is stopped. Preview validates structure only. Conflict requires reread and user review, never blind retry."
+          },
+          "test": "test_guidance_access.Guidance.test_preview_no_network_ledger"
+        },
+        {
+          "kind": "error",
+          "operation": "guidance.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-15",
+            "summary": "Dia",
+            "source": "alfred",
+            "generated_at": "2026-11-15T08:00:01",
+            "expected_generated_at": null,
+            "priorities": [
+              {
+                "rank": 1,
+                "action": "Estudar",
+                "reason_code": "academic",
+                "reason": "Prova",
+                "project_slug": "faculdade",
+                "task_id": "task-1"
+              }
+            ]
+          },
+          "dry_run": true,
+          "request_id": "guide-test",
+          "result": {
+            "ok": false,
+            "error": "invalid_guidance_timestamp"
+          },
+          "test": "test_guidance_access.Guidance.test_bad_timestamps_and_source"
+        },
+        {
+          "kind": "apply",
+          "operation": "guidance.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-15",
+            "summary": "Dia",
+            "source": "alfred",
+            "generated_at": "2026-11-15T08:00:01-03:00",
+            "expected_generated_at": null,
+            "priorities": [
+              {
+                "rank": 1,
+                "action": "Estudar",
+                "reason_code": "academic",
+                "reason": "Prova",
+                "project_slug": "faculdade",
+                "task_id": "task-1"
+              }
+            ]
+          },
+          "dry_run": false,
+          "request_id": "guide-test",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "date": "2026-11-15",
+              "generated_at": "2026-11-15T08:00:01-03:00",
+              "summary": "Dia",
+              "fresh": true,
+              "priorities": [
+                {
+                  "rank": 1,
+                  "action": "Estudar",
+                  "reason_code": "academic",
+                  "reason": "Prova",
+                  "project_slug": "faculdade",
+                  "task_id": "task-1"
+                }
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_guidance_access.Guidance.test_second_version_update"
+        },
+        {
+          "kind": "preview",
+          "operation": "guidance.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-15",
+            "summary": "Dia",
+            "source": "alfred",
+            "generated_at": "2026-11-15T08:00:01-03:00",
+            "expected_generated_at": null,
+            "priorities": [
+              {
+                "rank": 1,
+                "action": "Estudar",
+                "reason_code": "academic",
+                "reason": "Prova",
+                "project_slug": "faculdade",
+                "task_id": "task-1"
+              }
+            ]
+          },
+          "dry_run": true,
+          "request_id": "guide-test",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "guidance.set",
+            "method": "PUT",
+            "path": "/api/projects/guidance/2026-11-15",
+            "fields": [
+              "expected_generated_at",
+              "generated_at",
+              "priorities",
+              "source",
+              "summary"
+            ],
+            "side_effects": "Writes today only. Read guidance.get first; expected_generated_at is its timestamp or null. At most 3 priorities; source must be alfred. Never activate until old writer is stopped. Preview validates structure only. Conflict requires reread and user review, never blind retry."
+          },
+          "test": "test_guidance_access.Guidance.test_preview_no_network_ledger"
+        }
+      ]
+    },
+    {
+      "operation": "habit_logs.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habit_logs.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "habit_id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "habit_logs.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "habit_id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "habit_logs.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "habit_id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "habit_logs.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "habit_id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "habit_logs.delete",
+            "method": "DELETE",
+            "path": "/api/habit-logs/fixture",
+            "fields": [
+              "date",
+              "habit_id"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "habit_logs.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habit_logs.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "habit_id": "h-1"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        },
+        {
+          "kind": "error",
+          "operation": "habit_logs.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "from": "2026-11-12",
+            "to": "2026-11-11"
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "invalid_date_range"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_strict_validation"
+        }
+      ]
+    },
+    {
+      "operation": "habit_logs.set",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habit_logs.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "habit_id": "h",
+            "date": "2026-11-11",
+            "outcome": "done",
+            "value": 1
+          },
+          "dry_run": false,
+          "request_id": "habit_logs.set",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "l",
+              "habit_id": "h",
+              "date": "2026-11-11",
+              "value": 1,
+              "outcome": null
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "error",
+          "operation": "habit_logs.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "habit_id": "h",
+            "date": "2026-11-11",
+            "outcome": "done",
+            "value": {
+              "invalid_python_number": "nan"
+            }
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "invalid_field_value"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_strict_validation"
+        },
+        {
+          "kind": "apply",
+          "operation": "habit_logs.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "habit_id": "h",
+            "date": "2026-11-11",
+            "outcome": "done",
+            "value": 1
+          },
+          "dry_run": false,
+          "request_id": "habit_logs.set",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "l",
+              "habit_id": "h",
+              "date": "2026-11-11",
+              "value": 1,
+              "outcome": null
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        }
+      ]
+    },
+    {
+      "operation": "habits.children",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.children",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "habits.children",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ],
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "habits.children",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "habits.children",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "habits.children",
+            "method": "PATCH",
+            "path": "/api/habits/fixture/children",
+            "fields": [
+              "ordered_ids"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "habits.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "habits.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "habits.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "habits.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "habits.create",
+            "method": "POST",
+            "path": "/api/habits",
+            "fields": [
+              "title"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "habits.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "habits.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "habits.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "habits.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "habits.delete",
+            "method": "DELETE",
+            "path": "/api/habits/fixture",
+            "fields": [],
+            "side_effects": "Deletes habit logs and ritual links; compound children archived. Prefer habits.update status=archived when history should remain."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "habits.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "status": "all",
+            "date": "2026-11-11"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        }
+      ]
+    },
+    {
+      "operation": "habits.reorder",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "habits.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ],
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "habits.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "habits.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "habits.reorder",
+            "method": "PATCH",
+            "path": "/api/habits/reorder",
+            "fields": [
+              "ordered_ids"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "habits.streak",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.streak",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "habits.streak",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "habits.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "habits.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "habits.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "habits.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "habits.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "habits.update",
+            "method": "PUT",
+            "path": "/api/habits/fixture",
+            "fields": [
+              "title"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "ideas.to_task",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "ideas.to_task",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "category": "fixture",
+            "date": "2026-11-11",
+            "priority": "low"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "task": {
+                "id": "newtask",
+                "source_idea_id": "fixture"
+              },
+              "idea": {
+                "id": "fixture",
+                "idea_status": "virou_tarefa"
+              }
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "ideas.to_task",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "category": "fixture",
+            "date": "2026-11-11",
+            "priority": "low",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "ideas.to_task",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "category": "fixture",
+            "date": "2026-11-11",
+            "priority": "low"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "task": {
+                "id": "newtask",
+                "source_idea_id": "fixture"
+              },
+              "idea": {
+                "id": "fixture",
+                "idea_status": "virou_tarefa"
+              }
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "ideas.to_task",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "category": "fixture",
+            "date": "2026-11-11",
+            "priority": "low"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "ideas.to_task",
+            "method": "POST",
+            "path": "/api/ideas/fixture/to-task",
+            "fields": [
+              "category",
+              "date",
+              "priority"
+            ],
+            "side_effects": "Creates task, marks idea promoted and syncs calendar."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "insights.avoidance",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "insights.avoidance",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "insights.avoidance",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "insights.best_hours",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "insights.best_hours",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "insights.best_hours",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "insights.correlation",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "insights.correlation",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "insights.correlation",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "insights.weekly",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "insights.weekly",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "insights.weekly",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "projects.add_update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.add_update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "summary": "fixture",
+            "date": "2026-11-11"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "update",
+              "summary": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "projects.add_update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "summary": "fixture",
+            "date": "2026-11-11",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "projects.add_update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "summary": "fixture",
+            "date": "2026-11-11"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "update",
+              "summary": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "projects.add_update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "summary": "fixture",
+            "date": "2026-11-11"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "projects.add_update",
+            "method": "POST",
+            "path": "/api/projects/fixture/updates",
+            "fields": [
+              "date",
+              "summary"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "projects.complete_step",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.complete_step",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_step": "fixture",
+            "summary": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "project": {
+                "id": "fixture",
+                "next_step": ""
+              },
+              "update": {
+                "id": "update"
+              }
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "projects.complete_step",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_step": "fixture",
+            "summary": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "projects.complete_step",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_step": "fixture",
+            "summary": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "project": {
+                "id": "fixture",
+                "next_step": ""
+              },
+              "update": {
+                "id": "update"
+              }
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "projects.complete_step",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_step": "fixture",
+            "summary": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "projects.complete_step",
+            "method": "POST",
+            "path": "/api/projects/fixture/complete-next-step",
+            "fields": [
+              "expected_step",
+              "summary"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "projects.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "name": "fixture",
+            "slug": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "projects.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "name": "fixture",
+            "slug": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "projects.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "name": "fixture",
+            "slug": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "projects.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "name": "fixture",
+            "slug": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "projects.create",
+            "method": "POST",
+            "path": "/api/projects",
+            "fields": [
+              "name",
+              "slug"
+            ],
+            "side_effects": "Focus/column changes only when the user requests them; do not choose priorities silently."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "projects.get",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "projects.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "projects.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        }
+      ]
+    },
+    {
+      "operation": "projects.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_revision": 1,
+            "name": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "name": "Updated",
+              "revision": 2
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "projects.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_revision": 1,
+            "name": "Updated",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "projects.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_revision": 1,
+            "name": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "name": "Updated",
+              "revision": 2
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "projects.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "expected_revision": 1,
+            "name": "Updated"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "projects.update",
+            "method": "PATCH",
+            "path": "/api/projects/fixture",
+            "fields": [
+              "expected_revision",
+              "name"
+            ],
+            "side_effects": "Focus/column/live/objective edits require a user request. expected_revision from latest projects.get is mandatory; conflict requires reread and user review, never blind retry."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "projects.updates",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "projects.updates",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "projects.updates",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "purchases.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "purchases.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "purchases.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "purchases.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "purchases.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "purchases.create",
+            "method": "POST",
+            "path": "/api/purchases",
+            "fields": [
+              "title"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "purchases.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "purchases.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "purchases.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "purchases.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "purchases.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "purchases.delete",
+            "method": "DELETE",
+            "path": "/api/purchases/fixture",
+            "fields": [],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "purchases.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "purchases.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "purchases.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "purchases.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "purchases.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "purchases.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "purchases.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "purchases.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "title": "Updated"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "purchases.update",
+            "method": "PATCH",
+            "path": "/api/purchases/fixture",
+            "fields": [
+              "title"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "reviews.current",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "reviews.current",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "reviews.current",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "reviews.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "reviews.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "reviews.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "reviews.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "reviews.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "date": "2026-11-11",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "reviews.delete",
+            "method": "DELETE",
+            "path": "/api/weekly-reviews/fixture",
+            "fields": [
+              "date"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "reviews.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "reviews.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "reviews.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "reviews.set",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "reviews.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "week_start": "2026-11-11",
+            "highlights": "fixture",
+            "blockers": "fixture",
+            "learnings": "fixture",
+            "next_week_focus": "fixture",
+            "overall_score": 1
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "reviews.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "week_start": "2026-11-11",
+            "highlights": "fixture",
+            "blockers": "fixture",
+            "learnings": "fixture",
+            "next_week_focus": "fixture",
+            "overall_score": 1,
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "reviews.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "week_start": "2026-11-11",
+            "highlights": "fixture",
+            "blockers": "fixture",
+            "learnings": "fixture",
+            "next_week_focus": "fixture",
+            "overall_score": 1
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "created",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "reviews.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "week_start": "2026-11-11",
+            "highlights": "fixture",
+            "blockers": "fixture",
+            "learnings": "fixture",
+            "next_week_focus": "fixture",
+            "overall_score": 1
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "reviews.set",
+            "method": "POST",
+            "path": "/api/weekly-reviews",
+            "fields": [
+              "blockers",
+              "highlights",
+              "learnings",
+              "next_week_focus",
+              "overall_score",
+              "week_start"
+            ],
+            "side_effects": "Full weekly replacement: all fields required, not a partial patch."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "rituals.get",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "rituals.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "rituals.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "rituals.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "rituals.list",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "rituals.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "rituals.progress",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "rituals.progress",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "error",
+          "operation": "rituals.progress",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.create",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "unit"
+          },
+          "dry_run": false,
+          "request_id": "tasks.create",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "t",
+              "title": "unit"
+            },
+            "effects": {
+              "calendar_sync": {
+                "status": "mocked"
+              }
+            }
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "unit"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": false,
+            "error": "write_requires_request_id"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_dry_run_and_request_id"
+        },
+        {
+          "kind": "apply",
+          "operation": "tasks.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "unit"
+          },
+          "dry_run": false,
+          "request_id": "tasks.create",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "t",
+              "title": "unit"
+            },
+            "effects": {
+              "calendar_sync": {
+                "status": "mocked"
+              }
+            }
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "preview",
+          "operation": "tasks.create",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "title": "unit"
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "tasks.create",
+            "method": "POST",
+            "path": "/api/tasks",
+            "fields": [
+              "title"
+            ],
+            "side_effects": "May create/update/cancel a Google Calendar event according to Praxis policy. Completing an existing recurring task may create the next occurrence and its calendar event; completion/reopening can award/reverse XP. Primary-record readback does not certify external Calendar delivery. No delete operation."
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_dry_run_and_request_id"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.delete",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "t"
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "missing_required_field"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_forbidden_operations_extras_and_path_injection"
+        },
+        {
+          "kind": "apply",
+          "operation": "tasks.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "deleted": true,
+              "id": "fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "tasks.delete",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "confirm_delete": true
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "tasks.delete",
+            "method": "DELETE",
+            "path": "/api/tasks/fixture",
+            "fields": [],
+            "side_effects": "Deletes checklist, reverses XP and cancels calendar event. Explicit user request only."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.get",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "t-1"
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.get",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "../settings"
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "invalid_field_value"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_forbidden_operations_extras_and_path_injection"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.list",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "limit": 12,
+            "offset": 3
+          },
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.list",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "include_overdue": false
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_forbidden_operations_extras_and_path_injection"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.not_today",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.not_today",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.not_today",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture",
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "tasks.not_today",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "fixture",
+              "title": "Fixture"
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "tasks.not_today",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "fixture"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "tasks.not_today",
+            "method": "POST",
+            "path": "/api/tasks/fixture/not-today",
+            "fields": [],
+            "side_effects": "Moves open task to tomorrow and syncs calendar."
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.reorder",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ],
+            "uid": "other"
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": false,
+            "error": "invalid_payload"
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        },
+        {
+          "kind": "apply",
+          "operation": "tasks.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": false,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "ordered_ids": [
+                "a",
+                "b"
+              ]
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_all_new_writes_readback_and_idempotent_replay"
+        },
+        {
+          "kind": "preview",
+          "operation": "tasks.reorder",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "ordered_ids": [
+              "a",
+              "b"
+            ]
+          },
+          "dry_run": true,
+          "request_id": "fixture",
+          "result": {
+            "ok": true,
+            "dry_run": true,
+            "operation": "tasks.reorder",
+            "method": "PATCH",
+            "path": "/api/tasks/reorder",
+            "fields": [
+              "ordered_ids"
+            ],
+            "side_effects": ""
+          },
+          "test": "test_praxis_extended.ExtendedTests.test_every_new_schema_preview_and_unknown_field"
+        }
+      ]
+    },
+    {
+      "operation": "tasks.update",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "tasks.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "t",
+            "status": "completed"
+          },
+          "dry_run": false,
+          "request_id": "tasks.update",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "t",
+              "status": "completed"
+            },
+            "effects": {
+              "calendar_sync": {
+                "status": "mocked"
+              }
+            }
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "error",
+          "operation": "tasks.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "t",
+            "title": "unit"
+          },
+          "dry_run": false,
+          "request_id": "reserved",
+          "result": {
+            "ok": false,
+            "error": "request_id_conflict"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_preexisting_pending_and_cross_operation_conflict"
+        },
+        {
+          "kind": "apply",
+          "operation": "tasks.update",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "id": "t",
+            "status": "completed"
+          },
+          "dry_run": false,
+          "request_id": "tasks.update",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "t",
+              "status": "completed"
+            },
+            "effects": {
+              "calendar_sync": {
+                "status": "mocked"
+              }
+            }
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        }
+      ]
+    },
+    {
+      "operation": "wellness.get",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "wellness.get",
+          "layer": "praxis_adapter.py",
+          "payload": {},
+          "dry_run": true,
+          "request_id": "",
+          "result": {
+            "ok": true,
+            "data": []
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_read_routes"
+        }
+      ]
+    },
+    {
+      "operation": "wellness.set",
+      "scope": "adapter with mocked transport; helper fixtures where identified, not full remote API parity",
+      "samples": [
+        {
+          "kind": "success",
+          "operation": "wellness.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11",
+            "sleep_hours": 7.5,
+            "sleep_quality": 3,
+            "mood": 4,
+            "productivity": 3,
+            "note": ""
+          },
+          "dry_run": false,
+          "request_id": "wellness.set",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "w",
+              "date": "2026-11-11",
+              "sleep_hours": 7.5,
+              "sleep_quality": 3,
+              "mood": 4,
+              "productivity": 3,
+              "note": ""
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        },
+        {
+          "kind": "error",
+          "operation": "wellness.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11"
+          },
+          "dry_run": true,
+          "request_id": "unit",
+          "result": {
+            "ok": false,
+            "error": "missing_required_field"
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_strict_validation"
+        },
+        {
+          "kind": "apply",
+          "operation": "wellness.set",
+          "layer": "praxis_adapter.py",
+          "payload": {
+            "date": "2026-11-11",
+            "sleep_hours": 7.5,
+            "sleep_quality": 3,
+            "mood": 4,
+            "productivity": 3,
+            "note": ""
+          },
+          "dry_run": false,
+          "request_id": "wellness.set",
+          "result": {
+            "ok": true,
+            "dry_run": false,
+            "verified": true,
+            "data": {
+              "id": "w",
+              "date": "2026-11-11",
+              "sleep_hours": 7.5,
+              "sleep_quality": 3,
+              "mood": 4,
+              "productivity": 3,
+              "note": ""
+            },
+            "effects": {}
+          },
+          "test": "test_praxis_adapter.AdapterTests.test_all_write_routes_and_readbacks"
+        }
+      ]
+    }
+  ]
+}
