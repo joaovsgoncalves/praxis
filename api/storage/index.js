@@ -4,6 +4,7 @@ import {
   StorageError, mapStorageError, recordId,
   newTask, taskPatch, taskQuery,
   newReview, reviewPatch, reviewQuery, weekStart,
+  newPurchase, purchasePatch, purchaseQuery,
 } from './contract.js';
 
 /**
@@ -26,6 +27,15 @@ function domainSpecs(now) {
       list: ['read', (query) => [reviewQuery(query)]],
       create: ['write', (input) => [newReview(input, now)]],
       patch: ['write', (id, fields) => [recordId(id), reviewPatch(fields)]],
+      remove: ['readwrite', (id) => [recordId(id)]],
+    },
+    purchases: {
+      get: ['read', (id) => [recordId(id)]],
+      list: ['read', (query) => [purchaseQuery(query)]],
+      maxSort: ['read', () => []],
+      // Firestore lê a sequência antes de gravar: mesma regra nos dois motores.
+      create: ['readwrite', (input) => [newPurchase(input)]],
+      patch: ['write', (id, fields) => [recordId(id), purchasePatch(fields)]],
       remove: ['readwrite', (id) => [recordId(id)]],
     },
   };

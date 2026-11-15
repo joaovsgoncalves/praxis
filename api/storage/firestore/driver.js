@@ -1,6 +1,7 @@
 import { assertUserId } from '../../lib/tenantDb.js';
 import { firestoreTasks } from './tasks.js';
 import { firestoreWeeklyReviews } from './weeklyReviews.js';
+import { firestorePurchases } from './purchases.js';
 
 /**
  * SDK injetado: importar este módulo não lê credencial nem abre rede.
@@ -14,6 +15,7 @@ export function createFirestoreDriver({ client, root = client }) {
   const domains = {
     tasks: (owner, tx) => firestoreTasks(userDoc(owner).collection('tasks'), tx),
     weeklyReviews: (owner, tx) => firestoreWeeklyReviews(userDoc(owner), tx, client),
+    purchases: (owner, tx) => firestorePurchases(userDoc(owner), tx, client),
   };
   const driver = {
     kind: 'firestore',

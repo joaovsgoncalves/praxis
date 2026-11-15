@@ -43,6 +43,7 @@ import { initContinuityGuidanceSchema } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
 import { createWeeklyReviewsService } from './services/weeklyReviews.js';
+import { createPurchasesService } from './services/purchases.js';
 import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -182,6 +183,7 @@ const storageRuntime = createStorageRuntime({
   },
 });
 const weeklyReviews = createWeeklyReviewsService({ storage: storageRuntime.storage });
+const purchases = createPurchasesService({ storage: storageRuntime.storage });
 
 /** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
 function forEachOwner(label, fn) {
@@ -266,7 +268,7 @@ const routeCtx = {
 // --- Domain routes ---
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
 registerOpsRoutes(app, { apiDir: __dirname });
-app.use('/api/purchases', createPurchasesRouter({ db }));
+app.use('/api/purchases', createPurchasesRouter({ purchases }));
 app.use('/api/projects', createProjectsRouter({ db, getLocalDateString }));
 app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não existem para esta conta'));
 app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));

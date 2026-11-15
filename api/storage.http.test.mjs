@@ -1,5 +1,5 @@
 /**
- * Revisões semanais no servidor de verdade, já pela camada nova: cópia isolada da API (banco novo,
+ * Rotas já servidas pela camada nova (revisões semanais e compras), no servidor de verdade: cópia isolada da API (banco novo,
  * sem agenda, sem segredo de produção), duas contas, chave do agente no fluxo do Alfred, conferência
  * no arquivo de cada conta e desligamento gracioso.
  */
@@ -134,6 +134,26 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.match(await res.text(), /RangeError: Invalid time value/);
   });
 
+  await t.test('compras pela camada nova: contas separadas e fluxo purchases.* do Alfred', async () => {
+    const pa = await call(proc, 'POST', '/api/purchases', { cookie: A, body: { title: 'Fone do Jota', horizon: 'short' } });
+    const pb = await call(proc, 'POST', '/api/purchases', { cookie: B, body: { title: 'Livro da Bia' } });
+    assert.equal(pa.status, 201, pa.text); assert.equal(pb.status, 201, pb.text);
+    assert.equal(pa.json.sort_order, 1); assert.equal(pb.json.sort_order, 1, 'posição conta por conta');
+    assert.deepEqual((await call(proc, 'GET', '/api/purchases?status=all', { cookie: B })).json.map((r) => r.title), ['Livro da Bia']);
+    assert.equal((await call(proc, 'PATCH', `/api/purchases/${pa.json.id}`, { cookie: B, body: { title: 'invadida' } })).status, 404);
+    assert.equal((await call(proc, 'DELETE', `/api/purchases/${pa.json.id}`, { cookie: B })).status, 404);
+    // purchases.create/update/delete do Alfred e a releitura que ele faz (status=all).
+    const made = await call(proc, 'POST', '/api/purchases', { key: API_KEY, body: { title: 'Pelo Alfred', notes: 'n', horizon: 'long', status: 'want', price_estimate: '150', url: 'https://exemplo.invalid' } });
+    assert.equal(made.status, 201, made.text); assert.equal(made.json.sort_order, 2);
+    const upd = await call(proc, 'PATCH', `/api/purchases/${made.json.id}`, { key: API_KEY, body: { status: 'bought' } });
+    assert.equal(upd.json.status, 'bought');
+    const rows = (await call(proc, 'GET', '/api/purchases?status=all', { key: API_KEY })).json;
+    assert.deepEqual(rows.map((r) => r.title), ['Fone do Jota', 'Pelo Alfred']);
+    assert.deepEqual(rows[1], upd.json, 'releitura igual à resposta');
+    assert.equal((await call(proc, 'DELETE', `/api/purchases/${made.json.id}`, { key: API_KEY })).status, 204);
+    assert.equal((await call(proc, 'GET', '/api/purchases', { cookie: A })).json.length, 1);
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -145,6 +165,8 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     t.after(() => { control.close(); other.close(); });
     assert.deepEqual(control.prepare('SELECT highlights FROM weekly_reviews ORDER BY week_start').pluck().all(), ['Depois de apagar']);
     assert.deepEqual(other.prepare('SELECT highlights FROM weekly_reviews').pluck().all(), ['Da Bia']);
+    assert.deepEqual(control.prepare('SELECT title FROM purchase_items').pluck().all(), ['Fone do Jota']);
+    assert.deepEqual(other.prepare('SELECT title FROM purchase_items').pluck().all(), ['Livro da Bia']);
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
 });

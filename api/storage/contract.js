@@ -111,6 +111,45 @@ export function reviewQuery(input = {}) {
   return { limit };
 }
 
+// Compras/desejos: colunas na ordem da tabela `purchase_items` (purchaseList.js).
+export const PURCHASE_FIELDS = Object.freeze(['id', 'title', 'notes', 'horizon', 'status', 'price_estimate', 'url', 'sort_order', 'created_date', 'updated_date']);
+const PURCHASE_TEXT = new Set(['title', 'notes', 'horizon', 'status', 'price_estimate', 'url']);
+const PURCHASE_IMMUTABLE = new Set(['id', 'sort_order', 'created_date']);
+function purchaseValues(input) {
+  plain(input);
+  for (const [key, value] of Object.entries(input)) {
+    if (!PURCHASE_FIELDS.includes(key)) throw new StorageError('unknown_purchase_field');
+    if (key === 'id') recordId(value);
+    else if (key === 'title') { if (typeof value !== 'string') throw new StorageError('invalid_purchase_value'); }
+    else if (PURCHASE_TEXT.has(key)) { if (value !== null && typeof value !== 'string') throw new StorageError('invalid_purchase_value'); }
+    // Afinidade INTEGER: o valor já chega convertido (número, texto não numérico ou null).
+    else if (key === 'sort_order') { if (value !== null && typeof value !== 'string' && !Number.isFinite(value)) throw new StorageError('invalid_purchase_value'); }
+    else if (typeof value !== 'string' || !SQL_STAMP.test(value)) throw new StorageError('invalid_purchase_value');
+  }
+  return structuredClone(input);
+}
+/** Linha completa: o serviço decide todos os valores (inclusive `sort_order`). */
+export function newPurchase(input) {
+  const clean = purchaseValues(input);
+  for (const field of PURCHASE_FIELDS) if (!Object.hasOwn(clean, field)) throw new StorageError('incomplete_purchase');
+  return Object.fromEntries(PURCHASE_FIELDS.map((field) => [field, clean[field]]));
+}
+export function purchasePatch(input) {
+  const clean = purchaseValues(input);
+  for (const key of Object.keys(clean)) if (PURCHASE_IMMUTABLE.has(key)) throw new StorageError('immutable_purchase_field');
+  if (!Object.keys(clean).length) throw new StorageError('empty_patch');
+  return clean;
+}
+/** `status`: valor exato ou null; `excludePaused` só vale sem status; `horizon`: valor exato ou null. */
+export function purchaseQuery(input = {}) {
+  plain(input);
+  const query = { status: null, excludePaused: false, horizon: null, ...input };
+  for (const key of Object.keys(query)) if (!['status', 'excludePaused', 'horizon'].includes(key)) throw new StorageError('invalid_purchase_query');
+  if ((query.status !== null && typeof query.status !== 'string') || (query.horizon !== null && typeof query.horizon !== 'string')
+      || typeof query.excludePaused !== 'boolean' || (query.excludePaused && query.status !== null)) throw new StorageError('invalid_purchase_query');
+  return query;
+}
+
 export function mapStorageError(error) {
   if (error instanceof StorageError) return error;
   if (['SQLITE_CONSTRAINT_PRIMARYKEY', 'SQLITE_CONSTRAINT_UNIQUE', 6].includes(error?.code)) return new StorageError('already_exists');

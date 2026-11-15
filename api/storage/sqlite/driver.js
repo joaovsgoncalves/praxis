@@ -2,8 +2,9 @@ import { assertUserId } from '../../lib/tenantDb.js';
 import { StorageError } from '../contract.js';
 import { sqliteTasks } from './tasks.js';
 import { sqliteWeeklyReviews } from './weeklyReviews.js';
+import { sqlitePurchases } from './purchases.js';
 
-const DOMAINS = Object.freeze({ tasks: sqliteTasks, weeklyReviews: sqliteWeeklyReviews });
+const DOMAINS = Object.freeze({ tasks: sqliteTasks, weeklyReviews: sqliteWeeklyReviews, purchases: sqlitePurchases });
 
 /**
  * Opera as tabelas existentes, sem esquema, semente ou conexão implícitos.
