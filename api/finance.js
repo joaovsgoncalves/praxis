@@ -283,6 +283,21 @@ export function initFinanceSchema(db) {
       source TEXT DEFAULT 'pluggy'
     );
 
+    -- compras do cartão que o banco ainda não confirmou (PENDING no Pluggy). Ficam fora de todas as
+    -- somas; a lista de cada banco é trocada inteira a cada leitura completa e a compra sai daqui
+    -- quando a versão confirmada aparece em finance_transactions.
+    CREATE TABLE IF NOT EXISTS finance_pending_transactions (
+      external_id TEXT PRIMARY KEY,
+      institution TEXT NOT NULL,
+      account_id TEXT,
+      posted_on TEXT NOT NULL,
+      amount REAL NOT NULL,
+      raw_description TEXT DEFAULT '',
+      merchant TEXT DEFAULT '',
+      category TEXT,
+      seen_at TEXT
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS idx_finance_tx_pierre
       ON finance_transactions(pierre_tx_id)
       WHERE pierre_tx_id IS NOT NULL AND pierre_tx_id != '';
@@ -295,6 +310,11 @@ export function initFinanceSchema(db) {
   }
   if (!accountCols.includes('card_last4')) {
     db.exec('ALTER TABLE finance_accounts ADD COLUMN card_last4 TEXT');
+  }
+  // PF x PJ (separação leve): a conta diz de quem é; dívida, parcela, assinatura e lançamento herdam
+  // pela conta (sem conta = PF). Visão geral, mês e insights são PF por padrão; `entity=pj` mostra a empresa.
+  if (!accountCols.includes('entity')) {
+    db.exec("ALTER TABLE finance_accounts ADD COLUMN entity TEXT NOT NULL DEFAULT 'pf'");
   }
   const settingsCols = db.prepare('PRAGMA table_info(finance_settings)').all().map((c) => c.name);
   if (!settingsCols.includes('hide_values')) {
@@ -342,6 +362,12 @@ export function initFinanceSchema(db) {
   `);
   linkPaymentsToTransactions(db);
   initCoverageSchema(db);
+
+  // pagamento de fatura confirmado pelo João que o banco ainda não mostra (Argos, 14/11/2026) — só aditivo
+  const cardCols = db.prepare('PRAGMA table_info(finance_card_status)').all().map((c) => c.name);
+  if (cardCols.length && !cardCols.includes('bill_paid_manual')) {
+    db.exec('ALTER TABLE finance_card_status ADD COLUMN bill_paid_manual REAL DEFAULT 0');
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS finance_fixed_expenses (
       id TEXT PRIMARY KEY,
@@ -789,12 +815,38 @@ export function latestBalance(db, accountId, amountKind = 'available') {
   `).get(accountId, amountKind);
 }
 
-export function listAccounts(db, { status = 'active' } = {}) {
+export const ENTITIES = ['pf', 'pj'];
+
+/** `entity` de consulta: 'pf' | 'pj' | 'all'. Valor ausente vira o padrão; inválido é recusado. */
+export function parseEntity(value, fallback = 'pf') {
+  if (value === undefined || value === null || value === '') return fallback;
+  const v = String(value).toLowerCase();
+  if (v === 'all' || ENTITIES.includes(v)) return v;
+  throw badRequest('entity inválido: use pf, pj ou all');
+}
+
+/** ids das contas da empresa */
+export function pjAccountIds(db) {
+  return new Set(db.prepare("SELECT id FROM finance_accounts WHERE entity = 'pj'").all().map((r) => r.id));
+}
+
+function belongs(pj, accountId, entity) {
+  if (entity === 'all') return true;
+  const isPj = accountId != null && pj.has(accountId);
+  return entity === 'pj' ? isPj : !isPj;
+}
+
+export function listAccounts(db, { status = 'active', entity = 'all' } = {}) {
   let q = 'SELECT * FROM finance_accounts WHERE 1=1';
   const params = [];
   if (status && status !== 'all') {
     q += ' AND status = ?';
     params.push(status);
+  }
+  const ent = parseEntity(entity, 'all');
+  if (ent !== 'all') {
+    q += ' AND entity = ?';
+    params.push(ent);
   }
   q += ' ORDER BY sort_order ASC, name ASC';
   const rows = db.prepare(q).all(...params);
@@ -805,6 +857,7 @@ export function listAccounts(db, { status = 'active' } = {}) {
     const projected = latestBalance(db, acc.id, 'projected_bill');
     return {
       ...acc,
+      entity: acc.entity || 'pf',
       brand_color: acc.brand_color || null,
       card_last4: acc.card_last4 || null,
       is_operational: Number(acc.is_operational) === 1,
@@ -829,11 +882,13 @@ export function createAccount(db, body) {
   }
   const id = body.id || randomUUID();
   const now = nowIso();
+  const entity = parseEntity(body.entity, 'pf');
+  if (entity === 'all') throw badRequest('entity da conta: pf ou pj');
   const sort = db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM finance_accounts').get();
   db.prepare(`
     INSERT INTO finance_accounts
-      (id, name, kind, institution, mask, pierre_account_id, is_operational, status, sort_order, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, name, kind, institution, mask, pierre_account_id, is_operational, status, sort_order, created_at, updated_at, entity)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     name,
@@ -846,6 +901,7 @@ export function createAccount(db, body) {
     Number.isFinite(Number(body.sort_order)) ? Number(body.sort_order) : (sort.m || 0) + 1,
     now,
     now,
+    entity,
   );
   if (body.amount !== undefined) {
     createBalance(db, {
@@ -866,6 +922,11 @@ export function updateAccount(db, id, body = {}) {
   // valida antes de gravar qualquer coisa
   const brandColor = body.brand_color !== undefined ? normalizeBrandColor(body.brand_color) : existing.brand_color;
   const cardLast4 = body.card_last4 !== undefined ? normalizeCardLast4(body.card_last4) : existing.card_last4;
+  const entity = body.entity !== undefined ? parseEntity(body.entity) : (existing.entity || 'pf');
+  if (entity === 'all') throw badRequest('entity da conta: pf ou pj');
+  if (body.entity !== undefined) {
+    db.prepare('UPDATE finance_accounts SET entity = ? WHERE id = ?').run(entity, id);
+  }
   db.prepare(`
     UPDATE finance_accounts SET
       name = COALESCE(?, name),
@@ -1125,7 +1186,8 @@ export function updateTransaction(db, id, body = {}) {
 }
 
 /** Extrato: lançamento manual já confirmado pelo banco não aparece de novo. */
-export function listTransactions(db, { from, to, account_id, category, q, limit } = {}) {
+export function listTransactions(db, { from, to, account_id, category, q, limit, entity } = {}) {
+  const ent = parseEntity(entity, 'all');
   const today = todayFortaleza();
   const start = isValidDateString(from) ? from : addDays(today, -30);
   const end = isValidDateString(to) ? to : today;
@@ -1143,6 +1205,11 @@ export function listTransactions(db, { from, to, account_id, category, q, limit 
     sql += ' AND (merchant LIKE ? OR raw_description LIKE ?)';
     const like = `%${q}%`;
     params.push(like, like);
+  }
+  if (ent !== 'all') {
+    sql += ent === 'pj'
+      ? " AND account_id IN (SELECT id FROM finance_accounts WHERE entity = 'pj')"
+      : " AND (account_id IS NULL OR account_id NOT IN (SELECT id FROM finance_accounts WHERE entity = 'pj'))";
   }
   sql += ' ORDER BY posted_on DESC, created_at DESC LIMIT ?';
   params.push(Math.min(Number(limit) || 200, 1000));
@@ -1513,14 +1580,16 @@ export function updateGoal(db, id, body = {}) {
   return listGoals(db).find((g) => g.id === id);
 }
 
-export function getInsights(db, { from, to, today: todayArg } = {}) {
+export function getInsights(db, { from, to, entity, today: todayArg } = {}) {
+  const ent = parseEntity(entity, 'pf');
+  const pj = pjAccountIds(db);
   const today = isValidDateString(todayArg) ? todayArg : todayFortaleza();
   const start = isValidDateString(from) ? from : addDays(today, -30);
   const end = isValidDateString(to) ? to : today;
   const rows = db.prepare(`
     SELECT * FROM finance_transactions
     WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL
-  `).all(start, end).filter((tx) => !OFF_BUDGET_CATEGORIES.includes(tx.category));
+  `).all(start, end).filter((tx) => !OFF_BUDGET_CATEGORIES.includes(tx.category) && belongs(pj, tx.account_id, ent));
 
   let outflow = 0;
   let inflow = 0;
@@ -1579,7 +1648,7 @@ export function getInsights(db, { from, to, today: todayArg } = {}) {
     days,
     tx_count: rows.length,
     // saldo em dia não prova extrato: a tela só chama zero de zero com coverage.zero_is_real
-    coverage: getStatementCoverage(db, { from: start, to: end, today }),
+    coverage: getStatementCoverage(db, { from: start, to: end, today, only: (id) => belongs(pj, id, ent) }),
   };
 }
 
@@ -1771,7 +1840,7 @@ function cardLabel(card) {
  * fixas ativas não pagas no mês do vencimento, assinaturas active/keep e mínimo em aberto dos cartões.
  * Dívida com status waiting (pai) não entra.
  */
-export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus }) {
+export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus, pj = pjAccountIds(db) }) {
   const until = addDays(salaryDate, -1);
   const items = [];
   const unknown = [];
@@ -1790,6 +1859,7 @@ export function commitmentsUntilSalary(db, { today, salaryDate, cardsStatus }) {
 
   for (const sub of listSubscriptions(db)) {
     if (!['active', 'keep'].includes(sub.status) || !(sub.amount > 0)) continue;
+    if (!belongs(pj, sub.account_id, 'pf')) continue;
     if (sub.cadence === 'yearly') {
       if (sub.next_charge && sub.next_charge >= today && sub.next_charge <= until) {
         items.push({ kind: 'subscription', id: sub.id, name: sub.name, amount: sub.amount, due_date: sub.next_charge });
@@ -1961,16 +2031,18 @@ export function saveBudgets(db, body) {
 }
 
 /** Gasto do mês por categoria (só saídas; fatura e transferência à parte), com limite e % do orçamento. */
-export function getMonthSummary(db, { month, today } = {}) {
+export function getMonthSummary(db, { month, today, entity } = {}) {
+  const ent = parseEntity(entity, 'pf');
+  const pj = pjAccountIds(db);
   const day = isValidDateString(today) ? today : todayFortaleza();
   const ym = month === undefined || month === null || month === '' ? monthOf(day) : parseMonth(month);
   const [y, m] = ym.split('-').map(Number);
   const from = `${ym}-01`;
   const to = ymdOf(y, m, daysInMonth(y, m));
   const rows = db.prepare(`
-    SELECT category, direction, amount, source FROM finance_transactions
+    SELECT category, direction, amount, source, account_id FROM finance_transactions
     WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL AND direction != 'internal'
-  `).all(from, to);
+  `).all(from, to).filter((tx) => belongs(pj, tx.account_id, ent));
 
   const spent = new Map();
   const count = new Map();
@@ -2025,10 +2097,33 @@ export function getMonthSummary(db, { month, today } = {}) {
     manual_out: money(manualOut),
     manual_in: money(manualIn),
     manual_tx_count: manualCount,
-    coverage: getStatementCoverage(db, { from, to, today: day }),
+    coverage: getStatementCoverage(db, { from, to, today: day, only: (id) => belongs(pj, id, ent) }),
     budget_total: money([...budgets.values()].reduce((s, v) => s + v, 0)),
     categories,
+    pending_card: pendingCardSummary(db, from, to, pj, ent),
+    entity: ent,
   };
+}
+
+/** Compras de cartão ainda pendentes no banco, à parte: não entram em total_out nem no orçamento. */
+function pendingCardSummary(db, from, to, pj = pjAccountIds(db), entity = 'pf') {
+  const rows = db.prepare(`
+    SELECT amount, seen_at, account_id FROM finance_pending_transactions
+    WHERE amount < 0 AND posted_on >= ? AND posted_on <= ?
+  `).all(from, to).filter((r) => belongs(pj, r.account_id, entity));
+  const seen = rows.map((r) => r.seen_at).filter(Boolean).sort().at(-1) || null;
+  return { count: rows.length, total: money(rows.reduce((s, r) => s - r.amount, 0)), seen_at: seen };
+}
+
+/** GET /api/finance/pending — lista das compras pendentes (mais novas primeiro). */
+export function listPendingTransactions(db) {
+  return db.prepare(`
+    SELECT p.external_id, p.institution, p.account_id, a.name AS account_name, p.posted_on, p.amount,
+           p.merchant, p.category, p.seen_at
+    FROM finance_pending_transactions p
+    LEFT JOIN finance_accounts a ON a.id = p.account_id
+    ORDER BY p.posted_on DESC, p.external_id ASC
+  `).all();
 }
 
 // ── Categoria e descrição do banco ────────────────────────────────────────────
@@ -2082,14 +2177,28 @@ export function cleanMerchant(description) {
   return s.slice(0, 80);
 }
 
+/** Fatura cujo vencimento já passou e cujo fechamento tem mais de 35 dias: o banco ainda não mandou o ciclo novo. */
+export function billCycleStale(card, today) {
+  if (!card || !card.bill_due || !card.bill_closing || !isValidDateString(today)) return false;
+  if (card.bill_due >= today) return false;
+  const [y1, m1, d1] = card.bill_closing.slice(0, 10).split('-').map(Number);
+  const [y2, m2, d2] = today.split('-').map(Number);
+  return (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000 > 35;
+}
+
 /** Estado dos cartões que o banco mandou, com o nome da conta e a situação da fatura. */
-export function listCardStatus(db) {
+export function listCardStatus(db, { today } = {}) {
+  const day = isValidDateString(today) ? today : todayFortaleza();
   return db.prepare(`
     SELECT cs.*, a.name AS account_name, a.status AS account_status
     FROM finance_card_status cs
     LEFT JOIN finance_accounts a ON a.id = cs.account_id
     ORDER BY cs.bill_due IS NULL, cs.bill_due ASC, cs.institution ASC
-  `).all().map((card) => ({ ...card, card_situation: cardSituation(card) }));
+  `).all().map((card) => ({
+    ...card,
+    card_situation: cardSituation(card),
+    bill_cycle_stale: billCycleStale(card, day),
+  }));
 }
 
 /** Última atualização de cada banco ativo (cartão ou saldo do Pluggy); devolve a mais antiga. */
@@ -2125,9 +2234,11 @@ export function lastMidasSync(db) {
 export function getOverview(db, { today } = {}) {
   const day = isValidDateString(today) ? today : todayFortaleza();
   const settings = getSettings(db);
-  const accounts = listAccounts(db);
-  const debts = listDebts(db);
-  const subscriptions = listSubscriptions(db);
+  // visão geral é sempre PF; a empresa tem a própria visão (month/insights/accounts com entity=pj)
+  const pj = pjAccountIds(db);
+  const accounts = listAccounts(db).filter((a) => a.entity !== 'pj');
+  const debts = listDebts(db).filter((d) => belongs(pj, d.account_id, 'pf'));
+  const subscriptions = listSubscriptions(db).filter((s) => belongs(pj, s.account_id, 'pf'));
   const lastSync = db.prepare(
     'SELECT * FROM finance_sync_log ORDER BY started_at DESC LIMIT 1',
   ).get();
@@ -2163,9 +2274,9 @@ export function getOverview(db, { today } = {}) {
       .reduce((s, d) => s + d.balance, 0),
   );
 
-  const cardsStatus = listCardStatus(db);
+  const cardsStatus = listCardStatus(db, { today: day }).filter((c) => belongs(pj, c.account_id, 'pf'));
   const salaryDate = nextSalaryDate(day, settings.salary_day);
-  const commitments = commitmentsUntilSalary(db, { today: day, salaryDate, cardsStatus });
+  const commitments = commitmentsUntilSalary(db, { today: day, salaryDate, cardsStatus, pj });
   const committedUntilSalary = money(commitments.items.reduce((s, c) => s + c.amount, 0));
   const safeToSpend = money(Math.max(0, livre - committedUntilSalary));
   const creditAvailableTotal = money(
@@ -2178,7 +2289,7 @@ export function getOverview(db, { today } = {}) {
   const workMonth = money(liveSubs.filter((s) => s.lane === 'work').reduce((s, x) => s + x.amount, 0));
   const personalMonth = money(liveSubs.filter((s) => s.lane === 'personal').reduce((s, x) => s + x.amount, 0));
 
-  const openInst = listInstallments(db, { status: 'open' });
+  const openInst = listInstallments(db, { status: 'open' }).filter((x) => belongs(pj, x.account_id, 'pf'));
   const installmentsRemaining = money(openInst.reduce((s, x) => s + Number(x.remaining || 0), 0));
   const installmentsMonth = money(openInst.reduce((s, x) => s + Number(x.monthly || 0), 0));
   const lastInstDue = openInst
@@ -2220,7 +2331,9 @@ export function getOverview(db, { today } = {}) {
     safe_to_spend: safeToSpend,
     // compatibilidade: faturas de cartão de hoje-3 a hoje+7 (o front usa os compromissos até o salário)
     bills_due_7d: billsDue7d,
-    month: getMonthSummary(db, { today: day }),
+    month: getMonthSummary(db, { today: day, entity: 'pf' }),
+    entity: 'pf',
+    pj_accounts_n: pj.size,
     debts_total: debtsTotal,
     cards_total: cardsTotal,
     cards_status: cardsStatus,
@@ -2239,7 +2352,7 @@ export function getOverview(db, { today } = {}) {
     next_step: nextStep,
     accounts,
     debts,
-    bank_shown: listBankShown(db, { today: day }),
+    bank_shown: listBankShown(db, { today: day, entity: 'pf' }),
     last_sync: lastSync || null,
     last_midas_sync: lastMidasSync(db),
     settings,
@@ -2254,8 +2367,17 @@ const BANK_STALE_DAYS = 3;
  * A conta é a identidade; Pierre e Pluggy disputam pela data, então a mesma conta nunca aparece
  * (nem soma) duas vezes e conta só com Pluggy não fica de fora. Saldo digitado não entra aqui.
  */
-export function listBankShown(db, { today } = {}) {
+/** Cobertura do extrato só das contas da entidade pedida (PF por padrão, como mês e insights). */
+export function getCoverageFor(db, { from, to, today, entity } = {}) {
+  const ent = parseEntity(entity, 'pf');
+  const pj = pjAccountIds(db);
+  return getStatementCoverage(db, { from, to, today, only: (id) => belongs(pj, id, ent) });
+}
+
+export function listBankShown(db, { today, entity } = {}) {
   const day = isValidDateString(today) ? today : todayFortaleza();
+  const ent = parseEntity(entity, 'all');
+  const pj = pjAccountIds(db);
   const marks = BANK_BALANCE_SOURCES.map(() => '?').join(', ');
   const rows = db.prepare(`
     SELECT b.account_id, b.amount_kind, b.amount, b.source, b.as_of, b.created_at,
@@ -2270,6 +2392,7 @@ export function listBankShown(db, { today } = {}) {
   const seen = new Set();
   const entries = [];
   for (const row of rows) {
+    if (!belongs(pj, row.account_id, ent)) continue;
     const key = `${row.account_id}|${row.amount_kind}`;
     if (seen.has(key)) continue;
     seen.add(key);

@@ -37,8 +37,9 @@ import {
   updateSettings,
   updateSubscription,
   updateTransaction,
+  listPendingTransactions,
+  getCoverageFor,
 } from '../finance.js';
-import { getStatementCoverage } from '../lib/financeCoverage.js';
 import { ingestPluggy } from '../pluggyIngest.js';
 import { syncPierre } from '../pierreSync.js';
 
@@ -69,7 +70,7 @@ export function createFinanceRouter({ db, getLocalDateString }) {
 
   router.get('/month', (req, res) => {
     try {
-      res.json(getMonthSummary(db, { month: req.query.month, today: localToday() }));
+      res.json(getMonthSummary(db, { month: req.query.month, today: localToday(), entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
@@ -145,7 +146,11 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/accounts', (req, res) => {
-    res.json(listAccounts(db, { status: req.query.status }));
+    try {
+      res.json(listAccounts(db, { status: req.query.status, entity: req.query.entity }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.post('/accounts', (req, res) => {
@@ -255,14 +260,19 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/transactions', (req, res) => {
-    res.json(listTransactions(db, {
-      from: req.query.from,
-      to: req.query.to,
-      account_id: req.query.account_id,
-      category: req.query.category,
-      q: req.query.q,
-      limit: req.query.limit,
-    }));
+    try {
+      res.json(listTransactions(db, {
+        from: req.query.from,
+        to: req.query.to,
+        account_id: req.query.account_id,
+        category: req.query.category,
+        q: req.query.q,
+        limit: req.query.limit,
+        entity: req.query.entity,
+      }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.post('/transactions', (req, res) => {
@@ -283,7 +293,11 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   router.get('/insights', (req, res) => {
-    res.json(getInsights(db, { from: req.query.from, to: req.query.to, today: localToday() }));
+    try {
+      res.json(getInsights(db, { from: req.query.from, to: req.query.to, entity: req.query.entity, today: localToday() }));
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.get('/goals', (_req, res) => {
@@ -318,9 +332,21 @@ export function createFinanceRouter({ db, getLocalDateString }) {
     }
   });
 
-  /** O que se sabe do extrato no período (separado da data do saldo). */
+  /** O que se sabe do extrato no período (separado da data do saldo); PF por padrão, como mês e insights. */
   router.get('/coverage', (req, res) => {
-    res.json(getStatementCoverage(db, { from: req.query.from, to: req.query.to, today: localToday() }));
+    try {
+      res.json(getCoverageFor(db, { from: req.query.from, to: req.query.to, today: localToday(), entity: req.query.entity }));
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  router.get('/pending', (_req, res) => {
+    try {
+      res.json({ pending: listPendingTransactions(db) });
+    } catch (err) {
+      sendError(res, err);
+    }
   });
 
   router.get('/sync/last', (_req, res) => {

@@ -299,3 +299,38 @@ test('Pluggy: o extrato cobre também o cartão achado pelo final, mesmo com out
   const cov = await requestJson(server.base, `/api/finance/coverage?from=2026-10-15&to=${TODAY}`);
   assert.equal(cov.accounts.find((a) => a.account_id === 'acc-gold').status, 'complete');
 });
+
+test('PF e PJ: conta da empresa sem extrato não rebaixa a cobertura pessoal nem aparece em "O banco mostrou"', async (t) => {
+  const db = bareDb(t);
+  for (const id of ['acc-a', 'acc-b']) {
+    recordStatementCoverage(db, { accountId: id, source: 'pluggy', from: '2026-10-01', to: TODAY });
+  }
+  createAccount(db, { id: 'acc-pj', name: 'Asaas Empresa', institution: 'asaas', kind: 'checking', entity: 'pj' });
+  createBalance(db, { account_id: 'acc-pj', amount: 900, amount_kind: 'available', source: 'pluggy', as_of: TODAY });
+  createTransaction(db, { account_id: 'acc-pj', posted_on: '2026-11-10', amount: -300, category: 'Assinaturas', source: 'pluggy', external_id: 'pj-1' });
+
+  const pf = getInsights(db, { from: '2026-11-01', to: TODAY, today: TODAY });
+  assert.equal(pf.coverage.status, 'complete', 'a conta da empresa não entra na conta pessoal');
+  assert.equal(pf.coverage.zero_is_real, true);
+  assert.ok(!pf.coverage.accounts.some((a) => a.account_id === 'acc-pj'));
+  assert.equal(pf.coverage.bank_tx_count, 0, 'lançamento da empresa não conta como extrato pessoal');
+
+  const pj = getInsights(db, { from: '2026-11-01', to: TODAY, today: TODAY, entity: 'pj' });
+  assert.deepEqual(pj.coverage.accounts.map((a) => a.account_id), ['acc-pj']);
+  assert.equal(pj.coverage.zero_is_real, false, 'empresa com saldo e sem extrato: total não é confirmado');
+
+  const month = getMonthSummary(db, { month: '2026-11', today: TODAY });
+  assert.equal(month.coverage.status, 'complete');
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => TODAY }));
+  const server = await startTestServer(app);
+  t.after(() => server.close());
+  const overview = await requestJson(server.base, '/api/finance/overview');
+  assert.ok(!overview.bank_shown.some((row) => row.account_id === 'acc-pj'), 'visão geral é PF');
+  const cov = await requestJson(server.base, '/api/finance/coverage?from=2026-11-01&to=2026-11-14');
+  assert.equal(cov.status, 'complete');
+  const covPj = await requestJson(server.base, '/api/finance/coverage?from=2026-11-01&to=2026-11-14&entity=pj');
+  assert.deepEqual(covPj.accounts.map((a) => a.account_id), ['acc-pj']);
+});

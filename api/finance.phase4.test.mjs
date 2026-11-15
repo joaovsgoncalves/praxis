@@ -323,9 +323,9 @@ const BANK_TXS = [
 test('ingest de transações: grava, deduplica e tira fatura/transferência do mês', async (t) => {
   const { db, api } = await mount(t, { seed: true });
   const first = await api(INGEST, { method: 'POST', body: ingestBody(BANK_TXS) });
-  assert.deepEqual(first.transactions, { received: 5, inserted: 5, duplicates: 0, matched: 0, skipped: [] });
+  assert.deepEqual(first.transactions, { received: 5, inserted: 5, duplicates: 0, matched: 0, relinked: 0, skipped: [] });
   const second = await api(INGEST, { method: 'POST', body: ingestBody(BANK_TXS) });
-  assert.deepEqual(second.transactions, { received: 5, inserted: 0, duplicates: 5, matched: 0, skipped: [] });
+  assert.deepEqual(second.transactions, { received: 5, inserted: 0, duplicates: 5, matched: 0, relinked: 0, skipped: [] });
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM finance_transactions WHERE source = 'pluggy'").get().n, 5);
   const log = db.prepare("SELECT tx_n FROM finance_sync_log WHERE actor = 'midas' ORDER BY rowid").all();
   assert.deepEqual(log.map((l) => l.tx_n), [5, 0]);

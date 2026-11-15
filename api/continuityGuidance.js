@@ -182,6 +182,59 @@ export function upsertContinuityGuidance(db, payload) {
   return getContinuityGuidance(db, date);
 }
 
+const WRITE_ROOT_KEYS = new Set(['date', 'summary', 'generated_at', 'source', 'priorities', 'expected_generated_at']);
+const WRITE_ITEM_KEYS = new Set(['rank', 'action', 'reason_code', 'reason', 'project_slug', 'task_id']);
+
+function httpError(status, message, extra = {}) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = message;
+  Object.assign(err, extra);
+  return err;
+}
+
+/**
+ * PUT /api/projects/guidance/:date — escrita da orientação do dia pela API (mesmas regras do
+ * script do Sêneca: campos desconhecidos recusados, até 3 prioridades, generated_at com fuso).
+ * Trava: se já existe orientação nessa data, `expected_generated_at` precisa ser o `generated_at`
+ * lido; sem orientação, mande `expected_generated_at: null`. Diferente → 409 GUIDANCE_CHANGED.
+ * Só um escritor por vez é regra de operação (decisão D1 do plano); a trava evita a perda silenciosa.
+ */
+export function writeContinuityGuidance(db, date, body = {}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'payload must be an object');
+  const unknown = Object.keys(body).filter((k) => !WRITE_ROOT_KEYS.has(k));
+  if (unknown.length) throw httpError(400, `campos não permitidos: ${unknown.sort().join(', ')}`);
+  if (!Array.isArray(body.priorities)) throw httpError(400, 'priorities must be an array');
+  for (const item of body.priorities) {
+    if (item && typeof item === 'object') {
+      const bad = Object.keys(item).filter((k) => !WRITE_ITEM_KEYS.has(k));
+      if (bad.length) throw httpError(400, `campos não permitidos na prioridade: ${bad.sort().join(', ')}`);
+    }
+  }
+  if (body.date !== undefined && body.date !== date) throw httpError(400, 'date do corpo difere da URL');
+  if (typeof body.source !== 'string' || !body.source.trim()) throw httpError(400, 'source obrigatório (quem escreve)');
+  if (!Object.prototype.hasOwnProperty.call(body, 'expected_generated_at')) {
+    throw httpError(400, 'expected_generated_at obrigatório (generated_at lido, ou null se não havia orientação)');
+  }
+  const payload = { ...body, date };
+  delete payload.expected_generated_at;
+
+  const run = db.transaction(() => {
+    const current = db.prepare('SELECT generated_at FROM continuity_guidance WHERE date = ?').get(date);
+    const currentAt = current ? current.generated_at : null;
+    if ((body.expected_generated_at ?? null) !== currentAt) {
+      throw httpError(409, 'GUIDANCE_CHANGED', { current_generated_at: currentAt });
+    }
+    try {
+      validateContinuityGuidance(db, payload);
+    } catch (err) {
+      throw httpError(400, err.message);
+    }
+    return upsertContinuityGuidance(db, payload);
+  });
+  return run();
+}
+
 export function getContinuityGuidance(db, date) {
   const fallback = {
     date,

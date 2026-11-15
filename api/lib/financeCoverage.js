@@ -121,7 +121,7 @@ function coveredDays(windows, from, to) {
  * Dias no futuro não contam. O dia de hoje ainda está em aberto no banco, então o período é
  * completo com extrato até ontem (a não ser que o período seja só hoje).
  */
-export function getStatementCoverage(db, { from, to, today } = {}) {
+export function getStatementCoverage(db, { from, to, today, only } = {}) {
   const day = isYmd(today) ? today : todayFortaleza();
   const start = isYmd(from) ? from : addDays(day, -30);
   const end = isYmd(to) && to >= start ? to : (isYmd(to) ? start : day);
@@ -137,7 +137,7 @@ export function getStatementCoverage(db, { from, to, today } = {}) {
     SELECT id, name, institution, kind, status, pierre_account_id FROM finance_accounts
     WHERE status = 'active'
     ORDER BY sort_order ASC, id ASC
-  `).all();
+  `).all().filter((a) => (typeof only === 'function' ? only(a.id) : true));
   const windowsOf = db.prepare(`
     SELECT source, covered_from, covered_to, recorded_at FROM finance_statement_coverage
     WHERE account_id = ? ORDER BY covered_from ASC
@@ -194,7 +194,18 @@ export function getStatementCoverage(db, { from, to, today } = {}) {
   const linked = perAccount.filter((a) => a.status !== 'manual');
   const complete = linked.filter((a) => a.status === 'complete');
   const some = linked.filter((a) => a.status === 'complete' || a.status === 'partial');
-  const totals = countFor(null);
+  // com filtro de contas (PF/PJ), os totais contam só os lançamentos dessas contas
+  let totals = countFor(null);
+  if (typeof only === 'function') {
+    const rows = db.prepare(`
+      SELECT account_id, source, matched_tx_id FROM finance_transactions
+      WHERE posted_on >= ? AND posted_on <= ?
+    `).all(start, measuredTo).filter((tx) => only(tx.account_id));
+    totals = daysTotal === 0 ? { bank: 0, manual: 0 } : {
+      bank: rows.filter((tx) => BANK_SOURCES.includes(tx.source)).length,
+      manual: rows.filter((tx) => MANUAL_SOURCES.includes(tx.source) && tx.matched_tx_id == null).length,
+    };
+  }
 
   let status = 'unavailable';
   if (daysRequired > 0 && linked.length > 0 && complete.length === linked.length) status = 'complete';
