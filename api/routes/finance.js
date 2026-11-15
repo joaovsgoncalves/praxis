@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
 import {
   createAccount,
   createBalance,
@@ -58,6 +59,7 @@ function withIntentKey(req) {
 /** Finanças — mounted at /api/finance */
 export function createFinanceRouter({ db, getLocalDateString }) {
   const router = Router();
+  installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
 
   router.get('/overview', (req, res) => {
