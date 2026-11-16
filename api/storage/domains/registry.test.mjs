@@ -28,7 +28,8 @@ const probe = {
 };
 
 test('registro: nomes válidos, sem colisão com os domínios de base nem entre fases', () => {
-  assert.deepEqual(EXTRA_DOMAINS, [], 'fases ainda vazias nesta base');
+  assert.ok(Object.isFrozen(EXTRA_DOMAINS), 'registro montado e congelado');
+  assert.equal(new Set(EXTRA_DOMAINS.map((d) => d.name)).size, EXTRA_DOMAINS.length, 'sem nome repetido entre fases');
   assert.throws(() => checkDomains([{ ...probe, name: 'tasks' }]), /repetido: tasks/);
   assert.throws(() => checkDomains([probe, probe]), /repetido: probeNotes/);
   assert.throws(() => checkDomains([{ ...probe, name: 'Bad-name' }]), /nome válido/);
