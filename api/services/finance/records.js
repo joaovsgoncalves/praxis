@@ -17,8 +17,8 @@ import {
   SUB_LANES, SUB_CADENCES, SUB_STATUSES, SOURCES, INST_STATUSES, GOAL_STATUSES, FINANCE_CATEGORIES, OFF_BUDGET_CATEGORIES,
   money, isValidDateString, todayFortaleza,
 } from '../../finance.js';
-import { bindPositional, sqliteRowWithReal } from '../../storage/sqliteSemantics.js';
-import { pick, badRequest, parseMonthDay, parseAmount, uniqueAs, findIn, boundUpdate } from './shared.js';
+import { sqliteRowWithReal } from '../../storage/sqliteSemantics.js';
+import { pick, badRequest, parseMonthDay, parseAmount, uniqueAs, findIn, boundUpdate, boundFilters } from './shared.js';
 
 const T = (name) => [name, 'TEXT'], I = (name) => [name, 'INTEGER'], R = (name) => [name, 'REAL'];
 const SUB_INSERT = [T('id'), T('name'), T('lane'), R('amount'), T('cadence'), I('charge_day'), T('account_id'), T('status'), T('next_charge'), T('vendor_hint'), T('source'), I('locked'), T('note'), T('created_at'), T('updated_at')];
@@ -85,15 +85,6 @@ function fixedFields(body, existing = null) {
   if (body.note !== undefined) out.note = String(body.note ?? '').slice(0, 500);
   return out;
 }
-/** Um `?` por filtro presente, listas achatadas e os mesmos erros de ligação da consulta antiga. */
-function boundFilters(entries) {
-  const used = entries.filter(([, on]) => on);
-  const bound = bindPositional(used.map(([, , value]) => value), used.length);
-  const out = Object.fromEntries(entries.map(([column]) => [column, null]));
-  used.forEach(([column], index) => { out[column] = bound[index]; });
-  return out;
-}
-
 export function createFinanceRecordsService({ storage, now = () => new Date(), newId = randomUUID }) {
   if (!storage?.financeFixedExpenses || typeof storage.transaction !== 'function') throw new TypeError('finance records service requires storage');
   const iso = () => now().toISOString();

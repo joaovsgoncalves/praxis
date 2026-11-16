@@ -2,7 +2,7 @@ import { StorageError } from '../contract.js';
 import { documentId, originalId, centsToMoney } from '../schema.mjs';
 import { compareSqlite } from '../sqliteOrder.js';
 import { sqliteStoredText } from '../sqliteSemantics.js';
-import { columnNames, keyOf, exactCents } from '../sqlite/financeTables.js';
+import { columnNames, keyOf, exactCents, uniqueColumns } from '../sqlite/financeTables.js';
 
 /**
  * Tabela genérica de finanças no Firestore (domínio 2 em diante): `users/{uid}/<coleção>/{documentId(chave)}`.
@@ -42,14 +42,25 @@ export function firestoreFinanceTable(name, def) {
         return [column, value !== null && def.money.includes(column) ? centsToMoney(value) : value];
       }));
     };
+    const sentinelRef = (column, value) => userDoc.collection('uniqueKeys').doc(documentId(`${name}.${column}:${sqliteStoredText(value)}`));
     const createIn = (tx, row, seen, slot) => {
       const ref = col.doc(documentId(row[key]));
       if (seen.has(ref.path)) throw new StorageError('already_exists');
       seen.add(ref.path);
+      // UNIQUE do SQLite = documento-sentinela criado no mesmo commit (apagado junto, se o domínio apagar).
+      const sentinels = uniqueColumns(def, row).map(({ column }) => {
+        const keyRef = sentinelRef(column, row[column]);
+        if (seen.has(keyRef.path)) throw new StorageError('already_exists');
+        seen.add(keyRef.path);
+        return [keyRef, { domain: name, field: column, value: sqliteStoredText(row[column]), record_id: sqliteStoredText(row[key]) }];
+      });
+      for (const [keyRef, data] of sentinels) tx.create(keyRef, data);
       tx.create(ref, { ...toDoc(row), _row: slot });
       return structuredClone(row);
     };
     return {
+      /** Documento -> linha no formato SQLite (para repositórios que compõem este). */
+      project,
       async reserve(count) {
         if (!transaction) return;
         if (reservation) throw new StorageError('sequence_already_reserved');
@@ -65,6 +76,17 @@ export function firestoreFinanceTable(name, def) {
         for (const column of def.filters) if (filters[column] !== null) query = query.where(column, '==', filters[column]);
         const rows = (await read(query)).docs.map((doc) => ({ row: project(doc), seq: doc.data()._row ?? 0 }));
         return rows.sort((a, b) => compare(a.row, b.row) || a.seq - b.seq).map(({ row }) => row);
+      },
+      async findUnique(column, value) {
+        if (!(def.unique ?? []).some((rule) => rule.column === column)) throw new StorageError('invalid_unique_column');
+        const snap = await read(col.where(column, '==', sqliteStoredText(value)).limit(1));
+        return snap.empty ? null : project(snap.docs[0]);
+      },
+      async clash(row) {
+        for (const { column } of uniqueColumns(def, row)) {
+          if (!(await read(col.where(column, '==', sqliteStoredText(row[column])).limit(1))).empty) return column;
+        }
+        return (await read(col.doc(documentId(row[key])))).exists ? key : null;
       },
       async create(row) {
         if (!transaction) {

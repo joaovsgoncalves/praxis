@@ -3,7 +3,7 @@
  * privadas de finance.js (oráculo em test-support/oracles/finance.bcbadad.js), sem mudar finance.js.
  */
 import { recordId, StorageError } from '../../storage/contract.js';
-import { sqliteRowWithReal } from '../../storage/sqliteSemantics.js';
+import { bindPositional, sqliteRowWithReal } from '../../storage/sqliteSemantics.js';
 import { money } from '../../finance.js';
 
 export function pick(value, allowed, fallback) {
@@ -24,15 +24,35 @@ export function parseAmount(value, field = 'amount') {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw badRequest(`${field} precisa ser número >= 0`);
   return money(value);
 }
-function sqliteUniqueError(table, column) {
+/** O erro do SQLite para chave repetida: a primária tem código próprio, os índices UNIQUE outro. */
+export function sqliteUniqueError(table, column) {
   const error = new Error(`UNIQUE constraint failed: ${table}.${column}`);
   error.name = 'SqliteError';
-  error.code = 'SQLITE_CONSTRAINT_PRIMARYKEY';
+  error.code = column === 'id' ? 'SQLITE_CONSTRAINT_PRIMARYKEY' : 'SQLITE_CONSTRAINT_UNIQUE';
   return error;
 }
 /** Chave repetida: o mesmo erro (mensagem e código) que o SQLite dava na rota antiga. */
 export async function uniqueAs(table, promise, column = 'id') {
   try { return await promise; } catch (error) { if (error?.code === 'already_exists') throw sqliteUniqueError(table, column); throw error; }
+}
+export function intentConflict(message) {
+  const err = new Error(message);
+  err.status = 409;
+  err.code = 'intent_conflict';
+  return err;
+}
+/** Um `?` por filtro presente, listas achatadas e os mesmos erros de ligação da consulta antiga. */
+export function boundFilters(entries) {
+  const used = entries.filter(([, on]) => on);
+  const bound = bindPositional(used.map(([, , value]) => value), used.length);
+  const out = Object.fromEntries(entries.map(([column]) => [column, null]));
+  used.forEach(([column], index) => { out[column] = bound[index]; });
+  return out;
+}
+export function addDays(ymd, days) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
+  return dt.toISOString().slice(0, 10);
 }
 /** Id que nenhum registro pode ter (inválido para guardar) = registro inexistente. */
 export async function orMissing(promise, missing = null) {

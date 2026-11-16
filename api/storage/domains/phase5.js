@@ -11,6 +11,8 @@ import { StorageError, recordId } from '../contract.js';
 import { FINANCE_TABLES, FINANCE_GENERIC_TABLES, financeRow, financePatch, optionalText } from '../sqlite/financeTables.js';
 import { sqliteFinanceTable } from '../sqlite/financeTable.js';
 import { firestoreFinanceTable } from '../firestore/financeTable.js';
+import { sqliteFinanceTransactions, transactionRangeQuery } from '../sqlite/financeTransactions.js';
+import { firestoreFinanceTransactions } from '../firestore/financeTransactions.js';
 import { sqliteFinanceSettings, sqliteFinanceAccounts, sqliteFinanceBalances } from '../sqlite/financeCore.js';
 import { firestoreFinanceSettings, firestoreFinanceAccounts, firestoreFinanceBalances } from '../firestore/financeCore.js';
 
@@ -29,9 +31,16 @@ function plainQuery(input, keys, code) {
  * Domínio 2 em diante: tabela genérica (financeTables.js). `methods` escolhe o que o domínio expõe;
  * `list(filtros)` só aceita as colunas de `filters`, cada uma texto exato ou null (sem filtro).
  */
-function tableDomain(name, methods) {
+function tableDomain(name, methods, { extra = {}, sqliteMake, firestoreMake } = {}) {
   const def = FINANCE_GENERIC_TABLES[name];
+  const uniqueNames = (def.unique ?? []).map((rule) => rule.column);
   const all = {
+    ...extra,
+    findUnique: ['read', (column, value) => {
+      if (!uniqueNames.includes(column) || typeof value !== 'string' || value === '') throw new StorageError('invalid_unique_column');
+      return [column, value];
+    }],
+    clash: ['read', (row) => [financeRow(def, row)]],
     reserve: ['read', count],
     get: ['read', (key) => [recordId(key)]],
     list: ['read', (query = {}) => {
@@ -44,7 +53,7 @@ function tableDomain(name, methods) {
     remove: ['write', (key) => [recordId(key)]],
   };
   const pickMethods = (target) => Object.fromEntries(methods.map((method) => [method, target[method]]));
-  const sqlite = sqliteFinanceTable(def), firestore = firestoreFinanceTable(name, def);
+  const sqlite = sqliteMake ?? sqliteFinanceTable(def), firestore = firestoreMake ?? firestoreFinanceTable(name, def);
   return {
     name,
     spec: () => pickMethods(all),
@@ -103,6 +112,15 @@ export const DOMAINS = [
   tableDomain('financeGoals', ['reserve', 'get', 'list', 'create', 'patch']),
   tableDomain('financeFixedExpenses', CATALOG),
   tableDomain('financeBudgets', ['list', 'upsert', 'remove']),
-  // Lançamentos: no domínio 2 só soltar o vínculo da assinatura apagada (listar por assinatura + alterar).
-  tableDomain('financeTransactions', ['list', 'patch']),
+  // Domínio 3: dívidas, baixas e lançamentos (criação, extrato, busca pela baixa e por chave única).
+  tableDomain('financeDebts', ['reserve', 'get', 'list', 'create', 'patch']),
+  tableDomain('financePayments', ['reserve', 'get', 'findUnique', 'clash', 'create']),
+  tableDomain('financeTransactions', ['reserve', 'get', 'list', 'range', 'byPayment', 'findUnique', 'clash', 'create', 'patch'], {
+    extra: {
+      range: ['read', (query) => [transactionRangeQuery(query)]],
+      byPayment: ['read', (paymentId) => [recordId(paymentId)]],
+    },
+    sqliteMake: sqliteFinanceTransactions,
+    firestoreMake: firestoreFinanceTransactions,
+  }),
 ];

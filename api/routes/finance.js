@@ -2,20 +2,14 @@ import { Router } from 'express';
 import { asyncRoute } from '../lib/asyncRoute.js';
 import { createFinanceCoreService } from '../services/finance/core.js';
 import { createFinanceRecordsService } from '../services/finance/records.js';
+import { createFinanceLedgerService } from '../services/finance/ledger.js';
 import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
 import {
-  createDebt,
-  createTransactionOnce,
   getInsights,
   getMonthSummary,
   getOverview,
   lastSync,
-  listDebts,
-  listTransactions,
-  payDebt,
   seedFinanceIfEmpty,
-  updateDebt,
-  updateTransaction,
   listPendingTransactions,
   getCoverageFor,
 } from '../finance.js';
@@ -36,15 +30,16 @@ function withIntentKey(req) {
 
 /**
  * Finanças — mounted at /api/finance.
- * Migração (fase 5): configuração, contas e saldos (services/finance/core.js) e cadastros — fixas,
- * orçamento, assinaturas, parcelas, metas (services/finance/records.js) — saem da camada assíncrona
- * (`storage`); o resto ainda usa `db`. Envelope igual ao da rota antiga, congelada em
+ * Migração (fase 5): configuração, contas e saldos (services/finance/core.js), cadastros — fixas,
+ * orçamento, assinaturas, parcelas, metas (services/finance/records.js) — e dívidas, baixas e lançamentos
+ * (services/finance/ledger.js) saem da camada assíncrona (`storage`); o resto ainda usa `db`. Envelope igual ao da rota antiga, congelada em
  * test-support/oracles/financeRoutes.bcbadad.js para a prova de paridade.
  */
 export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
   if (!storage) throw new TypeError('createFinanceRouter: informe storage (camada assíncrona)');
   const core = createFinanceCoreService({ storage, now });
   const records = createFinanceRecordsService({ storage, now });
+  const ledger = createFinanceLedgerService({ storage, now });
   const router = Router();
   installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
@@ -172,33 +167,33 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     }
   }));
 
-  router.get('/debts', (req, res) => {
-    res.json(listDebts(db, { status: req.query.status }));
-  });
+  router.get('/debts', asyncRoute(async (req, res) => {
+    res.json(await ledger.listDebts({ status: req.query.status }));
+  }));
 
-  router.post('/debts', (req, res) => {
+  router.post('/debts', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createDebt(db, req.body || {}));
+      res.status(201).json(await ledger.createDebt(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/debts/:id', (req, res) => {
-    const row = updateDebt(db, req.params.id, req.body || {});
+  router.patch('/debts/:id', asyncRoute(async (req, res) => {
+    const row = await ledger.updateDebt(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.post('/debts/:id/pay', (req, res) => {
+  router.post('/debts/:id/pay', asyncRoute(async (req, res) => {
     try {
-      const row = payDebt(db, req.params.id, withIntentKey(req));
+      const row = await ledger.payDebt(req.params.id, withIntentKey(req));
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   router.get('/subscriptions', asyncRoute(async (req, res) => {
     res.json(await records.listSubscriptions({ lane: req.query.lane, status: req.query.status }));
@@ -248,9 +243,9 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     res.json({ ok: true, id: row.id });
   }));
 
-  router.get('/transactions', (req, res) => {
+  router.get('/transactions', asyncRoute(async (req, res) => {
     try {
-      res.json(listTransactions(db, {
+      res.json(await ledger.listTransactions({
         from: req.query.from,
         to: req.query.to,
         account_id: req.query.account_id,
@@ -262,24 +257,24 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.post('/transactions', (req, res) => {
+  router.post('/transactions', asyncRoute(async (req, res) => {
     try {
       const body = withIntentKey(req);
-      const { row, replayed } = createTransactionOnce(db, { ...body, posted_on: body.posted_on ?? localToday() });
+      const { row, replayed } = await ledger.createTransactionOnce({ ...body, posted_on: body.posted_on ?? localToday() });
       // reenvio da mesma intenção: devolve o primeiro lançamento, sem criar outro
       res.status(replayed ? 200 : 201).json(replayed ? { ...row, replayed: true } : row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/transactions/:id', (req, res) => {
-    const row = updateTransaction(db, req.params.id, req.body || {});
+  router.patch('/transactions/:id', asyncRoute(async (req, res) => {
+    const row = await ledger.updateTransaction(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
   router.get('/insights', (req, res) => {
     try {

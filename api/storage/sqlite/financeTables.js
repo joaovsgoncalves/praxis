@@ -76,17 +76,39 @@ export const FINANCE_GENERIC_TABLES = Object.freeze({
     order: [{ col: 'category' }],
     filters: [],
   }),
-  // Só o necessário no domínio 2 (apagar assinatura solta o vínculo); criação e unicidade no domínio 3.
+  // Domínio 2: soltar o vínculo da assinatura apagada (`list` por assinatura + `patch`). Domínio 3: criação,
+  // unicidade e extrato (`range`, `byPayment`). `unique` = índices UNIQUE parciais do SQLite, na ordem em que
+  // ele os confere num banco novo (external_id, intent_key, pierre_tx_id; a chave primária por último);
+  // `ignoreEmpty` = o índice também ignora texto vazio. Valor nulo nunca conta.
   financeTransactions: Object.freeze({
     table: 'finance_transactions',
     columns: [text('id'), text('pierre_tx_id'), text('account_id'), text('posted_on'), real('amount'), text('direction'), text('raw_description'), text('merchant'), text('category'), text('subscription_id'), text('debt_id'), text('source'), text('created_at'), text('external_id'), text('matched_tx_id'), text('note'), text('payment_id'), text('intent_key')],
     money: ['amount'], notNull: ['id', 'posted_on', 'amount'],
     order: [],
     filters: ['subscription_id'],
+    unique: [{ column: 'external_id', ignoreEmpty: true }, { column: 'intent_key' }, { column: 'pierre_tx_id', ignoreEmpty: true }],
+  }),
+  // Domínio 3: dívidas (`queue ASC, balance DESC`) e baixas (uma por chave de intenção).
+  financeDebts: Object.freeze({
+    table: 'finance_debts',
+    columns: [text('id'), text('title'), text('account_id'), text('kind'), real('balance'), real('min_payment'), text('apr_label'), int('due_day'), text('due_date'), text('status'), int('queue'), text('source'), int('locked'), text('note'), text('created_at'), text('updated_at')],
+    money: ['balance', 'min_payment'], notNull: ['id', 'title'],
+    order: [{ col: 'queue' }, { col: 'balance', desc: true }],
+    filters: ['status'],
+  }),
+  financePayments: Object.freeze({
+    table: 'finance_payments',
+    columns: [text('id'), text('debt_id'), text('account_id'), real('amount'), text('paid_on'), text('method'), int('confirmed'), text('note'), text('created_at'), text('intent_key')],
+    money: ['amount'], notNull: ['id', 'debt_id', 'amount', 'paid_on'],
+    order: [],
+    filters: [],
+    unique: [{ column: 'intent_key' }],
   }),
 });
 
 export const keyOf = (def) => def.key ?? 'id';
+/** Colunas UNIQUE que valem para este valor (nulo, e vazio onde o índice ignora, não contam). */
+export const uniqueColumns = (def, row) => (def.unique ?? []).filter(({ column, ignoreEmpty }) => row[column] !== null && row[column] !== undefined && !(ignoreEmpty && row[column] === ''));
 export const orderSql = (def) => def.order.map(({ col, desc, isNull }) => (isNull ? `${col} IS NULL` : `${col} ${desc ? 'DESC' : 'ASC'}`)).join(', ');
 
 export const columnNames = (def) => def.columns.map(([name]) => name);
@@ -126,6 +148,10 @@ export function financeRow(def, input) {
     checkValue(def, name, input[name]);
   }
   recordId(input[def.key ?? 'id']);
+  // O documento-sentinela do UNIQUE leva o valor no id: mesmo limite de tamanho nos dois motores.
+  for (const { column } of uniqueColumns(def, input)) {
+    if (Buffer.byteLength(String(input[column])) > 1400) throw new StorageError('unique_value_too_long', `unique_value_too_long: ${def.table}.${column}`);
+  }
   if (def.singleton && input.id !== def.singleton) throw new StorageError('invalid_record_id');
   return Object.fromEntries(names.map((name) => [name, input[name]]));
 }
@@ -138,6 +164,7 @@ export function financePatch(def, input) {
   if (!keys.length) throw new StorageError('empty_patch');
   for (const key of keys) {
     if (key === (def.key ?? 'id')) throw new StorageError('immutable_record_id');
+    if ((def.unique ?? []).some((rule) => rule.column === key)) throw new StorageError('immutable_unique_field', `immutable_unique_field: ${def.table}.${key}`);
     if (!names.includes(key)) throw new StorageError('unknown_finance_field', `unknown_finance_field: ${def.table}.${key}`);
     checkValue(def, key, input[key]);
   }

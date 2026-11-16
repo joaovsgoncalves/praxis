@@ -51,10 +51,10 @@ export async function makeFinanceParityApp(kind, { mount = '/api/finance', dbOpt
   const db = createTestDb(dbOptions);
   cleanup.push(() => db.close());
   let app, storage = null;
+  const scope = new AsyncLocalStorage();
   if (kind === 'oracle') {
     app = await listen(mount, oracle(db));
   } else {
-    const scope = new AsyncLocalStorage();
     let driver;
     if (kind === 'sqlite') {
       driver = createSqliteDriver({ open: () => db });
@@ -68,7 +68,8 @@ export async function makeFinanceParityApp(kind, { mount = '/api/finance', dbOpt
     storage = createStorage({ driver, currentOwner: () => scope.getStore() });
     app = await listen(mount, build({ storage, db }), (req, res, next) => scope.run('alice', next));
   }
-  return { ...app, db, storage, dispose: async () => { await app.close(); for (const fn of cleanup) await fn(); } };
+  // `as(fn)`: chamada direta à camada assíncrona com o dono das rotas (só para conferência de teste).
+  return { ...app, db, storage, as: (fn) => scope.run('alice', fn), dispose: async () => { await app.close(); for (const fn of cleanup) await fn(); } };
 }
 
 function normalizer() {

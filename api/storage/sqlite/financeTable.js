@@ -1,5 +1,5 @@
 import { StorageError } from '../contract.js';
-import { columnNames, keyOf, orderSql } from './financeTables.js';
+import { columnNames, keyOf, orderSql, uniqueColumns } from './financeTables.js';
 
 /**
  * Tabela genérica de finanças (domínio 2 em diante) sobre a tabela existente, com a consulta da rota
@@ -23,6 +23,18 @@ export function sqliteFinanceTable(def) {
         for (const column of def.filters) if (filters[column] !== null) { sql += ` AND ${column} = ?`; params.push(filters[column]); }
         if (order) sql += ` ORDER BY ${order}`;
         return db.prepare(sql).all(...params);
+      },
+      /** Linha que já tem esse valor numa coluna UNIQUE (só as colunas de `def.unique`). */
+      async findUnique(column, value) {
+        if (!(def.unique ?? []).some((rule) => rule.column === column)) throw new StorageError('invalid_unique_column');
+        return db.prepare(`SELECT * FROM ${def.table} WHERE ${column} = ?`).get(value) ?? null;
+      },
+      /** Primeira coluna UNIQUE (na ordem de conferência do SQLite) ou chave que a linha violaria; null se nenhuma. */
+      async clash(row) {
+        for (const { column } of uniqueColumns(def, row)) {
+          if (db.prepare(`SELECT 1 FROM ${def.table} WHERE ${column} = ?`).get(row[column])) return column;
+        }
+        return db.prepare(`SELECT 1 FROM ${def.table} WHERE ${key} = ?`).get(row[key]) ? key : null;
       },
       async create(row) {
         if (db.inTransaction) {

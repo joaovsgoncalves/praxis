@@ -55,10 +55,13 @@ function accountView(acc, latest) {
   };
 }
 
-export function createFinanceCoreService({ storage, now = () => new Date(), newId = randomUUID }) {
-  if (!storage?.financeAccounts || typeof storage.transaction !== 'function') throw new TypeError('finance core service requires storage');
+/**
+ * Plano de gravação da configuração (linha única): `planSettings(atual, corpo)` decide criar a linha padrão
+ * ou alterar a existente, como `updateSettings` da antiga; `applySettings` grava dentro de uma transação já
+ * aberta. Também usado pela baixa de dívida (services/finance/ledger.js), que ajusta a mesma linha.
+ */
+export function createSettingsPlanner({ now = () => new Date() } = {}) {
   const iso = () => now().toISOString();
-
   /** Leitura de `getSettings`, sem gravar: null se a linha não existe. */
   const defaultSettings = () => ({
     ...sqliteRowWithReal(SETTINGS_INSERT, ['default', 0, 0, '', iso()]),
@@ -96,6 +99,15 @@ export function createFinanceCoreService({ storage, now = () => new Date(), newI
     if (plan.create) await tx.financeSettings.create(plan.create);
     if (plan.patch) await tx.financeSettings.patch(plan.patch);
   }
+
+  return { defaultSettings, planSettings, applySettings };
+}
+
+export function createFinanceCoreService({ storage, now = () => new Date(), newId = randomUUID }) {
+  if (!storage?.financeAccounts || typeof storage.transaction !== 'function') throw new TypeError('finance core service requires storage');
+  const iso = () => now().toISOString();
+
+  const { defaultSettings, planSettings, applySettings } = createSettingsPlanner({ now });
 
   async function getSettings() {
     await storage.transaction(async (tx) => {
