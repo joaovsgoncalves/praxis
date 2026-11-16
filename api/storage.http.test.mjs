@@ -154,6 +154,44 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal((await call(proc, 'GET', '/api/purchases', { cookie: A })).json.length, 1);
   });
 
+  await t.test('finanças pela camada nova: contas separadas, baixa com chave de intenção, extrato e ingest do agente', async () => {
+    const post = async (url, cookie, body, k) => {
+      const res = await fetch(`${proc.base}/api/finance${url}`, { method: 'POST', headers: { 'content-type': 'application/json', cookie, ...(k ? { 'Idempotency-Key': k } : {}) }, body: JSON.stringify(body) });
+      return { status: res.status, json: await res.json() };
+    };
+    assert.equal((await call(proc, 'POST', '/api/finance/accounts', { cookie: A, body: { id: 'a-jota', name: 'Inter do Jota', kind: 'checking', institution: 'inter', is_operational: true, amount: 500, source: 'pluggy', as_of: '2026-11-14' } })).status, 201);
+    assert.equal((await call(proc, 'POST', '/api/finance/debts', { cookie: A, body: { id: 'd1', title: 'Cartão do Jota', kind: 'card', balance: 300 } })).status, 201);
+    assert.equal((await call(proc, 'POST', '/api/finance/debts', { cookie: B, body: { id: 'd1', title: 'Dívida da Bia', kind: 'loan', balance: 90 } })).status, 201, 'mesmo id em outra conta');
+    const first = await post('/debts/d1/pay', A, { amount: 100, paid_on: '2026-11-14' }, 'servidor-0001');
+    const again = await post('/debts/d1/pay', A, { amount: 100, paid_on: '2026-11-14' }, 'servidor-0001');
+    assert.equal(first.status, 200, JSON.stringify(first.json)); assert.equal(first.json.replayed, false);
+    assert.equal(again.json.replayed, true); assert.equal(again.json.payment.id, first.json.payment.id);
+    assert.equal((await post('/debts/d1/pay', A, { amount: 5 }, 'servidor-0001')).status, 409, 'mesma chave, outro valor');
+    const listA = (await call(proc, 'GET', '/api/finance/debts?status=all', { cookie: A })).json;
+    assert.equal(listA.find((d) => d.id === 'd1')?.balance, 200, `baixou uma vez só: ${JSON.stringify(listA.map((d) => [d.id, d.balance]))}`);
+    const listB = await call(proc, 'GET', '/api/finance/debts?status=all', { cookie: B });
+    assert.equal(listB.json.find((d) => d.id === 'd1')?.balance, 90, `a outra conta não mexeu: ${listB.text}`);
+    assert.deepEqual((await call(proc, 'GET', '/api/finance/transactions?from=2020-01-01&to=2030-01-01', { cookie: B })).json, [], 'extrato da Bia vazio');
+    const paidB = await post('/debts/d1/pay', B, { amount: 90 });
+    assert.equal(paidB.json.debt?.balance, 0, JSON.stringify(paidB));
+    assert.deepEqual((await call(proc, 'GET', '/api/finance/transactions?from=2020-01-01&to=2030-01-01', { cookie: A })).json.filter((row) => row.debt_id === 'd1').map((row) => [row.payment_id, row.amount]), [[first.json.payment.id, -100]]);
+    // sync do Argos: corpo do Midas com a chave do agente cai na conta do dono legado
+    const ingest = await call(proc, 'POST', '/api/finance/ingest/pluggy', { key: API_KEY, body: {
+      source: 'pluggy', institutions: [{ institution: 'inter', updated_at: '2026-12-31T12:00:00Z', status: 'UPDATED', bank: { balance: 800, reserved: [] }, card: null, statement: { from: '2026-11-01', to: '2026-11-14' } }],
+      transactions: [{ external_id: 'EXT-SRV-1', institution: 'inter', account_type: 'BANK', date: '2026-11-13', amount: -42.5, description: 'PADARIA', category: 'Food' }],
+    } });
+    assert.equal(ingest.status, 200, ingest.text);
+    assert.equal(ingest.json.applied.length, 1, ingest.text);
+    assert.equal(ingest.json.transactions.inserted, 1);
+    assert.equal((await call(proc, 'GET', '/api/finance/transactions?from=2020-01-01&to=2030-01-01&q=padaria', { cookie: A })).json.length, 1);
+    assert.equal(ingest.json.applied[0].balance, 800);
+    const target = ingest.json.applied[0].account_id;
+    assert.equal((await call(proc, 'GET', `/api/finance/balances?account_id=${target}`, { cookie: A })).json[0].amount, 800, 'o saldo do banco ficou na conta do dono');
+    assert.deepEqual((await call(proc, 'GET', '/api/finance/pending', { cookie: B })).json, { pending: [] });
+    assert.equal((await call(proc, 'GET', '/api/finance/sync/last', { cookie: B })).json.error, 'never', 'a outra conta nunca sincronizou');
+    assert.equal((await call(proc, 'GET', '/api/finance/sync/last', { cookie: A })).json.actor, 'midas');
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -167,6 +205,12 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual(other.prepare('SELECT highlights FROM weekly_reviews').pluck().all(), ['Da Bia']);
     assert.deepEqual(control.prepare('SELECT title FROM purchase_items').pluck().all(), ['Fone do Jota']);
     assert.deepEqual(other.prepare('SELECT title FROM purchase_items').pluck().all(), ['Livro da Bia']);
+    assert.deepEqual(control.prepare('SELECT debt_id, amount, intent_key FROM finance_payments').all(), [{ debt_id: 'd1', amount: 100, intent_key: 'servidor-0001' }]);
+    assert.deepEqual(other.prepare('SELECT debt_id, amount FROM finance_payments').all(), [{ debt_id: 'd1', amount: 90 }]);
+    assert.deepEqual(control.prepare("SELECT external_id FROM finance_transactions WHERE external_id = 'EXT-SRV-1'").pluck().all(), ['EXT-SRV-1']);
+    assert.equal(other.prepare("SELECT COUNT(*) FROM finance_transactions WHERE external_id = 'EXT-SRV-1'").pluck().get(), 0, 'a transação do banco não vazou para a Bia');
+    assert.equal(other.prepare('SELECT COUNT(*) FROM finance_sync_log').pluck().get(), 0);
+    assert.equal(control.prepare("SELECT COUNT(*) FROM finance_sync_log WHERE actor = 'midas'").pluck().get(), 1);
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
 });
