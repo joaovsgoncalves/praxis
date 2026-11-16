@@ -37,6 +37,15 @@ export function sqliteFinanceTransactions(db) {
   const base = sqliteFinanceTable(DEF)(db);
   return {
     ...base,
+    /** Lançamentos com esses `external_id` (único quando não vazio): `SELECT ... WHERE external_id IN (...)`. */
+    async byExternalIds(list) {
+      const found = [];
+      for (let i = 0; i < list.length; i += 500) {
+        const chunk = list.slice(i, i + 500);
+        found.push(...db.prepare(`SELECT * FROM finance_transactions WHERE external_id IN (${chunk.map(() => '?').join(', ')})`).all(...chunk));
+      }
+      return found;
+    },
     async byPayment(paymentId) {
       return db.prepare('SELECT * FROM finance_transactions WHERE payment_id = ?').get(paymentId) ?? null;
     },

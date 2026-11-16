@@ -132,6 +132,7 @@ export function firestoreFinanceBalances(userDoc, transaction, client) {
       const rows = await t.all(col.where('source', 'in', ['pierre', 'pluggy']));
       return rows.sort((a, b) => a.seq - b.seq).map(({ row }) => row);
     },
+    patch: t.patch,
     create: t.create,
   };
 }

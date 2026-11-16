@@ -15,6 +15,8 @@ import { sqliteFinanceTransactions, transactionRangeQuery, transactionPeriodQuer
 import { firestoreFinanceTransactions } from '../firestore/financeTransactions.js';
 import { sqliteFinanceSyncLog, syncLogQuery } from '../sqlite/financeSyncLog.js';
 import { firestoreFinanceSyncLog } from '../firestore/financeSyncLog.js';
+import { sqliteFinanceReceipts } from '../sqlite/financeReceipts.js';
+import { firestoreFinanceReceipts } from '../firestore/financeReceipts.js';
 import { sqliteFinanceSettings, sqliteFinanceAccounts, sqliteFinanceBalances } from '../sqlite/financeCore.js';
 import { firestoreFinanceSettings, firestoreFinanceAccounts, firestoreFinanceBalances } from '../firestore/financeCore.js';
 
@@ -105,6 +107,7 @@ export const DOMAINS = [
       }],
       bank: ['read', none],
       create: ['write', (row) => [financeRow(T.financeBalances, row)]],
+      patch: ['write', (id, fields) => [recordId(id), financePatch(T.financeBalances, fields)]],
     }),
     sqlite: sqliteFinanceBalances,
     firestore: firestoreFinanceBalances,
@@ -119,21 +122,32 @@ export const DOMAINS = [
   tableDomain('financeDebts', ['reserve', 'get', 'list', 'create', 'patch']),
   tableDomain('financePayments', ['reserve', 'get', 'list', 'findUnique', 'clash', 'create']),
   // Domínio 4: leituras compostas (o ingest do banco grava; escritas do ingest entram no domínio 5).
-  tableDomain('financePendingTransactions', ['reserve', 'get', 'list', 'create']),
-  tableDomain('financeCardStatus', ['reserve', 'get', 'list', 'create']),
-  tableDomain('financeStatementCoverage', ['reserve', 'get', 'list', 'create']),
+  tableDomain('financePendingTransactions', ['reserve', 'get', 'list', 'create', 'upsert', 'remove']),
+  tableDomain('financeCardStatus', ['reserve', 'get', 'list', 'create', 'upsert']),
+  tableDomain('financeStatementCoverage', ['reserve', 'get', 'list', 'create', 'remove']),
   tableDomain('financeSyncLog', ['reserve', 'get', 'latest', 'create'], {
     extra: { latest: ['read', (query) => [syncLogQuery(query)]] },
     sqliteMake: sqliteFinanceSyncLog,
     firestoreMake: firestoreFinanceSyncLog,
   }),
-  tableDomain('financeTransactions', ['reserve', 'get', 'list', 'range', 'between', 'byPayment', 'findUnique', 'clash', 'create', 'patch'], {
+  tableDomain('financeTransactions', ['reserve', 'get', 'list', 'range', 'between', 'byExternalIds', 'byPayment', 'findUnique', 'clash', 'create', 'patch'], {
     extra: {
       range: ['read', (query) => [transactionRangeQuery(query)]],
       between: ['read', (query) => [transactionPeriodQuery(query)]],
       byPayment: ['read', (paymentId) => [recordId(paymentId)]],
+      byExternalIds: ['read', (list) => {
+        if (!Array.isArray(list) || list.length > 2000 || list.some((value) => typeof value !== 'string' || value === '')) throw new StorageError('invalid_transaction_query');
+        return [[...new Set(list)]];
+      }],
     },
     sqliteMake: sqliteFinanceTransactions,
     firestoreMake: firestoreFinanceTransactions,
   }),
+  // Domínio 5: só leitura de uma tabela da fase 6 (recibos do Alfred) para o piso do pagamento ainda não visto.
+  {
+    name: 'financeReceipts',
+    spec: () => ({ list: ['read', none] }),
+    sqlite: sqliteFinanceReceipts,
+    firestore: firestoreFinanceReceipts,
+  },
 ];

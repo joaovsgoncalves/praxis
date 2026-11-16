@@ -4,9 +4,9 @@ import { createFinanceCoreService } from '../services/finance/core.js';
 import { createFinanceRecordsService } from '../services/finance/records.js';
 import { createFinanceLedgerService } from '../services/finance/ledger.js';
 import { createFinanceReadsService } from '../services/finance/reads.js';
+import { createFinanceIngestService } from '../services/finance/ingest.js';
 import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
 import { seedFinanceIfEmpty, lastSync } from '../finance.js';
-import { ingestPluggy } from '../pluggyIngest.js';
 import { syncPierre } from '../pierreSync.js';
 
 function sendError(res, err) {
@@ -34,6 +34,7 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
   const records = createFinanceRecordsService({ storage, now });
   const ledger = createFinanceLedgerService({ storage, now });
   const reads = createFinanceReadsService({ storage, now });
+  const ingest = createFinanceIngestService({ storage, now });
   const router = Router();
   installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
@@ -302,13 +303,13 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
   });
 
   // Midas manda o JSON normalizado do Pluggy de hora em hora
-  router.post('/ingest/pluggy', (req, res) => {
+  router.post('/ingest/pluggy', asyncRoute(async (req, res) => {
     try {
-      res.json(ingestPluggy(db, req.body, { today: localToday() }));
+      res.json(await ingest.ingestPluggy(req.body, { today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   /** O que se sabe do extrato no período (separado da data do saldo); PF por padrão, como mês e insights. */
   router.get('/coverage', asyncRoute(async (req, res) => {

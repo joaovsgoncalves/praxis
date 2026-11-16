@@ -1,5 +1,6 @@
 import { compareSqlite } from '../sqliteOrder.js';
 import { sqliteLike } from '../sqlite/financeLike.js';
+import { sqliteStoredText } from '../sqliteSemantics.js';
 import { firestoreFinanceTable } from './financeTable.js';
 import { FINANCE_GENERIC_TABLES } from '../sqlite/financeTables.js';
 
@@ -19,6 +20,14 @@ export function firestoreFinanceTransactions(userDoc, transaction, client) {
   const read = (target) => (transaction ? transaction.get(target) : target.get());
   return {
     ...base,
+    async byExternalIds(list) {
+      const found = [];
+      for (let i = 0; i < list.length; i += 30) {
+        const chunk = list.slice(i, i + 30).map((value) => sqliteStoredText(value));
+        found.push(...(await read(col.where('external_id', 'in', chunk))).docs.map((doc) => base.project(doc)));
+      }
+      return found;
+    },
     async byPayment(paymentId) {
       const docs = (await read(col.where('payment_id', '==', paymentId))).docs
         .map((doc) => ({ doc, seq: doc.data()._row ?? 0 })).sort((a, b) => a.seq - b.seq);
