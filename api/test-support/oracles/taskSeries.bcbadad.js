@@ -1,5 +1,9 @@
+/**
+ * ORÁCULO CONGELADO: cópia literal de `git show bcbadad:api/lib/taskSeries.js` (só imports ajustados).
+ * Não editar: é a referência da prova de paridade HTTP da fase 3.
+ */
 import { randomUUID } from 'crypto';
-import { nextRecurrenceDate } from '../taskRecurrence.js';
+import { nextRecurrenceDate } from '../../taskRecurrence.js';
 
 /**
  * Garante a próxima ocorrência da série. Uma ocorrência por série e data, em qualquer

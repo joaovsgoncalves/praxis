@@ -1,50 +1,24 @@
 import { Router } from 'express';
-import { randomUUID } from 'crypto';
+import { asyncRoute } from '../lib/asyncRoute.js';
 
-/** Wellness router — mounted at /api/wellness */
-export function createWellnessRouter(ctx) {
-  const { db } = ctx;
+/**
+ * Wellness router — mounted at /api/wellness.
+ * Regras no serviço (`services/routine/focusWellness.js`); envelope igual ao da rota antiga,
+ * congelada em `test-support/oracles/wellness.bcbadad.js` para a prova de paridade.
+ */
+export function createWellnessRouter({ wellness }) {
+  if (!wellness) throw new TypeError('createWellnessRouter: informe o serviço wellness');
   const router = Router();
 
-  // ==================== WELLNESS ====================
-  router.get('/', (req, res) => {
-    const { date } = req.query;
-    let query = 'SELECT * FROM wellness_checks';
-    const params = [];
+  router.get('/', asyncRoute(async (req, res) => {
+    res.json(await wellness.list({ date: req.query.date }));
+  }));
 
-    if (date) { query += ' WHERE date = ?'; params.push(date); }
-    query += ' ORDER BY date DESC LIMIT 30';
-
-    const checks = db.prepare(query).all(...params);
-    res.json(checks);
-  });
-
-  router.post('/', (req, res) => {
-    const id = randomUUID();
-    const { date, sleep_hours = 7, sleep_quality = 3, mood = 3, productivity = 3, note = '' } = req.body;
-
-    if (!date) return res.status(400).json({ error: 'date required' });
-
-    // Upsert: update if exists for this date
-    const existing = db.prepare('SELECT id FROM wellness_checks WHERE date = ?').get(date);
-    if (existing) {
-      db.prepare(`
-        UPDATE wellness_checks SET 
-          sleep_hours = ?, sleep_quality = ?, mood = ?, productivity = ?, note = ?
-        WHERE id = ?
-      `).run(sleep_hours, sleep_quality, mood, productivity, note, existing.id);
-      const updated = db.prepare('SELECT * FROM wellness_checks WHERE id = ?').get(existing.id);
-      return res.json(updated);
-    }
-
-    db.prepare(`
-      INSERT INTO wellness_checks (id, date, sleep_hours, sleep_quality, mood, productivity, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, date, sleep_hours, sleep_quality, mood, productivity, note);
-
-    const check = db.prepare('SELECT * FROM wellness_checks WHERE id = ?').get(id);
-    res.status(201).json(check);
-  });
+  router.post('/', asyncRoute(async (req, res) => {
+    if (!req.body.date) return res.status(400).json({ error: 'date required' });
+    const { created, row } = await wellness.upsert(req.body);
+    res.status(created ? 201 : 200).json(row);
+  }));
 
   return router;
 }

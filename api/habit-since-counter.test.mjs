@@ -17,6 +17,7 @@ import {
   requestJson,
   startTestServer,
 } from "./test-support/helpers.mjs";
+import { habitServicesFor, sqliteStorageFor } from "./test-support/httpParity.fase3.mjs";
 
 test("daysSinceDate counts civil days from the last-incident date", () => {
   assert.equal(daysSinceDate("2026-08-22", "2026-08-24"), 2);
@@ -53,10 +54,13 @@ test("isHabitDueOnDate excludes since tracking_mode", () => {
 test("since habit is a clock: POST/PUT date, GET days, reject daily check, no reset field", async (t) => {
   const db = createTestDb();
   const ctx = buildRouteCtx(db, { getLocalDateString: () => "2026-08-24" });
+  const { storage, inScope } = sqliteStorageFor(db);
+  const services = habitServicesFor(storage, ctx);
   const app = express();
   app.use(express.json());
-  app.use("/api/habits", createHabitsRouter(ctx));
-  registerHabitLogRoutes(app, ctx);
+  app.use(inScope);
+  app.use("/api/habits", createHabitsRouter(services));
+  registerHabitLogRoutes(app, services);
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

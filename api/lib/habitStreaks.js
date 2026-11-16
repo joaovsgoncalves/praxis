@@ -24,7 +24,14 @@ export function getStreaks(db, habitId, getLocalDateString) {
   const logs = db.prepare(
     `SELECT date, completed, outcome FROM habit_logs WHERE habit_id = ? ORDER BY date DESC`,
   ).all(habitId);
+  return streaksFromLogs(logs, getLocalDateString);
+}
 
+/**
+ * Mesma conta de getStreaks sobre registros já lidos (`date`, `completed`, `outcome`, em ordem de
+ * data decrescente). Pura: serve ao storage assíncrono sem tocar no banco.
+ */
+export function streaksFromLogs(logs, getLocalDateString) {
   if (logs.length === 0) return { current_streak: 0, best_streak: 0 };
 
   const byDate = new Map();

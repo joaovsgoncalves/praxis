@@ -3,12 +3,14 @@ import { test } from 'node:test';
 import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
 import { buildRouteCtx, createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
+import { sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 
 async function setup(t) {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
   app.use(express.json());
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

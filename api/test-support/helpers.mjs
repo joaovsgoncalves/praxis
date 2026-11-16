@@ -10,14 +10,18 @@ import { initPurchaseSchema } from '../purchaseList.js';
 import { initFinanceSchema } from '../finance.js';
 import { initProjectsSchema } from '../projects.js';
 import { initContinuityGuidanceSchema } from '../continuityGuidance.js';
+import { initTaskCalendarQueueSchema } from '../lib/taskCalendarQueue.js';
+import { initDayRolloverSchema } from '../lib/dayRollover.js';
 
 /**
- * @param {{ withCaptureQueue?: boolean, withPurchases?: boolean, withFinance?: boolean, withProjects?: boolean, withContinuityGuidance?: boolean }} [options]
+ * @param {{ withCaptureQueue?: boolean, withPurchases?: boolean, withFinance?: boolean, withProjects?: boolean, withContinuityGuidance?: boolean, withTaskRoutine?: boolean }} [options]
+ * `withTaskRoutine`: tabelas da fila da agenda e da virada do dia (o servidor as cria ao preparar cada banco).
  */
 export function createTestDb(options = {}) {
   const db = new Database(':memory:');
   initializeDatabase(db);
   if (options.withCaptureQueue) initCaptureQueueSchema(db);
+  if (options.withTaskRoutine) { initTaskCalendarQueueSchema(db); initDayRolloverSchema(db); }
   if (options.withPurchases) initPurchaseSchema(db);
   if (options.withFinance) initFinanceSchema(db);
   if (options.withProjects) {

@@ -7,6 +7,7 @@ import { createStorage } from './storage/index.js';
 import { createSqliteDriver } from './storage/sqlite/driver.js';
 import { createFirestoreDriver } from './storage/firestore/driver.js';
 import { Firestore } from '@google-cloud/firestore';
+import { taskRow } from './storage/contract.js';
 
 const now = () => new Date('2026-11-15T12:00:00Z');
 async function fixture(kind) {
@@ -25,6 +26,10 @@ async function fixture(kind) {
     as:(owner, fn)=>scope.run(owner, fn), close:async()=>{ for(const db of databases.values()) db.close(); if(client)await client.terminate(); } };
 }
 const input = (id='t1') => ({id,title:'Tarefa sintética',date:'2026-11-15'});
+// `create` passou a ser readwrite (o Firestore lê a sequência antes de gravar): numa transação que já gravou, a ficha de
+// ordem é reservada ANTES (nextRow) e a linha entra com createAt. As asserções de cada subteste seguem as mesmas.
+const full=(id)=>taskRow(input(id),now());
+const slot=(token,i)=>token===null?null:token+i;
 
 for (const kind of ['sqlite','firestore']) {
  test(`${kind}: storage contract`, {skip:kind==='firestore'&&!process.env.FIRESTORE_EMULATOR_HOST}, async t => {
@@ -66,22 +71,23 @@ for (const kind of ['sqlite','firestore']) {
    for(const query of [{limit:0},{limit:1001},{offset:-1},{where:'SQL'},{owner:'alice'}])await assert.rejects(()=>s.tasks.list(query));
   }));
   await t.test('multi-record transaction commits together and rolls back on callback error',async()=>as('atomic_commit',async()=>{
-   await s.transaction(async tx=>{await tx.tasks.create(input('a'));await tx.tasks.create(input('b'));});
-   await assert.rejects(()=>s.transaction(async tx=>{await tx.tasks.patch('a',{title:'wrong'});await tx.tasks.create(input('c'));throw Error('injected');}),/injected/);
+   await s.transaction(async tx=>{const t=await tx.tasks.nextRow();await tx.tasks.createAt(full('a'),t);await tx.tasks.createAt(full('b'),slot(t,1));});
+   await assert.rejects(()=>s.transaction(async tx=>{const t=await tx.tasks.nextRow();await tx.tasks.patch('a',{title:'wrong'});await tx.tasks.createAt(full('c'),t);throw Error('injected');}),/injected/);
    assert.equal((await s.tasks.get('a')).title,'Tarefa sintética');assert.equal(await s.tasks.get('c'),null);
   }));
   await t.test('commit-time duplicate aborts all writes',async()=>inAtomic(async()=>{
-   await assert.rejects(()=>s.transaction(async tx=>{await tx.tasks.patch('a',{title:'wrong'});await tx.tasks.create(input('b'));}),{code:'already_exists'});
+   await assert.rejects(()=>s.transaction(async tx=>{const t=await tx.tasks.nextRow();await tx.tasks.patch('a',{title:'wrong'});await tx.tasks.createAt(full('b'),t);}),{code:'already_exists'});
    assert.equal((await s.tasks.get('a')).title,'Tarefa sintética');
   }));
   await t.test('same id created twice in one transaction is already_exists in both engines',async()=>as('double_create',async()=>{
-   await assert.rejects(()=>s.transaction(async tx=>{await tx.tasks.create(input('d'));await tx.tasks.create(input('d'));}),{code:'already_exists'});
+   await assert.rejects(()=>s.transaction(async tx=>{const t=await tx.tasks.nextRow();await tx.tasks.createAt(full('d'),t);await tx.tasks.createAt(full('d'),slot(t,1));}),{code:'already_exists'});
    assert.equal(await s.tasks.get('d'),null);
   }));
   await t.test('caught write failure still aborts the complete transaction',async()=>inAtomic(async()=>{
    await assert.rejects(()=>s.transaction(async tx=>{
+    const t=await tx.tasks.nextRow();
     await tx.tasks.patch('a',{title:'wrong'});
-    try{await tx.tasks.create(input('b'));}catch{/* Service mistakenly swallows write error. */}
+    try{await tx.tasks.createAt(full('b'),t);}catch{/* Service mistakenly swallows write error. */}
    }),{code:'already_exists'});
    assert.equal((await s.tasks.get('a')).title,'Tarefa sintética');
   }));

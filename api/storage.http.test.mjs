@@ -1,5 +1,5 @@
 /**
- * Rotas já servidas pela camada nova (revisões semanais e compras), no servidor de verdade: cópia isolada da API (banco novo,
+ * Rotas já servidas pela camada nova (revisões semanais, compras, foco, bem-estar, metas, gamificação, hábitos e tarefas), no servidor de verdade: cópia isolada da API (banco novo,
  * sem agenda, sem segredo de produção), duas contas, chave do agente no fluxo do Alfred, conferência
  * no arquivo de cada conta e desligamento gracioso.
  */
@@ -154,6 +154,165 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal((await call(proc, 'GET', '/api/purchases', { cookie: A })).json.length, 1);
   });
 
+  await t.test('foco e bem-estar pela camada nova: contas separadas e fluxos wellness.set/focus.create do Alfred', async () => {
+    const wa = await call(proc, 'POST', '/api/wellness', { cookie: A, body: { date: '2026-11-15', sleep_hours: 6.5, mood: 4 } });
+    const wb = await call(proc, 'POST', '/api/wellness', { cookie: B, body: { date: '2026-11-15', mood: 2 } });
+    assert.equal(wa.status, 201, wa.text); assert.equal(wb.status, 201, wb.text);
+    // wellness.set do Alfred: todos os campos, upsert do dia do dono legado, releitura por ?date=.
+    const set = await call(proc, 'POST', '/api/wellness', { key: API_KEY, body: { date: '2026-11-15', sleep_hours: 8, sleep_quality: 5, mood: 5, productivity: 4, note: 'Pelo Alfred' } });
+    assert.equal(set.status, 200, set.text); assert.equal(set.json.id, wa.json.id, 'atualiza o dia do dono, não cria outro');
+    assert.deepEqual((await call(proc, 'GET', '/api/wellness?date=2026-11-15', { key: API_KEY })).json, [set.json]);
+    assert.deepEqual((await call(proc, 'GET', '/api/wellness?date=2026-11-15', { cookie: B })).json.map((r) => r.mood), [2]);
+    // focus.create do Alfred e releitura por ?date=; a outra conta não vê.
+    const fa = await call(proc, 'POST', '/api/focus', { key: API_KEY, body: { date: '2026-11-15', duration_seconds: 1500, task_title: 'Pelo Alfred' } });
+    const fb = await call(proc, 'POST', '/api/focus', { cookie: B, body: { date: '2026-11-15', duration_seconds: 600 } });
+    assert.equal(fa.status, 201, fa.text); assert.equal(fb.status, 201, fb.text);
+    assert.deepEqual((await call(proc, 'GET', '/api/focus?date=2026-11-15', { cookie: A })).json, [fa.json]);
+    assert.deepEqual((await call(proc, 'GET', '/api/focus/stats?days=7', { cookie: B })).json.map((r) => r.total_seconds), [600]);
+    const bad = await fetch(`${proc.base}/api/focus`, { method: 'POST', headers: { cookie: A, 'content-type': 'application/json' }, body: JSON.stringify({ duration_seconds: 1.5 }), signal: AbortSignal.timeout(3000) });
+    assert.equal(bad.status, 500); assert.match(await bad.text(), /sqlite_coercion_unsupported/);
+  });
+
+  await t.test('metas pela camada nova: contas separadas, vínculo inicial, exclusão solta a tarefa e goals.list do Alfred', async () => {
+    const ga = await call(proc, 'POST', '/api/goals', { cookie: A, body: { title: 'Meta do Jota', initial_link: { type: 'task', title: 'Primeiro passo', date: '2026-11-20' } } });
+    const gb = await call(proc, 'POST', '/api/goals', { cookie: B, body: { title: 'Meta da Bia', initial_link: { type: 'habit' } } });
+    assert.equal(ga.status, 201, ga.text); assert.equal(gb.status, 201, gb.text);
+    assert.equal(ga.json.linked.type, 'task'); assert.equal(gb.json.linked.type, 'habit');
+    assert.deepEqual((await call(proc, 'GET', '/api/goals', { key: API_KEY })).json.map((g) => g.title), ['Meta do Jota'], 'goals.list do Alfred: só as do dono legado');
+    assert.equal((await call(proc, 'GET', `/api/goals/${ga.json.goal.id}`, { cookie: B })).status, 404);
+    assert.equal((await call(proc, 'DELETE', `/api/goals/${ga.json.goal.id}`, { cookie: B })).status, 404, 'a outra conta não apaga');
+    const task = (await call(proc, 'GET', '/api/tasks?date=2026-11-20', { cookie: A })).json.find((r) => r.id === ga.json.linked.id);
+    assert.equal(task?.goal_id, ga.json.goal.id, 'a rota legada de tarefas vê a tarefa criada pela camada nova');
+    const upd = await call(proc, 'PUT', `/api/goals/${ga.json.goal.id}`, { cookie: A, body: { deadline: '2026-12-31', manual_progress: 30 } });
+    assert.equal(upd.status, 200, upd.text); assert.equal(upd.json.deadline, '2026-12-31');
+    const del = await call(proc, 'DELETE', `/api/goals/${ga.json.goal.id}`, { cookie: A });
+    assert.deepEqual(del.json, { success: true, unlinked: { tasks: 1, habits: 0 } });
+    const after = (await call(proc, 'GET', '/api/tasks?date=2026-11-20', { cookie: A })).json.find((r) => r.id === ga.json.linked.id);
+    assert.equal(after?.goal_id, null, 'tarefa preservada, sem vínculo');
+  });
+
+  await t.test('gamificação pela camada nova: contas separadas, XP da tarefa legada, conquista com bônus e chave do agente', async () => {
+    const made = await call(proc, 'POST', '/api/tasks', { cookie: A, body: { title: 'Tarefa do XP', date: '2026-11-16' } });
+    assert.equal(made.status, 201, made.text);
+    assert.equal((await call(proc, 'PUT', `/api/tasks/${made.json.id}`, { cookie: A, body: { status: 'completed' } })).status, 200);
+    // O XP da tarefa saiu da rota legada (conexão do servidor); a rota nova o enxerga pela conexão dedicada.
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: A })).json.xp_total, 10);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: B })).json.xp_total, 0, 'a outra conta não recebe');
+    const checked = await call(proc, 'POST', '/api/gamification/check-achievements', { cookie: A });
+    assert.deepEqual(checked.json.new_achievements.map((a) => a.id), ['first_task']);
+    assert.equal(checked.json.bonus_xp, 10);
+    const add = await call(proc, 'POST', '/api/gamification/add-xp', { cookie: A, body: { amount: 25, reason: 'Pelo teste' } });
+    assert.equal(add.status, 200, add.text); assert.equal(add.json.xp_total, 45);
+    assert.equal((await call(proc, 'POST', '/api/gamification/add-xp', { cookie: B, body: { amount: 5 } })).json.xp_total, 5);
+    assert.equal((await call(proc, 'POST', '/api/gamification/add-xp', { cookie: A, body: { amount: -1 } })).status, 400);
+    assert.deepEqual((await call(proc, 'POST', '/api/gamification/check-achievements', { cookie: B })).json, { new_achievements: [], bonus_xp: 0 });
+    assert.deepEqual((await call(proc, 'POST', '/api/gamification/check-achievements', { cookie: A })).json, { new_achievements: [], bonus_xp: 0 }, 'idempotente');
+    const mine = (await call(proc, 'GET', '/api/gamification', { cookie: A })).json;
+    assert.equal(mine.xp_total, 45); assert.equal(mine.xp_week, 45);
+    assert.ok(mine.achievements.find((a) => a.id === 'first_task').unlocked_date);
+    assert.deepEqual((await call(proc, 'GET', '/api/gamification', { key: API_KEY })).json, mine, 'chave do agente = conta do dono legado');
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: B })).json.achievements.some((a) => a.unlocked_date), false);
+    assert.equal((await call(proc, 'GET', '/api/gamification')).status, 401);
+    // Estorno pela rota legada de tarefas volta o total que a rota nova lê.
+    assert.equal((await call(proc, 'PUT', `/api/tasks/${made.json.id}`, { cookie: A, body: { status: 'pending' } })).status, 200);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: A })).json.xp_total, 35);
+  });
+
+  await t.test('hábitos pela camada nova: contas separadas, composto com passos, registro por dia, exclusão e rituais', async () => {
+    const ha = await call(proc, 'POST', '/api/habits', { cookie: A, body: { title: 'P1 - Beber água', target_value: 2, unit: 'L' } });
+    const hb = await call(proc, 'POST', '/api/habits', { cookie: B, body: { title: 'Ler da Bia' } });
+    assert.equal(ha.status, 201, ha.text); assert.equal(hb.status, 201, hb.text);
+    assert.equal(ha.json.title, 'Beber água', 'prefixo de prioridade sai');
+    assert.deepEqual((await call(proc, 'GET', '/api/habits', { cookie: B })).json.map((h) => h.title).sort(), ['Ler da Bia', 'Meta da Bia'], 'só os hábitos da Bia (o outro veio do vínculo de meta)');
+    assert.deepEqual((await call(proc, 'GET', '/api/habits', { key: API_KEY })).json.map((h) => h.title), ['Beber água'], 'chave do agente: conta do dono legado');
+    const comp = await call(proc, 'POST', '/api/habits', { cookie: A, body: { title: 'Manhã', kind: 'compound', emoji: '🌅', children: [{ title: 'Alongar', preferred_time: '6:30' }, { title: 'Meditar', preferred_time: '07:00' }] } });
+    assert.equal(comp.status, 201, comp.text); assert.equal(comp.json.total_steps, 2); assert.equal(comp.json.time_of_day, 'morning');
+    const [step1, step2] = comp.json.children;
+    const today = '2026-11-10';
+    // registro: água com meta de 2 L; 0,5 + 0,5 não completa, 1,5 depois completa
+    const part = await call(proc, 'POST', '/api/habit-logs', { cookie: A, body: { habit_id: ha.json.id, date: today, increment: 0.5 } });
+    assert.equal(part.status, 201, part.text); assert.equal(part.json.completed, 0);
+    const more = await call(proc, 'POST', '/api/habit-logs', { cookie: A, body: { habit_id: ha.json.id, date: today, increment: 1.5 } });
+    assert.equal(more.status, 200, more.text); assert.equal(more.json.completed, 1); assert.equal(more.json.value, 2); assert.equal(more.json.id, part.json.id);
+    assert.equal((await call(proc, 'POST', '/api/habit-logs', { cookie: B, body: { habit_id: ha.json.id, date: today } })).status, 404, 'a outra conta não registra no meu hábito');
+    assert.equal((await call(proc, 'POST', '/api/habit-logs', { cookie: A, body: { habit_id: comp.json.id, date: today } })).status, 400);
+    for (const step of [step1, step2]) assert.equal((await call(proc, 'POST', '/api/habit-logs', { cookie: A, body: { habit_id: step.id, date: today } })).status, 201);
+    assert.deepEqual((await call(proc, 'GET', `/api/habit-logs?date=${today}`, { cookie: B })).json, []);
+    const tree = (await call(proc, 'GET', `/api/habits?date=${today}`, { cookie: A })).json;
+    assert.equal(tree.find((h) => h.id === comp.json.id).day_outcome, 'done');
+    assert.equal(tree.find((h) => h.id === ha.json.id).completed_today, true);
+    const rituals = (await call(proc, 'GET', `/api/rituals?date=${today}`, { cookie: A })).json;
+    assert.deepEqual(rituals.map((r) => [r.name, r.completed, r.total]), [['Manhã', 2, 2]]);
+    assert.equal((await call(proc, 'POST', '/api/rituals', { cookie: A, body: {} })).status, 410);
+    assert.equal((await call(proc, 'GET', `/api/habits/${ha.json.id}/streak`, { cookie: A })).json.current_streak, 0, 'o dia do registro não é o dia de hoje do servidor');
+    // editar e apagar o composto: passos arquivados, registros do hábito apagado somem
+    const upd = await call(proc, 'PUT', `/api/habits/${comp.json.id}`, { cookie: A, body: { status: 'paused' } });
+    assert.equal(upd.status, 200); assert.deepEqual(upd.json.children.map((c) => c.status), ['paused', 'paused']);
+    assert.deepEqual((await call(proc, 'DELETE', `/api/habits/${comp.json.id}`, { cookie: A })).json, { success: true });
+    const after = (await call(proc, 'GET', '/api/habits?status=all', { cookie: A })).json;
+    assert.deepEqual(after.map((h) => [h.title, h.status]).sort(), [['Alongar', 'archived'], ['Beber água', 'active'], ['Meditar', 'archived']]);
+    assert.equal((await call(proc, 'GET', `/api/habit-logs?habit_id=${step1.id}`, { cookie: A })).json.length, 1, 'registro do passo arquivado continua');
+    assert.deepEqual((await call(proc, 'DELETE', `/api/habit-logs/${part.json.id}`, { cookie: B })).json, { success: true }, 'mesmo envelope; a outra conta não apaga');
+    assert.equal((await call(proc, 'GET', `/api/habit-logs?habit_id=${ha.json.id}`, { cookie: A })).json.length, 1);
+    assert.equal((await call(proc, 'GET', '/api/habits')).status, 401);
+  });
+
+  await t.test('tarefas pela camada nova: conta própria, XP, série, checklist, adiar, ideia, excluir e chave do agente', async () => {
+    const made = spawnSync(process.execPath, ['scripts/create-user.mjs', 'Caio.Teste', 'Caio'], { cwd: apiDir, env: { ...process.env, PRAXIS_NEW_USER_PASSWORD: PASS_B }, encoding: 'utf8' });
+    assert.equal(made.status, 0, made.stderr);
+    const C = (await call(proc, 'POST', '/api/auth/login', { body: { username: 'caio.teste', password: PASS_B } })).cookie;
+    assert.ok(C);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' });
+    const t1 = await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'P1 - Série do Caio', date: today, recurrence: 'daily', sort_order: 5 } });
+    assert.equal(t1.status, 201, t1.text); assert.equal(t1.json.title, 'Série do Caio'); assert.deepEqual(t1.json.calendar_sync, { skipped: true }, 'conta sem agenda ligada');
+    assert.equal((await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'Meta que não existe', goal_id: 'nada' } })).status, 400);
+    // Alfred (chave) grava na conta do dono legado, não na do Caio.
+    const alfred = await call(proc, 'POST', '/api/tasks', { key: API_KEY, body: { title: 'Pelo Alfred', date: today } });
+    assert.equal(alfred.status, 201, alfred.text);
+    assert.deepEqual((await call(proc, 'GET', '/api/tasks', { cookie: C })).json.map((r) => r.title), ['Série do Caio']);
+    assert.ok((await call(proc, 'GET', '/api/tasks?limit=500', { key: API_KEY })).json.some((r) => r.id === alfred.json.id));
+    assert.equal((await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: B, body: { title: 'invadida' } })).status, 404, 'a outra conta não edita');
+    assert.equal((await call(proc, 'DELETE', `/api/tasks/${t1.json.id}`, { cookie: B })).status, 404);
+    assert.equal((await call(proc, 'GET', `/api/tasks/${alfred.json.id}`, { cookie: C })).status, 404);
+
+    // checklist: contagens na lista e no detalhe
+    const c1 = await call(proc, 'POST', `/api/tasks/${t1.json.id}/checklist`, { cookie: C, body: { title: 'Passo 1' } });
+    const c2 = await call(proc, 'POST', `/api/tasks/${t1.json.id}/checklist`, { cookie: C, body: { title: 'Passo 2' } });
+    assert.equal(c1.status, 201, c1.text); assert.equal(c2.json.sort_order, 1);
+    assert.equal((await call(proc, 'PATCH', `/api/tasks/${t1.json.id}/checklist/${c1.json.id}`, { cookie: C, body: { done: true } })).json.done, true);
+    assert.deepEqual((await call(proc, 'GET', `/api/tasks/${t1.json.id}`, { cookie: C })).json.checklist_done, 1);
+    assert.equal((await call(proc, 'GET', `/api/tasks/${t1.json.id}/checklist`, { cookie: B })).status, 404);
+
+    // concluir: XP uma vez e próxima ocorrência; reabrir estorna e não duplica a série
+    const done = await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: C, body: { status: 'completed' } });
+    assert.equal(done.status, 200, done.text); assert.equal(done.json.xp_sync.awarded, 10); assert.equal(done.json.next_occurrence.created, true);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: C })).json.xp_total, 10);
+    const reopened = await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: C, body: { status: 'pending' } });
+    assert.equal(reopened.json.xp_sync.awarded, -10);
+    const again = await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: C, body: { status: 'completed' } });
+    assert.equal(again.json.next_occurrence.created, false, 'a segunda conclusão acha a ocorrência que já existe'); assert.equal(again.json.next_occurrence.id, done.json.next_occurrence.id);
+
+    // adiar, ideia e posição
+    const later = await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'Adiar', date: today } });
+    const pushed = await call(proc, 'POST', `/api/tasks/${later.json.id}/not-today`, { cookie: C, body: { reason: 'Energy' } });
+    assert.equal(pushed.status, 200, pushed.text); assert.equal(pushed.json.day_outcome, 'not_today'); assert.equal(pushed.json.day_outcome_reason, 'energy'); assert.ok(pushed.json.date > today);
+    const idea = await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'Ideia solta', category: 'ideias' } });
+    assert.equal(idea.json.idea_status, 'capturada');
+    const promoted = await call(proc, 'POST', `/api/ideas/${idea.json.id}/to-task`, { cookie: C, body: {} });
+    assert.equal(promoted.status, 201, promoted.text); assert.equal(promoted.json.idea.idea_status, 'virou_tarefa'); assert.equal(promoted.json.task.source_idea_id, idea.json.id);
+    assert.equal((await call(proc, 'POST', `/api/ideas/${idea.json.id}/to-task`, { cookie: C, body: {} })).status, 409);
+    const reordered = await call(proc, 'PATCH', '/api/tasks/reorder', { cookie: C, body: { ordered_ids: [promoted.json.task.id, later.json.id] } });
+    assert.equal(reordered.json.updated, 2); assert.deepEqual(reordered.json.tasks.slice(0, 2).map((r) => r.id), [promoted.json.task.id, later.json.id]);
+
+    // excluir: o XP da tarefa concluída é estornado, o checklist some e nada vaza para a outra conta
+    assert.deepEqual((await call(proc, 'DELETE', `/api/tasks/${t1.json.id}`, { cookie: C })).json.xp_sync.awarded, -10);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: C })).json.xp_total, 0);
+    assert.equal((await call(proc, 'GET', `/api/tasks/${t1.json.id}/checklist`, { cookie: C })).status, 404);
+    assert.equal((await call(proc, 'GET', '/api/tasks')).status, 401);
+    const bad = await fetch(`${proc.base}/api/tasks?limit=1.5`, { headers: { cookie: C }, signal: AbortSignal.timeout(3000) });
+    assert.equal(bad.status, 500); assert.match(await bad.text(), /datatype mismatch/);
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -167,6 +326,71 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual(other.prepare('SELECT highlights FROM weekly_reviews').pluck().all(), ['Da Bia']);
     assert.deepEqual(control.prepare('SELECT title FROM purchase_items').pluck().all(), ['Fone do Jota']);
     assert.deepEqual(other.prepare('SELECT title FROM purchase_items').pluck().all(), ['Livro da Bia']);
+    assert.deepEqual(control.prepare('SELECT note FROM wellness_checks').pluck().all(), ['Pelo Alfred']);
+    assert.deepEqual(other.prepare('SELECT mood FROM wellness_checks').pluck().all(), [2]);
+    assert.deepEqual(control.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [1500]);
+    assert.deepEqual(other.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [600]);
+    assert.deepEqual(control.prepare('SELECT source_type, amount, reversed_date IS NOT NULL FROM xp_events ORDER BY source_type, amount').raw().all(),
+      [['achievement', 10, 0], ['manual', 25, 0], ['task', 10, 1]], 'eventos de XP do dono: tarefa estornada, conquista e prêmio manual');
+    assert.deepEqual(other.prepare('SELECT source_type, amount FROM xp_events').raw().all(), [['manual', 5]]);
+    assert.deepEqual([control, other].map((db) => db.prepare("SELECT xp_total FROM gamification WHERE id = 'main'").pluck().get()), [35, 5], 'espelho em cada conta');
+    assert.deepEqual(control.prepare('SELECT title, status FROM habits WHERE source NOT LIKE \'goal_wizard\' ORDER BY title').raw().all(), [['Alongar', 'archived'], ['Beber água', 'active'], ['Meditar', 'archived']]);
+    assert.deepEqual(other.prepare("SELECT title FROM habits WHERE source = 'manual'").pluck().all(), ['Ler da Bia']);
+    assert.equal(control.prepare('SELECT COUNT(*) FROM habit_logs').pluck().get(), 3, 'água e os dois passos');
+    assert.equal(other.prepare('SELECT COUNT(*) FROM habit_logs').pluck().get(), 0);
+    assert.equal(control.prepare('SELECT COUNT(*) FROM goals').pluck().get(), 0);
+    assert.deepEqual(other.prepare('SELECT title FROM goals').pluck().all(), ['Meta da Bia']);
+    assert.deepEqual(other.prepare("SELECT title, goal_id IS NOT NULL FROM habits WHERE source = 'goal_wizard'").raw().all(), [['Meta da Bia', 1]]);
+    assert.deepEqual(control.prepare("SELECT title, goal_id FROM tasks WHERE source = 'goal_wizard'").raw().all(), [['Primeiro passo', null]]);
+    const idC = control.prepare("SELECT id FROM praxis_users WHERE username = 'caio.teste'").pluck().get();
+    const third = new Database(path.join(apiDir, 'data', 'users', `${idC}.db`), { readonly: true });
+    t.after(() => third.close());
+    assert.deepEqual(third.prepare('SELECT title FROM tasks ORDER BY title').pluck().all(), ['Adiar', 'Ideia solta', 'Ideia solta', 'Série do Caio'], 'conta do Caio: a série seguiu, a tarefa excluída saiu');
+    assert.equal(third.prepare('SELECT COUNT(*) FROM task_checklist_items').pluck().get(), 0, 'checklist apagado com a tarefa');
+    assert.equal(third.prepare('SELECT COUNT(*) FROM task_calendar_queue').pluck().get(), 0, 'conta sem agenda não grava intenção');
+    assert.deepEqual(third.prepare('SELECT amount, reversed_date IS NOT NULL FROM xp_events').raw().all().sort(), [[10, 1], [10, 1]], 'dois prêmios da mesma origem, os dois estornados');
+    assert.equal(control.prepare("SELECT COUNT(*) FROM tasks WHERE title = 'Pelo Alfred'").pluck().get(), 1, 'a tarefa do Alfred ficou no banco do dono legado');
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
+});
+
+test('virada do dia no servidor: na subida fecha as vencidas de cada conta, uma vez, e a repetição não duplica', async (t) => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' });
+  const control = new Database(path.join(apiDir, 'praxis.db'));
+  const idC = control.prepare("SELECT id FROM praxis_users WHERE username = 'caio.teste'").pluck().get();
+  const files = [path.join(apiDir, 'praxis.db'), path.join(apiDir, 'data', 'users', `${idC}.db`)];
+  control.close();
+  for (const file of files) {
+    const db = new Database(file);
+    db.prepare(`INSERT INTO tasks (id, title, date, time, status, priority, category, sort_order, recurrence)
+      VALUES ('rv-1', 'Vencida de janeiro', '2026-01-01', '07:00', 'pending', 'medium', 'pessoal', 500, 'daily')`).run();
+    db.close();
+  }
+  const closedOn = (file) => {
+    const db = new Database(file, { readonly: true });
+    try {
+      return {
+        old: db.prepare("SELECT status, day_outcome, day_outcome_date FROM tasks WHERE id = 'rv-1'").get(),
+        children: db.prepare("SELECT date, status FROM tasks WHERE recurrence_parent_id = 'rv-1'").all(),
+        runs: db.prepare('SELECT day, closed FROM day_rollover_runs ORDER BY day').all(),
+      };
+    } finally { db.close(); }
+  };
+  for (const boot of [1, 2]) {
+    const proc = start();
+    t.after(() => { if (proc.child.exitCode === null) proc.child.kill('SIGKILL'); });
+    await ready(proc);
+    proc.child.kill('SIGTERM');
+    assert.equal((await proc.exited).code, 0, proc.log.slice(-800));
+    for (const file of files) {
+      const got = closedOn(file);
+      assert.deepEqual(got.old, { status: 'cancelled', day_outcome: 'missed', day_outcome_date: '2026-01-01' }, `subida ${boot}: a vencida fechou como não rolou (${path.basename(file)})`);
+      assert.deepEqual(got.children, [{ date: today, status: 'pending' }], `subida ${boot}: uma só ocorrência de hoje, sem filho no passado`);
+      assert.equal(got.runs.at(-1).day, today);
+      assert.equal(got.runs.at(-1).closed >= 1, true, 'o dia registra o que fechou');
+    }
+    // O log só fala quando algo fechou ou o dia começou: a segunda subida do mesmo dia fica calada.
+    if (boot === 1) assert.match(proc.log, /\[virada-do-dia\] \d{4}-\d\d-\d\d \(subida\)/);
+    else assert.doesNotMatch(proc.log, /\[virada-do-dia\]/);
+  }
 });

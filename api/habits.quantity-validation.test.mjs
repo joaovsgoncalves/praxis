@@ -4,6 +4,7 @@ import express from 'express';
 import { createHabitsRouter, registerHabitLogRoutes } from './routes/habits.js';
 import { readHabitQuantity } from './lib/habitQuantity.js';
 import { buildRouteCtx, createTestDb, startTestServer } from './test-support/helpers.mjs';
+import { habitServicesFor, sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 
 const DAY = '2026-11-14';
 
@@ -12,8 +13,11 @@ async function setup(t) {
   const app = express();
   app.use(express.json());
   const ctx = buildRouteCtx(db);
-  app.use('/api/habits', createHabitsRouter(ctx));
-  registerHabitLogRoutes(app, ctx);
+  const { storage, inScope } = sqliteStorageFor(db);
+  const services = habitServicesFor(storage, ctx);
+  app.use(inScope);
+  app.use('/api/habits', createHabitsRouter(services));
+  registerHabitLogRoutes(app, services);
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

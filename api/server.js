@@ -13,10 +13,10 @@ import {
 } from './praxisAuth.js';
 import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
-import { getLevel } from './lib/gamification.js';
 import { createCalendarServices } from './lib/calendarSync.js';
-import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
-import { createDayRollover } from './lib/dayRollover.js';
+import { createTaskCalendarQueue, initTaskCalendarQueueSchema } from './lib/taskCalendarQueue.js';
+import { initDayRolloverSchema } from './lib/dayRollover.js';
+import { createDayRollover } from './services/routine/dayRollover.js';
 import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
 import { createTenantDb } from './lib/tenantDb.js';
 import { createUserDbs } from './lib/userDbs.js';
@@ -44,6 +44,11 @@ import { createProjectsRouter } from './routes/projects.js';
 import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
 import { createWeeklyReviewsService } from './services/weeklyReviews.js';
 import { createPurchasesService } from './services/purchases.js';
+import { createFocusService, createWellnessService } from './services/routine/focusWellness.js';
+import { createGoalsService } from './services/routine/goals.js';
+import { createGamificationService } from './services/routine/gamification.js';
+import { createHabitsService, createHabitLogsService } from './services/routine/habits.js';
+import { createTasksService } from './services/routine/tasks.js';
 import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -154,6 +159,9 @@ function prepareUserData(target, { personalSeeds }) {
   if (personalSeeds) seedFinanceIfEmpty(target);
   initProjectsSchema(target);
   initContinuityGuidanceSchema(target);
+  // Fila da agenda e virada do dia moram no storage: a tabela precisa existir em TODO banco de conta.
+  initTaskCalendarQueueSchema(target);
+  initDayRolloverSchema(target);
   if (personalSeeds) seedProjectsIfEmpty(target);
 }
 
@@ -184,12 +192,18 @@ const storageRuntime = createStorageRuntime({
 });
 const weeklyReviews = createWeeklyReviewsService({ storage: storageRuntime.storage });
 const purchases = createPurchasesService({ storage: storageRuntime.storage });
+const focus = createFocusService({ storage: storageRuntime.storage });
+const wellness = createWellnessService({ storage: storageRuntime.storage });
+const goals = createGoalsService({ storage: storageRuntime.storage, getLocalDateString });
+const gamification = createGamificationService({ storage: storageRuntime.storage, getLocalDateString });
+const habits = createHabitsService({ storage: storageRuntime.storage, getLocalDateString, stripPriorityPrefix });
+const habitLogs = createHabitLogsService({ storage: storageRuntime.storage, HABIT_OUTCOMES, SKIP_REASONS });
 
-/** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
-function forEachOwner(label, fn) {
+/** Trabalho de relógio (sem requisição): roda uma vez para cada dono, um de cada vez, no banco dele. */
+async function forEachOwnerAsync(label, fn) {
   for (const owner of userDbs.ownerKeys()) {
     try {
-      tenant.runAs(owner, fn);
+      await tenant.runAs(owner, fn);
     } catch (error) {
       console.error(`[contas] ${label} falhou para ${owner === LEGACY_OWNER ? 'o dono legado' : `a conta ${owner.slice(0, 8)}…`}:`, error?.message || error);
     }
@@ -214,24 +228,6 @@ function stripPriorityPrefix(title) {
   return cleaned || title.trim();
 }
 
-function nextSortOrder(table) {
-  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid sortable table');
-  const row = db.prepare(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM ${table}`).get();
-  return Number(row?.next_order || 0);
-}
-
-function reorderItems(table, orderedIds) {
-  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid reorder table');
-  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return 0;
-  const uniqueIds = [...new Set(orderedIds.filter(Boolean).map(String))];
-  const update = db.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`);
-  const run = db.transaction((ids) => {
-    ids.forEach((id, index) => update.run(index, id));
-  });
-  run(uniqueIds);
-  return uniqueIds.length;
-}
-
 // A agenda do Google ligada ao servidor é a do dono legado. Para as outras contas, nada sai daqui:
 // nem evento criado, nem fila, nem leitura da agenda dele.
 const calendarServices = createCalendarServices({ db, getLocalDateString });
@@ -249,21 +245,19 @@ const calendarQueue = {
   stats: (...args) => (isLegacyScope() ? legacyCalendarQueue.stats(...args) : { pending: 0, failed: 0 }),
 };
 
-const routeCtx = {
-  db,
-  enrichCategory,
+// Tarefas pela camada assíncrona: status, XP, próxima ocorrência e a intenção de agenda na mesma transação;
+// depois do commit a fila é drenada fora dela (e só o dono legado tem agenda ligada).
+const tasks = createTasksService({
+  storage: storageRuntime.storage,
   getLocalDateString,
   addDaysLocal,
   stripPriorityPrefix,
-  nextSortOrder,
-  reorderItems,
-  syncTaskToCalendar,
-  taskNeedsCalendarSync,
-  calendarQueue,
-  getLevel,
+  enrichCategory,
   SKIP_REASONS,
-  HABIT_OUTCOMES,
-};
+  taskNeedsCalendarSync,
+  calendarEnabled: isLegacyScope,
+  scheduleCalendarDrain: () => setImmediate(() => calendarQueue.drain()),
+});
 
 // --- Domain routes ---
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
@@ -274,13 +268,13 @@ app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não
 app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));
 app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
 registerCaptureRoutes(app, { db, apiDir: __dirname });
-app.use('/api/tasks', createTasksRouter(routeCtx));
-registerIdeaToTaskRoute(app, routeCtx);
-app.use('/api/habits', createHabitsRouter(routeCtx));
-registerHabitLogRoutes(app, routeCtx);
-app.use('/api/wellness', createWellnessRouter(routeCtx));
-app.use('/api/focus', createFocusRouter({ db }));
-app.use('/api/goals', createGoalsRouter({ db, getLocalDateString, nextSortOrder }));
+app.use('/api/tasks', createTasksRouter({ tasks }));
+registerIdeaToTaskRoute(app, { tasks });
+app.use('/api/habits', createHabitsRouter({ habits }));
+registerHabitLogRoutes(app, { habitLogs });
+app.use('/api/wellness', createWellnessRouter({ wellness }));
+app.use('/api/focus', createFocusRouter({ focus }));
+app.use('/api/goals', createGoalsRouter({ goals }));
 app.use('/api/user', createSettingsRouter({ db }));
 registerParseVoiceRoutes(app, {
   getLocalDateString,
@@ -291,17 +285,17 @@ registerParseVoiceRoutes(app, {
 // Conta sem agenda ligada: o dia dela simplesmente não tem eventos (a tela não precisa tratar erro).
 app.get('/api/calendar/today', (req, res, next) => (isLegacyScope() ? next() : res.json([])));
 app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a esta conta'), createCalendarRouter());
-app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOrder }));
+app.use('/api/rituals', createRitualsRouter({ habits, getLocalDateString }));
 app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
 registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
-app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString }));
+app.use('/api/gamification', createGamificationRouter({ gamification }));
 app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ weeklyReviews }));
 
 const HOST = process.env.HOST || '127.0.0.1';
 
 // Virada do dia: fecha as vencidas antes de atender e segue conferindo a cada minuto.
-const dayRollover = createDayRollover({ db, getLocalDateString, nextSortOrder });
-forEachOwner('virada do dia', () => dayRollover.run('subida'));
+const dayRollover = createDayRollover({ storage: storageRuntime.storage, getLocalDateString });
+await forEachOwnerAsync('virada do dia', () => dayRollover.run('subida'));
 
 // Daqui em diante, banco sem dono no escopo não responde: nenhuma rota cai nos dados de outra pessoa.
 tenant.seal();
@@ -316,7 +310,13 @@ const server = app.listen(PORT, HOST, () => {
   });
   // Retentativa das intenções de agenda que falharam (a espera entre tentativas fica na fila).
   clocks.push(setInterval(() => tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain()), 60 * 1000).unref());
-  clocks.push(setInterval(() => forEachOwner('virada do dia', () => dayRollover.run('tick')), 60 * 1000).unref());
+  // Uma passada por vez: se a anterior ainda não terminou, esta espera o próximo minuto.
+  let rolling = false;
+  clocks.push(setInterval(async () => {
+    if (rolling) return;
+    rolling = true;
+    try { await forEachOwnerAsync('virada do dia', () => dayRollover.run('tick')); } finally { rolling = false; }
+  }, 60 * 1000).unref());
 });
 
 installGracefulShutdown({

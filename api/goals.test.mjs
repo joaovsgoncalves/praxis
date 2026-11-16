@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createGoalsRouter } from './routes/goals.js';
+import { createGoalsService } from './services/routine/goals.js';
+import { sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 import { buildRouteCtx, createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
 
 async function mountGoals(t) {
   const db = createTestDb();
   const app = express();
   app.use(express.json());
-  app.use('/api/goals', createGoalsRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/goals', scoped(createGoalsRouter({ goals: createGoalsService({ storage, getLocalDateString: buildRouteCtx(db).getLocalDateString }) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

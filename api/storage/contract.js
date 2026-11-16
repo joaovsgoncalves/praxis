@@ -32,7 +32,8 @@ function values(input) {
     if (!FIELDS.has(key)) throw new StorageError('unknown_task_field');
     if (key === 'id') { recordId(value); continue; }
     if (key === 'title') {
-      if (typeof value !== 'string' || !value.length) throw new StorageError('invalid_task_title');
+      // Texto, mesmo vazio: a PUT antiga gravava título ''. A criação direta (newTask) segue exigindo não vazio.
+      if (typeof value !== 'string') throw new StorageError('invalid_task_title');
     } else if (NUMERIC.has(key)) {
       if (value !== null && !Number.isSafeInteger(value)) throw new StorageError('invalid_task_integer');
     } else if (value !== null && typeof value !== 'string') throw new StorageError('invalid_task_value');
@@ -61,6 +62,65 @@ export function taskQuery(input = {}) {
   if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 1000
       || !Number.isInteger(query.offset) || query.offset < 0 || query.offset > 1000000) throw new StorageError('invalid_task_query');
   return query;
+}
+/**
+ * Colunas da tabela `tasks` na ordem física do SQLite (`SELECT *`), alinhadas a `PRAGMA table_info`
+ * por teste. O Firestore não guarda ordem de campos: toda linha de tarefa sai por esta lista.
+ */
+export const TASK_ROW_FIELDS = Object.freeze(['id', 'title', 'description', 'date', 'time', 'status', 'priority', 'category', 'goal_id', 'source',
+  'duration_minutes', 'calendar_event_id', 'sort_order', 'completed_date', 'completed_at', 'created_date', 'updated_date', 'recurrence',
+  'recurrence_days', 'recurrence_parent_id', 'idea_status', 'source_idea_id', 'day_outcome', 'day_outcome_date', 'day_outcome_reason']);
+/** DEFAULT de cada coluna da tabela (lib/dbInit.js); `created_date`/`updated_date` = `datetime('now')`. */
+export const TASK_TABLE_DEFAULTS = Object.freeze({ description: '', status: 'pending', priority: 'medium', category: 'pessoal', source: 'manual', recurrence: 'none', recurrence_days: '[]' });
+/** Linha completa de tarefa como o INSERT com colunas omitidas gravaria. */
+export function taskRow(values, now = new Date()) {
+  const stamp = now.toISOString().slice(0, 19).replace('T', ' ');
+  const row = { ...TASK_TABLE_DEFAULTS, created_date: stamp, updated_date: stamp, ...values };
+  return Object.fromEntries(TASK_ROW_FIELDS.map((field) => [field, row[field] ?? null]));
+}
+/** Ficha de ordem de inserção reservada por `nextRow()`: null (SQLite) ou inteiro positivo (Firestore). */
+export function rowToken(value) {
+  if (value !== null && !(Number.isSafeInteger(value) && value > 0)) throw new StorageError('invalid_row_token');
+  return value;
+}
+/** Linha completa já com a afinidade aplicada pelo serviço (todas as colunas, na ordem da tabela). */
+export function fullTask(input) {
+  const clean = values(input);
+  for (const field of TASK_ROW_FIELDS) if (!Object.hasOwn(clean, field)) throw new StorageError('incomplete_task');
+  return Object.fromEntries(TASK_ROW_FIELDS.map((field) => [field, clean[field]]));
+}
+const textOrNull = (value) => value === null || typeof value === 'string';
+/** Filtros de `GET /api/tasks` (cada um texto ou null = não filtra) e a janela já limitada pelo serviço. */
+export function taskSearchQuery(input) {
+  plain(input);
+  const query = { date: null, status: null, category: null, idea_status: null, ...input };
+  for (const key of Object.keys(query)) if (!['date', 'status', 'category', 'idea_status', 'limit', 'offset'].includes(key)) throw new StorageError('invalid_task_query');
+  if (!['date', 'status', 'category', 'idea_status'].every((key) => textOrNull(query[key]))
+      || !Number.isSafeInteger(query.limit) || query.limit < 1 || !Number.isSafeInteger(query.offset) || query.offset < 0) throw new StorageError('invalid_task_query');
+  return query;
+}
+/** Texto simples de consulta (data, id de série). */
+export function taskText(value) {
+  if (typeof value !== 'string') throw new StorageError('invalid_task_query');
+  return value;
+}
+/** [[id, posição], ...] de `reorder`. */
+export function taskPositions(entries) {
+  if (!Array.isArray(entries)) throw new StorageError('invalid_task_query');
+  return entries.map((entry) => {
+    if (!Array.isArray(entry) || entry.length !== 2 || !Number.isSafeInteger(entry[1])) throw new StorageError('invalid_task_query');
+    return [recordId(entry[0]), entry[1]];
+  });
+}
+/** `goal_id = ?` das tarefas (e hábitos): texto exato, coluna TEXT. */
+export function taskGoalKey(value) {
+  if (typeof value !== 'string') throw new StorageError('invalid_query');
+  return value;
+}
+/** Lista de ids lida antes na mesma transação (ex.: itens de uma meta a soltar). */
+export function taskIdList(value) {
+  if (!Array.isArray(value)) throw new StorageError('invalid_query');
+  return value.map((id) => recordId(id));
 }
 // Revisão semanal: colunas na ordem da tabela SQLite (`weekly_reviews` em lib/dbInit.js).
 export const REVIEW_FIELDS = Object.freeze(['id', 'week_start', 'highlights', 'blockers', 'learnings', 'next_week_focus', 'overall_score', 'created_date', 'updated_date']);

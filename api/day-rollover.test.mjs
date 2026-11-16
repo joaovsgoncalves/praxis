@@ -1,22 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createDayRollover } from './lib/dayRollover.js';
-import { buildRouteCtx, createTestDb } from './test-support/helpers.mjs';
+import { createDayRollover } from './services/routine/dayRollover.js';
+import { createTestDb } from './test-support/helpers.mjs';
+import { sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 
 const quiet = { log() {}, error() {} };
 
 function setup(t, { today = '2026-10-15' } = {}) {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   t.after(() => db.close());
   const clock = { today };
-  const ctx = buildRouteCtx(db);
   const logs = [];
-  const rollover = createDayRollover({
-    db,
+  const { storage, as } = sqliteStorageFor(db);
+  const service = createDayRollover({
+    storage,
     getLocalDateString: () => clock.today,
-    nextSortOrder: ctx.nextSortOrder,
     log: { log: (line) => logs.push(line), error: (line) => logs.push(`ERRO ${line}`) },
   });
+  // A virada agora é assíncrona e roda no escopo de um dono; `run` devolve a promessa do resultado.
+  const rollover = { run: (reason) => as(() => service.run(reason)), start: (options) => service.start(options), stop: () => service.stop() };
   const insert = db.prepare(`
     INSERT INTO tasks (id, title, date, time, status, priority, category, sort_order, recurrence, recurrence_parent_id, source)
     VALUES (?, ?, ?, ?, 'pending', 'medium', 'pessoal', ?, ?, ?, ?)
@@ -26,13 +28,13 @@ function setup(t, { today = '2026-10-15' } = {}) {
   return { db, clock, rollover, insert, snapshot, xp, logs };
 }
 
-test('virada fecha a recorrente de ontem, garante a de hoje e registra o dia', (t) => {
+test('virada fecha a recorrente de ontem, garante a de hoje e registra o dia', async (t) => {
   const { db, rollover, insert, xp } = setup(t);
   insert.run('faculdade', 'Sair para a faculdade', '2026-10-14', '18:40', 1, 'daily', null, 'manual');
   insert.run('avulsa', 'Pagar boleto', '2026-10-14', '10:00', 2, 'none', null, 'manual');
   const xpBefore = xp();
 
-  const result = rollover.run('teste');
+  const result = await rollover.run('teste');
 
   assert.deepEqual({ ok: result.ok, closed: result.closed }, { ok: true, closed: 1 });
   const missed = db.prepare('SELECT status, day_outcome, day_outcome_date FROM tasks WHERE id = ?').get('faculdade');
@@ -43,19 +45,19 @@ test('virada fecha a recorrente de ontem, garante a de hoje e registra o dia', (
   assert.deepEqual(db.prepare('SELECT day, closed FROM day_rollover_runs').all(), [{ day: '2026-10-15', closed: 1 }]);
 });
 
-test('passadas repetidas no mesmo dia não mudam nada', (t) => {
+test('passadas repetidas no mesmo dia não mudam nada', async (t) => {
   const { db, rollover, insert, snapshot } = setup(t);
   insert.run('faculdade', 'Sair para a faculdade', '2026-10-14', '18:40', 1, 'daily', null, 'manual');
 
-  rollover.run('subida');
+  await rollover.run('subida');
   const first = snapshot();
-  for (let i = 0; i < 5; i += 1) assert.equal(rollover.run('tick').closed, 0);
+  for (let i = 0; i < 5; i += 1) assert.equal((await rollover.run('tick')).closed, 0);
 
   assert.deepEqual(snapshot(), first);
   assert.deepEqual(db.prepare('SELECT day, closed FROM day_rollover_runs').all(), [{ day: '2026-10-15', closed: 1 }]);
 });
 
-test('API parada por vários dias: a primeira passada fecha tudo e não cria ocorrência no passado', (t) => {
+test('API parada por vários dias: a primeira passada fecha tudo e não cria ocorrência no passado', async (t) => {
   const { db, rollover, insert } = setup(t, { today: '2026-10-20' });
   // A série ficou com três ocorrências abertas enquanto a API estava fora do ar.
   insert.run('agua', 'Regar plantas', '2026-10-12', '07:00', 1, 'daily', null, 'manual');
@@ -63,7 +65,7 @@ test('API parada por vários dias: a primeira passada fecha tudo e não cria oco
   insert.run('agua-14', 'Regar plantas', '2026-10-14', '07:00', 3, 'daily', 'agua', 'manual');
   insert.run('bloco', 'Sair para a faculdade', '2026-10-16', '18:20', 4, 'none', null, 'seneca');
 
-  const result = rollover.run('subida');
+  const result = await rollover.run('subida');
 
   assert.equal(result.closed, 4);
   const open = db.prepare("SELECT date FROM tasks WHERE status IN ('pending', 'in_progress') ORDER BY date").all();
@@ -78,20 +80,20 @@ test('API parada por vários dias: a primeira passada fecha tudo e não cria oco
   assert.equal(db.prepare("SELECT COUNT(*) c FROM tasks WHERE recurrence_parent_id = 'bloco'").get().c, 0, 'bloco do Sêneca não gera filho');
 });
 
-test('processo que atravessa a meia-noite fecha o dia novo sem reiniciar', (t) => {
+test('processo que atravessa a meia-noite fecha o dia novo sem reiniciar', async (t) => {
   const { db, clock, rollover, insert } = setup(t, { today: '2026-10-15' });
   insert.run('faculdade', 'Sair para a faculdade', '2026-10-15', '18:40', 1, 'daily', null, 'manual');
 
-  assert.equal(rollover.run('tick').closed, 0, 'tarefa de hoje não é vencida');
+  assert.equal((await rollover.run('tick')).closed, 0, 'tarefa de hoje não é vencida');
   clock.today = '2026-10-16';
-  assert.equal(rollover.run('tick').closed, 1);
+  assert.equal((await rollover.run('tick')).closed, 1);
 
   assert.equal(db.prepare("SELECT status FROM tasks WHERE id = 'faculdade'").get().status, 'cancelled');
   assert.equal(db.prepare("SELECT COUNT(*) c FROM tasks WHERE date = '2026-10-16' AND status = 'pending'").get().c, 1);
   assert.deepEqual(db.prepare('SELECT day FROM day_rollover_runs ORDER BY day').all().map((row) => row.day), ['2026-10-15', '2026-10-16']);
 });
 
-test('falha no meio é desfeita por inteiro e a passada seguinte conclui', (t) => {
+test('falha no meio é desfeita por inteiro e a passada seguinte conclui', async (t) => {
   const { db, rollover, insert, snapshot, logs } = setup(t);
   insert.run('faculdade', 'Sair para a faculdade', '2026-10-14', '18:40', 1, 'daily', null, 'manual');
   insert.run('agua', 'Regar plantas', '2026-10-14', '07:00', 2, 'daily', null, 'manual');
@@ -102,7 +104,7 @@ test('falha no meio é desfeita por inteiro e a passada seguinte conclui', (t) =
     BEGIN SELECT RAISE(ABORT, 'disco cheio (simulado)'); END;
   `);
 
-  const failed = rollover.run('tick');
+  const failed = await rollover.run('tick');
 
   assert.equal(failed.ok, false);
   assert.deepEqual(snapshot(), before, 'nada fica pela metade');
@@ -110,14 +112,14 @@ test('falha no meio é desfeita por inteiro e a passada seguinte conclui', (t) =
   assert.ok(logs.some((line) => line.startsWith('ERRO')), 'a falha vai para o log');
 
   db.exec('DROP TRIGGER falha_ao_criar_ocorrencia');
-  const retried = rollover.run('tick');
+  const retried = await rollover.run('tick');
 
   assert.deepEqual({ ok: retried.ok, closed: retried.closed }, { ok: true, closed: 2 });
   assert.equal(db.prepare("SELECT COUNT(*) c FROM tasks WHERE date = '2026-10-15' AND status = 'pending'").get().c, 2);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM tasks WHERE day_outcome = 'missed'").get().c, 2);
 });
 
-test('ideia e tarefa já concluída ou cancelada ficam fora da virada', (t) => {
+test('ideia e tarefa já concluída ou cancelada ficam fora da virada', async (t) => {
   const { db, rollover } = setup(t);
   const ins = db.prepare(`
     INSERT INTO tasks (id, title, date, time, status, priority, category, sort_order, recurrence)
@@ -127,7 +129,7 @@ test('ideia e tarefa já concluída ou cancelada ficam fora da virada', (t) => {
   ins.run('feita', 'Feita ontem', 'completed', 'pessoal', 2);
   ins.run('cancelada', 'Cancelada ontem', 'cancelled', 'pessoal', 3);
 
-  assert.equal(rollover.run('tick').closed, 0);
+  assert.equal((await rollover.run('tick')).closed, 0);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM tasks').get().c, 3);
 });
 

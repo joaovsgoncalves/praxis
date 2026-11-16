@@ -10,6 +10,7 @@ import {
   requestJson,
   startTestServer,
 } from './test-support/helpers.mjs';
+import { habitServicesFor, sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 
 test('boot migration turns each active legacy sequence into one ordered compound habit', () => {
   const db = createTestDb();
@@ -54,11 +55,14 @@ test('boot migration turns each active legacy sequence into one ordered compound
 test('compound API creates and reorders children, nests day outcomes, and keeps legacy read shim', async (t) => {
   const db = createTestDb();
   const ctx = buildRouteCtx(db);
+  const { storage, inScope } = sqliteStorageFor(db);
+  const services = habitServicesFor(storage, ctx);
   const app = express();
   app.use(express.json());
-  app.use('/api/habits', createHabitsRouter(ctx));
-  registerHabitLogRoutes(app, ctx);
-  app.use('/api/rituals', createRitualsRouter(ctx));
+  app.use(inScope);
+  app.use('/api/habits', createHabitsRouter(services));
+  registerHabitLogRoutes(app, services);
+  app.use('/api/rituals', createRitualsRouter({ habits: services.habits, getLocalDateString: ctx.getLocalDateString }));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

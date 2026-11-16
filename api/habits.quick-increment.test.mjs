@@ -16,6 +16,7 @@ import {
   requestJson,
   startTestServer,
 } from './test-support/helpers.mjs';
+import { habitServicesFor, sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 
 test('database migration configures water habit with target 3L and quick_increment 0.5', () => {
   const db = new Database(':memory:');
@@ -87,10 +88,13 @@ test('water migration does not overwrite a later user configuration on restart',
 test('API stores, updates, and returns quick_increment on habits', async (t) => {
   const db = createTestDb();
   const ctx = buildRouteCtx(db, { getLocalDateString: () => '2026-09-08' });
+  const { storage, inScope } = sqliteStorageFor(db);
+  const services = habitServicesFor(storage, ctx);
   const app = express();
   app.use(express.json());
-  app.use('/api/habits', createHabitsRouter(ctx));
-  registerHabitLogRoutes(app, ctx);
+  app.use(inScope);
+  app.use('/api/habits', createHabitsRouter(services));
+  registerHabitLogRoutes(app, services);
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -143,10 +147,13 @@ test('API stores, updates, and returns quick_increment on habits', async (t) => 
 test('habit logs accumulate values, keep habit open below target, and complete only at target', async (t) => {
   const db = createTestDb();
   const ctx = buildRouteCtx(db, { getLocalDateString: () => '2026-09-08' });
+  const { storage, inScope } = sqliteStorageFor(db);
+  const services = habitServicesFor(storage, ctx);
   const app = express();
   app.use(express.json());
-  app.use('/api/habits', createHabitsRouter(ctx));
-  registerHabitLogRoutes(app, ctx);
+  app.use(inScope);
+  app.use('/api/habits', createHabitsRouter(services));
+  registerHabitLogRoutes(app, services);
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -283,10 +290,13 @@ test('quick increment helper functions format progress, buttons and detect habit
 test('incrementing habit when skipped unfreezes it and sets value, and exceeding target completes', async (t) => {
   const db = createTestDb();
   const ctx = buildRouteCtx(db, { getLocalDateString: () => '2026-09-08' });
+  const { storage, inScope } = sqliteStorageFor(db);
+  const services = habitServicesFor(storage, ctx);
   const app = express();
   app.use(express.json());
-  app.use('/api/habits', createHabitsRouter(ctx));
-  registerHabitLogRoutes(app, ctx);
+  app.use(inScope);
+  app.use('/api/habits', createHabitsRouter(services));
+  registerHabitLogRoutes(app, services);
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

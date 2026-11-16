@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listHabitTree } from './habits.js';
+import { asyncRoute } from '../lib/asyncRoute.js';
 
 function asLegacyReadModel(compound) {
   const addressed = (compound.completed_steps || 0) + (compound.skipped_steps || 0);
@@ -25,8 +25,11 @@ function asLegacyReadModel(compound) {
 /**
  * One-release compatibility shim mounted at /api/rituals.
  * Product flows use /api/habits; legacy writes are intentionally gone.
+ * Leitura pela árvore canônica de hábitos (`services/routine/habits.js`); oráculo congelado em
+ * `test-support/oracles/rituals.bcbadad.js`.
  */
-export function createRitualsRouter({ db, getLocalDateString }) {
+export function createRitualsRouter({ habits, getLocalDateString }) {
+  if (!habits) throw new TypeError('createRitualsRouter: informe o serviço habits');
   const router = Router();
 
   router.use((req, res, next) => {
@@ -37,37 +40,35 @@ export function createRitualsRouter({ db, getLocalDateString }) {
     });
   });
 
-  function compounds(req) {
+  async function compounds(req) {
     const requestedStatus = String(req.query.status || 'active');
     const status = ['active', 'paused', 'archived', 'all'].includes(requestedStatus)
       ? requestedStatus
       : 'active';
-    return listHabitTree({
-      db,
-      getLocalDateString,
+    return (await habits.tree({
       status,
       date: req.query.date ? String(req.query.date) : undefined,
-    }).filter((habit) => habit.kind === 'compound');
+    })).filter((habit) => habit.kind === 'compound');
   }
 
-  router.get('/', (req, res) => {
-    res.json(compounds(req).map(asLegacyReadModel));
-  });
+  router.get('/', asyncRoute(async (req, res) => {
+    res.json((await compounds(req)).map(asLegacyReadModel));
+  }));
 
-  router.get('/:id', (req, res) => {
-    const compound = compounds(req).find((habit) => habit.id === req.params.id);
+  router.get('/:id', asyncRoute(async (req, res) => {
+    const compound = (await compounds(req)).find((habit) => habit.id === req.params.id);
     if (!compound) return res.status(404).json({ error: 'Compound habit not found' });
     return res.json(asLegacyReadModel(compound));
-  });
+  }));
 
-  router.get('/:id/progress', (req, res) => {
-    const compound = compounds(req).find((habit) => habit.id === req.params.id);
+  router.get('/:id/progress', asyncRoute(async (req, res) => {
+    const compound = (await compounds(req)).find((habit) => habit.id === req.params.id);
     if (!compound) return res.status(404).json({ error: 'Compound habit not found' });
     return res.json({
       ...asLegacyReadModel(compound),
       date: req.query.date || getLocalDateString(),
     });
-  });
+  }));
 
   return router;
 }

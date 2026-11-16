@@ -3,11 +3,13 @@ import { test } from 'node:test';
 import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
 import { buildRouteCtx, createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
+import { sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 
 test('include_overdue keeps today pending tasks when old rows fill the base limit', async (t) => {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -30,9 +32,10 @@ test('include_overdue keeps today pending tasks when old rows fill the base limi
 });
 
 test('include_overdue includes upcoming (tomorrow) pending tasks when old rows fill base limit', async (t) => {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -55,9 +58,10 @@ test('include_overdue includes upcoming (tomorrow) pending tasks when old rows f
 });
 
 test('include_overdue returns overdue, today, and future open tasks together', async (t) => {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -85,9 +89,10 @@ test('include_overdue returns overdue, today, and future open tasks together', a
 });
 
 test('include_overdue excludes open ideas from operational open tasks', async (t) => {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -110,9 +115,10 @@ test('include_overdue excludes open ideas from operational open tasks', async (t
 });
 
 test('unfiltered list honors requested limit above 200 so dump matches DB', async (t) => {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
@@ -141,9 +147,10 @@ test('unfiltered list honors requested limit above 200 so dump matches DB', asyn
 });
 
 test('unfiltered list supports offset pagination', async (t) => {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db)));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db)) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

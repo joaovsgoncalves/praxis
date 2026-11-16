@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
 import { createGamificationRouter } from './routes/gamification.js';
+import { createGamificationService } from './services/routine/gamification.js';
+import { sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 import { initializeDatabase } from './lib/dbInit.js';
 import { awardXp, recomputeXp, reverseXp } from './lib/xpEvents.js';
 import { buildRouteCtx, createTestDb, fixedDate, requestJson, startTestServer } from './test-support/helpers.mjs';
@@ -10,7 +12,7 @@ import { buildRouteCtx, createTestDb, fixedDate, requestJson, startTestServer } 
 const TODAY = '2026-10-15';
 
 async function setup(t, { xpTotal = 0 } = {}) {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   if (xpTotal > 0) {
     // Simula o banco antigo: XP gravado direto na gamification, registro ainda vazio.
     db.prepare("UPDATE gamification SET xp_total = ?, level = 6 WHERE id = 'main'").run(xpTotal);
@@ -18,11 +20,12 @@ async function setup(t, { xpTotal = 0 } = {}) {
   }
   const app = express();
   app.use(express.json());
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db, {
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db, {
     getLocalDateString: fixedDate(TODAY),
     syncTaskToCalendar: () => ({ skipped: true }),
-  })));
-  app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString: fixedDate(TODAY) }));
+  })) })));
+  app.use('/api/gamification', scoped(createGamificationRouter({ gamification: createGamificationService({ storage, getLocalDateString: fixedDate(TODAY) }) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
