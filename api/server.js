@@ -46,6 +46,7 @@ import { createWeeklyReviewsService } from './services/weeklyReviews.js';
 import { createPurchasesService } from './services/purchases.js';
 import { createFocusService, createWellnessService } from './services/routine/focusWellness.js';
 import { createGoalsService } from './services/routine/goals.js';
+import { createGamificationService } from './services/routine/gamification.js';
 import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -189,6 +190,7 @@ const purchases = createPurchasesService({ storage: storageRuntime.storage });
 const focus = createFocusService({ storage: storageRuntime.storage });
 const wellness = createWellnessService({ storage: storageRuntime.storage });
 const goals = createGoalsService({ storage: storageRuntime.storage, getLocalDateString });
+const gamification = createGamificationService({ storage: storageRuntime.storage, getLocalDateString });
 
 /** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
 function forEachOwner(label, fn) {
@@ -299,7 +301,7 @@ app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a
 app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOrder }));
 app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
 registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
-app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString }));
+app.use('/api/gamification', createGamificationRouter({ gamification }));
 app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ weeklyReviews }));
 
 const HOST = process.env.HOST || '127.0.0.1';

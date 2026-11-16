@@ -1,5 +1,5 @@
 /**
- * Rotas já servidas pela camada nova (revisões semanais, compras, foco, bem-estar e metas), no servidor de verdade: cópia isolada da API (banco novo,
+ * Rotas já servidas pela camada nova (revisões semanais, compras, foco, bem-estar, metas e gamificação), no servidor de verdade: cópia isolada da API (banco novo,
  * sem agenda, sem segredo de produção), duas contas, chave do agente no fluxo do Alfred, conferência
  * no arquivo de cada conta e desligamento gracioso.
  */
@@ -191,6 +191,33 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal(after?.goal_id, null, 'tarefa preservada, sem vínculo');
   });
 
+  await t.test('gamificação pela camada nova: contas separadas, XP da tarefa legada, conquista com bônus e chave do agente', async () => {
+    const made = await call(proc, 'POST', '/api/tasks', { cookie: A, body: { title: 'Tarefa do XP', date: '2026-11-16' } });
+    assert.equal(made.status, 201, made.text);
+    assert.equal((await call(proc, 'PUT', `/api/tasks/${made.json.id}`, { cookie: A, body: { status: 'completed' } })).status, 200);
+    // O XP da tarefa saiu da rota legada (conexão do servidor); a rota nova o enxerga pela conexão dedicada.
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: A })).json.xp_total, 10);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: B })).json.xp_total, 0, 'a outra conta não recebe');
+    const checked = await call(proc, 'POST', '/api/gamification/check-achievements', { cookie: A });
+    assert.deepEqual(checked.json.new_achievements.map((a) => a.id), ['first_task']);
+    assert.equal(checked.json.bonus_xp, 10);
+    const add = await call(proc, 'POST', '/api/gamification/add-xp', { cookie: A, body: { amount: 25, reason: 'Pelo teste' } });
+    assert.equal(add.status, 200, add.text); assert.equal(add.json.xp_total, 45);
+    assert.equal((await call(proc, 'POST', '/api/gamification/add-xp', { cookie: B, body: { amount: 5 } })).json.xp_total, 5);
+    assert.equal((await call(proc, 'POST', '/api/gamification/add-xp', { cookie: A, body: { amount: -1 } })).status, 400);
+    assert.deepEqual((await call(proc, 'POST', '/api/gamification/check-achievements', { cookie: B })).json, { new_achievements: [], bonus_xp: 0 });
+    assert.deepEqual((await call(proc, 'POST', '/api/gamification/check-achievements', { cookie: A })).json, { new_achievements: [], bonus_xp: 0 }, 'idempotente');
+    const mine = (await call(proc, 'GET', '/api/gamification', { cookie: A })).json;
+    assert.equal(mine.xp_total, 45); assert.equal(mine.xp_week, 45);
+    assert.ok(mine.achievements.find((a) => a.id === 'first_task').unlocked_date);
+    assert.deepEqual((await call(proc, 'GET', '/api/gamification', { key: API_KEY })).json, mine, 'chave do agente = conta do dono legado');
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: B })).json.achievements.some((a) => a.unlocked_date), false);
+    assert.equal((await call(proc, 'GET', '/api/gamification')).status, 401);
+    // Estorno pela rota legada de tarefas volta o total que a rota nova lê.
+    assert.equal((await call(proc, 'PUT', `/api/tasks/${made.json.id}`, { cookie: A, body: { status: 'pending' } })).status, 200);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: A })).json.xp_total, 35);
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -208,6 +235,10 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual(other.prepare('SELECT mood FROM wellness_checks').pluck().all(), [2]);
     assert.deepEqual(control.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [1500]);
     assert.deepEqual(other.prepare('SELECT duration_seconds FROM focus_sessions').pluck().all(), [600]);
+    assert.deepEqual(control.prepare('SELECT source_type, amount, reversed_date IS NOT NULL FROM xp_events ORDER BY source_type, amount').raw().all(),
+      [['achievement', 10, 0], ['manual', 25, 0], ['task', 10, 1]], 'eventos de XP do dono: tarefa estornada, conquista e prêmio manual');
+    assert.deepEqual(other.prepare('SELECT source_type, amount FROM xp_events').raw().all(), [['manual', 5]]);
+    assert.deepEqual([control, other].map((db) => db.prepare("SELECT xp_total FROM gamification WHERE id = 'main'").pluck().get()), [35, 5], 'espelho em cada conta');
     assert.equal(control.prepare('SELECT COUNT(*) FROM goals').pluck().get(), 0);
     assert.deepEqual(other.prepare('SELECT title FROM goals').pluck().all(), ['Meta da Bia']);
     assert.deepEqual(other.prepare("SELECT title, goal_id IS NOT NULL FROM habits WHERE source = 'goal_wizard'").raw().all(), [['Meta da Bia', 1]]);

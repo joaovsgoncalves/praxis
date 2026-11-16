@@ -11,7 +11,13 @@ import { documentId, originalId } from '../schema.mjs';
  * - Leitura da coleção inteira; filtro e ordem em memória com a comparação do SQLite.
  *   ceiling: lê a coleção inteira da conta a cada consulta; trocar por consulta indexada se crescer.
  */
-export function phase3Rows(userDoc, transaction, client, collection, fields) {
+/**
+ * `uniqueKey(row)`: texto da chave UNIQUE do SQLite (ex.: habit_logs(habit_id, date)) ou null. Com ela,
+ * criar grava também a sentinela `users/{uid}/uniqueKeys/{chave}` no mesmo commit (ALREADY_EXISTS se
+ * já existe), como em storage/firestore/weeklyReviews.js.
+ */
+export function phase3Rows(userDoc, transaction, client, collection, fields, { uniqueKey = null } = {}) {
+  const keys = userDoc.collection('uniqueKeys');
   const col = userDoc.collection(collection);
   const seqRef = userDoc.collection('sequences').doc(collection);
   const read = (target) => (transaction ? transaction.get(target) : target.get());
@@ -27,7 +33,11 @@ export function phase3Rows(userDoc, transaction, client, collection, fields) {
     if (seen.has(ref.path)) throw new StorageError('already_exists');
     const seq = await tx.get(seqRef);
     const next = (seq.exists ? seq.data().next : 0) + 1;
+    const key = uniqueKey ? uniqueKey(row) : null;
+    const keyRef = key === null ? null : keys.doc(documentId(key));
+    if (keyRef && seen.has(keyRef.path)) throw new StorageError('already_exists');
     seen.add(ref.path);
+    if (keyRef) { seen.add(keyRef.path); tx.create(keyRef, { domain: collection, key, record_id: row.id }); }
     tx.set(seqRef, { next });
     tx.create(ref, { ...row, _row: next });
     return structuredClone(row);

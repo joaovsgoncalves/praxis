@@ -1,4 +1,5 @@
-import { getStreaks } from './habitStreaks.js';
+import { getStreaks, streaksFromLogs } from './habitStreaks.js';
+import { StorageError } from '../storage/contract.js';
 
 export function getLevel(xp) {
   const levels = [
@@ -163,4 +164,85 @@ export function checkAchievements(db, { getLocalDateString }) {
   return db.prepare(
     `SELECT * FROM achievements WHERE id IN (${newlyUnlocked.map(() => '?').join(',')})`,
   ).all(...newlyUnlocked);
+}
+
+/** Id de hábito de uma sequência (rituais antigos em JSON): texto ou nulo; o resto o SQLite converteria. */
+function sequenceIds(ids) {
+  for (const id of ids) {
+    if (id !== null && typeof id !== 'string') {
+      throw new StorageError('sqlite_coercion_unsupported', `sqlite_coercion_unsupported: id ${typeof id} em habits_order`);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Decide quais conquistas desbloquear, na mesma ordem e com as mesmas regras de checkAchievements,
+ * a partir de fatos já lidos (sem banco). Pura.
+ *
+ * - `facts`: o que storage.achievementFacts.load() devolve (contagens, hábitos simples ativos com seus
+ *   registros, sequências matinais, registros concluídos, datas de bem-estar).
+ * - `achievements`: linhas da tabela; só conta quem existe e ainda não tem `unlocked_date`.
+ * Devolve os ids na ordem em que a regra antiga os desbloqueava.
+ *
+ * Diferença intencional: `habits_order` de ritual antigo com id que não seja texto (número, objeto) vira
+ * `sqlite_coercion_unsupported`; nenhum dado real guarda isso.
+ */
+export function pendingAchievements(facts, achievements, { getLocalDateString }) {
+  const byId = new Map(achievements.map((a) => [a.id, a]));
+  const locked = (id) => { const a = byId.get(id); return Boolean(a) && !a.unlocked_date; };
+  const found = [];
+
+  if (locked('first_task') && facts.completedTasks >= 1) found.push('first_task');
+  if (locked('centurion') && facts.completedTasks >= 100) found.push('centurion');
+
+  const streakOf = (habit) => streaksFromLogs(habit.logs, getLocalDateString).current_streak;
+  for (const [id, days] of [['on_fire', 7], ['diamond', 30]]) {
+    if (locked(id) && facts.activeSimpleHabits.some((habit) => streakOf(habit) >= days)) found.push(id);
+  }
+
+  if (locked('focus_master') && facts.focusTotal >= 36000) found.push('focus_master');
+
+  if (locked('early_bird')) {
+    const sequences = facts.morningCompounds.map((compound) => compound.childIds);
+    for (const raw of facts.legacyMorningOrders) {
+      try {
+        const ids = JSON.parse(raw || '[]');
+        if (Array.isArray(ids)) sequences.push(ids);
+      } catch { /* ignore invalid legacy JSON */ }
+    }
+    const completedOn = (habitIds) => {
+      const members = new Set(habitIds), perDate = new Map();
+      for (const log of facts.completedLogs) if (members.has(log.habit_id)) perDate.set(log.date, (perDate.get(log.date) || 0) + 1);
+      return perDate;
+    };
+    for (const habitIds of sequences) {
+      if (habitIds.length === 0) continue;
+      let ritualCompleteDays = 0;
+      for (const done of completedOn(sequenceIds(habitIds)).values()) if (done === habitIds.length) ritualCompleteDays += 1;
+      if (ritualCompleteDays >= 5) { found.push('early_bird'); break; }
+    }
+  }
+
+  if (locked('balanced')) {
+    const dates = facts.wellnessDates;
+    if (dates.length >= 7) {
+      let streak = 1;
+      for (let i = 1; i < dates.length; i += 1) {
+        const prev = new Date(`${dates[i - 1]}T00:00:00`);
+        const curr = new Date(`${dates[i]}T00:00:00`);
+        const diff = Math.round((prev - curr) / (1000 * 60 * 60 * 24));
+        if (diff === 1) {
+          streak += 1;
+          if (streak >= 7) break;
+        } else {
+          streak = 1;
+        }
+      }
+      if (streak >= 7) found.push('balanced');
+    }
+  }
+
+  if (locked('creator') && facts.jotavTasks >= 10) found.push('creator');
+  return found;
 }

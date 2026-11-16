@@ -49,10 +49,11 @@ async function listen(mount, router, scopeMiddleware) {
 /**
  * kind: 'oracle' | 'sqlite' | 'firestore'. Nos motores novos, `as(fn)` roda `fn` no escopo do dono do teste.
  * setup: { mount, dbOptions?, oracle(db), build(storage, clock), seed?: [{ table, domain, rows }],
- *          clock?, clockTables?: ['tabela', ...] }
+ *          clock?, clockTables?: ['tabela', ...], mirror?: [{ table, domain }] (só Firestore: copia as
+ *          linhas com que o esquema SQLite já nasce) }
  */
 export async function makeParityApp(kind, setup) {
-  const { mount, dbOptions = {}, oracle, build, seed = [], clock = null, clockTables = [] } = setup;
+  const { mount, dbOptions = {}, oracle, build, seed = [], clock = null, clockTables = [], mirror = [] } = setup;
   const cleanup = [];
   let app, storage = null, db = null, as = null;
   if (kind === 'oracle') {
@@ -89,6 +90,13 @@ export async function makeParityApp(kind, setup) {
     storage = createStorage({ driver, currentOwner: () => scope.getStore(), now: clock ? clock.now : undefined });
     as = (fn) => scope.run(OWNER, fn);
     await scope.run(OWNER, async () => {
+      // Linhas que o esquema do SQLite já nasce tendo (ex.: conquistas, gamification 'main').
+      if (kind === 'firestore' && mirror.length) {
+        const fresh = createTestDb(dbOptions);
+        try {
+          for (const { table, domain } of mirror) for (const row of fresh.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()) await storage[domain].create(row);
+        } finally { fresh.close(); }
+      }
       for (const { domain, rows } of seed) for (const row of rows) await storage[domain].create(row);
     });
     app = await listen(mount, build(storage, clock), (req, res, next) => scope.run(OWNER, next));

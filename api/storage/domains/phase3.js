@@ -14,6 +14,8 @@ import { sqliteGoals } from '../sqlite/goals.js';
 import { sqliteHabits } from '../sqlite/habits.js';
 import { firestoreGoals } from '../firestore/goals.js';
 import { firestoreHabits } from '../firestore/habits.js';
+import { sqliteXpEvents, sqliteGamification, sqliteAchievements, sqliteAchievementFacts, sqliteHabitLogs, sqliteRituals } from '../sqlite/xp.js';
+import { firestoreXpEvents, firestoreGamification, firestoreAchievements, firestoreAchievementFacts, firestoreHabitLogs, firestoreRituals } from '../firestore/xp.js';
 
 function plain(value, code = 'invalid_record') {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -127,6 +129,30 @@ export function habitRow(values, now = new Date()) {
   return Object.fromEntries(HABIT_FIELDS.map((field) => [field, row[field] ?? null]));
 }
 
+// ---- XP: tabelas `xp_events`, `gamification` (linha única 'main'), `achievements` ----
+export const XP_EVENT_COLUMNS = Object.freeze([['id', 'TEXT', true], ['source_type', 'TEXT', true], ['source_id', 'TEXT', true], ['amount', 'INTEGER', true], ['reason', 'TEXT'], ['created_date', 'TEXT'], ['reversed_date', 'TEXT']]);
+const xpEventRows = rowContract(XP_EVENT_COLUMNS, new Set(['id', 'source_type', 'source_id', 'amount', 'created_date']));
+export const XP_EVENT_FIELDS = xpEventRows.fields;
+/** Id fixo do documento de `gamification` (tabela de linha única): users/{uid}/gamification/main. */
+export const GAMIFICATION_ID = 'main';
+export const GAMIFICATION_COLUMNS = Object.freeze([['id', 'TEXT', true], ['xp_total', 'INTEGER'], ['level', 'INTEGER'], ['updated_date', 'TEXT']]);
+const gamificationRows = rowContract(GAMIFICATION_COLUMNS, new Set(['id']));
+export const GAMIFICATION_FIELDS = gamificationRows.fields;
+export const ACHIEVEMENT_COLUMNS = Object.freeze([['id', 'TEXT', true], ['name', 'TEXT', true], ['description', 'TEXT'], ['emoji', 'TEXT'], ['xp_reward', 'INTEGER'], ['unlocked_date', 'TEXT']]);
+const achievementRows = rowContract(ACHIEVEMENT_COLUMNS, new Set(['id', 'name', 'description', 'emoji', 'xp_reward']));
+export const ACHIEVEMENT_FIELDS = achievementRows.fields;
+// ---- Registros de hábito e rituais (fase 3, domínio 4 completa): tabelas `habit_logs`, `rituals` ----
+export const HABIT_LOG_COLUMNS = Object.freeze([['id', 'TEXT', true], ['habit_id', 'TEXT', true], ['date', 'TEXT', true], ['completed', 'INTEGER'], ['created_date', 'TEXT'], ['value', 'REAL'], ['outcome', 'TEXT'], ['skip_reason', 'TEXT'], ['note', 'TEXT']]);
+const habitLogRows = rowContract(HABIT_LOG_COLUMNS, new Set(['id', 'habit_id', 'date', 'created_date']));
+export const HABIT_LOG_FIELDS = habitLogRows.fields;
+export const RITUAL_COLUMNS = Object.freeze([['id', 'TEXT', true], ['name', 'TEXT', true], ['emoji', 'TEXT'], ['time_of_day', 'TEXT'], ['habits_order', 'TEXT'], ['status', 'TEXT'], ['created_date', 'TEXT']]);
+const ritualRows = rowContract(RITUAL_COLUMNS, new Set(['id', 'created_date']));
+export const RITUAL_FIELDS = ritualRows.fields;
+function sourceKey(type, id) {
+  if (typeof type !== 'string' || typeof id !== 'string') throw new StorageError('invalid_query');
+  return [type, id];
+}
+
 export const DOMAINS = [
   {
     name: 'focusSessions',
@@ -179,5 +205,61 @@ export const DOMAINS = [
     }),
     sqlite: sqliteHabits,
     firestore: (userDoc, transaction, client) => firestoreHabits(userDoc, transaction, client),
+  },
+  {
+    name: 'xpEvents',
+    spec: () => ({
+      // Totais crus do SUM do SQLite (COALESCE 0); o serviço aplica Number/Math.max como a antiga.
+      activeTotal: ['read', () => []],
+      // Todos os eventos (auditoria e prova de migração), `created_date, id`.
+      list: ['read', () => []],
+      weekTotal: ['read', (since) => [goalKey(since)]],
+      findActive: ['read', (type, id) => sourceKey(type, id)],
+      // Índice único parcial (source_type, source_id) WHERE reversed_date IS NULL: no Firestore, sentinela.
+      create: ['write', (row) => [xpEventRows.row(row)]],
+      // Estorno: `reversed_date = carimbo` no evento (e, no Firestore, apaga a sentinela do ativo).
+      reverse: ['readwrite', (id, stamp) => [recordId(id), textKey(stamp)]],
+    }),
+    sqlite: sqliteXpEvents,
+    firestore: (userDoc, transaction, client) => firestoreXpEvents(userDoc, transaction, client),
+  },
+  {
+    name: 'gamification',
+    spec: () => ({
+      get: ['read', (id) => [recordId(id)]],
+      create: ['write', (row) => [gamificationRows.row(row)]],
+      patch: ['write', (id, fields) => [recordId(id), gamificationRows.patch(fields)]],
+    }),
+    sqlite: sqliteGamification,
+    firestore: (userDoc, transaction, client) => firestoreGamification(userDoc, transaction, client),
+  },
+  {
+    name: 'achievements',
+    spec: () => ({
+      list: ['read', () => []],
+      create: ['readwrite', (row) => [achievementRows.row(row)]],
+      patch: ['write', (id, fields) => [recordId(id), achievementRows.patch(fields)]],
+    }),
+    sqlite: sqliteAchievements,
+    firestore: (userDoc, transaction, client) => firestoreAchievements(userDoc, transaction, client),
+  },
+  {
+    name: 'habitLogs',
+    spec: () => ({ create: ['readwrite', (row) => [habitLogRows.row(row)]] }),
+    sqlite: sqliteHabitLogs,
+    firestore: (userDoc, transaction, client) => firestoreHabitLogs(userDoc, transaction, client),
+  },
+  {
+    name: 'rituals',
+    spec: () => ({ create: ['readwrite', (row) => [ritualRows.row(row)]] }),
+    sqlite: sqliteRituals,
+    firestore: (userDoc, transaction, client) => firestoreRituals(userDoc, transaction, client),
+  },
+  {
+    // Só leitura: tudo o que a avaliação de conquistas consulta, cru, em ordem canônica (rowid/_row).
+    name: 'achievementFacts',
+    spec: () => ({ load: ['read', () => []] }),
+    sqlite: sqliteAchievementFacts,
+    firestore: (userDoc, transaction, client) => firestoreAchievementFacts(userDoc, transaction, client),
   },
 ];

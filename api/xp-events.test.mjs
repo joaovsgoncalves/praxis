@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
 import { createGamificationRouter } from './routes/gamification.js';
+import { createGamificationService } from './services/routine/gamification.js';
+import { sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 import { initializeDatabase } from './lib/dbInit.js';
 import { awardXp, recomputeXp, reverseXp } from './lib/xpEvents.js';
 import { buildRouteCtx, createTestDb, fixedDate, requestJson, startTestServer } from './test-support/helpers.mjs';
@@ -22,7 +24,8 @@ async function setup(t, { xpTotal = 0 } = {}) {
     getLocalDateString: fixedDate(TODAY),
     syncTaskToCalendar: () => ({ skipped: true }),
   })));
-  app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString: fixedDate(TODAY) }));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/gamification', scoped(createGamificationRouter({ gamification: createGamificationService({ storage, getLocalDateString: fixedDate(TODAY) }) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();
