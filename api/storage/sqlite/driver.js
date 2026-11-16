@@ -33,6 +33,15 @@ export function createSqliteDriver({ open, domains = EXTRA_DOMAINS }) {
   const targets = (db) => Object.fromEntries(Object.entries(DOMAINS).map(([name, make]) => [name, make(db)]));
   const driver = {
     kind: 'sqlite',
+    async runLegacy(owner, callback) {
+      const db = dbFor(owner);
+      return queued(db, () => {
+        if (db.inTransaction) throw new StorageError('sqlite_connection_already_in_transaction');
+        const value = callback();
+        if (value && typeof value.then === 'function') throw new TypeError('legacy callback must be synchronous');
+        return value;
+      });
+    },
     async transaction(owner, callback) {
       const db = dbFor(owner);
       return queued(db, async () => {

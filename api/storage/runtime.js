@@ -33,6 +33,10 @@ export function createStorageRuntime({ engine, currentOwner, now, sqlite, firest
   return {
     engine,
     storage,
+    runLegacy(callback) {
+      if (engine !== 'sqlite') throw new Error('legacy integration only available on sqlite');
+      return driver.runLegacy(currentOwner(), callback);
+    },
     openOwners: () => connections?.openOwners() ?? [],
     close() {
       closing ??= (async () => {

@@ -26,6 +26,7 @@ import { compareSqlite } from '../../storage/sqliteOrder.js';
 import { createSettingsPlanner } from './core.js';
 import { createFinanceReadsService } from './reads.js';
 import { addDays } from './shared.js';
+import { DOMAINS as FINANCE_DOMAINS } from '../../storage/domains/phase5.js';
 
 const CHUNK_WEIGHT = 350;
 const dayNumber = (ymd) => Date.parse(`${String(ymd).slice(0, 10)}T00:00:00Z`) / 86400000;
@@ -378,25 +379,52 @@ export function createFinanceIngestService({ storage, now = () => new Date(), ne
     const payload = parsePluggyPayload(body);
     const stamp = now().toISOString();
     const day = today || todayFortaleza(now());
-    let outcome = null, rest = [];
-    await storage.transaction(async (tx) => {
-      outcome = await plan(tx, payload, stamp, day);
-      // cabe tudo numa transação: como a antiga. Senão o excedente de lançamentos sai em transações seguintes.
-      const first = [...outcome.ops];
-      let weight = first.reduce((s, op) => s + weightOf(op), 0) + 3;
-      const later = [];
-      for (const op of outcome.deferred) {
-        if (!later.length && weight + weightOf(op) <= CHUNK_WEIGHT) { first.push(op); weight += weightOf(op); } else later.push(op);
+    let outcome = null;
+    const specs = Object.fromEntries(FINANCE_DOMAINS.map((d) => [d.name, d.spec()]));
+    // Normaliza TODO o plano antes da primeira escrita: valor inválido no último lote não pode
+    // deixar saldos, cobertura nem prefixo do extrato confirmados.
+    const validate = (ops) => {
+      const check = (domain, method, ...args) => specs[domain][method][1](...args);
+      for (const op of ops) {
+        const map = { balancePatch: ['financeBalances','patch',op.id,op.fields], balanceCreate: ['financeBalances','create',op.row],
+          coverageRemove: ['financeStatementCoverage','remove',op.id], coverageCreate: ['financeStatementCoverage','create',op.row],
+          cardUpsert: ['financeCardStatus','upsert',op.row], debtPatch: ['financeDebts','patch',op.id,op.fields],
+          pendingRemove: ['financePendingTransactions','remove',op.key], pendingUpsert: ['financePendingTransactions','upsert',op.row],
+          txPatch: ['financeTransactions','patch',op.id,op.fields], txCreate: ['financeTransactions','create',op.row], syncLog: ['financeSyncLog','create',op.row] };
+        if (op.t === 'settings') {
+          if (op.plan.create) check('financeSettings','create',op.plan.create);
+          if (op.plan.patch) check('financeSettings','patch',op.plan.patch);
+        } else {
+          const args = map[op.t]; if (!args) throw new Error(`operação desconhecida: ${op.t}`); check(...args);
+        }
       }
-      rest = later;
-      if (!later.length) first.push({ t: 'syncLog', row: outcome.syncLog });
-      await execute(tx, first);
-    });
-    for (let i = 0; i < rest.length;) {
-      const chunk = []; let weight = 3;
-      while (i < rest.length && weight + weightOf(rest[i]) <= CHUNK_WEIGHT) { chunk.push(rest[i]); weight += weightOf(rest[i]); i += 1; }
-      if (i >= rest.length) chunk.push({ t: 'syncLog', row: outcome.syncLog });
-      await storage.transaction((tx) => execute(tx, chunk));
+    };
+    while (true) {
+      // Replanejar DENTRO de cada transação: outro ingest pode ter gravado o próximo lote.
+      // Isso também refaz o casamento dos manuais, nunca reaplica um plano obsoleto.
+      const step = await storage.transaction(async (tx) => {
+        const current = await plan(tx, payload, stamp, day);
+        validate([...current.ops, ...current.deferred, { t: 'syncLog', row: current.syncLog }]);
+        const fixedWeight = current.ops.reduce((sum, op) => sum + weightOf(op), 0) + 3;
+        const totalWeight = fixedWeight + current.deferred.reduce((sum, op) => sum + weightOf(op), 0);
+        if (storage.kind === 'sqlite' || totalWeight <= CHUNK_WEIGHT) {
+          const log = { ...current.syncLog, tx_n: outcome?.syncLog.tx_n ?? current.syncLog.tx_n };
+          await execute(tx, [...current.ops, ...current.deferred, { t: 'syncLog', row: log }]);
+          return { current, done: true };
+        }
+        if (fixedWeight > CHUNK_WEIGHT) throw new Error('ingest_metadata_batch_too_large');
+        const chunk = []; let weight = 3;
+        for (const op of current.deferred) {
+          if (weight + weightOf(op) > CHUNK_WEIGHT) break;
+          chunk.push(op); weight += weightOf(op);
+        }
+        if (!chunk.length) throw new Error('ingest_batch_cannot_progress');
+        // Cobertura, saldo/cartão, dívida, pendentes e log SOMENTE no último commit.
+        await execute(tx, chunk);
+        return { current, done: false };
+      });
+      outcome ??= step.current;
+      if (step.done) break;
     }
     const overview = await reads.getOverview({ today });
     return {

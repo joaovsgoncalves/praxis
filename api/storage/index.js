@@ -137,5 +137,5 @@ export function createStorage({ driver, currentOwner, now = () => new Date(), do
     closing = true;
     while (inflight.size) await Promise.allSettled([...inflight]);
   }
-  return Object.freeze({ ...root, transaction, close });
+  return Object.freeze({ ...root, kind: driver.kind, transaction, close });
 }

@@ -5,6 +5,8 @@ import { makeParityApp, parityEngines } from './test-support/httpParity.fase3.mj
 import { createTaskCalendarQueue as oracleQueue } from './test-support/oracles/taskCalendarQueue.bcbadad.js';
 import { createAsyncTaskCalendarQueue } from './services/routine/calendarQueue.js';
 import { taskRow } from './storage/contract.js';
+import { createTasksService } from './services/routine/tasks.js';
+import { buildRouteCtx } from './test-support/helpers.mjs';
 
 const START = '2026-11-16T12:00:00.000Z';
 async function fixture(kind, t) {
@@ -94,5 +96,26 @@ for (const kind of parityEngines()) {
     const second = f.run(() => f.queue.drain()); release();
     assert.deepEqual(await second, await first); assert.equal(f.calls.length, 1);
     assert.deepEqual(await f.rows(), []);
+  });
+}
+
+for (const kind of parityEngines()) {
+  test(`${kind}: atualização no mesmo milissegundo durante o dreno preserva a intenção nova`, async (t) => {
+    const app = await makeParityApp(kind, { mount:'/', dbOptions:{withTaskRoutine:true}, oracle:()=>express.Router(), build:()=>express.Router() }); t.after(app.dispose);
+    const ctx = buildRouteCtx(app.db, { getLocalDateString:()=> '2026-11-16' });
+    const tasks = createTasksService({storage:app.storage, getLocalDateString:ctx.getLocalDateString, addDaysLocal:ctx.addDaysLocal, stripPriorityPrefix:ctx.stripPriorityPrefix, SKIP_REASONS:ctx.SKIP_REASONS, now:()=>new Date(START), taskNeedsCalendarSync:()=>true});
+    await app.as(async()=>{
+      const made=await tasks.create({title:'antes',date:'2026-11-16'});assert.equal(made.status,201);
+      const id=made.body.id;
+      const before=await app.storage.taskCalendarQueue.get(id);
+      const queue=createAsyncTaskCalendarQueue({storage:app.storage, now:()=>new Date(START), syncTaskToCalendar:async()=>{
+        const changed=await tasks.update(id,{title:'depois'});assert.equal(changed.status,200);
+        return {action:'synced'};
+      }});
+      await queue.drain();
+      const after=await app.storage.taskCalendarQueue.get(id);
+      assert.ok(after);assert.notEqual(after.updated_date,before.updated_date);
+      assert.equal((await app.storage.tasks.get(id)).title,'depois');
+    });
   });
 }

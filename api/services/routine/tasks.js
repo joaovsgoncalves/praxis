@@ -119,7 +119,8 @@ export function createTasksService({
       async write(tx, token) {
         const next = slots(token), iso = now().toISOString(), stamp = sqlStamp(now());
         for (const { id, snapshot, existing } of intents) {
-          const fields = { snapshot: snapshot ? JSON.stringify(snapshot) : null, status: 'pending', attempts: 0, last_error: null, next_attempt_at: iso, updated_date: iso };
+          const revisionStamp = existing && Date.parse(existing.updated_date) >= Date.parse(iso) ? new Date(Date.parse(existing.updated_date) + 1).toISOString() : iso;
+          const fields = { snapshot: snapshot ? JSON.stringify(snapshot) : null, status: 'pending', attempts: 0, last_error: null, next_attempt_at: iso, updated_date: revisionStamp };
           if (existing) await tx.taskCalendarQueue.patch(id, fields);
           else await tx.taskCalendarQueue.createAt({ task_id: id, ...fields, created_date: stamp }, next());
         }

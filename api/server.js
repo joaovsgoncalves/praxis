@@ -243,9 +243,9 @@ const taskNeedsCalendarSync = (...args) => isLegacyScope() && calendarServices.t
 const runCalendarMaintenance = () => tenant.runAs(LEGACY_OWNER, () => calendarServices.runCalendarMaintenance());
 
 // Agenda fora da transação da tarefa: as rotas gravam a intenção, a fila sincroniza depois.
-const legacyCalendarQueue = createAsyncTaskCalendarQueue({ storage: storageRuntime.storage, syncTaskToCalendar });
+const legacyCalendarQueue = createAsyncTaskCalendarQueue({ storage: storageRuntime.storage, syncTaskToCalendar: (task) => storageRuntime.runLegacy(() => syncTaskToCalendar(task)) });
 const calendarQueue = {
-  drain: (...args) => (isLegacyScope() ? legacyCalendarQueue.drain(...args) : { processed: 0, done: 0, retry: 0, failed: 0 }),
+  drain: async (...args) => (isLegacyScope() ? legacyCalendarQueue.drain(...args) : { processed: 0, done: 0, retry: 0, failed: 0 }),
   stats: (...args) => (isLegacyScope() ? legacyCalendarQueue.stats(...args) : { pending: 0, failed: 0 }),
 };
 
