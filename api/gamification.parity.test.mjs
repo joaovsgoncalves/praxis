@@ -220,24 +220,45 @@ test('gamificação: ritual antigo com id que não é texto é recusado, sem des
   }
 });
 
-test('gamificação: checagens e prêmios simultâneos pagam cada origem uma só vez', async (t) => {
-  for (const kind of parityEngines()) {
-    const app = await makeParityApp(kind, baseSetup({ seed: everything }));
-    t.after(app.dispose);
-    clock.reset();
-    const service = createGamificationService({ storage: app.storage, getLocalDateString: () => TODAY, now: clock.now });
-    const [checks, adds] = await app.as(() => Promise.all([
-      Promise.all(Array.from({ length: 6 }, () => service.checkAchievements())),
-      Promise.all(Array.from({ length: 5 }, (_, i) => service.addXp({ amount: 10 + i, reason: `corrida ${i}` }))),
-    ]));
-    const paid = checks.reduce((sum, r) => sum + r.bonus_xp, 0);
-    assert.equal(paid, 10 + 50 + 200 + 100 + 50 + 30 + 50 + 50, `${kind}: bônus pago uma vez`);
-    assert.equal(checks.flatMap((r) => r.new_achievements).length, 8, `${kind}: cada conquista sai em uma única resposta`);
-    const state = await savedState(app, kind);
-    assert.equal(state.events.filter((e) => e.includes('"achievement"')).length, 8, kind);
-    assert.equal(state.events.filter((e) => e.includes('"manual"')).length, 5, kind);
-    const total = paid + 10 + 11 + 12 + 13 + 14;
-    assert.equal(state.mirror.xp_total, total, `${kind}: espelho = soma dos eventos ativos`);
-    assert.equal(adds.every((r) => r.xp_total >= 10), true, kind);
-  }
-});
+// A regra legada de add-xp desbloqueia sem bônus: a corrida mista NÃO tem bônus total fixo.
+// Separar os dois ordenamentos prova 540/0; a disputa mista prova invariantes, sem aceitar erros.
+for (const order of ['checks-first', 'manual-first', 'mixed']) {
+  test(`gamificação: simultâneos ${order} preservam origens únicas e espelho exato`, async (t) => {
+    for (const kind of parityEngines()) {
+      const app = await makeParityApp(kind, baseSetup({ seed: everything })); t.after(app.dispose);
+      clock.reset();
+      const service = createGamificationService({ storage: app.storage, getLocalDateString: () => TODAY, now: clock.now });
+      const checks = [], adds = [];
+      const check = async () => { const r = await service.checkAchievements(); checks.push(r); };
+      const add = async (i) => { const r = await service.addXp({ amount: 10 + i, reason: `corrida ${i}` }); adds.push(r); };
+      await app.as(async () => {
+        if (order === 'checks-first') {
+          await Promise.all(Array.from({ length: 6 }, check));
+          await Promise.all(Array.from({ length: 5 }, (_, i) => add(i)));
+        } else if (order === 'manual-first') {
+          await Promise.all(Array.from({ length: 5 }, (_, i) => add(i)));
+          await Promise.all(Array.from({ length: 6 }, check));
+        } else {
+          // Três escritores concorrentes de cada vez: não presumir a ordem nem mascarar rejeições.
+          for (let i = 0; i < 5; i++) await Promise.all([check(), add(i), check()]);
+        }
+      });
+      const paid = checks.reduce((sum, r) => sum + r.bonus_xp, 0);
+      if (order === 'checks-first') assert.equal(paid, 540, `${kind}: seis checagens pagam cada bônus uma vez`);
+      if (order === 'manual-first') assert.equal(paid, 0, `${kind}: regra legada de desbloqueio sem bônus`);
+      const state = await savedState(app, kind);
+      const events = state.events.map(JSON.parse).filter((e) => e.reversed_date === null);
+      const achievements = events.filter((e) => e.source_type === 'achievement');
+      assert.equal(new Set(achievements.map((e) => e.source_id)).size, achievements.length, `${kind}: nenhuma origem paga duas vezes`);
+      assert.equal(achievements.reduce((sum, e) => sum + e.amount, 0), paid);
+      assert.ok(paid >= 0 && paid <= 540);
+      assert.equal(events.filter((e) => e.source_type === 'manual').length, 5);
+      assert.equal(state.achievements.filter((a) => a.unlocked_date).length, 8);
+      const unlockedResponses = [...checks, ...adds].flatMap((r) => r.new_achievements);
+      assert.equal(unlockedResponses.length, 8);
+      assert.equal(new Set(unlockedResponses.map((a) => a.id)).size, 8);
+      assert.equal(state.mirror.xp_total, paid + 60);
+      assert.equal(state.mirror.xp_total, events.reduce((sum, e) => sum + e.amount, 0));
+    }
+  });
+}

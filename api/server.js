@@ -14,7 +14,8 @@ import {
 import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
 import { createCalendarServices } from './lib/calendarSync.js';
-import { createTaskCalendarQueue, initTaskCalendarQueueSchema } from './lib/taskCalendarQueue.js';
+import { initTaskCalendarQueueSchema } from './lib/taskCalendarQueue.js';
+import { createAsyncTaskCalendarQueue } from './services/routine/calendarQueue.js';
 import { initDayRolloverSchema } from './lib/dayRollover.js';
 import { createDayRollover } from './services/routine/dayRollover.js';
 import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
@@ -242,9 +243,8 @@ const taskNeedsCalendarSync = (...args) => isLegacyScope() && calendarServices.t
 const runCalendarMaintenance = () => tenant.runAs(LEGACY_OWNER, () => calendarServices.runCalendarMaintenance());
 
 // Agenda fora da transação da tarefa: as rotas gravam a intenção, a fila sincroniza depois.
-const legacyCalendarQueue = createTaskCalendarQueue({ db, syncTaskToCalendar });
+const legacyCalendarQueue = createAsyncTaskCalendarQueue({ storage: storageRuntime.storage, syncTaskToCalendar });
 const calendarQueue = {
-  enqueue: (...args) => (isLegacyScope() ? legacyCalendarQueue.enqueue(...args) : { queued: false }),
   drain: (...args) => (isLegacyScope() ? legacyCalendarQueue.drain(...args) : { processed: 0, done: 0, retry: 0, failed: 0 }),
   stats: (...args) => (isLegacyScope() ? legacyCalendarQueue.stats(...args) : { pending: 0, failed: 0 }),
 };
@@ -260,7 +260,7 @@ const tasks = createTasksService({
   SKIP_REASONS,
   taskNeedsCalendarSync,
   calendarEnabled: isLegacyScope,
-  scheduleCalendarDrain: () => setImmediate(() => calendarQueue.drain()),
+  scheduleCalendarDrain: () => setImmediate(() => { void calendarQueue.drain().catch((error) => console.error('[calendar-queue]', error.message)); }),
 });
 
 // --- Domain routes ---
@@ -328,6 +328,7 @@ installGracefulShutdown({
   server,
   steps: [
     ['relógios', () => { for (const clock of clocks) clearInterval(clock); }],
+    ['fila da agenda em andamento', () => legacyCalendarQueue.idle()],
     ['camada de persistência', () => storageRuntime.close()],
     ['bancos das contas', () => tenant.closeAll()],
     ['banco de controle', () => { if (controlDb.open) controlDb.close(); }],
