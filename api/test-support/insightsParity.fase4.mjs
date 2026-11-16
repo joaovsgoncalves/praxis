@@ -26,7 +26,8 @@ import { copyToFirestore, INSIGHTS_TABLES, TODAY } from './insightsFixture.fase4
 
 const OPTIONS = { withProjects: true, withCaptureQueue: true };
 
-export function insightsSetup({ seed, getLocalDateString = () => TODAY, openaiApiKey } = {}) {
+/** `track.open` = transações abertas na camada nova neste instante (para provar que nada externo roda dentro). */
+export function insightsSetup({ seed, getLocalDateString = () => TODAY, openaiApiKey, track } = {}) {
   return {
     mount: '',
     dbOptions: OPTIONS,
@@ -41,7 +42,14 @@ export function insightsSetup({ seed, getLocalDateString = () => TODAY, openaiAp
       registerOraclePraxia(router, { db, getLocalDateString, openaiApiKey });
       return router;
     },
-    build: (storage) => {
+    build: (rawStorage) => {
+      const storage = !track ? rawStorage : {
+        ...rawStorage,
+        transaction: async (callback) => {
+          track.open += 1;
+          try { return await rawStorage.transaction(callback); } finally { track.open -= 1; }
+        },
+      };
       const insights = createInsightsService({ storage });
       const router = Router();
       router.use('/api/insights', createInsightsRouter({ insights, getLocalDateString }));
