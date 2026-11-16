@@ -133,6 +133,8 @@ export function sqliteStorageFor(db, owner = OWNER) {
   return {
     storage,
     scoped: (router) => (req, res, next) => scope.run(owner, () => router(req, res, next)),
+    /** Para chamar um serviço direto (sem rota) no escopo do dono. */
+    as: (fn) => scope.run(owner, fn),
     /** Para rotas montadas direto no `app`: `app.use(inScope)` antes delas. */
     inScope: (req, res, next) => scope.run(owner, next),
   };

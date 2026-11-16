@@ -15,7 +15,8 @@ import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
 import { createCalendarServices } from './lib/calendarSync.js';
 import { createTaskCalendarQueue, initTaskCalendarQueueSchema } from './lib/taskCalendarQueue.js';
-import { createDayRollover, initDayRolloverSchema } from './lib/dayRollover.js';
+import { initDayRolloverSchema } from './lib/dayRollover.js';
+import { createDayRollover } from './services/routine/dayRollover.js';
 import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
 import { createTenantDb } from './lib/tenantDb.js';
 import { createUserDbs } from './lib/userDbs.js';
@@ -198,11 +199,11 @@ const gamification = createGamificationService({ storage: storageRuntime.storage
 const habits = createHabitsService({ storage: storageRuntime.storage, getLocalDateString, stripPriorityPrefix });
 const habitLogs = createHabitLogsService({ storage: storageRuntime.storage, HABIT_OUTCOMES, SKIP_REASONS });
 
-/** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
-function forEachOwner(label, fn) {
+/** Trabalho de relógio (sem requisição): roda uma vez para cada dono, um de cada vez, no banco dele. */
+async function forEachOwnerAsync(label, fn) {
   for (const owner of userDbs.ownerKeys()) {
     try {
-      tenant.runAs(owner, fn);
+      await tenant.runAs(owner, fn);
     } catch (error) {
       console.error(`[contas] ${label} falhou para ${owner === LEGACY_OWNER ? 'o dono legado' : `a conta ${owner.slice(0, 8)}…`}:`, error?.message || error);
     }
@@ -225,12 +226,6 @@ function stripPriorityPrefix(title) {
   if (typeof title !== 'string') return title;
   const cleaned = title.replace(/^\s*P\d+\s*(?:[—–-]|:|\.)\s*/i, '').trim();
   return cleaned || title.trim();
-}
-
-function nextSortOrder(table) {
-  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid sortable table');
-  const row = db.prepare(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM ${table}`).get();
-  return Number(row?.next_order || 0);
 }
 
 // A agenda do Google ligada ao servidor é a do dono legado. Para as outras contas, nada sai daqui:
@@ -299,8 +294,8 @@ app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ weeklyReviews }));
 const HOST = process.env.HOST || '127.0.0.1';
 
 // Virada do dia: fecha as vencidas antes de atender e segue conferindo a cada minuto.
-const dayRollover = createDayRollover({ db, getLocalDateString, nextSortOrder });
-forEachOwner('virada do dia', () => dayRollover.run('subida'));
+const dayRollover = createDayRollover({ storage: storageRuntime.storage, getLocalDateString });
+await forEachOwnerAsync('virada do dia', () => dayRollover.run('subida'));
 
 // Daqui em diante, banco sem dono no escopo não responde: nenhuma rota cai nos dados de outra pessoa.
 tenant.seal();
@@ -315,7 +310,13 @@ const server = app.listen(PORT, HOST, () => {
   });
   // Retentativa das intenções de agenda que falharam (a espera entre tentativas fica na fila).
   clocks.push(setInterval(() => tenant.runAs(LEGACY_OWNER, () => calendarQueue.drain()), 60 * 1000).unref());
-  clocks.push(setInterval(() => forEachOwner('virada do dia', () => dayRollover.run('tick')), 60 * 1000).unref());
+  // Uma passada por vez: se a anterior ainda não terminou, esta espera o próximo minuto.
+  let rolling = false;
+  clocks.push(setInterval(async () => {
+    if (rolling) return;
+    rolling = true;
+    try { await forEachOwnerAsync('virada do dia', () => dayRollover.run('tick')); } finally { rolling = false; }
+  }, 60 * 1000).unref());
 });
 
 installGracefulShutdown({

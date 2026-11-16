@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
-import { createDayRollover } from './lib/dayRollover.js';
+import { createDayRollover } from './services/routine/dayRollover.js';
 import { buildRouteCtx, createTestDb, fixedDate, requestJson, startTestServer } from './test-support/helpers.mjs';
 import { sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 
@@ -21,13 +21,12 @@ async function setup(t) {
       return { skipped: true };
     },
   });
-  const { storage, scoped } = sqliteStorageFor(db);
+  const { storage, scoped, as } = sqliteStorageFor(db);
   app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, ctx) })));
   // O fechamento é da virada do dia; a lista só lê.
   const rollover = createDayRollover({
-    db,
+    storage,
     getLocalDateString: fixedDate(TODAY),
-    nextSortOrder: ctx.nextSortOrder,
     log: { log() {}, error() {} },
   });
   const server = await startTestServer(app);
@@ -41,8 +40,8 @@ async function setup(t) {
     VALUES (?, ?, ?, ?, 'pending', 'medium', 'pessoal', ?, ?, ?, ?)
   `);
   const readList = () => requestJson(server.base, `/api/tasks?limit=50&include_overdue=1&today=${TODAY}`);
-  const list = () => {
-    rollover.run('teste');
+  const list = async () => {
+    await as(() => rollover.run('teste'));
     return readList();
   };
   const xp = () => db.prepare("SELECT xp_total FROM gamification WHERE id = 'main'").get().xp_total;

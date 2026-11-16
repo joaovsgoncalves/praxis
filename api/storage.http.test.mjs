@@ -353,3 +353,44 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
 });
+
+test('virada do dia no servidor: na subida fecha as vencidas de cada conta, uma vez, e a repetição não duplica', async (t) => {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' });
+  const control = new Database(path.join(apiDir, 'praxis.db'));
+  const idC = control.prepare("SELECT id FROM praxis_users WHERE username = 'caio.teste'").pluck().get();
+  const files = [path.join(apiDir, 'praxis.db'), path.join(apiDir, 'data', 'users', `${idC}.db`)];
+  control.close();
+  for (const file of files) {
+    const db = new Database(file);
+    db.prepare(`INSERT INTO tasks (id, title, date, time, status, priority, category, sort_order, recurrence)
+      VALUES ('rv-1', 'Vencida de janeiro', '2026-01-01', '07:00', 'pending', 'medium', 'pessoal', 500, 'daily')`).run();
+    db.close();
+  }
+  const closedOn = (file) => {
+    const db = new Database(file, { readonly: true });
+    try {
+      return {
+        old: db.prepare("SELECT status, day_outcome, day_outcome_date FROM tasks WHERE id = 'rv-1'").get(),
+        children: db.prepare("SELECT date, status FROM tasks WHERE recurrence_parent_id = 'rv-1'").all(),
+        runs: db.prepare('SELECT day, closed FROM day_rollover_runs ORDER BY day').all(),
+      };
+    } finally { db.close(); }
+  };
+  for (const boot of [1, 2]) {
+    const proc = start();
+    t.after(() => { if (proc.child.exitCode === null) proc.child.kill('SIGKILL'); });
+    await ready(proc);
+    proc.child.kill('SIGTERM');
+    assert.equal((await proc.exited).code, 0, proc.log.slice(-800));
+    for (const file of files) {
+      const got = closedOn(file);
+      assert.deepEqual(got.old, { status: 'cancelled', day_outcome: 'missed', day_outcome_date: '2026-01-01' }, `subida ${boot}: a vencida fechou como não rolou (${path.basename(file)})`);
+      assert.deepEqual(got.children, [{ date: today, status: 'pending' }], `subida ${boot}: uma só ocorrência de hoje, sem filho no passado`);
+      assert.equal(got.runs.at(-1).day, today);
+      assert.equal(got.runs.at(-1).closed >= 1, true, 'o dia registra o que fechou');
+    }
+    // O log só fala quando algo fechou ou o dia começou: a segunda subida do mesmo dia fica calada.
+    if (boot === 1) assert.match(proc.log, /\[virada-do-dia\] \d{4}-\d\d-\d\d \(subida\)/);
+    else assert.doesNotMatch(proc.log, /\[virada-do-dia\]/);
+  }
+});
