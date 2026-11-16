@@ -148,6 +148,31 @@ export const HABIT_LOG_FIELDS = habitLogRows.fields;
 export const RITUAL_COLUMNS = Object.freeze([['id', 'TEXT', true], ['name', 'TEXT', true], ['emoji', 'TEXT'], ['time_of_day', 'TEXT'], ['habits_order', 'TEXT'], ['status', 'TEXT'], ['created_date', 'TEXT']]);
 const ritualRows = rowContract(RITUAL_COLUMNS, new Set(['id', 'created_date']));
 export const RITUAL_FIELDS = ritualRows.fields;
+/** [[id, posição], ...] para `reorder`: id válido e posição inteira. */
+function positionEntries(entries) {
+  if (!Array.isArray(entries)) throw new StorageError('invalid_query');
+  return entries.map((entry) => {
+    if (!Array.isArray(entry) || entry.length !== 2 || !Number.isSafeInteger(entry[1])) throw new StorageError('invalid_query');
+    return [recordId(entry[0]), entry[1]];
+  });
+}
+/** Consulta de `habits`: `status` exato ou null (todos). */
+function habitListQuery(input = {}) {
+  plain(input, 'invalid_query');
+  for (const key of Object.keys(input)) if (key !== 'status') throw new StorageError('invalid_query');
+  const status = input.status ?? null;
+  if (status !== null && typeof status !== 'string') throw new StorageError('invalid_query');
+  return { status };
+}
+/** Filtros de `habit_logs`: cada um texto ou null (nulo = não filtra), como `if (date) ...` da antiga. */
+function logListQuery(input = {}) {
+  plain(input, 'invalid_query');
+  const query = { date: null, from: null, to: null, habit_id: null, ...input };
+  for (const [key, value] of Object.entries(query)) {
+    if (!['date', 'from', 'to', 'habit_id'].includes(key) || (value !== null && typeof value !== 'string')) throw new StorageError('invalid_query');
+  }
+  return query;
+}
 function sourceKey(type, id) {
   if (typeof type !== 'string' || typeof id !== 'string') throw new StorageError('invalid_query');
   return [type, id];
@@ -202,6 +227,14 @@ export const DOMAINS = [
       create: ['readwrite', (row) => [habitRows.row(row)]],
       createAt: ['write', (row, token) => [habitRows.row(row), rowToken(token)]],
       clearGoal: ['write', (ids) => [idList(ids)]],
+      // Rotas de hábitos (domínio 4): lista `sort_order IS NULL, sort_order, created_date DESC`.
+      list: ['read', (query) => [habitListQuery(query)]],
+      patch: ['write', (id, fields) => [recordId(id), habitRows.patch(fields)]],
+      remove: ['write', (id) => [recordId(id)]],
+      idsByParent: ['read', (parentId) => [textKey(parentId)]],
+      maxPosition: ['read', (parentId) => [textKey(parentId)]],
+      // `UPDATE habits SET sort_order = <posição> WHERE id = <id>` para cada [id, posição]; id que não existe não faz nada.
+      reorder: ['readwrite', (entries) => [positionEntries(entries)]],
     }),
     sqlite: sqliteHabits,
     firestore: (userDoc, transaction, client) => firestoreHabits(userDoc, transaction, client),
@@ -245,13 +278,28 @@ export const DOMAINS = [
   },
   {
     name: 'habitLogs',
-    spec: () => ({ create: ['readwrite', (row) => [habitLogRows.row(row)]] }),
+    spec: () => ({
+      create: ['readwrite', (row) => [habitLogRows.row(row)]],
+      get: ['read', (id) => [recordId(id)]],
+      find: ['read', (habitId, date) => [textKey(habitId), textKey(date)]],
+      // Sem ORDER BY na antiga: com habit_id o SQLite usa o índice (habit_id, date); sem ele, ordem de inserção.
+      list: ['read', (query) => [logListQuery(query)]],
+      forDate: ['read', (date) => [textKey(date)]],
+      forHabits: ['read', (ids) => [idList(ids)]],
+      patch: ['write', (id, fields) => [recordId(id), habitLogRows.patch(fields)]],
+      remove: ['readwrite', (id) => [recordId(id)]],
+      removeByHabit: ['readwrite', (habitId) => [textKey(habitId)]],
+    }),
     sqlite: sqliteHabitLogs,
     firestore: (userDoc, transaction, client) => firestoreHabitLogs(userDoc, transaction, client),
   },
   {
     name: 'rituals',
-    spec: () => ({ create: ['readwrite', (row) => [ritualRows.row(row)]] }),
+    spec: () => ({
+      create: ['readwrite', (row) => [ritualRows.row(row)]],
+      list: ['read', () => []],
+      patch: ['write', (id, fields) => [recordId(id), ritualRows.patch(fields)]],
+    }),
     sqlite: sqliteRituals,
     firestore: (userDoc, transaction, client) => firestoreRituals(userDoc, transaction, client),
   },

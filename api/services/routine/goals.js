@@ -20,7 +20,7 @@
  * (3) id com mais de 1500 bytes no caminho responde 404 (nenhum registro pode ter esse id).
  */
 import { randomUUID } from 'node:crypto';
-import { bindRow, unsupported, sqlStamp } from './affinity.js';
+import { bindRow, nextSort, sqlStamp } from './affinity.js';
 import { habitRow } from '../../storage/domains/phase3.js';
 
 const GOAL_INSERT = [['id', 'TEXT'], ['title', 'TEXT'], ['description', 'TEXT'], ['deadline', 'TEXT'], ['timeframe', 'TEXT'], ['category', 'TEXT'], ['status', 'TEXT'], ['manual_progress', 'INTEGER']];
@@ -35,13 +35,6 @@ function normalizeDeadline(value) {
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   return value;
-}
-
-/** `COALESCE(MAX(sort_order), -1) + 1` e `Number(... || 0)` do `nextSortOrder` do servidor. */
-function nextSort(top) {
-  if (top === null) return 0;
-  if (typeof top !== 'number') throw unsupported(`MAX(sort_order) com ${typeof top}`);
-  return Number(top + 1 || 0);
 }
 
 /** Id que nenhum registro pode ter (longo demais para guardar) = registro inexistente. */

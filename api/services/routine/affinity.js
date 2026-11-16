@@ -15,8 +15,20 @@ export function shifted(values) {
 }
 
 function real(value, name) {
-  if (value === null || typeof value === 'number') return value;
+  if (value === null) return value;
+  if (typeof value === 'number') {
+    if (Number.isNaN(value)) return null; // o SQLite grava NaN como NULL
+    if (!Number.isFinite(value)) throw unsupported(`${value} em coluna REAL ${name}`);
+    return value;
+  }
   throw unsupported(`${typeof value} em coluna REAL ${name}`);
+}
+
+/** `Number(COALESCE(MAX(coluna), -1) + 1 || 0)` do `nextSortOrder` do servidor, dado o `MAX` cru. */
+export function nextSort(top) {
+  if (top === null) return 0;
+  if (typeof top !== 'number') throw unsupported(`MAX(sort_order) com ${typeof top}`);
+  return Number(top + 1 || 0);
 }
 
 /**

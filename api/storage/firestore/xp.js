@@ -117,10 +117,33 @@ export function firestoreAchievements(userDoc, transaction, client) {
 /** `users/{uid}/habitLogs`: UNIQUE(habit_id, date) do SQLite = sentinela no mesmo commit. */
 export function firestoreHabitLogs(userDoc, transaction, client) {
   const base = phase3Rows(userDoc, transaction, client, 'habitLogs', HABIT_LOG_FIELDS, { uniqueKey: (row) => `habitLogs.habit_date:${JSON.stringify([row.habit_id, row.date])}` });
-  return { create: base.create };
+  const rows = async () => base.all();
+  const pick = (row, fields) => Object.fromEntries(fields.map((field) => [field, row[field]]));
+  return {
+    create: base.create,
+    get: base.get,
+    async find(habitId, date) { return (await rows()).find(({ row }) => row.habit_id === habitId && row.date === date)?.row ?? null; },
+    /** Sem ORDER BY na antiga: com habit_id o SQLite lê o índice (habit_id, date); sem ele, ordem de inserção. */
+    async list({ date, from, to, habit_id }) {
+      const found = (await rows()).filter(({ row }) => (!date || row.date === date) && (!from || compareSqlite(row.date, from) >= 0)
+        && (!to || compareSqlite(row.date, to) <= 0) && (!habit_id || row.habit_id === habit_id));
+      if (habit_id) found.sort((a, b) => compareSqlite(a.row.date, b.row.date) || a.seq - b.seq);
+      return found.map(({ row }) => row);
+    },
+    async forDate(date) { return (await rows()).filter(({ row }) => row.date === date).map(({ row }) => pick(row, ['habit_id', 'completed', 'outcome', 'skip_reason', 'note', 'value'])); },
+    async forHabits(ids) {
+      const wanted = new Set(ids);
+      return (await rows()).filter(({ row }) => wanted.has(row.habit_id)).sort((a, b) => compareSqlite(b.row.date, a.row.date) || a.seq - b.seq)
+        .map(({ row }) => pick(row, ['habit_id', 'date', 'completed', 'outcome']));
+    },
+    patch: base.patch,
+    async remove(id) { await base.removeAll([id]); },
+    async removeByHabit(habitId) { await base.removeAll((await rows()).filter(({ row }) => row.habit_id === habitId).map(({ row }) => row.id)); },
+  };
 }
 export function firestoreRituals(userDoc, transaction, client) {
-  return { create: phase3Rows(userDoc, transaction, client, 'rituals', RITUAL_FIELDS).create };
+  const base = phase3Rows(userDoc, transaction, client, 'rituals', RITUAL_FIELDS);
+  return { create: base.create, patch: base.patch, async list() { return (await base.all()).map(({ row }) => row); } };
 }
 
 /** Mesmo resultado de storage/sqlite/xp.js (sqliteAchievementFacts), em memória sobre as coleções. */

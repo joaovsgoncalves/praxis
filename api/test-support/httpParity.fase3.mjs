@@ -18,6 +18,7 @@ import { createTestDb } from './helpers.mjs';
 import { createStorage } from '../storage/index.js';
 import { createSqliteDriver } from '../storage/sqlite/driver.js';
 import { createFirestoreDriver } from '../storage/firestore/driver.js';
+import { createHabitsService, createHabitLogsService } from '../services/routine/habits.js';
 
 export { parityEngines, runParityScript } from './httpParity.mjs';
 
@@ -128,5 +129,18 @@ export async function assertParity(t, setup, script, { runParityScript, parityEn
 export function sqliteStorageFor(db, owner = OWNER) {
   const scope = new AsyncLocalStorage();
   const storage = createStorage({ driver: createSqliteDriver({ open: () => db }), currentOwner: () => scope.getStore() });
-  return { storage, scoped: (router) => (req, res, next) => scope.run(owner, () => router(req, res, next)) };
+  return {
+    storage,
+    scoped: (router) => (req, res, next) => scope.run(owner, () => router(req, res, next)),
+    /** Para rotas montadas direto no `app`: `app.use(inScope)` antes delas. */
+    inScope: (req, res, next) => scope.run(owner, next),
+  };
+}
+
+/** Serviços de hábitos e registros sobre `storage`, com o que o contexto de rota dos testes já traz. */
+export function habitServicesFor(storage, ctx) {
+  return {
+    habits: createHabitsService({ storage, getLocalDateString: ctx.getLocalDateString, stripPriorityPrefix: ctx.stripPriorityPrefix }),
+    habitLogs: createHabitLogsService({ storage, HABIT_OUTCOMES: ctx.HABIT_OUTCOMES, SKIP_REASONS: ctx.SKIP_REASONS }),
+  };
 }

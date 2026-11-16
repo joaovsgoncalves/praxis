@@ -48,10 +48,37 @@ export function sqliteAchievements(db) {
 }
 
 export function sqliteHabitLogs(db) {
-  return { async create(row) { return insert(db, 'habit_logs', HABIT_LOG_FIELDS, row); } };
+  const cols = HABIT_LOG_FIELDS.join(', ');
+  return {
+    async create(row) { return insert(db, 'habit_logs', HABIT_LOG_FIELDS, row); },
+    async get(id) { return db.prepare(`SELECT ${cols} FROM habit_logs WHERE id = ?`).get(id) ?? null; },
+    async find(habitId, date) { return db.prepare(`SELECT ${cols} FROM habit_logs WHERE habit_id = ? AND date = ?`).get(habitId, date) ?? null; },
+    // Mesma montagem da antiga (sem ORDER BY): o plano do SQLite decide a ordem.
+    async list({ date, from, to, habit_id }) {
+      let query = `SELECT ${cols} FROM habit_logs WHERE 1=1`;
+      const params = [];
+      if (date) { query += ' AND date = ?'; params.push(date); }
+      if (from) { query += ' AND date >= ?'; params.push(from); }
+      if (to) { query += ' AND date <= ?'; params.push(to); }
+      if (habit_id) { query += ' AND habit_id = ?'; params.push(habit_id); }
+      return db.prepare(query).all(...params);
+    },
+    async forDate(date) { return db.prepare('SELECT habit_id, completed, outcome, skip_reason, note, value FROM habit_logs WHERE date = ?').all(date); },
+    async forHabits(ids) {
+      if (!ids.length) return [];
+      return db.prepare(`SELECT habit_id, date, completed, outcome FROM habit_logs WHERE habit_id IN (${ids.map(() => '?').join(',')}) ORDER BY date DESC`).all(...ids);
+    },
+    async patch(id, fields) { patch(db, 'habit_logs', id, fields); },
+    async remove(id) { db.prepare('DELETE FROM habit_logs WHERE id = ?').run(id); },
+    async removeByHabit(habitId) { db.prepare('DELETE FROM habit_logs WHERE habit_id = ?').run(habitId); },
+  };
 }
 export function sqliteRituals(db) {
-  return { async create(row) { return insert(db, 'rituals', RITUAL_FIELDS, row); } };
+  return {
+    async create(row) { return insert(db, 'rituals', RITUAL_FIELDS, row); },
+    async list() { return db.prepare(`SELECT ${RITUAL_FIELDS.join(', ')} FROM rituals ORDER BY rowid`).all(); },
+    async patch(id, fields) { patch(db, 'rituals', id, fields); },
+  };
 }
 
 /** As consultas de lib/gamification.js (checkAchievements), cruas, em ordem canônica de rowid. */

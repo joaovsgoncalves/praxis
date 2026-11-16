@@ -4,7 +4,7 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import { createGoalsRouter } from './routes/goals.js';
 import { createGoalsService } from './services/routine/goals.js';
-import { sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
+import { habitServicesFor, sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
 import { createTasksRouter } from './routes/tasks.js';
 import { createHabitsRouter } from './routes/habits.js';
 import { initializeDatabase } from './lib/dbInit.js';
@@ -19,7 +19,7 @@ async function setup(t) {
   const { storage, scoped } = sqliteStorageFor(db);
   app.use('/api/goals', scoped(createGoalsRouter({ goals: createGoalsService({ storage, getLocalDateString: ctx.getLocalDateString }) })));
   app.use('/api/tasks', createTasksRouter(ctx));
-  app.use('/api/habits', createHabitsRouter(ctx));
+  app.use('/api/habits', scoped(createHabitsRouter(habitServicesFor(storage, ctx))));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

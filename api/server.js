@@ -47,6 +47,7 @@ import { createPurchasesService } from './services/purchases.js';
 import { createFocusService, createWellnessService } from './services/routine/focusWellness.js';
 import { createGoalsService } from './services/routine/goals.js';
 import { createGamificationService } from './services/routine/gamification.js';
+import { createHabitsService, createHabitLogsService } from './services/routine/habits.js';
 import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -191,6 +192,8 @@ const focus = createFocusService({ storage: storageRuntime.storage });
 const wellness = createWellnessService({ storage: storageRuntime.storage });
 const goals = createGoalsService({ storage: storageRuntime.storage, getLocalDateString });
 const gamification = createGamificationService({ storage: storageRuntime.storage, getLocalDateString });
+const habits = createHabitsService({ storage: storageRuntime.storage, getLocalDateString, stripPriorityPrefix });
+const habitLogs = createHabitLogsService({ storage: storageRuntime.storage, HABIT_OUTCOMES, SKIP_REASONS });
 
 /** Trabalho de relógio (sem requisição): roda uma vez para cada dono, no banco dele. */
 function forEachOwner(label, fn) {
@@ -283,8 +286,8 @@ app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
 registerCaptureRoutes(app, { db, apiDir: __dirname });
 app.use('/api/tasks', createTasksRouter(routeCtx));
 registerIdeaToTaskRoute(app, routeCtx);
-app.use('/api/habits', createHabitsRouter(routeCtx));
-registerHabitLogRoutes(app, routeCtx);
+app.use('/api/habits', createHabitsRouter({ habits }));
+registerHabitLogRoutes(app, { habitLogs });
 app.use('/api/wellness', createWellnessRouter({ wellness }));
 app.use('/api/focus', createFocusRouter({ focus }));
 app.use('/api/goals', createGoalsRouter({ goals }));
@@ -298,7 +301,7 @@ registerParseVoiceRoutes(app, {
 // Conta sem agenda ligada: o dia dela simplesmente não tem eventos (a tela não precisa tratar erro).
 app.get('/api/calendar/today', (req, res, next) => (isLegacyScope() ? next() : res.json([])));
 app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a esta conta'), createCalendarRouter());
-app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOrder }));
+app.use('/api/rituals', createRitualsRouter({ habits, getLocalDateString }));
 app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
 registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
 app.use('/api/gamification', createGamificationRouter({ gamification }));

@@ -75,6 +75,22 @@ export function phase3Rows(userDoc, transaction, client, collection, fields, { u
       const ref = col.doc(documentId(id));
       if (transaction) transaction.delete(ref); else await ref.delete();
     },
+    /**
+     * Apaga as linhas `ids` (e a sentinela UNIQUE de cada uma, se houver) no mesmo commit. Lê todas
+     * antes de apagar; id que não existe é ignorado, como o DELETE do SQLite.
+     */
+    async removeAll(ids) {
+      const run = async (tx) => {
+        const snaps = [];
+        for (const id of ids) snaps.push(await tx.get(col.doc(documentId(id))));
+        for (const snap of snaps) {
+          if (!snap.exists) continue;
+          if (uniqueKey) tx.delete(keys.doc(documentId(uniqueKey(snap.data()))));
+          tx.delete(snap.ref);
+        }
+      };
+      if (transaction) await run(transaction); else await client.runTransaction(run, { maxAttempts: 5 });
+    },
     async patch(id, values) {
       const ref = col.doc(documentId(id));
       if (transaction) transaction.update(ref, values); else await ref.update(values);
