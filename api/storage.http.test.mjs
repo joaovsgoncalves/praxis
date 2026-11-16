@@ -42,6 +42,7 @@ function start(extraEnv = {}) {
       PORT: String(port), HOST: '127.0.0.1',
       PRAXIS_WEB_AUTH: '1', PRAXIS_APP_PASSWORD: PASS_A, FORJA_APP_PASSWORD: PASS_A,
       PRAXIS_COOKIE_SECURE: '0', FORJA_CALENDAR_SYNC_ENABLED: '0', FORJA_API_KEY: API_KEY,
+      OPENAI_API_KEY: '',
       PRAXIS_CAPTURE_WEBHOOK_SECRET: `gancho-${port}`, PRAXIS_API_VERSION: 'teste-revisoes',
       FORJA_TRANSCRIBE_PYTHON: '/bin/false', PRAXIS_DATA_DIR: path.join(apiDir, 'data'),
       ...extraEnv,
@@ -311,6 +312,91 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal((await call(proc, 'GET', '/api/tasks')).status, 401);
     const bad = await fetch(`${proc.base}/api/tasks?limit=1.5`, { headers: { cookie: C }, signal: AbortSignal.timeout(3000) });
     assert.equal(bad.status, 500); assert.match(await bad.text(), /datatype mismatch/);
+  });
+
+  await t.test('configurações pela camada nova (fase 4): cada conta grava a sua linha, no arquivo dela', async () => {
+    const sa = await call(proc, 'PUT', '/api/user/settings', { cookie: A, body: { full_name: 'Jota', focus_weekly_goal_minutes: 300 } });
+    assert.equal(sa.status, 200, sa.text);
+    assert.equal((await call(proc, 'PUT', '/api/user/settings', { cookie: B, body: { list_density: 'compact' } })).status, 200);
+    const gb = (await call(proc, 'GET', '/api/user/settings', { cookie: B })).json;
+    assert.deepEqual([gb.full_name, gb.list_density, gb.focus_weekly_goal_minutes], ['João Victor', 'compact', null], 'a da Bia não pegou a do Jota');
+    const ga = (await call(proc, 'GET', '/api/user/settings', { key: API_KEY })).json;
+    assert.deepEqual(ga, sa.json, 'chave do agente lê a linha do dono legado');
+    assert.equal((await call(proc, 'PUT', '/api/user/settings', { cookie: A, body: { list_density: 'bad' } })).status, 400);
+    assert.equal((await fetch(`${proc.base}/api/user/settings`, { method: 'PUT', headers: { cookie: A, 'content-type': 'application/json' }, body: '{"full_name":true}', signal: AbortSignal.timeout(3000) })).status, 500, 'erro de ligação responde, não pendura');
+    const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
+    const idB = control.prepare("SELECT id FROM praxis_users WHERE username = 'bia.teste'").pluck().get();
+    const other = new Database(path.join(apiDir, 'data', 'users', `${idB}.db`), { readonly: true });
+    try {
+      assert.deepEqual(control.prepare('SELECT full_name, focus_weekly_goal_minutes FROM user_settings').all(), [{ full_name: 'Jota', focus_weekly_goal_minutes: 300 }]);
+      assert.deepEqual(other.prepare('SELECT full_name, list_density FROM user_settings').all(), [{ full_name: 'João Victor', list_density: 'compact' }]);
+    } finally { control.close(); other.close(); }
+  });
+
+  await t.test('frentes pela camada nova (fase 4): contas separadas e fluxo do Alfred com revisão', async () => {
+    const la = (await call(proc, 'GET', '/api/projects', { cookie: A })).json;
+    assert.equal(la.length, 9, 'semente só no banco do dono legado');
+    assert.deepEqual((await call(proc, 'GET', '/api/projects', { cookie: B })).json, []);
+    const mine = await call(proc, 'POST', '/api/projects', { cookie: B, body: { slug: 'frente-da-bia', name: 'Da Bia', next_step: 'Começar' } });
+    assert.equal(mine.status, 201, mine.text);
+    assert.equal((await call(proc, 'GET', '/api/projects/frente-da-bia', { cookie: A })).status, 404);
+    assert.equal((await call(proc, 'PATCH', '/api/projects/praxis', { cookie: B, body: { name: 'invadida' } })).status, 404);
+    const read = (await call(proc, 'GET', '/api/projects/praxis', { key: API_KEY })).json;
+    const ok = await call(proc, 'PATCH', '/api/projects/praxis', { key: API_KEY, body: { next_step: 'Pelo Alfred', expected_revision: read.revision } });
+    assert.equal(ok.status, 200, ok.text); assert.equal(ok.json.revision, read.revision + 1);
+    const stale = await call(proc, 'PATCH', '/api/projects/praxis', { key: API_KEY, body: { next_step: 'velho', expected_revision: read.revision } });
+    assert.deepEqual([stale.status, stale.json], [409, { error: 'REVISION_CHANGED', current_revision: read.revision + 1 }]);
+    const done = await call(proc, 'POST', '/api/projects/praxis/complete-next-step', { key: API_KEY, body: { expected_step: 'Pelo Alfred' } });
+    assert.equal(done.status, 200, done.text); assert.equal(done.json.update.summary, 'Concluído: Pelo Alfred');
+    assert.equal((await call(proc, 'GET', '/api/projects/praxis/updates', { cookie: A })).json.length, 1);
+    assert.equal((await call(proc, 'GET', '/api/projects/frente-da-bia/updates', { cookie: B })).json.length, 0);
+    const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
+    const idB = control.prepare("SELECT id FROM praxis_users WHERE username = 'bia.teste'").pluck().get();
+    const other = new Database(path.join(apiDir, 'data', 'users', `${idB}.db`), { readonly: true });
+    try {
+      assert.deepEqual(control.prepare("SELECT next_step, revision FROM projects WHERE slug = 'praxis'").get(), { next_step: '', revision: read.revision + 2 });
+      assert.deepEqual(other.prepare('SELECT slug FROM projects').pluck().all(), ['frente-da-bia']);
+      assert.equal(control.prepare("SELECT COUNT(*) FROM projects WHERE slug = 'frente-da-bia'").pluck().get(), 0);
+    } finally { control.close(); other.close(); }
+  });
+
+  await t.test('orientação do dia pela camada nova (fase 4): trava do Alfred e contas separadas', async () => {
+    const today = (await call(proc, 'GET', '/api/projects/guidance/today', { key: API_KEY })).json;
+    const body = { source: 'alfred', generated_at: `${today.date}T07:50:00-03:00`, summary: 'Do Jota', priorities: [{ rank: 1, action: 'Revisar', reason_code: 'manual', reason: 'hoje', project_slug: 'praxis' }] };
+    const first = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { key: API_KEY, body: { ...body, expected_generated_at: today.generated_at } });
+    assert.equal(first.status, 200, first.text);
+    assert.equal(first.json.priorities[0].project.name, 'Praxis');
+    const blind = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { key: API_KEY, body: { ...body, expected_generated_at: null } });
+    assert.deepEqual([blind.status, blind.json.error], [409, 'GUIDANCE_CHANGED']);
+    assert.deepEqual((await call(proc, 'GET', '/api/projects/guidance/today', { cookie: A })).json, first.json);
+    assert.equal((await call(proc, 'GET', '/api/projects/guidance/today', { cookie: B })).json.fresh, false, 'a da Bia continua vazia');
+    const bia = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { cookie: B, body: { ...body, summary: 'Da Bia', expected_generated_at: null, priorities: [{ rank: 1, action: 'a', reason_code: 'manual', reason: 'b', project_slug: 'frente-da-bia' }] } });
+    assert.equal(bia.status, 200, bia.text);
+    const notMine = await call(proc, 'PUT', `/api/projects/guidance/${today.date}`, { cookie: B, body: { ...body, expected_generated_at: body.generated_at } });
+    assert.deepEqual([notMine.status, notMine.json.error], [400, 'project_slug not found: praxis'], 'frente de outra conta não existe aqui');
+    const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
+    try { assert.deepEqual(control.prepare('SELECT summary FROM continuity_guidance').pluck().all(), ['Do Jota']); } finally { control.close(); }
+  });
+
+  await t.test('insights de leitura pela camada nova (fase 4): cada conta lê só os seus dados', async () => {
+    const made = await call(proc, 'POST', '/api/tasks', { cookie: A, body: { title: 'Declarar imposto', date: '2026-01-10', category: 'pessoal', priority: 'high' } });
+    assert.ok([200, 201].includes(made.status), made.text);
+    const titles = (res) => res.json.items.map((item) => item.title);
+    const mine = await call(proc, 'GET', '/api/insights/avoidance?date=2026-11-16', { cookie: A });
+    assert.equal(mine.status, 200, mine.text);
+    assert.ok(titles(mine).includes('Declarar imposto'));
+    assert.ok(!titles(await call(proc, 'GET', '/api/insights/avoidance?date=2026-11-16', { cookie: B })).includes('Declarar imposto'), 'a Bia não vê a tarefa do Jota');
+    assert.ok(titles(await call(proc, 'GET', '/api/insights/avoidance?date=2026-11-16', { key: API_KEY })).includes('Declarar imposto'), 'chave do agente lê a conta do dono legado');
+    const weekA = (await call(proc, 'GET', '/api/insights/weekly?week_start=2026-02-02', { cookie: A })).json;
+    const weekB = (await call(proc, 'GET', '/api/insights/weekly?week_start=2026-02-02', { cookie: B })).json;
+    assert.deepEqual([weekA.bottlenecks.overdue_tasks_count, weekB.bottlenecks.overdue_tasks_count], [1, 0]);
+    for (const url of ['/api/insights/best-hours', '/api/insights/correlation']) {
+      assert.equal((await call(proc, 'GET', url, { cookie: B })).status, 200, url);
+    }
+    const mirror = await call(proc, 'POST', '/api/praxia/confront', { cookie: A, body: { date: '2026-11-16' } });
+    assert.deepEqual([mirror.status, mirror.json.source], [200, 'rules'], 'sem chave da OpenAI responde com as regras, sem rede');
+    const bad = await fetch(`${proc.base}/api/insights/avoidance?date=lixo`, { headers: { cookie: A }, signal: AbortSignal.timeout(3000) });
+    assert.deepEqual([bad.status, (await bad.json()).error], [500, 'Invalid time value'], 'erro responde em JSON, não pendura');
   });
 
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {

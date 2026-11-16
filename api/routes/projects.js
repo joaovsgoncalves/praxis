@@ -1,15 +1,6 @@
 import { Router } from 'express';
-import {
-  applyProjectPatch,
-  completeProjectNextStep,
-  createProject,
-  createProjectUpdate,
-  getProject,
-  listProjectUpdates,
-  listProjects,
-  todayFortaleza,
-} from '../projects.js';
-import { getContinuityGuidance, writeContinuityGuidance } from '../continuityGuidance.js';
+import { asyncRoute } from '../lib/asyncRoute.js';
+import { todayFortaleza } from '../projects.js';
 
 function sendError(res, err) {
   const status = err.status || 500;
@@ -26,84 +17,89 @@ function sendError(res, err) {
   res.status(status).json({ error: err.message || 'error' });
 }
 
-/** Projects — mounted at /api/projects */
-export function createProjectsRouter({ db, getLocalDateString = todayFortaleza }) {
+/**
+ * Projects — mounted at /api/projects.
+ * Frentes e timeline pelo serviço (`services/personal/projects.js`) sobre a camada assíncrona;
+ * orientação do dia pelo serviço `services/personal/guidance.js`. Envelope igual ao da rota antiga,
+ * congelada em `test-support/oracles/projectsRoute.bcbadad.js`.
+ */
+export function createProjectsRouter({ projects, guidance, getLocalDateString = todayFortaleza }) {
+  if (!projects || !guidance) throw new TypeError('createProjectsRouter: informe os serviços projects e guidance');
   const router = Router();
 
-  router.get('/', (_req, res) => {
-    res.json(listProjects(db));
-  });
+  router.get('/', asyncRoute(async (_req, res) => {
+    res.json(await projects.list());
+  }));
 
-  router.get('/:id/updates', (req, res) => {
-    const rows = listProjectUpdates(db, req.params.id, req.query.limit);
+  router.get('/:id/updates', asyncRoute(async (req, res) => {
+    const rows = await projects.listUpdates(req.params.id, req.query.limit);
     if (!rows) return res.status(404).json({ error: 'Not found' });
     res.json(rows);
-  });
+  }));
 
-  router.post('/:id/updates', (req, res) => {
+  router.post('/:id/updates', asyncRoute(async (req, res) => {
     try {
-      const row = createProjectUpdate(db, req.params.id, req.body || {});
+      const row = await projects.addUpdate(req.params.id, req.body || {});
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.status(201).json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.post('/:id/complete-next-step', (req, res) => {
+  router.post('/:id/complete-next-step', asyncRoute(async (req, res) => {
     try {
-      const result = completeProjectNextStep(db, req.params.id, req.body || {});
+      const result = await projects.completeNextStep(req.params.id, req.body || {});
       if (!result) return res.status(404).json({ error: 'Not found' });
       res.json(result);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/guidance/today', (_req, res) => {
+  router.get('/guidance/today', asyncRoute(async (_req, res) => {
     try {
       const today = typeof getLocalDateString === 'function'
         ? getLocalDateString()
         : todayFortaleza();
-      const guidance = getContinuityGuidance(db, today);
-      res.json(guidance);
+      res.json(await guidance.read(today));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.put('/guidance/:date', (req, res) => {
+  router.put('/guidance/:date', asyncRoute(async (req, res) => {
     try {
-      res.json(writeContinuityGuidance(db, req.params.date, req.body || {}));
+      res.json(await guidance.write(req.params.date, req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/:id', (req, res) => {
-    const row = getProject(db, req.params.id);
+  router.get('/:id', asyncRoute(async (req, res) => {
+    const row = await projects.get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.post('/', (req, res) => {
+  router.post('/', asyncRoute(async (req, res) => {
     try {
-      const row = createProject(db, req.body || {});
+      const row = await projects.create(req.body || {});
       res.status(201).json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/:id', (req, res) => {
+  router.patch('/:id', asyncRoute(async (req, res) => {
     try {
-      const row = applyProjectPatch(db, req.params.id, req.body || {});
+      const row = await projects.patch(req.params.id, req.body || {});
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   return router;
 }

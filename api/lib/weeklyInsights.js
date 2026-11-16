@@ -1,5 +1,11 @@
 /**
  * Agregação semanal para /api/insights/weekly (Praxis onda 8).
+ *
+ * Lê pelo repositório de leitura `insightsRead` (storage/domains/phase4.js), SQLite ou Firestore, com
+ * o mesmo resultado da versão antiga sobre o banco (oráculo em test-support/oracles/weeklyInsights.bcbadad.js).
+ * Diferença intencional: erro numa das leituras da camada factual agora falha o pedido em vez de virar
+ * "sem movimento" (a consulta só falha com esquema quebrado; a ausência das tabelas de frentes continua
+ * valendo como lista vazia, no repositório).
  */
 
 export function addDaysYmd(ymd, days) {
@@ -43,11 +49,11 @@ function cleanTitle(title) {
 }
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {object} read repositório `insightsRead` (storage.insightsRead ou tx.insightsRead)
  * @param {string} weekStart YYYY-MM-DD (segunda)
  * @param {{ today?: string }} [options] today = 'YYYY-MM-DD' (default: data local)
  */
-export function buildWeeklyInsights(db, weekStart, options = {}) {
+export async function buildWeeklyInsights(read, weekStart, options = {}) {
   const weekEnd = addDaysYmd(weekStart, 6);
   const today = String(options.today || localYmd());
   // Semana em andamento: só conta dias já transcorridos (não pune o futuro).
@@ -55,32 +61,13 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
   const weekDates = [];
   for (let i = 0; i < 7; i++) weekDates.push(addDaysYmd(weekStart, i));
 
-  const completedTasks = db.prepare(`
-    SELECT id, title, priority, category, date, completed_date
-    FROM tasks
-    WHERE status = 'completed'
-      AND category != 'ideias'
-      AND (
-        (date IS NOT NULL AND date BETWEEN ? AND ?)
-        OR (completed_date IS NOT NULL AND completed_date BETWEEN ? AND ?)
-      )
-    ORDER BY completed_date DESC, updated_date DESC
-    LIMIT 50
-  `).all(weekStart, weekEnd, weekStart, weekEnd);
+  const completedTasks = await read.completedTasksOfWeek(weekStart, weekEnd);
 
-  const stalePending = db.prepare(`
-    SELECT title FROM tasks
-    WHERE status = 'pending'
-      AND category != 'ideias'
-      AND date IS NOT NULL
-      AND date < ?
-    ORDER BY date ASC
-    LIMIT 10
-  `).all(weekStart);
+  const stalePending = await read.stalePendingTasks(weekStart);
 
   const overdueCount = stalePending.length;
 
-  const activeHabits = db.prepare("SELECT * FROM habits WHERE status = 'active'").all();
+  const activeHabits = await read.activeHabits();
   let habitSlots = 0;
   let habitDone = 0;
   let habitSkipped = 0;
@@ -94,15 +81,18 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
   // e vai para `days_routines`, que fecha a conta com `victories`.
   const habitDayStats = Object.fromEntries(weekDates.map((d) => [d, { done: 0, total: 0 }]));
   const routineSlots = { slots: 0, done: 0, skipped: 0 };
-  const habitLogStmt = db.prepare(
-    'SELECT completed, outcome, skip_reason FROM habit_logs WHERE habit_id = ? AND date = ?',
-  );
+  // Um registro por hábito e dia (índice único): a semana inteira numa leitura só.
+  const logsByHabit = new Map();
+  for (const row of await read.habitLogs(weekStart, weekEnd)) {
+    if (!logsByHabit.has(row.habit_id)) logsByHabit.set(row.habit_id, new Map());
+    logsByHabit.get(row.habit_id).set(row.date, row);
+  }
 
   for (const day of weekDates) {
     const isFuture = day > effEnd;
     for (const h of activeHabits) {
       if (!isHabitDueOnDate(h, day)) continue;
-      const log = habitLogStmt.get(h.id, day);
+      const log = logsByHabit.get(h.id)?.get(day);
       const isSkipped = log && log.outcome === 'skipped';
       const isDone = log && !isSkipped && (
         log.outcome === 'done' || log.completed === 1 || log.completed === true
@@ -140,17 +130,7 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
   const habitPct = habitSlots > 0 ? Math.round((habitDone / habitSlots) * 100) : null;
 
   // Tarefas do dia: data no dia, fora ideias e canceladas (inclui "não rolou").
-  const taskDayRows = db.prepare(`
-    SELECT substr(date, 1, 10) AS day,
-           COUNT(*) AS total,
-           SUM(CASE WHEN status IN ('completed', 'done') THEN 1 ELSE 0 END) AS done
-    FROM tasks
-    WHERE date IS NOT NULL
-      AND substr(date, 1, 10) BETWEEN ? AND ?
-      AND COALESCE(category, '') != 'ideias'
-      AND COALESCE(status, 'pending') != 'cancelled'
-    GROUP BY substr(date, 1, 10)
-  `).all(weekStart, weekEnd);
+  const taskDayRows = await read.taskDayCounts(weekStart, weekEnd);
   const taskDayStats = Object.fromEntries(taskDayRows.map((r) => [r.day, r]));
 
   const dayItems = weekDates.map((date) => {
@@ -174,20 +154,12 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
     };
   });
 
-  const focusAgg = db.prepare(`
-    SELECT COUNT(*) as sessions, COALESCE(SUM(duration_seconds), 0) as total_seconds
-    FROM focus_sessions
-    WHERE date BETWEEN ? AND ?
-  `).get(weekStart, weekEnd);
+  const focusAgg = await read.focusTotals(weekStart, weekEnd);
 
   const focusMinutes = Math.round((focusAgg?.total_seconds || 0) / 60);
   const focusSessions = focusAgg?.sessions || 0;
 
-  const wellnessRows = db.prepare(`
-    SELECT mood, productivity, sleep_hours, sleep_quality
-    FROM wellness_checks
-    WHERE date BETWEEN ? AND ?
-  `).all(weekStart, weekEnd);
+  const wellnessRows = await read.wellnessBetween(weekStart, weekEnd);
 
   let avgMood = null;
   let avgProductivity = null;
@@ -207,25 +179,9 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
     avgSleep = +(sum.sleep / n).toFixed(1);
   }
 
-  const ideasNew = db.prepare(`
-    SELECT COUNT(*) as c FROM tasks
-    WHERE category = 'ideias'
-      AND substr(created_date, 1, 10) BETWEEN ? AND ?
-  `).get(weekStart, weekEnd).c;
+  const { created: ideasNew, promoted: ideasPromoted } = await read.ideaCounts(weekStart, weekEnd);
 
-  const ideasPromoted = db.prepare(`
-    SELECT COUNT(*) as c FROM tasks
-    WHERE category = 'ideias'
-      AND idea_status = 'virou_tarefa'
-      AND substr(updated_date, 1, 10) BETWEEN ? AND ?
-  `).get(weekStart, weekEnd).c;
-
-  const promissoras = db.prepare(`
-    SELECT title FROM tasks
-    WHERE category = 'ideias' AND idea_status = 'promissora'
-    ORDER BY updated_date DESC
-    LIMIT 5
-  `).all();
+  const promissoras = await read.promissoras();
 
   const topMissed = Object.entries(missByHabit)
     .sort((a, b) => b[1] - a[1])
@@ -374,7 +330,7 @@ export function buildWeeklyInsights(db, weekStart, options = {}) {
       learnings: draft_learnings,
       next_week_focus: draft_next_week_focus,
     },
-    life_history: buildLifeHistory(db, weekStart, weekEnd),
+    life_history: await buildLifeHistory(read, weekStart, weekEnd),
     days: dayItems,
     days_routines: routineSlots,
   };
@@ -457,83 +413,31 @@ function sameSig(A, B) {
   return aInB >= 0.8 || bInA >= 0.8;
 }
 
-function tableHas(table, db) {
-  try {
-    const row = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
-      .get(table);
-    return !!row;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Camada factual da semana: não é opinião nem cobrança. Junta avanços reais da
  * continuidade (project_updates) e tarefas concluídas, agrupando por área e em
  * uma timeline curta. Nunca muda a frente; apenas lê o que já aconteceu.
  */
-function buildLifeHistory(db, weekStart, weekEnd) {
+async function buildLifeHistory(read, weekStart, weekEnd) {
   const updates = [];
   const projectName = new Map();
 
-  if (tableHas('projects', db)) {
-    try {
-      const projects = db
-        .prepare('SELECT id, slug, name FROM projects')
-        .all();
-      for (const p of projects) projectName.set(p.id, { slug: p.slug, name: p.name });
-    } catch {
-      projectName.clear();
-    }
-  }
+  for (const p of await read.projectNames()) projectName.set(p.id, { slug: p.slug, name: p.name });
 
-  if (tableHas('project_updates', db)) {
-    try {
-      const rows = db
-        .prepare(
-          `SELECT date, project_id, summary, source
-           FROM project_updates
-           WHERE date BETWEEN ? AND ?
-           ORDER BY date ASC, created_at ASC`,
-        )
-        .all(weekStart, weekEnd);
-      for (const r of rows) {
-        const meta = projectName.get(r.project_id) || { slug: String(r.project_id), name: '' };
-        updates.push({
-          date: r.date,
-          front: meta.slug,
-          name: meta.name || meta.slug,
-          summary: String(r.summary || '').trim(),
-          source: r.source || 'manual',
-          kind: 'continuidade',
-        });
-      }
-    } catch {
-      // tabela presente mas consulta falhou: não derruba o resumo
-    }
+  for (const r of await read.projectUpdatesBetween(weekStart, weekEnd)) {
+    const meta = projectName.get(r.project_id) || { slug: String(r.project_id), name: '' };
+    updates.push({
+      date: r.date,
+      front: meta.slug,
+      name: meta.name || meta.slug,
+      summary: String(r.summary || '').trim(),
+      source: r.source || 'manual',
+      kind: 'continuidade',
+    });
   }
 
   // Tarefas concluídas na semana, excluídas ideias (fontes e amostras honestas).
-  let completed = [];
-  try {
-    completed = db
-      .prepare(
-        `SELECT title, category
-         FROM tasks
-         WHERE status IN ('completed','done')
-           AND category != 'ideias'
-           AND (
-             (date IS NOT NULL AND date BETWEEN ? AND ?)
-             OR (completed_date IS NOT NULL AND completed_date BETWEEN ? AND ?)
-           )
-         ORDER BY COALESCE(completed_date, date) DESC
-         LIMIT 80`,
-      )
-      .all(weekStart, weekEnd, weekStart, weekEnd);
-  } catch {
-    completed = [];
-  }
+  const completed = await read.completedTasksForHistory(weekStart, weekEnd);
 
   const byArea = {};
   const timeline = [];

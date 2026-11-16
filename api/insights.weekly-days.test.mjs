@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
 import express from 'express';
-import { buildWeeklyInsights } from './lib/weeklyInsights.js';
 import { createInsightsRouter } from './routes/insights.js';
 import { createTestDb, fixedDate, requestJson, startTestServer } from './test-support/helpers.mjs';
+import { readerFor, testEngines, weeklyOn } from './test-support/insightsParity.fase4.mjs';
 
 // Quinta-feira; a semana vai de seg 12/10 a dom 18/10.
 const TODAY = '2026-10-15';
@@ -55,10 +54,10 @@ function sum(days, key) {
   return days.reduce((acc, d) => acc + d[key], 0);
 }
 
-test('days[] traz 7 itens de segunda a domingo, com hoje e futuros marcados', () => {
+testEngines('days[] traz 7 itens de segunda a domingo, com hoje e futuros marcados', async (t, kind) => {
   const db = createTestDb();
   seed(db);
-  const payload = buildWeeklyInsights(db, WEEK_START, { today: TODAY });
+  const payload = await weeklyOn(t, kind, db, WEEK_START, { today: TODAY });
   db.close();
 
   assert.equal(payload.days.length, 7);
@@ -69,10 +68,10 @@ test('days[] traz 7 itens de segunda a domingo, com hoje e futuros marcados', ()
   assert.deepEqual(payload.days.map((d) => d.is_future), [false, false, false, false, true, true, true]);
 });
 
-test('cada dia conta tarefas e hábitos; cancelada, não rolou e ideias ficam fora', () => {
+testEngines('cada dia conta tarefas e hábitos; cancelada, não rolou e ideias ficam fora', async (t, kind) => {
   const db = createTestDb();
   seed(db);
-  const { days } = buildWeeklyInsights(db, WEEK_START, { today: TODAY });
+  const { days } = await weeklyOn(t, kind, db, WEEK_START, { today: TODAY });
   db.close();
   const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
 
@@ -130,10 +129,10 @@ function assertInvariant(payload) {
   }
 }
 
-test('soma dos dias bate com victories (invariante)', () => {
+testEngines('soma dos dias bate com victories (invariante)', async (t, kind) => {
   const db = createTestDb();
   seed(db);
-  const payload = buildWeeklyInsights(db, WEEK_START, { today: TODAY });
+  const payload = await weeklyOn(t, kind, db, WEEK_START, { today: TODAY });
   db.close();
 
   assertInvariant(payload);
@@ -145,10 +144,10 @@ test('soma dos dias bate com victories (invariante)', () => {
   assert.equal(payload.victories.habits_open_slots, 10);
 });
 
-test('semana passada fecha com 7 dias não futuros e a mesma invariante', () => {
+testEngines('semana passada fecha com 7 dias não futuros e a mesma invariante', async (t, kind) => {
   const db = createTestDb();
   seed(db);
-  const payload = buildWeeklyInsights(db, '2026-10-05', { today: TODAY });
+  const payload = await weeklyOn(t, kind, db, '2026-10-05', { today: TODAY });
   db.close();
   const { days } = payload;
 
@@ -160,11 +159,12 @@ test('semana passada fecha com 7 dias não futuros e a mesma invariante', () => 
   assert.equal(payload.days_routines.slots, 7);
 });
 
-test('GET /api/insights/weekly devolve days[] sem endpoint novo', async (t) => {
+testEngines('GET /api/insights/weekly devolve days[] sem endpoint novo', async (t, kind) => {
   const db = createTestDb();
   seed(db);
+  const { insights } = await readerFor(t, kind, db);
   const app = express();
-  app.use('/api/insights', createInsightsRouter({ db, getLocalDateString: fixedDate(TODAY) }));
+  app.use('/api/insights', createInsightsRouter({ insights, getLocalDateString: fixedDate(TODAY) }));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

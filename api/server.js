@@ -28,6 +28,7 @@ import { createGoalsRouter } from './routes/goals.js';
 import { createRitualsRouter } from './routes/rituals.js';
 import { createPurchasesRouter } from './routes/purchases.js';
 import { createSettingsRouter } from './routes/settings.js';
+import { createSettingsService } from './services/personal/settings.js';
 import { createGamificationRouter } from './routes/gamification.js';
 import { createInsightsRouter, registerPraxiaRoutes } from './routes/insights.js';
 import { createWeeklyReviewsRouter } from './routes/weeklyReviews.js';
@@ -41,6 +42,9 @@ import { createFinanceRouter } from './routes/finance.js';
 import { initProjectsSchema, seedProjectsIfEmpty } from './projects.js';
 import { initContinuityGuidanceSchema } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
+import { createProjectsService } from './services/personal/projects.js';
+import { createGuidanceService } from './services/personal/guidance.js';
+import { createInsightsService } from './services/personal/insights.js';
 import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
 import { createWeeklyReviewsService } from './services/weeklyReviews.js';
 import { createPurchasesService } from './services/purchases.js';
@@ -263,7 +267,7 @@ const tasks = createTasksService({
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
 registerOpsRoutes(app, { apiDir: __dirname });
 app.use('/api/purchases', createPurchasesRouter({ purchases }));
-app.use('/api/projects', createProjectsRouter({ db, getLocalDateString }));
+app.use('/api/projects', createProjectsRouter({ projects: createProjectsService({ storage: storageRuntime.storage }), guidance: createGuidanceService({ storage: storageRuntime.storage }), getLocalDateString }));
 app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não existem para esta conta'));
 app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));
 app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
@@ -275,7 +279,7 @@ registerHabitLogRoutes(app, { habitLogs });
 app.use('/api/wellness', createWellnessRouter({ wellness }));
 app.use('/api/focus', createFocusRouter({ focus }));
 app.use('/api/goals', createGoalsRouter({ goals }));
-app.use('/api/user', createSettingsRouter({ db }));
+app.use('/api/user', createSettingsRouter({ settings: createSettingsService({ storage: storageRuntime.storage }) }));
 registerParseVoiceRoutes(app, {
   getLocalDateString,
   addDaysLocal,
@@ -286,8 +290,9 @@ registerParseVoiceRoutes(app, {
 app.get('/api/calendar/today', (req, res, next) => (isLegacyScope() ? next() : res.json([])));
 app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a esta conta'), createCalendarRouter());
 app.use('/api/rituals', createRitualsRouter({ habits, getLocalDateString }));
-app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
-registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
+const insightsService = createInsightsService({ storage: storageRuntime.storage });
+app.use('/api/insights', createInsightsRouter({ insights: insightsService, getLocalDateString }));
+registerPraxiaRoutes(app, { insights: insightsService, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
 app.use('/api/gamification', createGamificationRouter({ gamification }));
 app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ weeklyReviews }));
 
