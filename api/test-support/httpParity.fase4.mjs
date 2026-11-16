@@ -56,7 +56,8 @@ async function listen(mount, router, before) {
  * kind: 'oracle' | 'sqlite' | 'firestore'.
  * oracle(db) monta o router antigo; build(storage, { clock, db }) monta o router novo.
  * seedSqlite(db): semente gravada direto no SQLite (oráculo e motor sqlite).
- * seedStorage(storage): semente do Firestore pela camada nova (só dados, sem regra).
+ * seedStorage(storage, { userDoc }): semente do Firestore pela camada nova (só dados, sem regra); `userDoc` é o
+ * documento da conta, para semear coleções que a camada nova só lê (documentos crus, FROZEN §2).
  */
 export async function makeClockedParityApp(kind, { mount, dbOptions = {}, oracle, build, seedSqlite, seedStorage, every = 1, owner = 'alice' }) {
   const clock = createTestClock({ every });
@@ -71,7 +72,7 @@ export async function makeClockedParityApp(kind, { mount, dbOptions = {}, oracle
     return { ...app, clock, db, dispose: async () => { await app.close(); for (const fn of cleanup) await fn(); } };
   }
   const scope = new AsyncLocalStorage();
-  let driver, db = null;
+  let driver, db = null, userDoc = null;
   if (kind === 'sqlite') {
     db = useClockInSqlite(createTestDb(dbOptions), clock);
     cleanup.push(() => db.close());
@@ -82,10 +83,12 @@ export async function makeClockedParityApp(kind, { mount, dbOptions = {}, oracle
     assert.match(host || '', /^(127\.0\.0\.1|localhost):\d+$/);
     const client = new Firestore({ projectId: 'demo-praxis-storage', host, ssl: false });
     cleanup.push(() => client.terminate());
-    driver = createFirestoreDriver({ client, root: client.collection('parityRuns').doc(randomUUID()) });
+    const root = client.collection('parityRuns').doc(randomUUID());
+    userDoc = root.collection('users').doc(owner);
+    driver = createFirestoreDriver({ client, root });
   }
   const storage = createStorage({ driver, currentOwner: () => scope.getStore() });
-  if (kind === 'firestore' && seedStorage) await scope.run(owner, () => seedStorage(storage));
+  if (kind === 'firestore' && seedStorage) await scope.run(owner, () => seedStorage(storage, { userDoc }));
   app = await listen(mount, build(storage, { clock, db }), (req, res, next) => { clock.tick(); scope.run(owner, next); });
   return { ...app, clock, db, storage, as: (fn) => scope.run(owner, fn), dispose: async () => { await app.close(); for (const fn of cleanup) await fn(); } };
 }

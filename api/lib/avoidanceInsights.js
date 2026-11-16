@@ -1,5 +1,7 @@
 /**
  * Cockpit "o que estou evitando" — agregação determinística (onda 16).
+ * Lê pelo repositório de leitura `insightsRead` (SQLite ou Firestore); oráculo em
+ * test-support/oracles/avoidanceInsights.bcbadad.js.
  */
 import { addDaysYmd, isHabitDueOnDate } from './weeklyInsights.js';
 
@@ -33,23 +35,15 @@ function overdueReason(days, dateYmd) {
 const DISPLAY_LIMIT = 8;
 
 /**
- * @param {import('better-sqlite3').Database} db
+ * @param {object} read repositório `insightsRead` (storage.insightsRead ou tx.insightsRead)
  * @param {string} today YYYY-MM-DD
  */
-export function buildAvoidanceInsights(db, today) {
+export async function buildAvoidanceInsights(read, today) {
   const yesterday = addDaysYmd(today, -1);
   const weekAgo = addDaysYmd(today, -7);
   const items = [];
 
-  const overdueRaw = db.prepare(`
-    SELECT id, title, date, priority, category
-    FROM tasks
-    WHERE status NOT IN ('completed', 'done', 'cancelled')
-      AND category != 'ideias'
-      AND date IS NOT NULL AND date < ?
-    ORDER BY date ASC, priority DESC
-    LIMIT 24
-  `).all(today);
+  const overdueRaw = await read.overdueTasks(today);
 
   /** Mesmo título em várias datas (recorrência) → uma linha, a mais atrasada. */
   const overdueByTitle = new Map();
@@ -78,16 +72,7 @@ export function buildAvoidanceInsights(db, today) {
     });
   }
 
-  const floating = db.prepare(`
-    SELECT id, title, priority, created_date
-    FROM tasks
-    WHERE status NOT IN ('completed', 'done', 'cancelled')
-      AND category != 'ideias'
-      AND date IS NULL
-      AND substr(created_date, 1, 10) <= ?
-    ORDER BY created_date ASC
-    LIMIT 5
-  `).all(weekAgo);
+  const floating = await read.floatingTasks(weekAgo);
 
   for (const t of floating) {
     items.push({
@@ -101,28 +86,12 @@ export function buildAvoidanceInsights(db, today) {
     });
   }
 
-  const activeHabits = db.prepare("SELECT * FROM habits WHERE status = 'active'").all();
+  const activeHabits = await read.activeHabits();
 
   // Closed loop today = done OR conscious skip (outcome=skipped)
-  const todayClosed = new Set(
-    db.prepare(`
-      SELECT habit_id FROM habit_logs
-      WHERE date = ?
-        AND (completed = 1 OR outcome = 'skipped' OR outcome = 'done')
-    `).all(today).map((r) => r.habit_id),
-  );
-  const yesterdayClosed = new Set(
-    db.prepare(`
-      SELECT habit_id FROM habit_logs
-      WHERE date = ?
-        AND (completed = 1 OR outcome = 'skipped' OR outcome = 'done')
-    `).all(yesterday).map((r) => r.habit_id),
-  );
-  const yesterdaySkipped = new Set(
-    db.prepare(`
-      SELECT habit_id FROM habit_logs WHERE date = ? AND outcome = 'skipped'
-    `).all(yesterday).map((r) => r.habit_id),
-  );
+  const todayClosed = new Set(await read.closedHabitIds(today));
+  const yesterdayClosed = new Set(await read.closedHabitIds(yesterday));
+  const yesterdaySkipped = new Set(await read.skippedHabitIds(yesterday));
 
   for (const h of activeHabits) {
     const dueToday = isHabitDueOnDate(h, today);
@@ -159,13 +128,7 @@ export function buildAvoidanceInsights(db, today) {
 
   // Padrão: 3+ skips conscientes no mesmo hábito em 7 dias
   const weekStart = weekAgo;
-  const skipCounts = db.prepare(`
-    SELECT habit_id, COUNT(*) AS skips
-    FROM habit_logs
-    WHERE outcome = 'skipped' AND date > ? AND date <= ?
-    GROUP BY habit_id
-    HAVING skips >= 3
-  `).all(weekStart, today);
+  const skipCounts = await read.skippedHabitCounts(weekStart, today);
 
   for (const row of skipCounts) {
     const h = activeHabits.find((x) => x.id === row.habit_id);
@@ -185,15 +148,7 @@ export function buildAvoidanceInsights(db, today) {
 
 
 
-  const staleIdeas = db.prepare(`
-    SELECT id, title, idea_status, updated_date
-    FROM tasks
-    WHERE category = 'ideias'
-      AND idea_status IN ('capturada', 'promissora')
-      AND substr(COALESCE(updated_date, created_date), 1, 10) <= ?
-    ORDER BY updated_date ASC
-    LIMIT 5
-  `).all(weekAgo);
+  const staleIdeas = await read.staleIdeas(weekAgo);
 
   for (const idea of staleIdeas) {
     items.push({
@@ -209,9 +164,7 @@ export function buildAvoidanceInsights(db, today) {
     });
   }
 
-  const failedCaptures = db.prepare(`
-    SELECT COUNT(*) AS n FROM capture_queue WHERE status = 'failed'
-  `).get();
+  const failedCaptures = { n: await read.failedCaptureCount() };
   if (failedCaptures?.n > 0) {
     items.push({
       id: 'capture-failed',
@@ -223,17 +176,10 @@ export function buildAvoidanceInsights(db, today) {
     });
   }
 
-  const pendingToday = db.prepare(`
-    SELECT COUNT(*) AS n FROM tasks
-    WHERE status NOT IN ('completed', 'done', 'cancelled')
-      AND category != 'ideias'
-      AND date = ?
-  `).get(today).n;
+  const pendingToday = await read.pendingTodayCount(today);
 
-  const focusToday = db.prepare(`
-    SELECT COALESCE(SUM(duration_seconds), 0) AS sec FROM focus_sessions WHERE date = ?
-  `).get(today);
-  const focusSec = focusToday?.sec || 0;
+  const focusToday = await read.focusTotals(today, today);
+  const focusSec = focusToday?.total_seconds || 0;
 
   if (pendingToday >= 3 && focusSec < 15 * 60) {
     items.push({
@@ -246,7 +192,7 @@ export function buildAvoidanceInsights(db, today) {
     });
   }
 
-  const wellnessToday = db.prepare('SELECT id FROM wellness_checks WHERE date = ? LIMIT 1').get(today);
+  const wellnessToday = (await read.wellnessBetween(today, today))[0];
   if (!wellnessToday && (pendingToday > 0 || overdue.length > 0)) {
     items.push({
       id: 'wellness-missing',

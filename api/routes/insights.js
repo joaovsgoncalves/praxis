@@ -1,187 +1,68 @@
 import { Router } from 'express';
-import { buildWeeklyInsights } from '../lib/weeklyInsights.js';
-import { buildAvoidanceInsights, buildRuleBasedPraxiaMirror } from '../lib/avoidanceInsights.js';
+import { buildRuleBasedPraxiaMirror } from '../lib/avoidanceInsights.js';
 import { mondayOf } from '../lib/week.js';
+import { asyncRoute } from '../lib/asyncRoute.js';
 
 /**
  * Insights router — mounted at /api/insights
+ * Leituras pelo serviço (`services/personal/insights.js`) sobre a camada assíncrona; envelope igual ao da
+ * rota antiga, congelada em `test-support/oracles/insightsRoute.bcbadad.js`.
  * Also exports registerPraxiaRoutes for POST /api/praxia/confront
  */
-export function createInsightsRouter({ db, getLocalDateString }) {
+export function createInsightsRouter({ insights, getLocalDateString }) {
+  if (!insights) throw new TypeError('createInsightsRouter: informe o serviço insights');
   const router = Router();
 
-  router.get('/best-hours', (req, res) => {
+  router.get('/best-hours', asyncRoute(async (req, res) => {
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const cutoffDate = thirtyDaysAgo.toISOString();
-
-      const sessions = db.prepare(`
-        SELECT * FROM focus_sessions
-        WHERE created_date >= ?
-        ORDER BY created_date DESC
-      `).all(cutoffDate);
-
-      if (sessions.length < 3) {
-        return res.json({
-          best_hours: [],
-          summary: 'Preciso de mais sessões de foco para sugerir horários',
-          total_sessions: sessions.length,
-        });
-      }
-
-      const hourMap = {};
-      for (const session of sessions) {
-        if (!session.created_date) continue;
-        const d = new Date(session.created_date);
-        if (isNaN(d.getTime())) continue;
-        const hour = d.getHours();
-        if (!hourMap[hour]) {
-          hourMap[hour] = { hour, total_minutes: 0, sessions: 0 };
-        }
-        hourMap[hour].total_minutes += Math.round((session.duration_seconds || 0) / 60);
-        hourMap[hour].sessions += 1;
-      }
-
-      const hourEntries = Object.values(hourMap)
-        .map(h => ({
-          hour: h.hour,
-          label: String(h.hour).padStart(2, '0') + ':00',
-          total_minutes: h.total_minutes,
-          sessions: h.sessions,
-        }))
-        .sort((a, b) => b.total_minutes - a.total_minutes);
-
-      const bestHours = hourEntries.slice(0, 3);
-
-      let summary = 'Preciso de mais sessões de foco para sugerir horários';
-      if (bestHours.length >= 2) {
-        const hours = bestHours.map(h => h.hour).sort((a, b) => a - b);
-        const hourLabels = hours.map(h => h + 'h');
-        summary = `Seus melhores horários de foco são ${hourLabels.join('-')}`;
-      } else if (bestHours.length === 1) {
-        summary = `Seu melhor horário de foco é ${bestHours[0].hour}h`;
-      }
-
-      res.json({
-        best_hours: bestHours,
-        summary,
-        total_sessions: sessions.length,
-      });
+      res.json(await insights.bestHours());
     } catch (error) {
       console.error('Best hours insights error:', error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  router.get('/correlation', (req, res) => {
+  router.get('/correlation', asyncRoute(async (req, res) => {
     try {
-      const days = Math.min(Number(req.query.days) || 60, 180);
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      const cutoffStr = cutoff.toISOString().split('T')[0];
-
-      const wellnessRows = db.prepare(
-        'SELECT date, sleep_hours, sleep_quality, mood, productivity FROM wellness_checks WHERE date >= ? ORDER BY date ASC',
-      ).all(cutoffStr);
-
-      if (wellnessRows.length < 5) {
-        return res.json({
-          enough_data: false,
-          message: 'Preciso de pelo menos 5 dias com check-in de bem-estar para comparar.',
-          days_analyzed: wellnessRows.length,
-        });
-      }
-
-      const activeHabitsCount = db.prepare("SELECT COUNT(*) as c FROM habits WHERE status = 'active'").get().c;
-      if (activeHabitsCount === 0) {
-        return res.json({
-          enough_data: false,
-          message: 'Nenhum hábito ativo para correlacionar.',
-          days_analyzed: wellnessRows.length,
-        });
-      }
-
-      const high = { mood: 0, sleep_hours: 0, productivity: 0, count: 0 };
-      const low = { mood: 0, sleep_hours: 0, productivity: 0, count: 0 };
-
-      for (const w of wellnessRows) {
-        const completed = db.prepare(
-          `SELECT COUNT(DISTINCT habit_id) as c FROM habit_logs
-           WHERE date = ? AND completed = 1
-           AND habit_id IN (SELECT id FROM habits WHERE status = 'active')`,
-        ).get(w.date).c;
-        const rate = completed / activeHabitsCount;
-        const bucket = rate >= 0.8 ? high : low;
-        bucket.mood += w.mood || 0;
-        bucket.sleep_hours += w.sleep_hours || 0;
-        bucket.productivity += w.productivity || 0;
-        bucket.count += 1;
-      }
-
-      const avg = (b) => b.count === 0 ? null : {
-        mood: +(b.mood / b.count).toFixed(2),
-        sleep_hours: +(b.sleep_hours / b.count).toFixed(2),
-        productivity: +(b.productivity / b.count).toFixed(2),
-        days: b.count,
-      };
-
-      const highAvg = avg(high);
-      const lowAvg = avg(low);
-
-      let insight = null;
-      if (highAvg && lowAvg) {
-        insight = {
-          mood_delta: +(highAvg.mood - lowAvg.mood).toFixed(2),
-          sleep_delta: +(highAvg.sleep_hours - lowAvg.sleep_hours).toFixed(2),
-          productivity_delta: +(highAvg.productivity - lowAvg.productivity).toFixed(2),
-        };
-      }
-
-      res.json({
-        enough_data: true,
-        days_analyzed: wellnessRows.length,
-        high_completion: highAvg,
-        low_completion: lowAvg,
-        insight,
-      });
+      res.json(await insights.correlation(req.query.days));
     } catch (error) {
       console.error('Correlation insights error:', error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  router.get('/weekly', (req, res) => {
+  router.get('/weekly', asyncRoute(async (req, res) => {
     try {
       const weekStart = mondayOf(req.query.week_start || req.query.date);
-      const payload = buildWeeklyInsights(db, weekStart, { today: getLocalDateString() });
+      const payload = await insights.weekly(weekStart, getLocalDateString());
       res.json(payload);
     } catch (error) {
       console.error('Weekly insights error:', error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  router.get('/avoidance', (req, res) => {
+  router.get('/avoidance', asyncRoute(async (req, res) => {
     try {
       const today = req.query.date || getLocalDateString();
-      const payload = buildAvoidanceInsights(db, today);
+      const payload = await insights.avoidance(today);
       res.json(payload);
     } catch (error) {
       console.error('Avoidance insights error:', error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   return router;
 }
 
-export function registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey }) {
-  app.post('/api/praxia/confront', async (req, res) => {
+export function registerPraxiaRoutes(app, { insights, getLocalDateString, openaiApiKey }) {
+  app.post('/api/praxia/confront', asyncRoute(async (req, res) => {
     try {
       const today = req.body?.date || getLocalDateString();
       const note = String(req.body?.note || '').trim().slice(0, 500);
-      const avoidance = buildAvoidanceInsights(db, today);
+      // A leitura termina (transação fechada) antes de qualquer chamada externa.
+      const avoidance = await insights.avoidance(today);
       const rulesMirror = buildRuleBasedPraxiaMirror(avoidance);
 
       if (!openaiApiKey) {
@@ -244,5 +125,5 @@ Sem listas numeradas dentro das strings. Sem emoji.`,
       console.error('PraxIA confront error:', error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 }

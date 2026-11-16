@@ -42,6 +42,7 @@ function start(extraEnv = {}) {
       PORT: String(port), HOST: '127.0.0.1',
       PRAXIS_WEB_AUTH: '1', PRAXIS_APP_PASSWORD: PASS_A, FORJA_APP_PASSWORD: PASS_A,
       PRAXIS_COOKIE_SECURE: '0', FORJA_CALENDAR_SYNC_ENABLED: '0', FORJA_API_KEY: API_KEY,
+      OPENAI_API_KEY: '',
       PRAXIS_CAPTURE_WEBHOOK_SECRET: `gancho-${port}`, PRAXIS_API_VERSION: 'teste-revisoes',
       FORJA_TRANSCRIBE_PYTHON: '/bin/false', PRAXIS_DATA_DIR: path.join(apiDir, 'data'),
       ...extraEnv,
@@ -216,6 +217,27 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual([notMine.status, notMine.json.error], [400, 'project_slug not found: praxis'], 'frente de outra conta não existe aqui');
     const control = new Database(path.join(apiDir, 'praxis.db'), { readonly: true });
     try { assert.deepEqual(control.prepare('SELECT summary FROM continuity_guidance').pluck().all(), ['Do Jota']); } finally { control.close(); }
+  });
+
+  await t.test('insights de leitura pela camada nova (fase 4): cada conta lê só os seus dados', async () => {
+    const made = await call(proc, 'POST', '/api/tasks', { cookie: A, body: { title: 'Declarar imposto', date: '2026-01-10', category: 'pessoal', priority: 'high' } });
+    assert.ok([200, 201].includes(made.status), made.text);
+    const titles = (res) => res.json.items.map((item) => item.title);
+    const mine = await call(proc, 'GET', '/api/insights/avoidance?date=2026-11-16', { cookie: A });
+    assert.equal(mine.status, 200, mine.text);
+    assert.ok(titles(mine).includes('Declarar imposto'));
+    assert.ok(!titles(await call(proc, 'GET', '/api/insights/avoidance?date=2026-11-16', { cookie: B })).includes('Declarar imposto'), 'a Bia não vê a tarefa do Jota');
+    assert.ok(titles(await call(proc, 'GET', '/api/insights/avoidance?date=2026-11-16', { key: API_KEY })).includes('Declarar imposto'), 'chave do agente lê a conta do dono legado');
+    const weekA = (await call(proc, 'GET', '/api/insights/weekly?week_start=2026-02-02', { cookie: A })).json;
+    const weekB = (await call(proc, 'GET', '/api/insights/weekly?week_start=2026-02-02', { cookie: B })).json;
+    assert.deepEqual([weekA.bottlenecks.overdue_tasks_count, weekB.bottlenecks.overdue_tasks_count], [1, 0]);
+    for (const url of ['/api/insights/best-hours', '/api/insights/correlation']) {
+      assert.equal((await call(proc, 'GET', url, { cookie: B })).status, 200, url);
+    }
+    const mirror = await call(proc, 'POST', '/api/praxia/confront', { cookie: A, body: { date: '2026-11-16' } });
+    assert.deepEqual([mirror.status, mirror.json.source], [200, 'rules'], 'sem chave da OpenAI responde com as regras, sem rede');
+    const bad = await fetch(`${proc.base}/api/insights/avoidance?date=lixo`, { headers: { cookie: A }, signal: AbortSignal.timeout(3000) });
+    assert.deepEqual([bad.status, (await bad.json()).error], [500, 'Invalid time value'], 'erro responde em JSON, não pendura');
   });
 
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {

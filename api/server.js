@@ -44,6 +44,7 @@ import { initContinuityGuidanceSchema } from './continuityGuidance.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createProjectsService } from './services/personal/projects.js';
 import { createGuidanceService } from './services/personal/guidance.js';
+import { createInsightsService } from './services/personal/insights.js';
 import { createStorageRuntime, storageEngineFromEnv } from './storage/runtime.js';
 import { createWeeklyReviewsService } from './services/weeklyReviews.js';
 import { createPurchasesService } from './services/purchases.js';
@@ -295,8 +296,9 @@ registerParseVoiceRoutes(app, {
 app.get('/api/calendar/today', (req, res, next) => (isLegacyScope() ? next() : res.json([])));
 app.use('/api/calendar', legacyOnly('calendar_not_linked', 'Agenda não ligada a esta conta'), createCalendarRouter());
 app.use('/api/rituals', createRitualsRouter({ db, getLocalDateString, nextSortOrder }));
-app.use('/api/insights', createInsightsRouter({ db, getLocalDateString }));
-registerPraxiaRoutes(app, { db, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
+const insightsService = createInsightsService({ storage: storageRuntime.storage });
+app.use('/api/insights', createInsightsRouter({ insights: insightsService, getLocalDateString }));
+registerPraxiaRoutes(app, { insights: insightsService, getLocalDateString, openaiApiKey: OPENAI_API_KEY });
 app.use('/api/gamification', createGamificationRouter({ db, getLocalDateString }));
 app.use('/api/weekly-reviews', createWeeklyReviewsRouter({ weeklyReviews }));
 

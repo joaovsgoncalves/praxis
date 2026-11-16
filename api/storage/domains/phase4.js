@@ -10,6 +10,8 @@ import { sqliteProjects, sqliteProjectUpdates } from '../sqlite/projects.js';
 import { firestoreProjects, firestoreProjectUpdates } from '../firestore/projects.js';
 import { sqliteContinuityGuidance } from '../sqlite/continuityGuidance.js';
 import { firestoreContinuityGuidance } from '../firestore/continuityGuidance.js';
+import { sqliteInsightsRead } from '../sqlite/insightsRead.js';
+import { firestoreInsightsRead } from '../firestore/insightsRead.js';
 
 // --- Configurações: tabela `user_settings`, linha única. ---
 /**
@@ -156,4 +158,45 @@ const continuityGuidance = {
   firestore: (userDoc, transaction) => firestoreContinuityGuidance(userDoc, transaction, GUIDANCE_FIELDS),
 };
 
-export const DOMAINS = [userSettings, projects, projectUpdates, continuityGuidance];
+// --- Insights de leitura: domínio SÓ DE LEITURA sobre tabelas de outras fases e das frentes. ---
+/**
+ * Lê `tasks`, `habits`, `habit_logs`, `focus_sessions`, `wellness_checks`, `capture_queue`, `projects` e
+ * `project_updates` (mapeamento do FROZEN §2: users/{uid}/<camelCase(tabela)>/{documentId(id)}, documento =
+ * linha SQLite + `_row` opcional). Nunca grava nelas. Cada método é uma das consultas da rota antiga
+ * (routes/insights.js, lib/weeklyInsights.js, lib/avoidanceInsights.js no commit bcbadad).
+ *
+ * Ordem de inserção (o rowid) que as consultas antigas usavam sem ORDER BY: `_row` do documento. Documento
+ * sem `_row` vem depois dos que têm e desempata pelo id; só importa em empate de ordenação.
+ * Argumento é sempre texto (data ou carimbo, ligado como TEXT); qualquer outro tipo é recusado.
+ */
+const insightsText = (value) => {
+  if (typeof value !== 'string') throw new StorageError('invalid_insights_argument');
+  return value;
+};
+const insightsNone = (...args) => {
+  if (args.length) throw new StorageError('invalid_insights_argument');
+  return [];
+};
+const insightsTexts = (count) => (...args) => {
+  if (args.length !== count) throw new StorageError('invalid_insights_argument');
+  return args.map(insightsText);
+};
+export const INSIGHTS_READ_METHODS = Object.freeze({
+  // /api/insights/best-hours e /correlation
+  focusSessionsSince: 1, wellnessSince: 1,
+  // /api/insights/weekly
+  completedTasksOfWeek: 2, stalePendingTasks: 1, activeHabits: 0, habitLogs: 2, taskDayCounts: 2, focusTotals: 2,
+  wellnessBetween: 2, ideaCounts: 2, promissoras: 0, projectNames: 0, projectUpdatesBetween: 2, completedTasksForHistory: 2,
+  // /api/insights/avoidance
+  overdueTasks: 1, floatingTasks: 1, staleIdeas: 1, closedHabitIds: 1, skippedHabitIds: 1, skippedHabitCounts: 2,
+  failedCaptureCount: 0, pendingTodayCount: 1,
+});
+
+const insightsRead = {
+  name: 'insightsRead',
+  spec: () => Object.fromEntries(Object.entries(INSIGHTS_READ_METHODS).map(([method, count]) => [method, ['read', count === 0 ? insightsNone : insightsTexts(count)]])),
+  sqlite: (db) => sqliteInsightsRead(db),
+  firestore: (userDoc, transaction) => firestoreInsightsRead(userDoc, transaction),
+};
+
+export const DOMAINS = [userSettings, projects, projectUpdates, continuityGuidance, insightsRead];
