@@ -5,7 +5,7 @@
  * Contrato (normalização dos argumentos) de cada domínio de rotina. As linhas trafegam como o SQLite
  * as guarda: colunas na ordem da tabela, valores já com a afinidade da coluna aplicada pelo serviço.
  */
-import { StorageError, recordId, taskGoalKey, taskIdList } from '../contract.js';
+import { StorageError, recordId, taskGoalKey, taskIdList, rowToken } from '../contract.js';
 import { sqliteFocusSessions } from '../sqlite/focusSessions.js';
 import { sqliteWellnessChecks } from '../sqlite/wellnessChecks.js';
 import { firestoreFocusSessions } from '../firestore/focusSessions.js';
@@ -15,6 +15,8 @@ import { sqliteHabits } from '../sqlite/habits.js';
 import { firestoreGoals } from '../firestore/goals.js';
 import { firestoreHabits } from '../firestore/habits.js';
 import { sqliteXpEvents, sqliteGamification, sqliteAchievements, sqliteAchievementFacts, sqliteHabitLogs, sqliteRituals } from '../sqlite/xp.js';
+import { sqliteTaskChecklistItems, sqliteTaskCalendarQueue, sqliteDayRolloverRuns } from '../sqlite/taskRoutine.js';
+import { firestoreTaskChecklistItems, firestoreTaskCalendarQueue, firestoreDayRolloverRuns } from '../firestore/taskRoutine.js';
 import { firestoreXpEvents, firestoreGamification, firestoreAchievements, firestoreAchievementFacts, firestoreHabitLogs, firestoreRituals } from '../firestore/xp.js';
 
 function plain(value, code = 'invalid_record') {
@@ -33,7 +35,7 @@ function columnValue(value, affinity, notNull = false) {
 }
 
 /** Validador de linha completa e de alteração a partir das colunas [nome, afinidade, NOT NULL?]. */
-function rowContract(columns, immutable) {
+function rowContract(columns, immutable, keyName = 'id') {
   const byName = new Map(columns.map(([name, affinity, notNull]) => [name, { affinity, notNull: Boolean(notNull) }]));
   const fields = Object.freeze(columns.map(([name]) => name));
   function check(input) {
@@ -41,7 +43,7 @@ function rowContract(columns, immutable) {
     for (const [key, value] of Object.entries(input)) {
       const column = byName.get(key);
       if (!column) throw new StorageError('unknown_field');
-      if (key === 'id') recordId(value);
+      if (key === keyName) recordId(value);
       else if (!columnValue(value, column.affinity, column.notNull)) throw new StorageError('invalid_value');
     }
     return structuredClone(input);
@@ -95,15 +97,7 @@ export const WELLNESS_COLUMNS = Object.freeze([['id', 'TEXT', true], ['date', 'T
 const wellnessRows = rowContract(WELLNESS_COLUMNS, new Set(['id', 'date', 'created_date']));
 export const WELLNESS_FIELDS = wellnessRows.fields;
 
-/**
- * Ficha de ordem de inserção (`_row` no Firestore) reservada por `nextRow()` antes das escritas, para
- * criar linhas de duas tabelas na mesma transação (o Firestore exige ler tudo antes de gravar).
- * SQLite: `null` (o rowid é implícito). Firestore: inteiro positivo.
- */
-function rowToken(value) {
-  if (value !== null && !(Number.isSafeInteger(value) && value > 0)) throw new StorageError('invalid_row_token');
-  return value;
-}
+// `rowToken` (ficha de ordem de inserção reservada por `nextRow()`) vive em storage/contract.js.
 /** `goal_id = ?` e lista de ids a soltar: mesma regra das tarefas (storage/contract.js). */
 const goalKey = taskGoalKey, idList = taskIdList;
 const sqlStamp = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
@@ -148,6 +142,17 @@ export const HABIT_LOG_FIELDS = habitLogRows.fields;
 export const RITUAL_COLUMNS = Object.freeze([['id', 'TEXT', true], ['name', 'TEXT', true], ['emoji', 'TEXT'], ['time_of_day', 'TEXT'], ['habits_order', 'TEXT'], ['status', 'TEXT'], ['created_date', 'TEXT']]);
 const ritualRows = rowContract(RITUAL_COLUMNS, new Set(['id', 'created_date']));
 export const RITUAL_FIELDS = ritualRows.fields;
+// ---- Tarefas (domínio 5): `task_checklist_items`, `task_calendar_queue` (chave task_id), `day_rollover_runs` (chave day) ----
+export const CHECKLIST_COLUMNS = Object.freeze([['id', 'TEXT', true], ['task_id', 'TEXT', true], ['title', 'TEXT', true], ['done', 'INTEGER'], ['sort_order', 'INTEGER'], ['created_date', 'TEXT'], ['updated_date', 'TEXT']]);
+const checklistRows = rowContract(CHECKLIST_COLUMNS, new Set(['id', 'task_id', 'created_date']));
+export const CHECKLIST_FIELDS = checklistRows.fields;
+export const QUEUE_COLUMNS = Object.freeze([['task_id', 'TEXT', true], ['snapshot', 'TEXT'], ['status', 'TEXT', true], ['attempts', 'INTEGER', true], ['last_error', 'TEXT'], ['next_attempt_at', 'TEXT', true], ['created_date', 'TEXT', true], ['updated_date', 'TEXT', true]]);
+const queueRows = rowContract(QUEUE_COLUMNS, new Set(['task_id', 'created_date']), 'task_id');
+export const QUEUE_FIELDS = queueRows.fields;
+export const ROLLOVER_COLUMNS = Object.freeze([['day', 'TEXT', true], ['closed', 'INTEGER', true], ['first_run_at', 'TEXT', true], ['last_change_at', 'TEXT']]);
+const rolloverRows = rowContract(ROLLOVER_COLUMNS, new Set(['day', 'first_run_at']), 'day');
+export const ROLLOVER_FIELDS = rolloverRows.fields;
+
 /** [[id, posição], ...] para `reorder`: id válido e posição inteira. */
 function positionEntries(entries) {
   if (!Array.isArray(entries)) throw new StorageError('invalid_query');
@@ -173,12 +178,68 @@ function logListQuery(input = {}) {
   }
   return query;
 }
+function positiveInt(value) {
+  if (!Number.isSafeInteger(value) || value < 1) throw new StorageError('invalid_query');
+  return value;
+}
 function sourceKey(type, id) {
   if (typeof type !== 'string' || typeof id !== 'string') throw new StorageError('invalid_query');
   return [type, id];
 }
 
 export const DOMAINS = [
+  {
+    // Itens de checklist da tarefa: `ORDER BY sort_order IS NULL, sort_order, created_date`, empate na inserção.
+    name: 'taskChecklistItems',
+    spec: () => ({
+      get: ['read', (id, taskId) => [recordId(id), textKey(taskId)]],
+      list: ['read', (taskId) => [textKey(taskId)]],
+      // Totais por tarefa (total, feitos) de uma lista de ids de tarefa, como o GROUP BY da lista.
+      counts: ['read', (taskIds) => [taskIdList(taskIds)]],
+      maxSort: ['read', (taskId) => [textKey(taskId)]],
+      nextRow: ['read', () => []],
+      create: ['readwrite', (row) => [checklistRows.row(row)]],
+      createAt: ['write', (row, token) => [checklistRows.row(row), rowToken(token)]],
+      patch: ['write', (id, fields) => [recordId(id), checklistRows.patch(fields)]],
+      remove: ['write', (id) => [recordId(id)]],
+      removeByTask: ['readwrite', (taskId) => [textKey(taskId)]],
+      // Só apaga (sem ler): o serviço leu os ids antes, na fase de leituras, para poder gravar depois do estorno de XP.
+      removeMany: ['write', (ids) => [idList(ids)]],
+    }),
+    sqlite: sqliteTaskChecklistItems,
+    firestore: (userDoc, transaction, client) => firestoreTaskChecklistItems(userDoc, transaction, client),
+  },
+  {
+    // Fila da agenda: uma linha por tarefa (chave `task_id`); a regra de fundir intenções está no serviço.
+    name: 'taskCalendarQueue',
+    spec: () => ({
+      get: ['read', (taskId) => [textKey(taskId)]],
+      nextRow: ['read', () => []],
+      createAt: ['write', (row, token) => [queueRows.row(row), rowToken(token)]],
+      patch: ['write', (taskId, fields) => [recordId(taskId), queueRows.patch(fields)]],
+      // Vencidas (`status = 'pending' AND next_attempt_at <= agora`), `next_attempt_at`, no máximo `limit`.
+      due: ['read', (nowIso, limit) => [textKey(nowIso), positiveInt(limit)]],
+      stats: ['read', () => []],
+      list: ['read', () => []],
+      // Condicionais a `updated_date` (a intenção nova que chegou durante a chamada fica).
+      finish: ['readwrite', (taskId, updatedDate) => [recordId(taskId), textKey(updatedDate)]],
+      fail: ['readwrite', (taskId, updatedDate, fields) => [recordId(taskId), textKey(updatedDate), queueRows.patch(fields)]],
+    }),
+    sqlite: sqliteTaskCalendarQueue,
+    firestore: (userDoc, transaction, client) => firestoreTaskCalendarQueue(userDoc, transaction, client),
+  },
+  {
+    // Virada do dia: uma linha por dia (chave `day`).
+    name: 'dayRolloverRuns',
+    spec: () => ({
+      get: ['read', (day) => [textKey(day)]],
+      list: ['read', () => []],
+      create: ['write', (row) => [rolloverRows.row(row)]],
+      patch: ['write', (day, fields) => [recordId(day), rolloverRows.patch(fields)]],
+    }),
+    sqlite: sqliteDayRolloverRuns,
+    firestore: (userDoc, transaction, client) => firestoreDayRolloverRuns(userDoc, transaction, client),
+  },
   {
     name: 'focusSessions',
     spec: () => ({

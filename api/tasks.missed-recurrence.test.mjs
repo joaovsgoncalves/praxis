@@ -4,12 +4,13 @@ import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
 import { createDayRollover } from './lib/dayRollover.js';
 import { buildRouteCtx, createTestDb, fixedDate, requestJson, startTestServer } from './test-support/helpers.mjs';
+import { sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 
 const TODAY = '2026-10-15';
 const YESTERDAY = '2026-10-14';
 
 async function setup(t) {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const calendarCalls = [];
   const app = express();
   app.use(express.json());
@@ -20,7 +21,8 @@ async function setup(t) {
       return { skipped: true };
     },
   });
-  app.use('/api/tasks', createTasksRouter(ctx));
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, ctx) })));
   // O fechamento é da virada do dia; a lista só lê.
   const rollover = createDayRollover({
     db,

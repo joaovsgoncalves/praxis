@@ -1,5 +1,6 @@
 import { StorageError } from '../contract.js';
 import { documentId, originalId } from '../schema.mjs';
+import { compareSqlite } from '../sqliteOrder.js';
 
 /**
  * Base das coleções de rotina da fase 3: `users/{uid}/<colecao>/{documentId(id)}`, documento = linha
@@ -16,7 +17,7 @@ import { documentId, originalId } from '../schema.mjs';
  * criar grava também a sentinela `users/{uid}/uniqueKeys/{chave}` no mesmo commit (ALREADY_EXISTS se
  * já existe), como em storage/firestore/weeklyReviews.js.
  */
-export function phase3Rows(userDoc, transaction, client, collection, fields, { uniqueKey = null } = {}) {
+export function phase3Rows(userDoc, transaction, client, collection, fields, { uniqueKey = null, keyField = 'id' } = {}) {
   const keys = userDoc.collection('uniqueKeys');
   const col = userDoc.collection(collection);
   const seqRef = userDoc.collection('sequences').doc(collection);
@@ -24,12 +25,14 @@ export function phase3Rows(userDoc, transaction, client, collection, fields, { u
   const created = new Set();
   const project = (doc) => {
     const row = doc.data();
-    originalId(doc.id, row.id);
+    originalId(doc.id, row[keyField]);
     return Object.fromEntries(fields.map((field) => [field, row[field] ?? null]));
   };
+  // Dentro da transação as leituras vêm antes de qualquer escrita: a coleção inteira lida uma vez só.
+  let snapshot = null;
   // `seen` é por tentativa: a repetição automática do Firestore começa com um conjunto vazio.
   async function createWith(tx, row, seen) {
-    const ref = col.doc(documentId(row.id));
+    const ref = col.doc(documentId(row[keyField]));
     if (seen.has(ref.path)) throw new StorageError('already_exists');
     const seq = await tx.get(seqRef);
     const next = (seq.exists ? seq.data().next : 0) + 1;
@@ -37,15 +40,20 @@ export function phase3Rows(userDoc, transaction, client, collection, fields, { u
     const keyRef = key === null ? null : keys.doc(documentId(key));
     if (keyRef && seen.has(keyRef.path)) throw new StorageError('already_exists');
     seen.add(ref.path);
-    if (keyRef) { seen.add(keyRef.path); tx.create(keyRef, { domain: collection, key, record_id: row.id }); }
+    if (keyRef) { seen.add(keyRef.path); tx.create(keyRef, { domain: collection, key, record_id: row[keyField] }); }
     tx.set(seqRef, { next });
     tx.create(ref, { ...row, _row: next });
     return structuredClone(row);
   }
   return {
-    /** [{ row, seq }] na ordem de inserção. */
+    /**
+     * [{ row, seq }] na ordem de inserção. Documento sem `_row` (dado anterior à sequência, ex.: tarefas
+     * das fases 1-2) vale 0: vem antes dos numerados e empata por id (bytes UTF-8), sempre igual.
+     */
     async all() {
-      return (await read(col)).docs.map((doc) => ({ row: project(doc), seq: doc.data()._row })).sort((a, b) => a.seq - b.seq);
+      if (!snapshot || !transaction) snapshot = await read(col);
+      return snapshot.docs.map((doc) => ({ row: project(doc), seq: doc.data()._row ?? 0 }))
+        .sort((a, b) => (a.seq - b.seq) || compareSqlite(a.row[keyField], b.row[keyField]));
     },
     async get(id) {
       const snap = await read(col.doc(documentId(id)));
@@ -64,7 +72,7 @@ export function phase3Rows(userDoc, transaction, client, collection, fields, { u
     async createAt(row, token) {
       if (!transaction) throw new StorageError('transaction_required');
       if (token === null) throw new StorageError('invalid_row_token');
-      const ref = col.doc(documentId(row.id));
+      const ref = col.doc(documentId(row[keyField]));
       if (created.has(ref.path)) throw new StorageError('already_exists');
       created.add(ref.path);
       transaction.set(seqRef, { next: token });

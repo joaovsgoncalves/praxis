@@ -9,13 +9,14 @@ import express from 'express';
 import { createTasksRouter } from './routes/tasks.js';
 import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
 import { buildRouteCtx, createTestDb, fixedDate, startTestServer } from './test-support/helpers.mjs';
+import { sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 
 const TODAY = '2026-11-13';
 const TOMORROW = '2026-11-14';
 const AFTER = '2026-11-15';
 
 async function setup(t, { sync } = {}) {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const clock = { now: new Date('2026-11-13T21:00:00.000Z') };
   const calls = [];
   const syncTaskToCalendar = (task) => {
@@ -25,13 +26,13 @@ async function setup(t, { sync } = {}) {
   const calendarQueue = createTaskCalendarQueue({ db, syncTaskToCalendar, now: () => clock.now });
   const app = express();
   app.use(express.json());
-  app.use('/api/tasks', createTasksRouter(buildRouteCtx(db, {
+  const { storage, scoped } = sqliteStorageFor(db);
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, buildRouteCtx(db, {
     getLocalDateString: fixedDate(TODAY),
     syncTaskToCalendar,
-    calendarQueue,
     // Nos testes a fila só anda quando o teste manda: prova que a rota não espera a agenda.
     scheduleCalendarDrain: () => {},
-  })));
+  }), { now: () => clock.now }) })));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

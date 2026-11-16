@@ -1,5 +1,5 @@
 /**
- * Rotas já servidas pela camada nova (revisões semanais, compras, foco, bem-estar, metas, gamificação e hábitos), no servidor de verdade: cópia isolada da API (banco novo,
+ * Rotas já servidas pela camada nova (revisões semanais, compras, foco, bem-estar, metas, gamificação, hábitos e tarefas), no servidor de verdade: cópia isolada da API (banco novo,
  * sem agenda, sem segredo de produção), duas contas, chave do agente no fluxo do Alfred, conferência
  * no arquivo de cada conta e desligamento gracioso.
  */
@@ -257,6 +257,62 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.equal((await call(proc, 'GET', '/api/habits')).status, 401);
   });
 
+  await t.test('tarefas pela camada nova: conta própria, XP, série, checklist, adiar, ideia, excluir e chave do agente', async () => {
+    const made = spawnSync(process.execPath, ['scripts/create-user.mjs', 'Caio.Teste', 'Caio'], { cwd: apiDir, env: { ...process.env, PRAXIS_NEW_USER_PASSWORD: PASS_B }, encoding: 'utf8' });
+    assert.equal(made.status, 0, made.stderr);
+    const C = (await call(proc, 'POST', '/api/auth/login', { body: { username: 'caio.teste', password: PASS_B } })).cookie;
+    assert.ok(C);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' });
+    const t1 = await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'P1 - Série do Caio', date: today, recurrence: 'daily', sort_order: 5 } });
+    assert.equal(t1.status, 201, t1.text); assert.equal(t1.json.title, 'Série do Caio'); assert.deepEqual(t1.json.calendar_sync, { skipped: true }, 'conta sem agenda ligada');
+    assert.equal((await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'Meta que não existe', goal_id: 'nada' } })).status, 400);
+    // Alfred (chave) grava na conta do dono legado, não na do Caio.
+    const alfred = await call(proc, 'POST', '/api/tasks', { key: API_KEY, body: { title: 'Pelo Alfred', date: today } });
+    assert.equal(alfred.status, 201, alfred.text);
+    assert.deepEqual((await call(proc, 'GET', '/api/tasks', { cookie: C })).json.map((r) => r.title), ['Série do Caio']);
+    assert.ok((await call(proc, 'GET', '/api/tasks?limit=500', { key: API_KEY })).json.some((r) => r.id === alfred.json.id));
+    assert.equal((await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: B, body: { title: 'invadida' } })).status, 404, 'a outra conta não edita');
+    assert.equal((await call(proc, 'DELETE', `/api/tasks/${t1.json.id}`, { cookie: B })).status, 404);
+    assert.equal((await call(proc, 'GET', `/api/tasks/${alfred.json.id}`, { cookie: C })).status, 404);
+
+    // checklist: contagens na lista e no detalhe
+    const c1 = await call(proc, 'POST', `/api/tasks/${t1.json.id}/checklist`, { cookie: C, body: { title: 'Passo 1' } });
+    const c2 = await call(proc, 'POST', `/api/tasks/${t1.json.id}/checklist`, { cookie: C, body: { title: 'Passo 2' } });
+    assert.equal(c1.status, 201, c1.text); assert.equal(c2.json.sort_order, 1);
+    assert.equal((await call(proc, 'PATCH', `/api/tasks/${t1.json.id}/checklist/${c1.json.id}`, { cookie: C, body: { done: true } })).json.done, true);
+    assert.deepEqual((await call(proc, 'GET', `/api/tasks/${t1.json.id}`, { cookie: C })).json.checklist_done, 1);
+    assert.equal((await call(proc, 'GET', `/api/tasks/${t1.json.id}/checklist`, { cookie: B })).status, 404);
+
+    // concluir: XP uma vez e próxima ocorrência; reabrir estorna e não duplica a série
+    const done = await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: C, body: { status: 'completed' } });
+    assert.equal(done.status, 200, done.text); assert.equal(done.json.xp_sync.awarded, 10); assert.equal(done.json.next_occurrence.created, true);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: C })).json.xp_total, 10);
+    const reopened = await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: C, body: { status: 'pending' } });
+    assert.equal(reopened.json.xp_sync.awarded, -10);
+    const again = await call(proc, 'PUT', `/api/tasks/${t1.json.id}`, { cookie: C, body: { status: 'completed' } });
+    assert.equal(again.json.next_occurrence.created, false, 'a segunda conclusão acha a ocorrência que já existe'); assert.equal(again.json.next_occurrence.id, done.json.next_occurrence.id);
+
+    // adiar, ideia e posição
+    const later = await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'Adiar', date: today } });
+    const pushed = await call(proc, 'POST', `/api/tasks/${later.json.id}/not-today`, { cookie: C, body: { reason: 'Energy' } });
+    assert.equal(pushed.status, 200, pushed.text); assert.equal(pushed.json.day_outcome, 'not_today'); assert.equal(pushed.json.day_outcome_reason, 'energy'); assert.ok(pushed.json.date > today);
+    const idea = await call(proc, 'POST', '/api/tasks', { cookie: C, body: { title: 'Ideia solta', category: 'ideias' } });
+    assert.equal(idea.json.idea_status, 'capturada');
+    const promoted = await call(proc, 'POST', `/api/ideas/${idea.json.id}/to-task`, { cookie: C, body: {} });
+    assert.equal(promoted.status, 201, promoted.text); assert.equal(promoted.json.idea.idea_status, 'virou_tarefa'); assert.equal(promoted.json.task.source_idea_id, idea.json.id);
+    assert.equal((await call(proc, 'POST', `/api/ideas/${idea.json.id}/to-task`, { cookie: C, body: {} })).status, 409);
+    const reordered = await call(proc, 'PATCH', '/api/tasks/reorder', { cookie: C, body: { ordered_ids: [promoted.json.task.id, later.json.id] } });
+    assert.equal(reordered.json.updated, 2); assert.deepEqual(reordered.json.tasks.slice(0, 2).map((r) => r.id), [promoted.json.task.id, later.json.id]);
+
+    // excluir: o XP da tarefa concluída é estornado, o checklist some e nada vaza para a outra conta
+    assert.deepEqual((await call(proc, 'DELETE', `/api/tasks/${t1.json.id}`, { cookie: C })).json.xp_sync.awarded, -10);
+    assert.equal((await call(proc, 'GET', '/api/gamification', { cookie: C })).json.xp_total, 0);
+    assert.equal((await call(proc, 'GET', `/api/tasks/${t1.json.id}/checklist`, { cookie: C })).status, 404);
+    assert.equal((await call(proc, 'GET', '/api/tasks')).status, 401);
+    const bad = await fetch(`${proc.base}/api/tasks?limit=1.5`, { headers: { cookie: C }, signal: AbortSignal.timeout(3000) });
+    assert.equal(bad.status, 500); assert.match(await bad.text(), /datatype mismatch/);
+  });
+
   await t.test('desligamento: termina limpo e o que foi gravado está no arquivo de cada conta', async () => {
     proc.child.kill('SIGTERM');
     const { code } = await proc.exited;
@@ -286,6 +342,14 @@ test('revisões semanais pela camada nova: duas contas, agente, disco e desligam
     assert.deepEqual(other.prepare('SELECT title FROM goals').pluck().all(), ['Meta da Bia']);
     assert.deepEqual(other.prepare("SELECT title, goal_id IS NOT NULL FROM habits WHERE source = 'goal_wizard'").raw().all(), [['Meta da Bia', 1]]);
     assert.deepEqual(control.prepare("SELECT title, goal_id FROM tasks WHERE source = 'goal_wizard'").raw().all(), [['Primeiro passo', null]]);
+    const idC = control.prepare("SELECT id FROM praxis_users WHERE username = 'caio.teste'").pluck().get();
+    const third = new Database(path.join(apiDir, 'data', 'users', `${idC}.db`), { readonly: true });
+    t.after(() => third.close());
+    assert.deepEqual(third.prepare('SELECT title FROM tasks ORDER BY title').pluck().all(), ['Adiar', 'Ideia solta', 'Ideia solta', 'Série do Caio'], 'conta do Caio: a série seguiu, a tarefa excluída saiu');
+    assert.equal(third.prepare('SELECT COUNT(*) FROM task_checklist_items').pluck().get(), 0, 'checklist apagado com a tarefa');
+    assert.equal(third.prepare('SELECT COUNT(*) FROM task_calendar_queue').pluck().get(), 0, 'conta sem agenda não grava intenção');
+    assert.deepEqual(third.prepare('SELECT amount, reversed_date IS NOT NULL FROM xp_events').raw().all().sort(), [[10, 1], [10, 1]], 'dois prêmios da mesma origem, os dois estornados');
+    assert.equal(control.prepare("SELECT COUNT(*) FROM tasks WHERE title = 'Pelo Alfred'").pluck().get(), 1, 'a tarefa do Alfred ficou no banco do dono legado');
     assert.equal(fs.existsSync(path.join(apiDir, 'praxis.db-wal')) ? fs.statSync(path.join(apiDir, 'praxis.db-wal')).size : 0, 0, 'WAL consolidado no fechamento');
   });
 });

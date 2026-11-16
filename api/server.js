@@ -13,10 +13,9 @@ import {
 } from './praxisAuth.js';
 import { initializeDatabase, resolveDbPath } from './lib/dbInit.js';
 import { CATEGORIES, enrichCategory } from './lib/categories.js';
-import { getLevel } from './lib/gamification.js';
 import { createCalendarServices } from './lib/calendarSync.js';
-import { createTaskCalendarQueue } from './lib/taskCalendarQueue.js';
-import { createDayRollover } from './lib/dayRollover.js';
+import { createTaskCalendarQueue, initTaskCalendarQueueSchema } from './lib/taskCalendarQueue.js';
+import { createDayRollover, initDayRolloverSchema } from './lib/dayRollover.js';
 import { createRequestLog, resolveApiVersion } from './lib/requestLog.js';
 import { createTenantDb } from './lib/tenantDb.js';
 import { createUserDbs } from './lib/userDbs.js';
@@ -48,6 +47,7 @@ import { createFocusService, createWellnessService } from './services/routine/fo
 import { createGoalsService } from './services/routine/goals.js';
 import { createGamificationService } from './services/routine/gamification.js';
 import { createHabitsService, createHabitLogsService } from './services/routine/habits.js';
+import { createTasksService } from './services/routine/tasks.js';
 import { installGracefulShutdown } from './lib/shutdown.js';
 
 function loadEnvFile(filePath, allowedPrefixes = []) {
@@ -158,6 +158,9 @@ function prepareUserData(target, { personalSeeds }) {
   if (personalSeeds) seedFinanceIfEmpty(target);
   initProjectsSchema(target);
   initContinuityGuidanceSchema(target);
+  // Fila da agenda e virada do dia moram no storage: a tabela precisa existir em TODO banco de conta.
+  initTaskCalendarQueueSchema(target);
+  initDayRolloverSchema(target);
   if (personalSeeds) seedProjectsIfEmpty(target);
 }
 
@@ -230,18 +233,6 @@ function nextSortOrder(table) {
   return Number(row?.next_order || 0);
 }
 
-function reorderItems(table, orderedIds) {
-  if (!['tasks', 'habits'].includes(table)) throw new Error('Invalid reorder table');
-  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return 0;
-  const uniqueIds = [...new Set(orderedIds.filter(Boolean).map(String))];
-  const update = db.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`);
-  const run = db.transaction((ids) => {
-    ids.forEach((id, index) => update.run(index, id));
-  });
-  run(uniqueIds);
-  return uniqueIds.length;
-}
-
 // A agenda do Google ligada ao servidor é a do dono legado. Para as outras contas, nada sai daqui:
 // nem evento criado, nem fila, nem leitura da agenda dele.
 const calendarServices = createCalendarServices({ db, getLocalDateString });
@@ -259,21 +250,19 @@ const calendarQueue = {
   stats: (...args) => (isLegacyScope() ? legacyCalendarQueue.stats(...args) : { pending: 0, failed: 0 }),
 };
 
-const routeCtx = {
-  db,
-  enrichCategory,
+// Tarefas pela camada assíncrona: status, XP, próxima ocorrência e a intenção de agenda na mesma transação;
+// depois do commit a fila é drenada fora dela (e só o dono legado tem agenda ligada).
+const tasks = createTasksService({
+  storage: storageRuntime.storage,
   getLocalDateString,
   addDaysLocal,
   stripPriorityPrefix,
-  nextSortOrder,
-  reorderItems,
-  syncTaskToCalendar,
-  taskNeedsCalendarSync,
-  calendarQueue,
-  getLevel,
+  enrichCategory,
   SKIP_REASONS,
-  HABIT_OUTCOMES,
-};
+  taskNeedsCalendarSync,
+  calendarEnabled: isLegacyScope,
+  scheduleCalendarDrain: () => setImmediate(() => calendarQueue.drain()),
+});
 
 // --- Domain routes ---
 app.use('/api/categories', createCategoriesRouter(CATEGORIES));
@@ -284,8 +273,8 @@ app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não
 app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));
 app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
 registerCaptureRoutes(app, { db, apiDir: __dirname });
-app.use('/api/tasks', createTasksRouter(routeCtx));
-registerIdeaToTaskRoute(app, routeCtx);
+app.use('/api/tasks', createTasksRouter({ tasks }));
+registerIdeaToTaskRoute(app, { tasks });
 app.use('/api/habits', createHabitsRouter({ habits }));
 registerHabitLogRoutes(app, { habitLogs });
 app.use('/api/wellness', createWellnessRouter({ wellness }));

@@ -11,7 +11,8 @@
  * - excluir: solta tarefas e hábitos da meta e apaga a meta na MESMA transação; falha = 500
  *   `goal_delete_failed` e nada muda.
  *
- * Meta, tarefa e hábito do vínculo nascem na MESMA transação (todas as leituras antes das escritas).
+ * Meta, tarefa e hábito do vínculo nascem na MESMA transação (todas as leituras antes das escritas; a tarefa
+ * reserva a ficha de ordem de inserção com `nextRow` e entra com `createAt`, como o hábito).
  *
  * Diferenças intencionais (nenhum consumidor manda; tela e Alfred mandam texto e número):
  * (1) erro na tarefa/hábito do vínculo (ex.: `initial_link.date` objeto) não deixa a meta gravada
@@ -22,6 +23,7 @@
 import { randomUUID } from 'node:crypto';
 import { bindRow, nextSort, sqlStamp } from './affinity.js';
 import { habitRow } from '../../storage/domains/phase3.js';
+import { taskRow } from '../../storage/contract.js';
 
 const GOAL_INSERT = [['id', 'TEXT'], ['title', 'TEXT'], ['description', 'TEXT'], ['deadline', 'TEXT'], ['timeframe', 'TEXT'], ['category', 'TEXT'], ['status', 'TEXT'], ['manual_progress', 'INTEGER']];
 const GOAL_UPDATE = [['title', 'TEXT'], ['description', 'TEXT'], ['deadline', 'TEXT'], ['timeframe', 'TEXT'], ['category', 'TEXT'], ['status', 'TEXT'], ['manual_progress', 'INTEGER'], ['id', 'TEXT']];
@@ -83,8 +85,8 @@ export function createGoalsService({ storage, getLocalDateString, now = () => ne
     return storage.transaction(async (tx) => {
       // Leituras primeiro: ordem da meta, posição e ordem do item vinculado.
       const goalRow = await tx.goals.nextRow();
-      let top = null, habitSlot = null;
-      if (type === 'task') top = await tx.tasks.maxSort();
+      let top = null, habitSlot = null, taskSlot = null;
+      if (type === 'task') { top = await tx.tasks.maxSort(); taskSlot = await tx.tasks.nextRow(); }
       if (type === 'habit') { top = await tx.habits.maxSort(); habitSlot = await tx.habits.nextRow(); }
 
       let linked = null, linkWrite = null;
@@ -92,7 +94,7 @@ export function createGoalsService({ storage, getLocalDateString, now = () => ne
         const taskId = newId();
         const taskDate = initial_link.date || deadlineValue || getLocalDateString();
         const values = bindRow(LINK_INSERT, [taskId, linkTitle, description || '', taskDate, id, nextSort(top)]);
-        linkWrite = () => tx.tasks.create({ ...values, status: 'pending', priority: 'medium', category: 'pessoal', source: 'goal_wizard' });
+        linkWrite = () => tx.tasks.createAt(taskRow({ ...values, status: 'pending', priority: 'medium', category: 'pessoal', source: 'goal_wizard' }, now()), taskSlot);
         linked = { type: 'task', id: taskId, title: linkTitle };
       } else if (type === 'habit') {
         const habitId = newId();

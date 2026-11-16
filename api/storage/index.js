@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { assertUserId } from '../lib/tenantDb.js';
 import {
   StorageError, mapStorageError, recordId,
-  newTask, taskPatch, taskQuery, taskGoalKey, taskIdList,
+  newTask, taskPatch, taskQuery, taskGoalKey, taskIdList, fullTask, rowToken, taskSearchQuery, taskText, taskPositions,
   newReview, reviewPatch, reviewQuery, weekStart,
   newPurchase, purchasePatch, purchaseQuery,
 } from './contract.js';
@@ -19,13 +19,29 @@ function domainSpecs(now, extra) {
     tasks: {
       get: ['read', (id) => [recordId(id)]],
       list: ['read', (query) => [taskQuery(query)]],
-      create: ['write', (input) => [newTask(input, now)]],
+      // Firestore lê a sequência (ordem de inserção) antes de gravar: mesma regra nos dois motores.
+      create: ['readwrite', (input) => [newTask(input, now)]],
+      // Fase 3: ficha de ordem reservada por `nextRow()` (leitura) e linha completa na hora de gravar.
+      nextRow: ['read', () => []],
+      createAt: ['write', (row, token) => [fullTask(row), rowToken(token)]],
       patch: ['write', (id, fields) => [recordId(id), taskPatch(fields)]],
       remove: ['write', (id) => [recordId(id)]],
       // Usados pelas metas (fase 3): posição MAX + 1 e soltar os itens de uma meta excluída.
       maxSort: ['read', () => []],
+      maxSortExcept: ['read', (id) => [recordId(id)]],
       idsByGoal: ['read', (goalId) => [taskGoalKey(goalId)]],
       clearGoal: ['write', (ids) => [taskIdList(ids)]],
+      // Rotas de tarefas (fase 3, domínio 5): as consultas da rota antiga.
+      search: ['read', (query) => [taskSearchQuery(query)]],
+      all: ['read', () => []],
+      operational: ['read', () => []],
+      completedOn: ['read', (today) => [taskText(today)]],
+      missedSince: ['read', (since) => [taskText(since)]],
+      findOccurrence: ['read', (parentRef, date, exceptId) => [taskText(parentRef), taskText(date), taskText(exceptId)]],
+      hasOpenUpcoming: ['read', (parentRef, today) => [taskText(parentRef), taskText(today)]],
+      staleForRollover: ['read', (today) => [taskText(today)]],
+      // `UPDATE tasks SET sort_order = <posição> WHERE id = <id>` para cada [id, posição]; id que não existe não faz nada.
+      reorder: ['readwrite', (entries) => [taskPositions(entries)]],
     },
     weeklyReviews: {
       get: ['read', (id) => [recordId(id)]],

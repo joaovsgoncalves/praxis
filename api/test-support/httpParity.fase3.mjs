@@ -19,6 +19,7 @@ import { createStorage } from '../storage/index.js';
 import { createSqliteDriver } from '../storage/sqlite/driver.js';
 import { createFirestoreDriver } from '../storage/firestore/driver.js';
 import { createHabitsService, createHabitLogsService } from '../services/routine/habits.js';
+import { createTasksService } from '../services/routine/tasks.js';
 
 export { parityEngines, runParityScript } from './httpParity.mjs';
 
@@ -135,6 +136,15 @@ export function sqliteStorageFor(db, owner = OWNER) {
     /** Para rotas montadas direto no `app`: `app.use(inScope)` antes delas. */
     inScope: (req, res, next) => scope.run(owner, next),
   };
+}
+
+/** Serviço de tarefas sobre `storage`, com o que o contexto de rota dos testes já traz (`options` vence). */
+export function tasksServiceFor(storage, ctx, options = {}) {
+  return createTasksService({
+    storage, getLocalDateString: ctx.getLocalDateString, addDaysLocal: ctx.addDaysLocal, stripPriorityPrefix: ctx.stripPriorityPrefix,
+    SKIP_REASONS: ctx.SKIP_REASONS, enrichCategory: ctx.enrichCategory, taskNeedsCalendarSync: ctx.taskNeedsCalendarSync ?? null,
+    scheduleCalendarDrain: ctx.scheduleCalendarDrain, ...options,
+  });
 }
 
 /** Serviços de hábitos e registros sobre `storage`, com o que o contexto de rota dos testes já traz. */

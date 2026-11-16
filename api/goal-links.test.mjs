@@ -4,7 +4,7 @@ import express from 'express';
 import Database from 'better-sqlite3';
 import { createGoalsRouter } from './routes/goals.js';
 import { createGoalsService } from './services/routine/goals.js';
-import { habitServicesFor, sqliteStorageFor } from './test-support/httpParity.fase3.mjs';
+import { habitServicesFor, sqliteStorageFor, tasksServiceFor } from './test-support/httpParity.fase3.mjs';
 import { createTasksRouter } from './routes/tasks.js';
 import { createHabitsRouter } from './routes/habits.js';
 import { initializeDatabase } from './lib/dbInit.js';
@@ -12,13 +12,13 @@ import { repairOrphanGoalLinks } from './lib/goalLinks.js';
 import { buildRouteCtx, createTestDb, startTestServer } from './test-support/helpers.mjs';
 
 async function setup(t) {
-  const db = createTestDb();
+  const db = createTestDb({ withTaskRoutine: true });
   const app = express();
   app.use(express.json());
   const ctx = buildRouteCtx(db);
   const { storage, scoped } = sqliteStorageFor(db);
   app.use('/api/goals', scoped(createGoalsRouter({ goals: createGoalsService({ storage, getLocalDateString: ctx.getLocalDateString }) })));
-  app.use('/api/tasks', createTasksRouter(ctx));
+  app.use('/api/tasks', scoped(createTasksRouter({ tasks: tasksServiceFor(storage, ctx) })));
   app.use('/api/habits', scoped(createHabitsRouter(habitServicesFor(storage, ctx))));
   const server = await startTestServer(app);
   t.after(() => {
