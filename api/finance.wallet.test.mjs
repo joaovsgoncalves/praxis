@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
+import { sqliteTestStorage } from './test-support/httpParity.fase5.mjs';
 import { BRAND_COLOR_IDS, initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
 import { createTestDb, requestJson, startTestServer } from './test-support/helpers.mjs';
 import { BRAND_PALETTE, accountBrand, brandOptionsFor, contrastRatio } from '../src/lib/financeBrand.js';
@@ -18,7 +19,7 @@ async function mountFinance(t) {
   seedFinanceIfEmpty(db);
   const app = express();
   app.use(express.json());
-  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => '2026-08-12' }));
+  app.use('/api/finance', createFinanceRouter({ db, storage: sqliteTestStorage(db), getLocalDateString: () => '2026-08-12' }));
   const server = await startTestServer(app);
   t.after(() => {
     db.close();

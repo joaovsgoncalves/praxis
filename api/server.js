@@ -270,7 +270,7 @@ app.use('/api/purchases', createPurchasesRouter({ purchases }));
 app.use('/api/projects', createProjectsRouter({ projects: createProjectsService({ storage: storageRuntime.storage }), guidance: createGuidanceService({ storage: storageRuntime.storage }), getLocalDateString }));
 app.post('/api/finance/seed', legacyOnly('personal_seed', 'Dados de partida não existem para esta conta'));
 app.post('/api/finance/sync', legacyOnly('bank_not_linked', 'Banco não ligado a esta conta'));
-app.use('/api/finance', createFinanceRouter({ db, getLocalDateString }));
+app.use('/api/finance', createFinanceRouter({ db, getLocalDateString, storage: storageRuntime.storage }));
 registerCaptureRoutes(app, { db, apiDir: __dirname });
 app.use('/api/tasks', createTasksRouter({ tasks }));
 registerIdeaToTaskRoute(app, { tasks });

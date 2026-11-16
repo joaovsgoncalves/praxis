@@ -830,7 +830,7 @@ export function pjAccountIds(db) {
   return new Set(db.prepare("SELECT id FROM finance_accounts WHERE entity = 'pj'").all().map((r) => r.id));
 }
 
-function belongs(pj, accountId, entity) {
+export function belongs(pj, accountId, entity) {
   if (entity === 'all') return true;
   const isPj = accountId != null && pj.has(accountId);
   return entity === 'pj' ? isPj : !isPj;
@@ -1808,7 +1808,7 @@ export function nextSalaryDate(today, salaryDay = DEFAULT_SALARY_DAY) {
 }
 
 /** Datas em que o dia D do mês cai dentro de [from, to]. */
-function occurrencesInWindow(day, from, to) {
+export function occurrencesInWindow(day, from, to) {
   const [fy, fm] = from.split('-').map(Number);
   const out = [];
   for (let i = 0; i < 3; i += 1) {
@@ -1907,7 +1907,7 @@ function shortDate(ymd) {
  * (c) nada aperta: quanto dá pra gastar até o salário.
  * Fatura com mínimo pago nunca vira passo: rolar o resto foi decisão.
  */
-function buildNextStep({ livre, commitments, cardsStatus, today, salaryDate, safeToSpend }) {
+export function buildNextStep({ livre, commitments, cardsStatus, today, salaryDate, safeToSpend }) {
   const urgentCard = cardsStatus
     .filter((c) => c.account_status === 'active' && c.card_situation === 'min_open' && c.bill_due)
     .map((c) => ({ ...c, days: daysUntil(c.bill_due, today) }))

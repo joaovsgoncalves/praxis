@@ -124,3 +124,42 @@ export function sqliteLimit(value) {
   error.code = 'SQLITE_MISMATCH';
   throw error;
 }
+
+/**
+ * Afinidade REAL (fase 5, finanças; oráculo em `sqliteSemantics.real.test.mjs`): número vira ponto
+ * flutuante (-0 volta 0), texto numérico vira número, o resto do texto fica texto. Infinito, inteiro
+ * fora da faixa segura e texto com mais de 15 dígitos significativos são recusados.
+ */
+export function applyRealAffinity(value) {
+  if (value === null) return null;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw unsupported(`número ${value} em coluna REAL`);
+    if (Number.isInteger(value) && !Number.isSafeInteger(value)) throw unsupported(`inteiro ${value} fora da faixa segura`);
+    return value === 0 ? 0 : value;
+  }
+  if (typeof value === 'string') {
+    if (!NUMERIC_TEXT.test(value)) return value;
+    const trimmed = value.replace(TRIM, ''), number = Number(trimmed);
+    if (!Number.isFinite(number)) throw unsupported(`texto numérico ${trimmed} sem representação finita`);
+    if (significantDigits(trimmed) > 15) throw unsupported(`texto ${trimmed} com mais de 15 dígitos`);
+    return number === 0 ? 0 : number;
+  }
+  throw unsupported(`afinidade REAL com ${typeof value}`);
+}
+
+/** Como `sqliteRow`, aceitando também colunas REAL. */
+export function sqliteRowWithReal(columns, args) {
+  const bound = bindPositional(args, columns.length);
+  return Object.fromEntries(columns.map(([name, affinity], index) => [name,
+    affinity === 'REAL' ? applyRealAffinity(bound[index]) : applyAffinity(bound[index], affinity)]));
+}
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+/**
+ * Texto como volta numa leitura do SQLite (better-sqlite3): substituto UTF-16 solto é gravado como
+ * 3 bytes inválidos (ED xx xx) e lido como 3 U+FFFD. Outro motor grava já o texto lido, para a
+ * resposta sair igual (oráculo em `sqliteSemantics.real.test.mjs`).
+ */
+export function sqliteStoredText(value) {
+  return typeof value === 'string' ? value.replace(LONE_SURROGATE, '���') : value;
+}

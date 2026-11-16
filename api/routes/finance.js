@@ -1,47 +1,12 @@
 import { Router } from 'express';
+import { asyncRoute } from '../lib/asyncRoute.js';
+import { createFinanceCoreService } from '../services/finance/core.js';
+import { createFinanceRecordsService } from '../services/finance/records.js';
+import { createFinanceLedgerService } from '../services/finance/ledger.js';
+import { createFinanceReadsService } from '../services/finance/reads.js';
+import { createFinanceIngestService } from '../services/finance/ingest.js';
 import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
-import {
-  createAccount,
-  createBalance,
-  createDebt,
-  createGoal,
-  createInstallment,
-  createSubscription,
-  deleteInstallment,
-  deleteSubscription,
-  createTransactionOnce,
-  createFixedExpense,
-  deleteFixedExpense,
-  getInsights,
-  getMonthSummary,
-  getOverview,
-  getSettings,
-  lastSync,
-  listAccounts,
-  listBalances,
-  listBudgets,
-  listDebts,
-  listFixedExpenses,
-  listGoals,
-  listInstallments,
-  listSubscriptions,
-  listTransactions,
-  markFixedPaid,
-  payDebt,
-  saveBudgets,
-  updateFixedExpense,
-  seedFinanceIfEmpty,
-  updateAccount,
-  updateDebt,
-  updateGoal,
-  updateInstallment,
-  updateSettings,
-  updateSubscription,
-  updateTransaction,
-  listPendingTransactions,
-  getCoverageFor,
-} from '../finance.js';
-import { ingestPluggy } from '../pluggyIngest.js';
+import { seedFinanceIfEmpty, lastSync } from '../finance.js';
 import { syncPierre } from '../pierreSync.js';
 
 function sendError(res, err) {
@@ -56,214 +21,226 @@ function withIntentKey(req) {
   return header ? { ...body, intent_key: header } : body;
 }
 
-/** Finanças — mounted at /api/finance */
-export function createFinanceRouter({ db, getLocalDateString }) {
+/**
+ * Finanças — mounted at /api/finance.
+ * Migração (fase 5): configuração, contas e saldos (services/finance/core.js), cadastros — fixas,
+ * orçamento, assinaturas, parcelas, metas (services/finance/records.js) — e dívidas, baixas e lançamentos
+ * (services/finance/ledger.js) saem da camada assíncrona (`storage`); o resto ainda usa `db`. Envelope igual ao da rota antiga, congelada em
+ * test-support/oracles/financeRoutes.bcbadad.js para a prova de paridade.
+ */
+export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
+  if (!storage) throw new TypeError('createFinanceRouter: informe storage (camada assíncrona)');
+  const core = createFinanceCoreService({ storage, now });
+  const records = createFinanceRecordsService({ storage, now });
+  const ledger = createFinanceLedgerService({ storage, now });
+  const reads = createFinanceReadsService({ storage, now });
+  const ingest = createFinanceIngestService({ storage, now });
   const router = Router();
   installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
 
-  router.get('/overview', (req, res) => {
+  router.get('/overview', asyncRoute(async (req, res) => {
     try {
-      res.json(getOverview(db, { today: localToday() }));
+      res.json(await reads.getOverview({ today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/month', (req, res) => {
+  router.get('/month', asyncRoute(async (req, res) => {
     try {
-      res.json(getMonthSummary(db, { month: req.query.month, today: localToday(), entity: req.query.entity }));
+      res.json(await reads.getMonthSummary({ month: req.query.month, today: localToday(), entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/budgets', (_req, res) => {
-    res.json(listBudgets(db));
-  });
+  router.get('/budgets', asyncRoute(async (_req, res) => {
+    res.json(await records.listBudgets());
+  }));
 
-  router.put('/budgets', (req, res) => {
+  router.put('/budgets', asyncRoute(async (req, res) => {
     try {
-      res.json(saveBudgets(db, req.body));
+      res.json(await records.saveBudgets(req.body));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   // despesas fixas mensais (faculdade, carro, contador…) — entram no "pode gastar até o salário"
-  router.get('/fixed', (_req, res) => {
-    res.json(listFixedExpenses(db, { today: localToday() }));
-  });
+  router.get('/fixed', asyncRoute(async (_req, res) => {
+    res.json(await records.listFixedExpenses({ today: localToday() }));
+  }));
 
-  router.post('/fixed', (req, res) => {
+  router.post('/fixed', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createFixedExpense(db, req.body || {}, { today: localToday() }));
+      res.status(201).json(await records.createFixedExpense(req.body || {}, { today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/fixed/:id', (req, res) => {
+  router.patch('/fixed/:id', asyncRoute(async (req, res) => {
     try {
-      const row = updateFixedExpense(db, req.params.id, req.body || {}, { today: localToday() });
+      const row = await records.updateFixedExpense(req.params.id, req.body || {}, { today: localToday() });
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.delete('/fixed/:id', (req, res) => {
-    const row = deleteFixedExpense(db, req.params.id);
+  router.delete('/fixed/:id', asyncRoute(async (req, res) => {
+    const row = await records.deleteFixedExpense(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, id: row.id });
-  });
+  }));
 
-  router.post('/fixed/:id/paid', (req, res) => {
+  router.post('/fixed/:id/paid', asyncRoute(async (req, res) => {
     try {
-      const row = markFixedPaid(db, req.params.id, { month: req.body?.month, today: localToday() });
+      const row = await records.markFixedPaid(req.params.id, { month: req.body?.month, today: localToday() });
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.delete('/fixed/:id/paid', (req, res) => {
-    const row = markFixedPaid(db, req.params.id, { month: null, today: localToday() });
+  router.delete('/fixed/:id/paid', asyncRoute(async (req, res) => {
+    const row = await records.markFixedPaid(req.params.id, { month: null, today: localToday() });
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.get('/settings', (_req, res) => {
-    res.json(getSettings(db));
-  });
+  router.get('/settings', asyncRoute(async (_req, res) => {
+    res.json(await core.getSettings());
+  }));
 
-  router.patch('/settings', (req, res) => {
+  router.patch('/settings', asyncRoute(async (req, res) => {
     try {
-      res.json(updateSettings(db, req.body || {}));
+      res.json(await core.updateSettings(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/accounts', (req, res) => {
+  router.get('/accounts', asyncRoute(async (req, res) => {
     try {
-      res.json(listAccounts(db, { status: req.query.status, entity: req.query.entity }));
+      res.json(await core.listAccounts({ status: req.query.status, entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.post('/accounts', (req, res) => {
+  router.post('/accounts', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createAccount(db, req.body || {}));
+      res.status(201).json(await core.createAccount(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/accounts/:id', (req, res) => {
+  router.patch('/accounts/:id', asyncRoute(async (req, res) => {
     try {
-      const row = updateAccount(db, req.params.id, req.body || {});
+      const row = await core.updateAccount(req.params.id, req.body || {});
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/balances', (req, res) => {
-    res.json(listBalances(db, { account_id: req.query.account_id }));
-  });
+  router.get('/balances', asyncRoute(async (req, res) => {
+    res.json(await core.listBalances({ account_id: req.query.account_id }));
+  }));
 
-  router.post('/balances', (req, res) => {
+  router.post('/balances', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createBalance(db, req.body || {}));
+      res.status(201).json(await core.createBalance(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/debts', (req, res) => {
-    res.json(listDebts(db, { status: req.query.status }));
-  });
+  router.get('/debts', asyncRoute(async (req, res) => {
+    res.json(await ledger.listDebts({ status: req.query.status }));
+  }));
 
-  router.post('/debts', (req, res) => {
+  router.post('/debts', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createDebt(db, req.body || {}));
+      res.status(201).json(await ledger.createDebt(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/debts/:id', (req, res) => {
-    const row = updateDebt(db, req.params.id, req.body || {});
+  router.patch('/debts/:id', asyncRoute(async (req, res) => {
+    const row = await ledger.updateDebt(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.post('/debts/:id/pay', (req, res) => {
+  router.post('/debts/:id/pay', asyncRoute(async (req, res) => {
     try {
-      const row = payDebt(db, req.params.id, withIntentKey(req));
+      const row = await ledger.payDebt(req.params.id, withIntentKey(req));
       if (!row) return res.status(404).json({ error: 'Not found' });
       res.json(row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/subscriptions', (req, res) => {
-    res.json(listSubscriptions(db, { lane: req.query.lane, status: req.query.status }));
-  });
+  router.get('/subscriptions', asyncRoute(async (req, res) => {
+    res.json(await records.listSubscriptions({ lane: req.query.lane, status: req.query.status }));
+  }));
 
-  router.post('/subscriptions', (req, res) => {
+  router.post('/subscriptions', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createSubscription(db, req.body || {}));
+      res.status(201).json(await records.createSubscription(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/subscriptions/:id', (req, res) => {
-    const row = updateSubscription(db, req.params.id, req.body || {});
+  router.patch('/subscriptions/:id', asyncRoute(async (req, res) => {
+    const row = await records.updateSubscription(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.delete('/subscriptions/:id', (req, res) => {
-    const row = deleteSubscription(db, req.params.id);
+  router.delete('/subscriptions/:id', asyncRoute(async (req, res) => {
+    const row = await records.deleteSubscription(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, id: row.id });
-  });
+  }));
 
-  router.get('/installments', (req, res) => {
-    res.json(listInstallments(db, { status: req.query.status }));
-  });
+  router.get('/installments', asyncRoute(async (req, res) => {
+    res.json(await records.listInstallments({ status: req.query.status }));
+  }));
 
-  router.post('/installments', (req, res) => {
+  router.post('/installments', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createInstallment(db, req.body || {}));
+      res.status(201).json(await records.createInstallment(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/installments/:id', (req, res) => {
-    const row = updateInstallment(db, req.params.id, req.body || {});
+  router.patch('/installments/:id', asyncRoute(async (req, res) => {
+    const row = await records.updateInstallment(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.delete('/installments/:id', (req, res) => {
-    const row = deleteInstallment(db, req.params.id);
+  router.delete('/installments/:id', asyncRoute(async (req, res) => {
+    const row = await records.deleteInstallment(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, id: row.id });
-  });
+  }));
 
-  router.get('/transactions', (req, res) => {
+  router.get('/transactions', asyncRoute(async (req, res) => {
     try {
-      res.json(listTransactions(db, {
+      res.json(await ledger.listTransactions({
         from: req.query.from,
         to: req.query.to,
         account_id: req.query.account_id,
@@ -275,50 +252,50 @@ export function createFinanceRouter({ db, getLocalDateString }) {
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.post('/transactions', (req, res) => {
+  router.post('/transactions', asyncRoute(async (req, res) => {
     try {
       const body = withIntentKey(req);
-      const { row, replayed } = createTransactionOnce(db, { ...body, posted_on: body.posted_on ?? localToday() });
+      const { row, replayed } = await ledger.createTransactionOnce({ ...body, posted_on: body.posted_on ?? localToday() });
       // reenvio da mesma intenção: devolve o primeiro lançamento, sem criar outro
       res.status(replayed ? 200 : 201).json(replayed ? { ...row, replayed: true } : row);
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/transactions/:id', (req, res) => {
-    const row = updateTransaction(db, req.params.id, req.body || {});
+  router.patch('/transactions/:id', asyncRoute(async (req, res) => {
+    const row = await ledger.updateTransaction(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
-  router.get('/insights', (req, res) => {
+  router.get('/insights', asyncRoute(async (req, res) => {
     try {
-      res.json(getInsights(db, { from: req.query.from, to: req.query.to, entity: req.query.entity, today: localToday() }));
+      res.json(await reads.getInsights({ from: req.query.from, to: req.query.to, entity: req.query.entity, today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/goals', (_req, res) => {
-    res.json(listGoals(db));
-  });
+  router.get('/goals', asyncRoute(async (_req, res) => {
+    res.json(await records.listGoals());
+  }));
 
-  router.post('/goals', (req, res) => {
+  router.post('/goals', asyncRoute(async (req, res) => {
     try {
-      res.status(201).json(createGoal(db, req.body || {}));
+      res.status(201).json(await records.createGoal(req.body || {}));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.patch('/goals/:id', (req, res) => {
-    const row = updateGoal(db, req.params.id, req.body || {});
+  router.patch('/goals/:id', asyncRoute(async (req, res) => {
+    const row = await records.updateGoal(req.params.id, req.body || {});
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
-  });
+  }));
 
   router.post('/seed', (req, res) => {
     const result = seedFinanceIfEmpty(db, { force: Boolean(req.body?.force) });
@@ -326,34 +303,34 @@ export function createFinanceRouter({ db, getLocalDateString }) {
   });
 
   // Midas manda o JSON normalizado do Pluggy de hora em hora
-  router.post('/ingest/pluggy', (req, res) => {
+  router.post('/ingest/pluggy', asyncRoute(async (req, res) => {
     try {
-      res.json(ingestPluggy(db, req.body, { today: localToday() }));
+      res.json(await ingest.ingestPluggy(req.body, { today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   /** O que se sabe do extrato no período (separado da data do saldo); PF por padrão, como mês e insights. */
-  router.get('/coverage', (req, res) => {
+  router.get('/coverage', asyncRoute(async (req, res) => {
     try {
-      res.json(getCoverageFor(db, { from: req.query.from, to: req.query.to, today: localToday(), entity: req.query.entity }));
+      res.json(await reads.getCoverageFor({ from: req.query.from, to: req.query.to, today: localToday(), entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/pending', (_req, res) => {
+  router.get('/pending', asyncRoute(async (_req, res) => {
     try {
-      res.json({ pending: listPendingTransactions(db) });
+      res.json({ pending: await reads.listPending() });
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/sync/last', (_req, res) => {
-    res.json(lastSync(db) || { ok: false, error: 'never' });
-  });
+  router.get('/sync/last', asyncRoute(async (_req, res) => {
+    res.json(await reads.lastSync() || { ok: false, error: 'never' });
+  }));
 
   router.post('/sync', async (req, res) => {
     try {

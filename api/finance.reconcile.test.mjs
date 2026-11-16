@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import express from 'express';
 import { createFinanceRouter } from './routes/finance.js';
+import { sqliteTestStorage } from './test-support/httpParity.fase5.mjs';
 import { createTransaction, getOverview, initFinanceSchema, seedFinanceIfEmpty } from './finance.js';
 import { diffTotals, financeTotals, toCents } from './lib/financeReconcile.js';
 import { ingestPluggy } from './pluggyIngest.js';
@@ -146,7 +147,7 @@ test('subir a migração de novo e reenviar a mesma baixa não mexem em nenhum t
   const db = seeded(t);
   const app = express();
   app.use(express.json());
-  app.use('/api/finance', createFinanceRouter({ db, getLocalDateString: () => '2026-08-12' }));
+  app.use('/api/finance', createFinanceRouter({ db, storage: sqliteTestStorage(db), getLocalDateString: () => '2026-08-12' }));
   const server = await startTestServer(app);
   t.after(() => server.close());
   const pay = (intent) => fetch(`${server.base}/api/finance/debts/debt-carro/pay`, {
