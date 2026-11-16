@@ -25,6 +25,13 @@ export function transactionRangeQuery(input) {
   return { from, to, accountId: textOrNull(input.accountId ?? null), category: textOrNull(input.category ?? null), like: textOrNull(input.like ?? null), entity, limit };
 }
 
+/** Período aberto nas pontas (`null` = sem limite); só texto. */
+export function transactionPeriodQuery(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new StorageError('invalid_transaction_query');
+  for (const key of Object.keys(input)) if (!['from', 'to'].includes(key)) throw new StorageError('invalid_transaction_query');
+  return { from: textOrNull(input.from ?? null), to: textOrNull(input.to ?? null) };
+}
+
 /** Lançamentos: tabela genérica + extrato e busca pela baixa. Mesmas consultas da rota antiga. */
 export function sqliteFinanceTransactions(db) {
   const base = sqliteFinanceTable(DEF)(db);
@@ -32,6 +39,18 @@ export function sqliteFinanceTransactions(db) {
     ...base,
     async byPayment(paymentId) {
       return db.prepare('SELECT * FROM finance_transactions WHERE payment_id = ?').get(paymentId) ?? null;
+    },
+    /**
+     * Todas as linhas do período (casadas incluídas), na ordem em que o SQLite varre o índice de `posted_on`
+     * sem ORDER BY: data crescente e, no empate, ordem de inserção. As leituras compostas somam nessa ordem.
+     */
+    async between({ from, to }) {
+      let sql = 'SELECT * FROM finance_transactions WHERE 1=1';
+      const params = [];
+      if (from !== null) { sql += ' AND posted_on >= ?'; params.push(from); }
+      if (to !== null) { sql += ' AND posted_on <= ?'; params.push(to); }
+      if (from !== null || to !== null) return db.prepare(sql).all(...params);
+      return db.prepare('SELECT * FROM finance_transactions ORDER BY posted_on ASC, rowid ASC').all();
     },
     async range({ from, to, accountId, category, like, entity, limit }) {
       let sql = 'SELECT * FROM finance_transactions WHERE posted_on >= ? AND posted_on <= ? AND matched_tx_id IS NULL';

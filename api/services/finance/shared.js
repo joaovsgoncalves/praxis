@@ -80,3 +80,10 @@ export function boundUpdate(columns, values, id, coalesce = []) {
   for (const column of coalesce) if (row[column] === null) delete row[column];
   return row;
 }
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** `YYYY-MM` válido ou 400 (`campo: use YYYY-MM`). */
+export function parseMonth(value, field = 'month') {
+  if (typeof value !== 'string' || !MONTH_RE.test(value)) throw badRequest(`${field}: use YYYY-MM`);
+  return value;
+}

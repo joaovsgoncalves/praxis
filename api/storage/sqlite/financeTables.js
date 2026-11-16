@@ -96,6 +96,37 @@ export const FINANCE_GENERIC_TABLES = Object.freeze({
     order: [{ col: 'queue' }, { col: 'balance', desc: true }],
     filters: ['status'],
   }),
+  // Domínio 4: o que o ingest do banco grava e as leituras compostas consomem.
+  financePendingTransactions: Object.freeze({
+    table: 'finance_pending_transactions',
+    key: 'external_id',
+    columns: [text('external_id'), text('institution'), text('account_id'), text('posted_on'), real('amount'), text('raw_description'), text('merchant'), text('category'), text('seen_at')],
+    money: ['amount'], notNull: ['external_id', 'institution', 'posted_on', 'amount'],
+    order: [{ col: 'posted_on', desc: true }, { col: 'external_id' }],
+    filters: [],
+  }),
+  financeCardStatus: Object.freeze({
+    table: 'finance_card_status',
+    key: 'account_id',
+    columns: [text('account_id'), text('institution'), text('last4'), text('brand'), real('used'), real('limit_total'), real('limit_available'), real('bill_total'), real('bill_minimum'), real('bill_paid'), real('bill_remaining'), text('bill_due'), text('bill_closing'), text('bank_updated_at'), text('updated_at'), text('source'), real('bill_paid_manual')],
+    money: ['used', 'limit_total', 'limit_available', 'bill_total', 'bill_minimum', 'bill_paid', 'bill_remaining', 'bill_paid_manual'], notNull: ['account_id', 'institution'],
+    order: [{ col: 'bill_due', isNull: true }, { col: 'bill_due' }, { col: 'institution' }],
+    filters: [],
+  }),
+  financeStatementCoverage: Object.freeze({
+    table: 'finance_statement_coverage',
+    columns: [text('id'), text('account_id'), text('source'), text('covered_from'), text('covered_to'), text('recorded_at')],
+    money: [], notNull: ['id', 'account_id', 'source', 'covered_from', 'covered_to', 'recorded_at'],
+    order: [{ col: 'covered_from' }],
+    filters: ['account_id'],
+  }),
+  financeSyncLog: Object.freeze({
+    table: 'finance_sync_log',
+    columns: [text('id'), text('started_at'), text('finished_at'), int('ok'), int('accounts_n'), int('tx_n'), text('error'), text('actor')],
+    money: [], notNull: ['id'],
+    order: [],
+    filters: [],
+  }),
   financePayments: Object.freeze({
     table: 'finance_payments',
     columns: [text('id'), text('debt_id'), text('account_id'), real('amount'), text('paid_on'), text('method'), int('confirmed'), text('note'), text('created_at'), text('intent_key')],

@@ -11,8 +11,10 @@ import { StorageError, recordId } from '../contract.js';
 import { FINANCE_TABLES, FINANCE_GENERIC_TABLES, financeRow, financePatch, optionalText } from '../sqlite/financeTables.js';
 import { sqliteFinanceTable } from '../sqlite/financeTable.js';
 import { firestoreFinanceTable } from '../firestore/financeTable.js';
-import { sqliteFinanceTransactions, transactionRangeQuery } from '../sqlite/financeTransactions.js';
+import { sqliteFinanceTransactions, transactionRangeQuery, transactionPeriodQuery } from '../sqlite/financeTransactions.js';
 import { firestoreFinanceTransactions } from '../firestore/financeTransactions.js';
+import { sqliteFinanceSyncLog, syncLogQuery } from '../sqlite/financeSyncLog.js';
+import { firestoreFinanceSyncLog } from '../firestore/financeSyncLog.js';
 import { sqliteFinanceSettings, sqliteFinanceAccounts, sqliteFinanceBalances } from '../sqlite/financeCore.js';
 import { firestoreFinanceSettings, firestoreFinanceAccounts, firestoreFinanceBalances } from '../firestore/financeCore.js';
 
@@ -101,6 +103,7 @@ export const DOMAINS = [
         if (limit !== null && (!Number.isSafeInteger(limit) || limit < 0)) throw new StorageError('invalid_balance_query');
         return [{ accountId: optionalText(query.accountId ?? null, 'invalid_balance_query'), limit }];
       }],
+      bank: ['read', none],
       create: ['write', (row) => [financeRow(T.financeBalances, row)]],
     }),
     sqlite: sqliteFinanceBalances,
@@ -114,10 +117,20 @@ export const DOMAINS = [
   tableDomain('financeBudgets', ['list', 'upsert', 'remove']),
   // Domínio 3: dívidas, baixas e lançamentos (criação, extrato, busca pela baixa e por chave única).
   tableDomain('financeDebts', ['reserve', 'get', 'list', 'create', 'patch']),
-  tableDomain('financePayments', ['reserve', 'get', 'findUnique', 'clash', 'create']),
-  tableDomain('financeTransactions', ['reserve', 'get', 'list', 'range', 'byPayment', 'findUnique', 'clash', 'create', 'patch'], {
+  tableDomain('financePayments', ['reserve', 'get', 'list', 'findUnique', 'clash', 'create']),
+  // Domínio 4: leituras compostas (o ingest do banco grava; escritas do ingest entram no domínio 5).
+  tableDomain('financePendingTransactions', ['reserve', 'get', 'list', 'create']),
+  tableDomain('financeCardStatus', ['reserve', 'get', 'list', 'create']),
+  tableDomain('financeStatementCoverage', ['reserve', 'get', 'list', 'create']),
+  tableDomain('financeSyncLog', ['reserve', 'get', 'latest', 'create'], {
+    extra: { latest: ['read', (query) => [syncLogQuery(query)]] },
+    sqliteMake: sqliteFinanceSyncLog,
+    firestoreMake: firestoreFinanceSyncLog,
+  }),
+  tableDomain('financeTransactions', ['reserve', 'get', 'list', 'range', 'between', 'byPayment', 'findUnique', 'clash', 'create', 'patch'], {
     extra: {
       range: ['read', (query) => [transactionRangeQuery(query)]],
+      between: ['read', (query) => [transactionPeriodQuery(query)]],
       byPayment: ['read', (paymentId) => [recordId(paymentId)]],
     },
     sqliteMake: sqliteFinanceTransactions,

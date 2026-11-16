@@ -3,16 +3,9 @@ import { asyncRoute } from '../lib/asyncRoute.js';
 import { createFinanceCoreService } from '../services/finance/core.js';
 import { createFinanceRecordsService } from '../services/finance/records.js';
 import { createFinanceLedgerService } from '../services/finance/ledger.js';
+import { createFinanceReadsService } from '../services/finance/reads.js';
 import { installFixedConfirmationRoutes } from '../finance.fixed-confirmation.candidate.mjs';
-import {
-  getInsights,
-  getMonthSummary,
-  getOverview,
-  lastSync,
-  seedFinanceIfEmpty,
-  listPendingTransactions,
-  getCoverageFor,
-} from '../finance.js';
+import { seedFinanceIfEmpty, lastSync } from '../finance.js';
 import { ingestPluggy } from '../pluggyIngest.js';
 import { syncPierre } from '../pierreSync.js';
 
@@ -40,25 +33,26 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
   const core = createFinanceCoreService({ storage, now });
   const records = createFinanceRecordsService({ storage, now });
   const ledger = createFinanceLedgerService({ storage, now });
+  const reads = createFinanceReadsService({ storage, now });
   const router = Router();
   installFixedConfirmationRoutes(router, db);
   const localToday = () => (typeof getLocalDateString === 'function' ? getLocalDateString() : undefined);
 
-  router.get('/overview', (req, res) => {
+  router.get('/overview', asyncRoute(async (req, res) => {
     try {
-      res.json(getOverview(db, { today: localToday() }));
+      res.json(await reads.getOverview({ today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/month', (req, res) => {
+  router.get('/month', asyncRoute(async (req, res) => {
     try {
-      res.json(getMonthSummary(db, { month: req.query.month, today: localToday(), entity: req.query.entity }));
+      res.json(await reads.getMonthSummary({ month: req.query.month, today: localToday(), entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   router.get('/budgets', asyncRoute(async (_req, res) => {
     res.json(await records.listBudgets());
@@ -276,13 +270,13 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
     res.json(row);
   }));
 
-  router.get('/insights', (req, res) => {
+  router.get('/insights', asyncRoute(async (req, res) => {
     try {
-      res.json(getInsights(db, { from: req.query.from, to: req.query.to, entity: req.query.entity, today: localToday() }));
+      res.json(await reads.getInsights({ from: req.query.from, to: req.query.to, entity: req.query.entity, today: localToday() }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
   router.get('/goals', asyncRoute(async (_req, res) => {
     res.json(await records.listGoals());
@@ -317,25 +311,25 @@ export function createFinanceRouter({ db, getLocalDateString, storage, now }) {
   });
 
   /** O que se sabe do extrato no período (separado da data do saldo); PF por padrão, como mês e insights. */
-  router.get('/coverage', (req, res) => {
+  router.get('/coverage', asyncRoute(async (req, res) => {
     try {
-      res.json(getCoverageFor(db, { from: req.query.from, to: req.query.to, today: localToday(), entity: req.query.entity }));
+      res.json(await reads.getCoverageFor({ from: req.query.from, to: req.query.to, today: localToday(), entity: req.query.entity }));
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/pending', (_req, res) => {
+  router.get('/pending', asyncRoute(async (_req, res) => {
     try {
-      res.json({ pending: listPendingTransactions(db) });
+      res.json({ pending: await reads.listPending() });
     } catch (err) {
       sendError(res, err);
     }
-  });
+  }));
 
-  router.get('/sync/last', (_req, res) => {
-    res.json(lastSync(db) || { ok: false, error: 'never' });
-  });
+  router.get('/sync/last', asyncRoute(async (_req, res) => {
+    res.json(await reads.lastSync() || { ok: false, error: 'never' });
+  }));
 
   router.post('/sync', async (req, res) => {
     try {

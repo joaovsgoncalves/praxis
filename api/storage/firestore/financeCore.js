@@ -128,6 +128,10 @@ export function firestoreFinanceBalances(userDoc, transaction, client) {
       const sorted = sortRows(rows, (a, b) => compareSqlite(b.as_of, a.as_of) || compareSqlite(b.created_at, a.created_at));
       return limit === null ? sorted : sorted.slice(0, limit);
     },
+    async bank() {
+      const rows = await t.all(col.where('source', 'in', ['pierre', 'pluggy']));
+      return rows.sort((a, b) => a.seq - b.seq).map(({ row }) => row);
+    },
     create: t.create,
   };
 }

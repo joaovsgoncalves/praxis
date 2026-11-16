@@ -32,14 +32,14 @@ export function initCoverageSchema(db) {
   `);
 }
 
-function isYmd(value) {
+export function isYmd(value) {
   if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
-function addDays(ymd, days) {
+export function addDays(ymd, days) {
   const [y, m, d] = ymd.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d + days, 12)).toISOString().slice(0, 10);
 }
@@ -50,7 +50,7 @@ export function daysBetween(a, b) {
   return Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000) + 1;
 }
 
-function todayFortaleza() {
+export function todayFortaleza() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date());
 }
 
@@ -87,7 +87,7 @@ export function recordStatementCoverage(db, { accountId, source, from, to, at } 
 }
 
 /** Soma os dias de [from, to] cobertos pela união das janelas. */
-function coveredDays(windows, from, to) {
+export function coveredDays(windows, from, to) {
   const clipped = windows
     .map((w) => ({ from: w.covered_from < from ? from : w.covered_from, to: w.covered_to > to ? to : w.covered_to }))
     .filter((w) => w.to >= w.from)

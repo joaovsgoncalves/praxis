@@ -76,6 +76,8 @@ export function sqliteFinanceBalances(db) {
       if (limit !== null) { sql += ' LIMIT ?'; params.push(limit); }
       return db.prepare(sql).all(...params);
     },
+    /** Saldos que vieram de banco (Pierre ou Pluggy), em ordem de inserção: o serviço escolhe o mais recente. */
+    async bank() { return db.prepare("SELECT * FROM finance_balances WHERE source IN ('pierre', 'pluggy') ORDER BY rowid ASC").all(); },
     async create(row) { slots.take(); return insert(db, def, row); },
   };
 }
