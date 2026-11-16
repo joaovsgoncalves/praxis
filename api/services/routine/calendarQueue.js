@@ -105,3 +105,16 @@ export function createAsyncTaskCalendarQueue({ storage, syncTaskToCalendar, now 
   }
   return { drain, stats, idle: () => draining ?? Promise.resolve() };
 }
+
+/** A espera pela fila SQLite pode tornar o retrato antigo obsoleto. Relê sem await, já fora
+ * de qualquer transação, imediatamente antes da chamada legada (que é síncrona).
+ */
+export function createCoordinatedCalendarSync({ runLegacy, readTask, syncTaskToCalendar }) {
+  return (snapshot) => runLegacy(() => {
+    const current = readTask(snapshot.id);
+    if (current) return syncTaskToCalendar(current);
+    // Retrato de exclusão: limpar o evento já conhecido. Retrato antigo de criação: não criar órfão.
+    if (snapshot.status === 'cancelled') return syncTaskToCalendar(snapshot);
+    return { skipped: true, reason: 'task removed before calendar delivery' };
+  });
+}

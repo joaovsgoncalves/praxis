@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { makeParityApp, parityEngines } from './test-support/httpParity.fase3.mjs';
 import { createTaskCalendarQueue as oracleQueue } from './test-support/oracles/taskCalendarQueue.bcbadad.js';
-import { createAsyncTaskCalendarQueue } from './services/routine/calendarQueue.js';
+import { createAsyncTaskCalendarQueue, createCoordinatedCalendarSync } from './services/routine/calendarQueue.js';
 import { taskRow } from './storage/contract.js';
 import { createTasksService } from './services/routine/tasks.js';
 import { buildRouteCtx } from './test-support/helpers.mjs';
@@ -119,3 +119,13 @@ for (const kind of parityEngines()) {
     });
   });
 }
+
+test('agenda revalida após esperar conexão: tarefa apagada não cria evento órfão e exclusão com evento ainda limpa', async()=>{
+ let run, current={id:'gone',title:'antes',status:'pending'};
+ const pending = [];
+ const sync = createCoordinatedCalendarSync({ runLegacy:(callback)=>new Promise(resolve=>{run=()=>resolve(callback());}), readTask:()=>current, syncTaskToCalendar:(row)=>{pending.push(row);return {action:row.status==='cancelled'?'deleted':'created'};} });
+ const first=sync(current);current=null;run();
+ assert.equal((await first).skipped,true);assert.equal(pending.length,0);
+ const cleanup=sync({id:'gone',status:'cancelled',calendar_event_id:'event'});run();
+ assert.equal((await cleanup).action,'deleted');assert.equal(pending.length,1);
+});

@@ -36,3 +36,11 @@ for(const kind of parityEngines()){
   });
  });
 }
+
+test('sqlite: ingest mantém limite contratual de 2000 lançamentos em uma transação', async(t)=>{
+ const app=await fixture('sqlite',t),service=createFinanceIngestService({storage:app.storage,now});
+ const body=payload();body.transactions=Array.from({length:2000},(_,i)=>({...body.transactions[0],external_id:`large-${i}`}));
+ assert.equal((await app.as(()=>service.ingestPluggy(body))).ok,true);
+ const rows=await app.as(()=>app.storage.financeTransactions.byExternalIds(body.transactions.map(r=>r.external_id)));
+ assert.equal(rows.length,2000);assert.equal(new Set(rows.map(r=>r.external_id)).size,2000);
+});

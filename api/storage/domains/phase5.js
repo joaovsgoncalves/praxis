@@ -23,7 +23,7 @@ import { firestoreFinanceSettings, firestoreFinanceAccounts, firestoreFinanceBal
 const T = FINANCE_TABLES;
 const none = () => [];
 function count(value = 1) {
-  if (!Number.isSafeInteger(value) || value < 1 || value > 500) throw new StorageError('invalid_reservation');
+  if (!Number.isSafeInteger(value) || value < 1 || value > 2000) throw new StorageError('invalid_reservation');
   return [value];
 }
 function plainQuery(input, keys, code) {
