@@ -1,4 +1,6 @@
-# Fase 2: onde estamos
+# Fase 2: histórico até a fatia de compras
+
+**Estado atual (16/11):** a entrega integrada foi publicada em SQLite. Consulte `RELEASE-PHASES345.md` e `evidence/release-phases345.json`. As contagens e pendências abaixo são o retrato anterior, não o estado atual.
 
 Atualizado em 15/11/2026. Branch local `ana/migracao-firebase-f2`, último código em `9f0010e`. Sem push, sem deploy, produção intacta (`bcbadad`, SQLite).
 
