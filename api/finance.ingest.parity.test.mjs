@@ -267,3 +267,23 @@ test('finanças ingest: carga grande (300 lançamentos novos em vários commits)
     for (let i = 0; i < steps.length; i += 1) assert.deepEqual(actual[i], expected[i], `${kind}, passo ${i}: ${expected[i].step}`);
   }
 });
+
+test('finanças ingest: o mesmo corpo em pedidos simultâneos grava cada lançamento uma vez só', { timeout: 300000 }, async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const list = Array.from({ length: 25 }, (_, i) => tx(`C-${i}`, { date: `2026-11-${String(1 + (i % 10)).padStart(2, '0')}`, amount: -(5 + i), description: `LOJA ${i}` }));
+  const body = { source: 'pluggy', institutions: [inter()], transactions: list, pending_institutions: ['inter'], pending_transactions: [tx('CP-1', { amount: -3, date: '2026-11-14' })] };
+  for (const kind of ['oracle', ...parityEngines()]) {
+    const app = await makeFinanceParityApp(kind, setup);
+    t.after(app.dispose);
+    await runFinanceScript(app, before().slice(0, 12));
+    const send = () => fetch(app.base + INGEST, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (res) => ({ status: res.status, body: await res.json() }));
+    const results = await Promise.all(Array.from({ length: 4 }, send));
+    assert.deepEqual(results.map((r) => r.status), [200, 200, 200, 200], `${kind}: ${JSON.stringify(results.map((r) => r.body))}`);
+    assert.equal(results.reduce((s, r) => s + r.body.transactions.inserted, 0), 25, `${kind}: cada lançamento entrou uma vez`);
+    assert.equal(results.reduce((s, r) => s + r.body.transactions.duplicates, 0), 75, `${kind}: o resto é repetido`);
+    const [rows] = await runFinanceScript(app, [['GET', '/transactions?from=2020-01-01&to=2030-01-01&limit=1000']]);
+    assert.equal(JSON.parse(rows.body).length, 25, `${kind}: 25 lançamentos`);
+    const [logRow] = await runFinanceScript(app, [['GET', '/sync/last']]);
+    assert.equal(JSON.parse(logRow.body).actor, 'midas');
+  }
+});
